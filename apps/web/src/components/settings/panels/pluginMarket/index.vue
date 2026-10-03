@@ -2,17 +2,10 @@
   <div class="pluginMarket">
     <div class="marketToolbar">
       <nav class="marketNav" aria-label="插件列表">
-        <button class="navButton" type="button" :aria-pressed="isMarketTab" @click="activeTab = 'discover'">发现插件</button>
         <button class="navButton" type="button" :aria-pressed="activeTab === 'installed'" @click="activeTab = 'installed'">已安装</button>
         <button class="navButton" type="button" :aria-pressed="activeTab === 'ffmpeg'" @click="activeTab = 'ffmpeg'">FFmpeg</button>
       </nav>
       <div class="marketActions">
-        <el-button tag="a" href="https://api.toonflow.net/console/plugIn" target="_blank" rel="noopener noreferrer" size="small" text :icon="IconExternalLink">
-          网页版市场
-        </el-button>
-        <el-button tag="a" href="https://qcn7xdsqgc4z.feishu.cn/docx/KNBNd9naqolsy6xjAOCcEAkqnRd" target="_blank" rel="noopener noreferrer" size="small" text :icon="IconBook">
-          开发者文档
-        </el-button>
         <template v-if="activeTab === 'installed'">
           <el-button size="small" type="primary" :icon="IconUpload" :loading="installing" aria-label="安装本地插件" @click="pluginFileInput?.click()">
             安装插件
@@ -57,23 +50,6 @@
       <template v-if="activeTab === 'installed'">
         <el-alert v-for="message in visibleLoadErrors" :key="message" class="loadError" :title="message" type="error" :closable="false" showIcon />
       </template>
-      <el-card v-else-if="marketNeedsKey" class="marketKey" shadow="never">
-        <el-text size="small">{{ marketError }}</el-text>
-        <form class="keyForm" @submit.prevent="saveMarketKey">
-          <el-input
-            v-model="draftKey"
-            type="password"
-            showPassword
-            autocomplete="off"
-            :maxlength="8192"
-            placeholder="填写 TF-Router API Key"
-            aria-label="TF-Router API Key"
-            :disabled="savingKey" />
-          <el-button type="primary" nativeType="submit" :loading="savingKey" :disabled="!draftKey.trim()">保存并继续</el-button>
-        </form>
-        <el-text v-if="keyError" type="danger" size="small" role="alert">{{ keyError }}</el-text>
-        <el-link href="https://api.toonflow.net/" target="_blank" rel="noopener noreferrer" type="primary">前往 TF-Router 获取 API Key</el-link>
-      </el-card>
       <el-alert v-else-if="marketError" class="loadError" :title="marketError" type="error" :closable="false" showIcon>
         <el-button size="small" @click="marketRefreshKey++">重试</el-button>
       </el-alert>
@@ -322,7 +298,7 @@ const pluginTypes = {
   agent: { label: "Agent", path: agentMarketEnabled ? "agents" : null, icon: IconSparkles2, tagType: "danger" },
 } as const;
 const tabs = { get discover() { return translate("发现插件"); }, get installed() { return translate("已安装"); }, ffmpeg: "FFmpeg" } as const;
-const activeTab = ref<keyof typeof tabs>("discover");
+const activeTab = ref<keyof typeof tabs>("installed");
 const isMarketTab = computed(() => activeTab.value === "discover");
 const marketPage = ref(1);
 const marketPageSize = 20;

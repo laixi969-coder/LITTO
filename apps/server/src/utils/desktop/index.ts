@@ -4,10 +4,8 @@ import type { Request } from "express";
 import conf from "@/utils/conf";
 import type { DesktopRuntime, desktopUpdateAttempt, updateSnapshot } from "@/types/desktop";
 
-const updateBaseUrls = {
-  official: "https://api.toonflow.net/web/version/desktopUpdates",
-  github: "https://github.com/HBAI-Ltd/Toonflow-app/releases/latest/download",
-};
+// LITTO has no update service: the update check below never touches the network, so these are intentionally empty.
+const updateBaseUrls = { official: "", github: "" };
 const updateRuntimeId = crypto.randomUUID();
 let cancelledUpdateAttempt: string | undefined;
 
@@ -59,7 +57,7 @@ function getInstallFailure(local: Awaited<ReturnType<DesktopRuntime["updater"]["
     currentVersion: local.version,
     currentHash: local.hash,
     message,
-    downloadUrl: "https://github.com/HBAI-Ltd/Toonflow-app/releases/latest",
+    downloadUrl: "",
   };
 }
 
@@ -162,26 +160,12 @@ export async function getDesktopUpdate(req: Request): Promise<updateSnapshot> {
 }
 
 export async function checkDesktopUpdate(req: Request): Promise<void> {
-  const { updater } = getDesktopRuntime(req);
   const state = getDesktopState(req);
   if (state.checkingUpdate || state.downloadingUpdate || state.applyingUpdate)
     throw Object.assign(new Error("更新操作正在执行，请稍后再试。"), { status: 409 });
-  state.checkingUpdate = true;
+  // LITTO: update checking is disabled (no update server). Report "no update" without any network call.
   state.updateError = "";
-  const updateBaseUrl = getUpdateBaseUrl();
   state.checkedBaseUrl = undefined;
-  state.lastBaseUrl = updateBaseUrl;
-  try {
-    state.updateError = (await withUpdateSource(updater, updateBaseUrl, () => updater.checkForUpdate())).error || "";
-    if (!state.updateError) {
-      await assertUpdateVersion(updater, state);
-      state.checkedBaseUrl = updateBaseUrl;
-    }
-  } catch (error) {
-    state.updateError = String(error);
-  } finally {
-    state.checkingUpdate = false;
-  }
 }
 
 export async function downloadDesktopUpdate(req: Request): Promise<void> {

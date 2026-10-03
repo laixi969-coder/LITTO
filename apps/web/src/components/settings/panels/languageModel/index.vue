@@ -14,7 +14,6 @@
             <el-text class="providerId" size="small" type="info" :title="item.id">{{ item.id }}</el-text>
           </div>
         </div>
-        <tfAccount v-if="isTfRouterProvider(item)" :apiKey="typeof item.apiKey === 'string' ? item.apiKey : ''" :visible="visible" :modelProvider="item" :saveApiKey="(key, models) => saveProviderApiKey(item.id, key, models)" />
         <div class="providerFooter">
           <div class="providerMeta">
             <el-tag v-if="getProviderVersion(item)" size="small" type="info" effect="plain">v{{ getProviderVersion(item) }}</el-tag>
@@ -47,7 +46,6 @@ import { customProviders, saveSettings, type CustomProvider, type CustomProvider
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
 import logoUrl from "@toonflow/assets/logo.svg";
-import tfAccount from "../../tfAccount.vue";
 import { isTfRouterProvider } from "@/lib/tf";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();

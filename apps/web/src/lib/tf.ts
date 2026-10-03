@@ -1,5 +1,4 @@
 import axios from "axios";
-import { customProviders, settings } from "@/stores/settings";
 
 type TfRequestOptions = { apiKey?: string; signal?: AbortSignal };
 
@@ -48,19 +47,16 @@ type TfPluginParams = {
   searchKeyword?: string;
 };
 
-export function isTfRouterProvider(provider: { id: string; apiUrl: string }) {
-  return provider.id.toLowerCase() === "tfrouter" && URL.canParse(provider.apiUrl)
-    && new URL(provider.apiUrl).origin === "https://api.toonflow.net";
+// LITTO has no dependency on the LITTO TF-Router service: no provider counts as TF-Router, no key is read,
+// and the client below fails locally for every call (nothing leaves the machine).
+export function isTfRouterProvider(_provider: { id: string; apiUrl: string }) {
+  return false;
 }
 
-const client = axios.create({ baseURL: "https://api.toonflow.net" });
+const client = axios.create({ baseURL: "about:blank", adapter: () => Promise.reject(new Error("LITTO 未启用 TF-Router 服务")) });
 
 export function getTfApiKey() {
-  const provider = customProviders.value.find(isTfRouterProvider);
-  const mediaConfigs = settings.value.mediaProviderConfigs as Record<string, { apiKey?: unknown }> | undefined;
-  return [provider?.apiKey, mediaConfigs?.tfRouter?.apiKey]
-    .map(key => typeof key === "string" ? key.trim().replace(/^Bearer(?:\s+|$)/i, "").trim() : "")
-    .find(Boolean) ?? "";
+  return "";
 }
 
 function requestOptions({ apiKey, signal }: TfRequestOptions = {}) {

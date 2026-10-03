@@ -1,16 +1,15 @@
 {
-  "name": "toonflow",
-  "description": "Toonflow 是一款 AI 短剧漫剧工具，能够利用 AI 技术将小说自动转化为剧本，并结合 AI 生成的图片和视频，实现高效的短剧创作。",
-  "author": "HBAI-Ltd <ltlctools@outlook.com>",
+  "name": "litto",
+  "description": "LITTO（里头）—— 好戏，都在里头。面向影视与短剧创作的 AI 工作台。",
+  "author": "LITTO contributors",
   "license": "MIT",
-  "homepage": "https://github.com/HBAI-Ltd/Toonflow-app#readme",
+  "homepage": "https://github.com/laixi969-coder/LITTO#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/HBAI-Ltd/Toonflow-app.git"
+    "url": "git+https://github.com/laixi969-coder/LITTO.git"
   },
   "bugs": {
-    "url": "https://github.com/HBAI-Ltd/Toonflow-app/issues",
-    "email": "ltlctools@outlook.com"
+    "url": "https://github.com/laixi969-coder/LITTO/issues"
   },
   "type": "module",
   "packageManager": "bun@1.3.14",
