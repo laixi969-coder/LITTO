@@ -1,4 +1,4 @@
-import { DatabaseSync } from "node:sqlite";
+import { openSqlite } from "./sqlite.ts";
 import { config } from "./config.ts";
 import { j, now, ulid } from "./util.ts";
 import { publishChange, TRACKED } from "./events.ts";
@@ -86,7 +86,7 @@ CREATE TABLE skill_installs(workspace_id TEXT NOT NULL, skill_id TEXT NOT NULL, 
     },
 ];
 
-export const db = new DatabaseSync(config.dbFile);
+export const db = await openSqlite(config.dbFile);
 db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=OFF; PRAGMA busy_timeout=5000;");
 
 export function migrate() {

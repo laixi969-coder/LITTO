@@ -92,6 +92,21 @@ function tokenOf(c: Context): string | null {
     return getCookie(c, "litto_session") ?? null;
 }
 
+/**
+ * Pure session resolution (no Hono): used by the HTTP middleware below and by the LITTO server's Express layer.
+ * Returns null when the token is missing/invalid; throws HttpError(403) when the requested workspace is not the caller's.
+ */
+export function resolveSession(token: string | null | undefined, wantedWorkspace?: string | null): Auth | null {
+    if (!token) return null;
+    const s = get("SELECT s.user_id, s.expires_at, u.email, u.is_admin, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?", sha256(token));
+    if (!s || s.expires_at < now() || s.deleted_at || s.status !== "active") return null;
+    const m = wantedWorkspace
+        ? get("SELECT m.workspace_id, m.role FROM workspace_members m JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND w.deleted_at IS NULL", wantedWorkspace, s.user_id)
+        : get("SELECT m.workspace_id, m.role FROM workspace_members m JOIN workspaces w ON w.id=m.workspace_id WHERE m.user_id=? AND w.deleted_at IS NULL ORDER BY w.created_at LIMIT 1", s.user_id);
+    if (!m) throw forbidden("not a member of this workspace");
+    return { user: { id: s.user_id, email: s.email, isAdmin: !!s.is_admin }, workspaceId: m.workspace_id, role: m.role };
+}
+
 /** Resolve session → user and the active workspace (header X-Workspace-Id, default: personal). Membership is verified server-side. */
 export async function authenticate(c: Context, next: Next) {
     const bearer = c.req.header("authorization")?.startsWith("Bearer ");
@@ -99,14 +114,9 @@ export async function authenticate(c: Context, next: Next) {
     if (!token) throw new HttpError(401, "not authenticated", "unauthenticated");
     // Cookie sessions require a custom header on mutations (CSRF defence; cross-site forms cannot set it).
     if (!bearer && !["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("x-litto-csrf") !== "1") throw forbidden("csrf check failed");
-    const s = get("SELECT s.user_id, s.expires_at, u.email, u.is_admin, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?", sha256(token));
-    if (!s || s.expires_at < now() || s.deleted_at || s.status !== "active") throw new HttpError(401, "session invalid", "unauthenticated");
-    const wanted = c.req.header("x-workspace-id");
-    const m = wanted
-        ? get("SELECT m.workspace_id, m.role FROM workspace_members m JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND w.deleted_at IS NULL", wanted, s.user_id)
-        : get("SELECT m.workspace_id, m.role FROM workspace_members m JOIN workspaces w ON w.id=m.workspace_id WHERE m.user_id=? AND w.deleted_at IS NULL ORDER BY w.created_at LIMIT 1", s.user_id);
-    if (!m) throw forbidden("not a member of this workspace");
-    c.set("auth", { user: { id: s.user_id, email: s.email, isAdmin: !!s.is_admin }, workspaceId: m.workspace_id, role: m.role } satisfies Auth);
+    const auth = resolveSession(token, c.req.header("x-workspace-id"));
+    if (!auth) throw new HttpError(401, "session invalid", "unauthenticated");
+    c.set("auth", auth);
     await next();
 }
 
