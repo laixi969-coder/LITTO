@@ -16,6 +16,7 @@ import StudioAdmin from "@/pages/studio/admin";
 import StudioLogin from "@/pages/studio/login";
 import StudioProjects from "@/pages/studio/projects";
 import StudioSettings from "@/pages/studio/settings";
+import StudioSkills from "@/pages/studio/skills";
 import StudioWorkbench from "@/pages/studio/workbench";
 
 export const router = createBrowserRouter([
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
             { path: "/studio", element: <StudioProjects /> },
             { path: "/studio/p/:pid", element: <StudioWorkbench /> },
             { path: "/studio/settings", element: <StudioSettings /> },
+            { path: "/studio/skills", element: <StudioSkills /> },
             { path: "/studio/admin", element: <StudioAdmin /> },
         ],
     },

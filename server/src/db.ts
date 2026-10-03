@@ -74,6 +74,15 @@ ALTER TABLE media ADD COLUMN proxy_key TEXT;
 CREATE TABLE renders(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, sequence_id TEXT NOT NULL, status TEXT NOT NULL, manifest TEXT, media_id TEXT, error TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);
 `,
     },
+    {
+        id: "0004_p3",
+        sql: `
+CREATE TABLE sso_connections(id TEXT PRIMARY KEY, name TEXT NOT NULL, issuer TEXT NOT NULL, client_id TEXT NOT NULL, secret_enc TEXT NOT NULL, domains TEXT NOT NULL DEFAULT '[]', workspace_id TEXT, role TEXT NOT NULL DEFAULT 'EDITOR', enforce INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT, updated_at TEXT);
+CREATE TABLE timelines(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, sequence_id TEXT NOT NULL UNIQUE, data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, created_at TEXT, updated_at TEXT);
+CREATE TABLE skills(id TEXT PRIMARY KEY, workspace_id TEXT, slug TEXT NOT NULL, name TEXT NOT NULL, version TEXT NOT NULL, author TEXT, description TEXT, manifest TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'published', created_by TEXT, created_at TEXT, updated_at TEXT, UNIQUE(slug,version));
+CREATE TABLE skill_installs(workspace_id TEXT NOT NULL, skill_id TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, installed_by TEXT, installed_at TEXT, PRIMARY KEY(workspace_id,skill_id));
+`,
+    },
 ];
 
 export const db = new DatabaseSync(config.dbFile);
@@ -132,7 +141,7 @@ const JSON_COLS: Record<string, string[]> = {
     worlds: ["data"], looks: ["data"], assets: ["data"], sequences: ["data"], scenes: ["data"], shots: ["data"],
     shot_states: ["data"], state_deltas: ["data"], keyframes: ["meta"], takes: ["meta"], qc_reports: ["findings"],
     projects: ["canvas"], asset_versions: ["snapshot"], reference_bindings: ["crop", "provider_compat"],
-    generation_jobs: ["parameters", "input_refs", "fallback_chain"], renders: ["manifest"], generation_outputs: ["meta"], continuity_issues: ["repair"],
+    generation_jobs: ["parameters", "input_refs", "fallback_chain"], renders: ["manifest"], timelines: ["data"], generation_outputs: ["meta"], continuity_issues: ["repair"],
 };
 export const camel = (s: string) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export const snake = (s: string) => s.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());

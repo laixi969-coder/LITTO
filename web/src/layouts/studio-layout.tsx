@@ -19,6 +19,7 @@ export default function StudioLayout() {
             <header className="flex h-11 shrink-0 items-center gap-4 border-b border-black/10 px-4 text-sm dark:border-white/10">
                 <Link to="/studio" className="flex items-center gap-2 font-semibold"><Clapperboard size={16} /> FilmFlow</Link>
                 <Link to="/studio" className="opacity-70 hover:opacity-100">项目</Link>
+                <Link to="/studio/skills" className="opacity-70 hover:opacity-100">Skills</Link>
                 <Link to="/canvas" className="opacity-70 hover:opacity-100">上游画布</Link>
                 <div className="flex-1" />
                 {workspaces.length > 0 && <Select size="small" variant="borderless" className="!w-44" value={workspaceId ?? undefined} onChange={(v) => { switchWorkspace(v); nav("/studio"); }} options={workspaces.map((w) => ({ value: w.id, label: `${w.kind === "team" ? "👥 " : ""}${w.name} · ${w.role}` }))} />}
