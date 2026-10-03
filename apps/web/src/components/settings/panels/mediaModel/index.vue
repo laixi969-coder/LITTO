@@ -1,5 +1,8 @@
 <template>
   <div v-if="loaded" class="providerList">
+    <el-alert class="easyConnect" style="margin-bottom: 12px" type="info" showIcon :closable="false" title="只想快速接入自己的模型？">
+      <el-button link type="primary" @click="openConnectModel('media')">简易接入 →</el-button>
+    </el-alert>
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">
@@ -40,6 +43,7 @@
 </template>
 
 <script setup lang="ts">
+import { openConnectModel } from "@/components/connectModel/state";
 import axios from "axios";
 import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, shallowRef, type Component } from "vue";
 import { ElMessage } from "element-plus";

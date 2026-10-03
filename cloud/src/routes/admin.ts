@@ -152,7 +152,7 @@ admin.patch("/storage/quota/:workspaceId", async (c) => {
 });
 
 // System
-const SYSTEM_KEYS = { registrationOpen: true, defaultCredits: 200, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: true, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true } } as Record<string, any>;
+const SYSTEM_KEYS = { registrationOpen: true, defaultCredits: 200, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: true, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true }, pricing: {} } as Record<string, any>;
 admin.get("/system", (c) => c.json(Object.fromEntries(Object.entries(SYSTEM_KEYS).map(([k, v]) => [k, setting(k, v)]))));
 admin.put("/system", async (c) => {
     const b = await body(c, z.record(z.any()));

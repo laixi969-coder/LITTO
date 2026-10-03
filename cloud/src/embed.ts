@@ -14,6 +14,7 @@ import { sweepUploads } from "./routes/extra.ts";
 export { resolveSession } from "./auth.ts";
 export type { Auth, Role } from "./auth.ts";
 export { scoped, get as dbGet, all as dbAll, run as dbRun, audit, setting } from "./db.ts";
+export { recordUsage } from "./usage.ts";
 export { accountOf, adminAdjust, creditsFor, hold, charge, release } from "./credits.ts";
 export const cloudRequestListener = getRequestListener(app.fetch);
 

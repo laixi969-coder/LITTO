@@ -1,3 +1,5 @@
+import { recordUsage } from "@/utils/usage";
+import { guardedFetch } from "@/utils/ssrf";
 import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
@@ -81,7 +83,8 @@ export async function readReference(cwd: string, reference: MediaReference, medi
 
 async function downloadAsset(url: string, signal?: AbortSignal) {
   if (!/^https?:\/\//i.test(url)) invalid("生成结果必须使用 HTTP 或 HTTPS 地址");
-  const response = await fetch(url, { signal });
+  // Provider responses are not trusted in multi-tenant mode: a provider pointed at a hostile base URL could return an internal address.
+  const response = await guardedFetch(url, { signal });
   if (!response.ok) throw new Error(t`下载生成结果失败（HTTP ${response.status}）`);
   if (Number(response.headers.get("content-length")) > maxMediaSize) {
     await response.body?.cancel();
@@ -127,7 +130,7 @@ async function assetBytes(asset: MediaAsset, mediaType: "image" | "video" | "aud
   return { bytes, mimeType };
 }
 
-export async function generateMedia(
+async function generateMediaUnrecorded(
   cwd: string,
   mediaType: "image" | "video" | "audio",
   request: MediaGenerationRequest,
@@ -191,5 +194,26 @@ export async function generateMedia(
     // ACT: 只回滚本次创建的文件，保留目录中已有的节点资源。
     await Promise.all(written.map(path => unlink(path).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; })));
     throw err;
+  }
+}
+
+/** Every media generation (from the canvas nodes, the agent tools, or the HTTP route) is recorded for the user's usage receipts. */
+export async function generateMedia(
+  cwd: string,
+  mediaType: "image" | "video" | "audio",
+  request: MediaGenerationRequest,
+  signal?: AbortSignal,
+): Promise<GeneratedMedia[]> {
+  const started = Date.now();
+  const base = { kind: mediaType, providerId: request.providerId, modelId: request.modelId, durationMs: 0 };
+  try {
+    const files = await generateMediaUnrecorded(cwd, mediaType, request, signal);
+    const seconds = (request as { duration?: number }).duration;
+    recordUsage(mediaType === "video" && seconds ? { ...base, units: seconds, unit: "second", durationMs: Date.now() - started }
+      : { ...base, units: Math.max(1, files.length), unit: mediaType === "image" ? "image" : "call", durationMs: Date.now() - started });
+    return files;
+  } catch (error) {
+    recordUsage({ ...base, units: 0, unit: mediaType === "video" ? "second" : mediaType === "image" ? "image" : "call", status: signal?.aborted ? "cancelled" : "error", durationMs: Date.now() - started });
+    throw error;
   }
 }

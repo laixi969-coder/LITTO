@@ -17,7 +17,6 @@
         class="themeOptions"
         :modelValue="uiSettings.theme"
         aria-label="外观模式"
-        @click="captureThemeClickPoint"
         @change="(value) => changeTheme(String(value))">
         <el-radio v-for="item in themes" :key="item.value" :value="item.value" border>
           <span class="themeLabel">
@@ -37,7 +36,7 @@
         </h3>
         <span class="settingValue">{{ uiSettings.primaryColor.toUpperCase() }}</span>
       </div>
-      <p class="description">用于按钮、选中状态与创作背景。</p>
+      <p class="description">用于按钮与选中状态。</p>
       <div class="colorOptions">
         <el-button
           v-for="color in colors"
@@ -115,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watchEffect } from "vue";
+import { ref, watchEffect } from "vue";
 import {
   IconSun,
   IconMoon,
@@ -142,6 +141,7 @@ const themes = [
   { value: "system", label: "跟随系统", description: "自动切换", icon: IconDeviceDesktop },
 ];
 const colors = [
+  { value: "#226b63", label: "工作台青" },
   { value: "#409eff", label: "天空蓝" },
   { value: "#6366f1", label: "鸢尾紫" },
   { value: "#a855f7", label: "薰衣紫" },
@@ -153,26 +153,7 @@ function changeColor(value: string | null) {
   if (value) updateUiSettings({ primaryColor: value });
 }
 
-// ACT: 圆心固定用视口中心，实际点击坐标由 captureThemeClickPoint 在 change 前写入。
-let themeClickPoint = { x: innerWidth / 2, y: innerHeight / 2 };
-function captureThemeClickPoint(event: MouseEvent) {
-  themeClickPoint = { x: event.clientX, y: event.clientY };
-}
-function changeTheme(value: string) {
-  const { x, y } = themeClickPoint;
-  const root = document.documentElement;
-  root.style.setProperty("--themeX", `${x}px`);
-  root.style.setProperty("--themeY", `${y}px`);
-  root.style.setProperty("--themeR", `${Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y))}px`);
-  if (!document.startViewTransition) {
-    updateUiSettings({ theme: value });
-    return;
-  }
-  document.startViewTransition(async () => {
-    updateUiSettings({ theme: value });
-    await nextTick();
-  });
-}
+function changeTheme(value: string) { updateUiSettings({ theme: value }); }
 </script>
 
 <style lang="scss" scoped>

@@ -5,7 +5,7 @@ export type AgentAttachment = { name: string; path: string; mimeType: string; fi
 export type AgentMessagePart =
   | { id: string; type: "text"; content: string }
   | { id: string; type: "thinking"; content: string; collapsed?: boolean; duration?: number }
-  | { id: string; type: "tool"; tool: AgentToolCall; collapsed?: boolean };
+  | { id: string; type: "tool"; tool: AgentToolCall; collapsed?: boolean; duration?: number };
 
 export type AgentMessage = {
   id: string;
@@ -17,6 +17,7 @@ export type AgentMessage = {
   mentions?: AgentMention[];
   parts?: AgentMessagePart[];
   streaming?: boolean;
+  duration?: number;
   error?: string;
   report?: { file: string; name: string };
 };

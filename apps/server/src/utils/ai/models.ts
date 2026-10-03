@@ -1,3 +1,4 @@
+import { assertPublicHttpUrl } from "@/utils/ssrf";
 import { t } from "@/lib/i18n";
 import { z } from "zod";
 
@@ -9,7 +10,7 @@ const modelSchema = z.object({
 });
 
 export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl: string; protocol: string; apiKey: string }) {
-  const url = new URL(apiUrl);
+  const url = new URL(await assertPublicHttpUrl(apiUrl));
   if (url.pathname === "/") url.pathname = "/v1";
   url.pathname = `${url.pathname.replace(/\/+$/, "")}/models`;
   const headers: Record<string, string> = { Accept: "application/json" };

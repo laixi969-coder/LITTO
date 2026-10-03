@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Context, Message } from "@earendil-works/pi-ai";
 import { validateFields } from "@/lib/middleware";
 import u from "@/utils";
+import { recordTextUsage } from "@/utils/usage";
 import { translateError, translateMessage, validationOptions } from "@/lib/i18n";
 
 const textPart = z.object({ type: z.literal("text"), text: z.string(), textSignature: z.string().optional() });
@@ -61,6 +62,7 @@ const inputSchema = z.object({
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
   const input = inputSchema.parse(req.body, validationOptions());
   const configured = u.ai.getConfiguredModel(input.providerId, input.modelId);
+  await u.ai.assertConfiguredUpstream(configured);
   const controller = new AbortController();
   const close = () => controller.abort();
   res.once("close", close);
@@ -83,6 +85,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
       }
       const message = await stream.result();
       if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "模型请求失败");
+      recordTextUsage(message);
       send({ type: "done", message });
     } catch (error) {
       send({ type: "error", message: error instanceof Error ? translateError(error) : translateMessage("模型请求失败") });

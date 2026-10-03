@@ -1,5 +1,6 @@
 <template>
   <div class="agentConversation">
+    <div class="runStatus" :data-state="activity" role="status"><span>{{ activityLabels[activity] }}</span><span v-if="selectedModelChoice">{{ selectedModelChoice.label }}</span></div>
     <div class="messageViewport t-chat t-chat--normal">
       <div ref="messageList" class="messageList t-chat__list" role="region" aria-label="对话消息" tabindex="0">
         <chat-item v-if="!messages.length && !disabled" role="assistant" variant="text">
@@ -34,7 +35,8 @@
             class="messageRow"
             :style="{ transform: `translateY(${row.start}px)` }"
             :class="{ userMessage: item.role === 'user', editingMessage: editingId === item.id }">
-            <chat-item :role="item.role" :variant="item.role === 'user' ? 'base' : 'text'" :textLoading="!!item.streaming && !compacting && !item.parts?.some(part => part.type === 'tool' || part.content)" animation="moving">
+            <div class="entryLabel">{{ item.role === 'user' ? '你的需求' : item.report ? '团队回报' : '执行过程' }}</div>
+            <chat-item :role="item.role" variant="text">
               <template #content>
                 <div class="messageContent">
                   <div v-if="item.report" class="reportHeader"><icon-users-group :size="14" />{{ item.report.name }} 上报</div>
@@ -49,7 +51,7 @@
                       </template>
                       <messageMarkdown v-if="!(part.collapsed ?? true)" :content="part.content" :streaming="!!item.streaming" :directory="directory" />
                     </chat-reasoning>
-                    <toolMessage v-else-if="part.type === 'tool'" v-model:collapsed="part.collapsed" :tool="part.tool" :directory="directory" @copy="copyMessage" />
+                    <toolMessage v-else-if="part.type === 'tool'" v-model:collapsed="part.collapsed" :tool="part.tool" :duration="part.duration" :directory="directory" @copy="copyMessage" />
                     <messageMarkdown v-else-if="part.type === 'text' && part.content" :content="part.content" :streaming="!!item.streaming" :directory="directory" />
                   </template>
                   <attachmentList v-if="item.attachments?.length" :attachments="item.attachments" :directory="directory" />
@@ -58,6 +60,7 @@
                 </div>
               </template>
             </chat-item>
+            <div v-if="item.role === 'assistant' && !item.streaming && !item.report" class="runReceipt"><span>{{ item.parts?.filter(part => part.type === 'tool').length ?? 0 }} 次工具调用</span><span v-if="item.duration !== undefined" title="本次连接的实际耗时">{{ item.duration.toFixed(1) }} 秒</span><span>{{ item.error ? '未完成' : '已结束' }}</span></div>
             <div v-if="!item.streaming" class="messageActions">
               <template v-if="editingId === item.id">
                 <el-button text size="small" :disabled="busy || deletingId !== undefined" @click="cancelEdit"><icon-x :size="14" />取消</el-button>
@@ -77,9 +80,9 @@
       <el-button v-if="messages.length && !atLatestMessage" class="scrollBottom" circle aria-label="回到最新消息" title="回到最新消息" @click="messageVirtualizer.scrollToEnd()"><icon-arrow-down :size="18" /></el-button>
     </div>
     <div v-if="compacting" class="compactionStatus" role="status">
-      <el-icon class="is-loading" aria-hidden="true"><icon-loader-2 :size="14" /></el-icon>
       <span>正在压缩上下文…</span>
     </div>
+    <div class="runControls"><span>{{ activity === 'attention' ? '回答流中的问题后继续' : activity === 'running' ? '可以随时停止当前任务' : '下一步由你决定' }}</span><el-button class="stopButton" :disabled="!busy && !(remoteRunning && initialSession?.parentFile)" @click="busy ? stopMessage() : emit('stopRequest')"><icon-player-stop-filled :size="12" />停止</el-button></div>
     <div class="messageInput">
       <div v-if="editingId" class="editingBanner"><span>编辑消息</span><el-button text size="small" :disabled="busy" @click="cancelEdit">取消</el-button></div>
       <div
@@ -140,9 +143,8 @@
             </div>
           </div>
         </el-popover>
-        <el-button class="sendButton" type="primary" circle :disabled="!busy && locked" :aria-label="busy ? '停止生成' : editingId ? '重发消息' : '发送消息'" :title="busy ? '停止生成' : editingId ? '重发消息' : '发送消息'" @click="busy ? stopMessage() : submitMessage()">
-          <icon-player-stop-filled v-if="busy" :size="14" />
-          <icon-arrow-up v-else :size="16" />
+        <el-button class="sendButton" type="primary" circle :disabled="locked" :aria-label="editingId ? '重发消息' : '发送消息'" :title="editingId ? '重发消息' : '发送消息'" @click="submitMessage()">
+          <icon-arrow-up :size="16" />
         </el-button>
       </div>
     </div>
@@ -156,7 +158,7 @@ import { defaultRangeExtractor, observeElementRect, useVirtualizer } from "@tans
 import axios from "axios";
 import {
   IconArrowUp, IconArrowDown, IconAtom, IconCopy,
-  IconCircleDashed, IconPencil, IconPlayerStopFilled, IconX, IconLoader2,
+  IconCircleDashed, IconPencil, IconPlayerStopFilled, IconX,
   IconTrash, IconLayoutGrid, IconMovie, IconPhoto, IconArrowUpRight, IconUsersGroup,
 } from "@tabler/icons-vue";
 import { ElMessage } from "element-plus";
@@ -188,7 +190,7 @@ import "@tdesign-vue-next/chat/es/style/index.css";
 import "x-sender/lib/XSender.css";
 
 const props = defineProps<{ active: boolean; initialSession: AgentConversation | null; sessionFile?: string; disabled: boolean }>();
-const emit = defineEmits<{ session: [file: string]; sent: [prompt: string]; event: [event: AgentEvent] }>();
+const emit = defineEmits<{ session: [file: string]; sent: [prompt: string]; event: [event: AgentEvent]; activity: [state: string]; stopRequest: [] }>();
 const workspaceStore = useWorkspaceStore();
 const directory = workspaceStore.project?.directory;
 const draftAttachments = ref<AgentAttachment[]>([]);
@@ -200,6 +202,13 @@ const stats = ref(props.initialSession?.stats);
 const contextUsage = ref(props.initialSession?.contextUsage);
 const busy = ref(false);
 const compacting = ref(false);
+const activity = computed(() => {
+  const last = messages.value.findLast(item => item.role === "assistant");
+  if (busy.value || remoteRunning.value) return last?.parts?.some(part => part.type === "tool" && part.tool.status === "running" && part.tool.question) ? "attention" : "running";
+  return last?.error ? "error" : "idle";
+});
+const activityLabels = { idle: "准备就绪", running: "AI 正在工作", attention: "等待你确认", error: "任务未完成" };
+watch(activity, state => emit("activity", state), { immediate: true });
 const deletingId = ref<string>();
 const restoringAttachment = ref(false);
 const locked = computed(() => props.disabled || busy.value || deletingId.value !== undefined || restoringAttachment.value);
@@ -321,7 +330,7 @@ function receiveEvent(event: AgentEvent) {
   applyEvent(event);
 }
 
-defineExpose({ receiveEvent });
+defineExpose({ receiveEvent, stopMessage });
 
 function getDraftContent() {
   return sender?.getModel().map((line, lineIndex) => line.map((tag, tagIndex) => {
@@ -806,6 +815,9 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
 
 <style lang="scss">
 .agentConversation {
+  .runStatus { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--studioBorder); color: var(--studioMuted); font-size: 12px; &[data-state="attention"] { color: var(--studioAttention); background: var(--studioAttentionSoft); } &[data-state="error"] { color: var(--el-color-danger); } span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+  .runControls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 16px; font-size: 11px; color: var(--studioMuted); .stopButton { min-height: 36px; gap: 6px; margin: 0; color: var(--studioAttention); border-color: var(--studioBorder); &.is-disabled { color: var(--studioMuted); opacity: 0.55; } } }
+
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -903,6 +915,9 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
     }
 
     .messageRow {
+      .entryLabel { margin: 16px 0 12px; color: var(--studioMuted); font-size: 11px; font-weight: 600; }
+      .runReceipt { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 4px; padding-top: 10px; border-top: 1px solid var(--studioBorder); color: var(--studioMuted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
       position: absolute;
       top: 0;
       left: 0;
@@ -958,13 +973,7 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
         }
       }
 
-      &.user .t-chat__content .t-chat__detail {
-        width: auto;
-        max-width: 80%;
-        padding: 6px 10px;
-        border-radius: calc(var(--ui-radius) * 1.25);
-        background: color-mix(in srgb, var(--el-text-color-secondary) 12%, var(--el-bg-color));
-      }
+      &.user .t-chat__content .t-chat__detail { width: 100%; max-width: 100%; padding: 12px; border-radius: var(--ui-radius); background: var(--studioInset); }
     }
 
     .messageContent {
@@ -1074,7 +1083,7 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
     border: 1px solid var(--el-border-color-light);
     border-radius: calc(var(--ui-radius) * 2.75);
     background: var(--el-bg-color);
-    box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
+    box-shadow: var(--studioShadow);
 
     &:focus-within {
       border-color: var(--el-color-primary-light-5);

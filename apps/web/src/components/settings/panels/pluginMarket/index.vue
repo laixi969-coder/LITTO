@@ -625,7 +625,7 @@ async function copyCard(url: string) {
 function canEditPlugin(plugin: Plugin) {
   return (
     activeTab.value === "installed" &&
-    (plugin.author !== "Toonflow" || plugin.type === "agent") &&
+    ((plugin.author !== "Toonflow" && plugin.author !== "LITTO") || plugin.type === "agent") &&
     (plugin.type === "node" || plugin.type === "skill" || (plugin.type === "tool" && canManageTools.value) || (plugin.type === "agent" && canManageAgents.value))
   );
 }

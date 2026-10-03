@@ -1,5 +1,11 @@
 <template>
   <main class="workspacePage" :style="{ '--agentWidth': `${agentVisible ? agentWidth : 0}px` }">
+    <aside class="workspaceRail" aria-label="项目任务">
+      <router-link class="railBrand" to="/home">LITTO <small>里头</small></router-link>
+      <span class="projectTitle" :title="workspaceStore.project?.name">{{ workspaceStore.project?.name }}</span>
+      <div ref="historyTarget" class="historyTarget" />
+      <div class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起执行流' : '打开执行流' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
+    </aside>
     <canvasPanel
       :key="workspaceStore.project?.directory"
       ref="canvasPanelRef"
@@ -35,7 +41,7 @@
         aria-controls="agentPanel"
         @click="agentVisible = !agentVisible"></el-button>
     </el-tooltip>
-    <floatingAgent v-model="agentVisible" @resize="agentWidth = $event" />
+    <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" />
     <settings v-model="settingsVisible" />
   </main>
 </template>
@@ -44,7 +50,7 @@
 import { defineAsyncComponent, nextTick, onMounted, onScopeDispose, provide, ref } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import axios from "axios";
-import { IconLayoutDashboard, IconFileText } from "@tabler/icons-vue";
+import { IconLayoutDashboard, IconFileText, IconLayoutSidebarRight, IconSettings } from "@tabler/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import settings from "@/components/settings/index.vue";
 import { useWorkspaceStore } from "@/stores/workspace";
@@ -63,8 +69,9 @@ const panelOptions = [
   { label: "画布", value: "canvas", icon: IconLayoutDashboard },
   { label: "文档", value: "document", icon: IconFileText },
 ];
-const agentVisible = ref(true);
+const agentVisible = ref(window.innerWidth >= 760);
 const agentWidth = ref(0);
+const historyTarget = ref<HTMLElement>();
 const settingsVisible = ref(false);
 const canvasPanelRef = ref<InstanceType<typeof canvasPanel>>();
 const documentPanelRef = ref<InstanceType<typeof documentPanel>>();
@@ -181,14 +188,25 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
 
 <style scoped lang="scss">
 .workspacePage {
+  --railWidth: 208px;
   position: relative;
   width: 100%;
   height: 100dvh;
   background-color: var(--el-bg-color);
 
+  .workspaceRail {
+    position: absolute; inset: 0 auto 0 0; z-index: 6; display: flex; flex-direction: column; width: var(--railWidth); background: var(--studioRail); color: var(--studioRailInk);
+    .railBrand { margin: 28px 24px 16px; color: inherit; text-decoration: none; font-size: 22px; font-weight: 650; letter-spacing: -0.04em; small { font-size: 12px; font-weight: 400; color: var(--studioRailMuted); } }
+    .projectTitle { padding: 0 24px 20px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid var(--studioRailHover); }
+    .historyTarget { flex: 1; min-height: 0; overflow: auto; }
+    .railActions { display: grid; padding: 16px; border-top: 1px solid var(--studioRailHover); .el-button { margin: 0; color: var(--studioRailInk); justify-content: flex-start; min-height: 44px; gap: 8px; } }
+  }
+
   .canvasPanel {
     position: absolute;
-    inset: 0;
+    inset: 0 var(--agentWidth) 0 var(--railWidth);
+    width: auto;
+    height: auto;
 
     &.backgroundPanel {
       opacity: 0;
@@ -200,7 +218,7 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
   .workspaceMenu {
     position: absolute;
     top: 15px;
-    left: 15px;
+    left: calc(var(--railWidth) + 15px);
     z-index: 5;
   }
 
@@ -211,7 +229,7 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
     --el-segmented-item-selected-bg-color: var(--el-color-primary-light-9);
     position: absolute;
     top: 15px;
-    left: 50%;
+    left: calc((100% + var(--railWidth) - var(--agentWidth)) / 2);
     z-index: 5;
     min-height: 32px;
     padding: 3px;
@@ -230,87 +248,8 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
     }
   }
 
-  .agentButton {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    z-index: 5;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 1px solid var(--el-border-color-light);
-    border-radius: 50%;
-    background: linear-gradient(145deg, var(--el-fill-color-light), var(--el-bg-color-overlay));
-    color: #f4fffe;
-    overflow: hidden;
-    isolation: isolate;
-    transition: transform 180ms ease;
-
-    &::before,
-    &::after {
-      content: "";
-      position: absolute;
-      inset: 5px;
-      border-radius: 50%;
-      pointer-events: none;
-    }
-
-    &::before {
-      z-index: -2;
-      background: radial-gradient(ellipse at 22% 15%, #a5fff0, transparent 55%), radial-gradient(ellipse at 85% 85%, #a999ff, transparent 60%),
-        radial-gradient(ellipse at 85% 20%, #1dd6cb, transparent 55%), linear-gradient(150deg, #12b8c9, #2765ba 65%, #5a5cc4);
-      animation: agentFlow 10s linear infinite;
-      filter: saturate(0.85);
-      transition: filter 180ms ease;
-    }
-
-    &::after {
-      z-index: -1;
-      background: radial-gradient(ellipse at 30% 12%, #ffffff80, transparent 48%), radial-gradient(ellipse at 65% 95%, #17246070, transparent 65%);
-      box-shadow: inset 0 1px 2px #ffffff80, inset 0 -2px 4px #14255460;
-    }
-
-    &.active::before,
-    &:hover::before {
-      filter: saturate(1.15);
-    }
-
-    &:hover {
-      transform: translateY(-1px);
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--el-color-primary);
-      outline-offset: 3px;
-    }
-
-    .agentLogo {
-      width: 24px;
-      height: 24px;
-      flex-shrink: 0;
-      background: currentColor;
-      mask-size: contain;
-      mask-position: center;
-      mask-repeat: no-repeat;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      transition: none;
-
-      &::before {
-        animation: none;
-      }
-    }
-  }
-}
-
-@keyframes agentFlow {
-  to {
-    transform: rotate(360deg);
-  }
+  .agentButton { position: absolute; top: 15px; right: 15px; z-index: 5; width: 36px; height: 36px; padding: 0; border: 1px solid var(--studioBorder); background: var(--studioSurface); &::before { content: "AI"; font-size: 12px; color: var(--studioDone); } }
+  @media (max-width: 1000px) { --railWidth: 176px; }
+  @media (max-width: 760px) { --railWidth: 0px; .workspaceRail { display: none; } .canvasPanel { right: 0; :deep(.canvasMenuPanel) { top: 58px; } :deep(.canvasMenu) { margin-left: 0; } } .panelSwitcher { left: 50%; } }
 }
 </style>

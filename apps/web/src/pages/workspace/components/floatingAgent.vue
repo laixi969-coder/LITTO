@@ -6,7 +6,7 @@
       class="floatingAgent"
       :class="{ docked, dragging: interaction?.mode === 'move' }"
       :style="panelStyle"
-      aria-label="AI 对话"
+      aria-label="AI 执行过程"
       @pointerdown="startMenuMove"
       @pointermove="moveInteraction"
       @pointerup="stopInteraction"
@@ -26,7 +26,7 @@
         tabindex="0"
         @pointerdown.stop="startInteraction($event, handle.edge)"
         @keydown="resizeWithKeyboard($event, handle.edge)" />
-      <agent v-model="visible">
+      <agent v-model="visible" :historyTarget="historyTarget">
         <template #menuActions>
           <el-button
             text
@@ -49,12 +49,13 @@ import { IconLayoutSidebarRight, IconAppWindowBottomRight } from "@tabler/icons-
 import agent from "@/components/agent/index.vue";
 
 const visible = defineModel<boolean>({ default: false });
+defineProps<{ historyTarget?: HTMLElement }>();
 const emit = defineEmits<{ resize: [width: number] }>();
-const docked = ref(false);
+const docked = ref(true);
 const viewport = reactive({ width: window.innerWidth, height: window.innerHeight });
 const gap = computed(() => Math.min(15, viewport.width / 2, viewport.height / 2));
 const maxWidth = computed(() => Math.max(0, viewport.width - (docked.value ? 0 : gap.value * 2)));
-const preferredWidth = ref(420);
+const preferredWidth = ref(380);
 const width = computed(() => Math.min(preferredWidth.value, maxWidth.value));
 const preferredHeight = ref<number>();
 const height = computed(() =>
@@ -203,8 +204,7 @@ onBeforeUnmount(() => {
   max-height: 100dvh;
   border: 1px solid var(--el-border-color-light);
   border-radius: var(--ui-radius-large, 12px);
-  background: color-mix(in srgb, var(--el-bg-color-overlay) 70%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--studioSurface);
   box-shadow: var(--el-box-shadow-light);
 
   &.docked {

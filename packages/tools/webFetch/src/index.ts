@@ -1,3 +1,5 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { TextDecoder } from "node:util";
 import { z } from "zod";
 import type { ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
@@ -16,10 +18,35 @@ function parseUrl(value: string, base?: URL) {
   return url;
 }
 
+// Multi-tenant servers (accounts on) must not let an agent reach internal services: refuse loopback / private / link-local / metadata
+// addresses before every request and redirect hop. Single-user mode (LITTO_AUTH=off) or LITTO_ALLOW_PRIVATE_UPSTREAMS=1 keeps the old open behaviour.
+const privateAllowed = () => process.env.LITTO_AUTH === "off" || process.env.LITTO_ALLOW_PRIVATE_UPSTREAMS === "1";
+function blockedIp(ip: string): boolean {
+  if (isIP(ip) === 4) {
+    const [a, b] = ip.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && (b === 168 || b === 0)) || a >= 224;
+  }
+  const lower = ip.toLowerCase();
+  const mapped = /^(?:::ffff:|64:ff9b::)(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
+  if (mapped) return blockedIp(mapped[1]);
+  if (/^::ffff:[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(lower)) return true;
+  const first = parseInt(lower.split(":")[0] || "0", 16);
+  return lower === "::" || lower === "::1" || (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80 || (first & 0xff00) === 0xff00;
+}
+async function assertPublicHost(url: URL) {
+  if (privateAllowed()) return;
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  const refuse = () => { throw new Error("出于安全原因，不能读取内网、本机或云服务内部地址"); };
+  if (isIP(host)) { if (blockedIp(host)) refuse(); return; }
+  if (/^(localhost|.*\.localhost|.*\.local|.*\.internal|.*\.lan|.*\.home\.arpa)$/i.test(host)) refuse();
+  const addresses = await lookup(host, { all: true, verbatim: true }).catch(() => []);
+  if (addresses.some(item => blockedIp(item.address))) refuse();
+}
+
 async function fetchText(value: string, signal: AbortSignal) {
   let url = parseUrl(value);
   for (let redirects = 0; ; redirects++) {
-    // ACT: 交给运行环境处理 DNS/代理以兼容 Fake-IP；本工具不提供内网隔离，需由部署环境限制网络边界。
+    await assertPublicHost(url);
     const response = await fetch(url, {
       redirect: "manual",
       signal,

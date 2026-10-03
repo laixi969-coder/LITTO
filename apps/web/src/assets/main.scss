@@ -1,4 +1,43 @@
 html:root {
+  // LITTO：暖灰工作台；青色为完成，橘色为需要处理。
+  --studioPage: #eeede8;
+  --studioSurface: #faf9f6;
+  --studioInset: #f2f1ec;
+  --studioInk: #272c29;
+  --studioMuted: #626860;
+  --studioBorder: rgba(47, 54, 46, 0.14);
+  --studioRail: #242b28;
+  --studioRailHover: #333e38;
+  --studioRailInk: #f0f1e9;
+  --studioRailMuted: #b4beb5;
+  --studioDone: #226b63;
+  --studioDoneSoft: #e3eeea;
+  --studioAttention: #a8481d;
+  --studioAttentionSoft: #f8e9dd;
+  --studioShadow: 0 8px 28px rgba(43, 52, 42, 0.07);
+  --el-bg-color: var(--studioSurface);
+  --el-bg-color-page: var(--studioPage);
+  --el-bg-color-overlay: var(--studioSurface);
+  --el-fill-color: #e8e9e2;
+  --el-fill-color-light: var(--studioInset);
+  --el-fill-color-lighter: #f5f4ef;
+  --el-fill-color-extra-light: #f7f6f2;
+  --el-fill-color-blank: var(--studioSurface);
+  --el-text-color-primary: var(--studioInk);
+  --el-text-color-regular: #4c534c;
+  --el-text-color-secondary: var(--studioMuted);
+  --el-text-color-placeholder: #6e756b;
+  --el-border-color: var(--studioBorder);
+  --el-border-color-light: rgba(47, 54, 46, 0.12);
+  --el-border-color-lighter: rgba(47, 54, 46, 0.09);
+  --el-color-success: var(--studioDone);
+  --el-color-warning: var(--studioAttention);
+  --td-bg-color-page: var(--studioPage);
+  --td-bg-color-container: var(--studioSurface);
+  --td-bg-color-secondarycontainer: var(--studioInset);
+  --td-text-color-primary: var(--studioInk);
+  --td-text-color-secondary: var(--studioMuted);
+  --td-text-color-placeholder: var(--studioMuted);
   --ui-radius: 8px;
   --ui-radius-small: calc(var(--ui-radius) * 0.5);
   --ui-radius-large: calc(var(--ui-radius) * 1.5);
@@ -22,6 +61,11 @@ html:root {
   .el-card {
     --el-card-border-radius: var(--ui-radius-large);
   }
+  .el-button--primary {
+    --el-button-text-color: var(--studioOnAccent);
+    --el-button-hover-text-color: var(--studioOnAccent);
+    --el-button-active-text-color: var(--studioOnAccent);
+  }
 
   .el-popper {
     --el-popper-border-radius: var(--ui-radius-large);
@@ -36,10 +80,39 @@ html:root {
   .el-tag { --el-tag-border-radius: var(--ui-radius-small); }
 }
 
+html:root.dark {
+  --studioPage: #1c211e;
+  --studioSurface: #252c28;
+  --studioInset: #303832;
+  --studioInk: #e8ede5;
+  --studioMuted: #b7c1b5;
+  --studioBorder: rgba(220, 235, 217, 0.18);
+  --studioDone: #82c6b7;
+  --studioDoneSoft: #2b443c;
+  --studioAttention: #efaa7a;
+  --studioAttentionSoft: #49372b;
+  --el-fill-color: #343d35;
+  --el-fill-color-lighter: #2a312c;
+  --el-fill-color-extra-light: #282f2a;
+  --el-text-color-regular: #cdd5c8;
+  --el-text-color-placeholder: #aab4a6;
+  --el-border-color-light: rgba(220, 235, 217, 0.14);
+  --el-border-color-lighter: rgba(220, 235, 217, 0.1);
+}
+
 html,
 body,
 #app {
   margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+button, a, input, textarea, [tabindex] {
+  &:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 3px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
 * {

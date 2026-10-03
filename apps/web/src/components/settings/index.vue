@@ -82,11 +82,13 @@ const visible = defineModel<boolean>({ default: false });
   .sidebar {
     min-height: 0;
     overflow-y: auto;
-    padding: 2px;
+    padding: 12px 8px;
+    background: var(--studioRail);
+    border-radius: var(--ui-radius);
 
     .settingsGroupLabel {
       margin: 14px 12px 6px;
-      color: var(--el-text-color-secondary);
+      color: var(--studioRailMuted);
       font-size: 12px;
       font-weight: 400;
       line-height: 1.5;
@@ -102,7 +104,7 @@ const visible = defineModel<boolean>({ default: false });
       border: 0;
       border-radius: var(--el-border-radius-base);
       background: transparent;
-      color: var(--el-text-color-regular);
+      color: var(--studioRailInk);
       font: inherit;
       text-align: start;
       cursor: pointer;
@@ -115,7 +117,7 @@ const visible = defineModel<boolean>({ default: false });
       }
 
       &:hover {
-        background: var(--el-fill-color-light);
+        background: var(--studioRailHover);
       }
 
       &[aria-pressed="true"] {
@@ -160,9 +162,10 @@ const visible = defineModel<boolean>({ default: false });
   }
 
   @media (max-width: 700px) {
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: 60px minmax(0, 1fr);
 
     .sidebar {
+      padding: 8px 4px;
       .settingsGroupLabel {
         margin: 12px 0 6px;
         text-align: center;

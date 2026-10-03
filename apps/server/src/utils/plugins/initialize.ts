@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, readFile, readdir, rename, unlink, writeAtomic, writeFile } from "@toonflow/file";
+import { copyFile, cp, lstat, mkdir, readFile, readdir, rename, unlink, writeAtomic, writeFile } from "@toonflow/file";
 import { resolve } from "node:path";
 
 export default async function initializePlugins(targetDirectory: string, sourceDirectory: string, fileFilter?: RegExp | readonly string[], revision?: string) {
@@ -7,7 +7,7 @@ export default async function initializePlugins(targetDirectory: string, sourceD
     if (error.code === "ENOENT") return null;
     throw error;
   });
-  if (initialized !== null && (revision === undefined || initialized === revision)) return;
+  if (revision !== undefined && initialized === revision) return;
 
   const entries = await readdir(sourceDirectory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return null;
@@ -23,6 +23,11 @@ export default async function initializePlugins(targetDirectory: string, sourceD
     const source = resolve(sourceDirectory, file.name);
     const target = resolve(targetDirectory, file.name);
     if (revision === undefined) {
+      // 已安装目录可由用户编辑；升级只补新增内置目录，不覆盖旧内容。
+      if (initialized !== null && await lstat(target).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      })) continue;
       await cp(source, target, { recursive: true, force: false });
       continue;
     }

@@ -51,6 +51,24 @@ const files = readdirSync(tenants).map((d) => join(tenants, d, "settings.json"))
 check("echoing the mask back keeps the stored key", files.length === 1 && readFileSync(files[0], "utf8").includes(SECRET));
 check("tenant settings file is mode 0600", files.length === 1 && (statSync(files[0]).mode & 0o777) === 0o600);
 
+// SSRF: tenants choose upstream addresses, so internal ones must be refused everywhere they can be entered
+const provider = (apiUrl: string) => ({ settings: { customProviders: [{ id: "p-ssrf", label: "ssrf", apiUrl, protocol: "openai-completions", models: [], apiKey: "" }] } });
+for (const bad of ["http://127.0.0.1:3000", "http://169.254.169.254/latest/meta-data", "http://localhost:8080/v1", "http://[::1]:9000", "http://10.0.0.5/v1", "http://[::ffff:127.0.0.1]/v1", "ftp://example.com/v1"]) {
+  const r = await api(alice, "PUT", "/api/settings/save", provider(bad));
+  check(`settings/save rejects provider address ${bad}`, r.status === 400, `status ${r.status}`);
+}
+check("settings/save accepts a public https address (validation only, no request made)", (await api(alice, "PUT", "/api/settings/save", provider("https://api.openai.com/v1"))).status === 200);
+check("fetch-models refuses internal address", (await api(alice, "POST", "/api/providers/models", { apiUrl: "http://169.254.169.254/v1", protocol: "openai-completions", apiKey: "" })).status === 400);
+const leak = "sk-NEVER-ECHO-THIS-1234";
+const testPrivate = await api(alice, "POST", "/api/providers/test", { kind: "text", apiUrl: "http://127.0.0.1:3000/v1", apiKey: leak });
+check("connection test refuses internal address in plain Chinese", testPrivate.status === 200 && testPrivate.json.data.ok === false && /内网|本机/.test(testPrivate.json.data.message), testPrivate.json?.data?.message);
+check("connection test never echoes the key", !JSON.stringify(testPrivate.json).includes(leak));
+const testDns = await api(alice, "POST", "/api/providers/test", { kind: "text", apiUrl: "https://invalid.example.invalid/v1", apiKey: leak });
+check("unresolvable host → friendly failure", testDns.json?.data?.ok === false && /无法解析|连不上/.test(testDns.json.data.message), testDns.json?.data?.message);
+check("media test: unknown provider and too-short key are refused", [(await api(alice, "POST", "/api/providers/test", { kind: "media", providerId: "nope", apiKey: "x".repeat(20) })).json.data.ok, (await api(alice, "POST", "/api/providers/test", { kind: "media", providerId: "meta", apiKey: "abc" })).json.data.ok].every((v) => v === false));
+check("tenants (non-admin) may use the connection test", testPrivate.status === 200);
+await api(alice, "PUT", "/api/settings/save", { settings: JSON.parse(aliceView).data }); // restore alice's earlier settings
+
 // plugin install is code execution: admin only
 for (const p of ["/api/tools/install", "/api/nodes/install", "/api/providers/media/save", "/api/skills/install"]) check(`non-admin blocked: POST ${p}`, (await api(alice, "POST", p, {})).status === 403);
 const admin = await login("admin@litto.local");

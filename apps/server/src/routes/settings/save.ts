@@ -6,6 +6,7 @@ import { success } from "@/lib/responseFormat";
 import { maxSystemPromptLength } from "@/agent/runtime/prompt";
 import { t } from "@/lib/i18n";
 import { restoreSecrets } from "@/utils/secrets";
+import { assertPublicHttpUrl } from "@/utils/ssrf";
 
 const router = Router();
 
@@ -20,6 +21,15 @@ export default router.put("/", validateFields({ settings: z.record(z.string(), z
 }) }), async (req, res) => {
   u.mcpControl.assertAppRequest(req);
   const settings = restoreSecrets(req.body.settings, u.conf.get("settings", {}));
+  // Tenants choose these addresses, so refuse internal ones up front with a clear message.
+  for (const provider of Array.isArray(settings.customProviders) ? settings.customProviders : []) {
+    if (provider && typeof provider.apiUrl === "string" && provider.apiUrl) await assertPublicHttpUrl(provider.apiUrl, { strictDns: false });
+  }
+  const mediaConfigs = settings.mediaProviderConfigs && typeof settings.mediaProviderConfigs === "object" ? Object.values(settings.mediaProviderConfigs as Record<string, unknown>) : [];
+  for (const config of mediaConfigs) {
+    const address = config && typeof config === "object" ? (config as Record<string, unknown>).baseUrl : undefined;
+    if (typeof address === "string" && address) await assertPublicHttpUrl(address, { strictDns: false });
+  }
   u.removeLegacySettings(settings);
   u.conf.set("settings", settings);
   await u.mcpRuntime.reloadMcpRuntime();

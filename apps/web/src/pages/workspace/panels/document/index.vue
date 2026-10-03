@@ -598,7 +598,8 @@ onDeactivated(() => {
   grid-template-columns: 220px minmax(min-content, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 20px;
-  width: 100%;
+  width: calc(100% - var(--railWidth, 0px));
+  margin-left: var(--railWidth, 0px);
   height: 100%;
   box-sizing: border-box;
   padding: 64px 20px 20px;

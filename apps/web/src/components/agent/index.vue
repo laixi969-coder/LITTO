@@ -1,5 +1,15 @@
 <template>
   <section v-show="visible" class="agent">
+    <teleport v-if="historyTarget" :to="historyTarget">
+      <div class="workHistory">
+        <div class="historyHeading"><h2>任务与历史</h2><el-button text :disabled="loading || historyLoading" aria-label="新建任务" @click="newConversation"><icon-plus :size="16" /></el-button></div>
+        <div v-if="conversations.some(item => item.activity === 'running' || item.activity === 'attention')" class="activeRuns" aria-label="进行中的任务">
+          <button v-for="item in conversations.filter(item => item.activity === 'running' || item.activity === 'attention')" :key="item.key" type="button" class="runEntry" :class="{ selected: item.key === conversationKey, attention: item.activity === 'attention' }" @click="conversationKey = item.key; visible = true"><span class="runDot" :class="{ working: item.key === conversationKey && item.activity === 'running' }" /><span class="runInfo"><strong>{{ item.name }}</strong><span>{{ item.activity === 'attention' ? '等待你确认' : '正在执行' }}</span></span></button>
+        </div>
+        <p v-if="!history.length" class="historyHint">{{ historyLoading ? '正在读取历史…' : '发起创作后，任务会出现在这里。' }}</p>
+        <button v-for="item in history" :key="item.file" type="button" class="runEntry" :class="{ selected: item.file === sessionFile }" @click="selectConversation(item.file); visible = true"><icon-message-circle :size="16" /><span class="runInfo"><strong>{{ item.name }}</strong><span>{{ new Date(item.modified).toLocaleDateString() }}</span></span></button>
+      </div>
+    </teleport>
     <agentMenu
       :key="conversationKey"
       :name="name"
@@ -29,6 +39,8 @@
       :disabled="loading || !initialized"
       @session="setSessionFile(item, $event)"
       @event="receiveAgentEvent"
+      @activity="item.activity = $event"
+      @stopRequest="stopConversation(item)"
       @sent="updateConversationName(item, $event)" />
   </section>
 </template>
@@ -38,6 +50,7 @@ import { computed, onBeforeUnmount, ref, watch, type ComponentPublicInstance } f
 import axios from "axios";
 import { translate } from "@toonflow/i18n/vue";
 import { ElMessage } from "element-plus";
+import { IconPlus, IconMessageCircle } from "@tabler/icons-vue";
 import { useWorkspaceStore } from "@/stores/workspace";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import type { AgentConversation, AgentHistory } from "./types";
@@ -46,7 +59,8 @@ import agentMenu from "./menu.vue";
 import conversation from "./conversation.vue";
 
 const visible = defineModel<boolean>({ default: false });
-type OpenConversation = { key: number; name: string; file?: string; parentFile?: string; subAgents: AgentSubAgent[]; session: AgentConversation | null };
+defineProps<{ historyTarget?: HTMLElement }>();
+type OpenConversation = { key: number; name: string; file?: string; parentFile?: string; activity: string; subAgents: AgentSubAgent[]; session: AgentConversation | null };
 // ACT: 会话实例保留到工作区关闭，让切换后的回复继续接收流式内容。
 const conversations = ref<OpenConversation[]>([]);
 const conversationKey = ref(0);
@@ -74,7 +88,7 @@ function showConversation(session: AgentConversation | null, activate = true) {
     return existing;
   }
   const key = ++nextConversationKey;
-  const item = { key, name: session?.name || "新对话", file: session?.file, parentFile: session?.parentFile, subAgents: session?.subAgents ?? [], session };
+  const item = { key, name: session?.name || "新对话", file: session?.file, parentFile: session?.parentFile, activity: session?.running ? "running" : "idle", subAgents: session?.subAgents ?? [], session };
   conversations.value.push(item);
   if (activate) conversationKey.value = key;
   return conversations.value[conversations.value.length - 1]!;
@@ -130,6 +144,17 @@ function backToParent() {
   if (file) void selectConversation(file);
 }
 
+function stopConversation(item: OpenConversation) {
+  const visited = new Set<number>();
+  while (item.parentFile && !visited.has(item.key)) {
+    visited.add(item.key);
+    const parent = conversations.value.find(parent => parent.file === item.parentFile);
+    if (!parent) return;
+    item = parent;
+  }
+  conversationRefs.get(item.key)?.stopMessage();
+}
+
 function updateConversationName(item: OpenConversation, prompt: string) {
   if (item.name !== "新对话") return;
   item.name = prompt.slice(0, 80);
@@ -160,6 +185,7 @@ async function newConversation() {
     const session = data.data;
     history.value.unshift({ file: session.file, name: session.name, modified: new Date().toISOString(), messageCount: 0 });
     showConversation(session);
+    visible.value = true;
     initialized.value = true;
   } catch (error) {
     if (currentRequest === requestId) ElMessage.error(axios.isAxiosError(error)
@@ -302,6 +328,21 @@ onBeforeUnmount(() => { requestId++; });
 </script>
 
 <style scoped lang="scss">
+.workHistory {
+  padding: 16px 12px; color: var(--studioRailInk);
+  .historyHeading { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 12px; h2 { margin: 0; font-size: 12px; font-weight: 500; color: var(--studioRailMuted); } .el-button { margin: 0; color: var(--studioRailInk); } }
+  .historyHint { margin: 8px; font-size: 12px; line-height: 1.8; color: var(--studioRailMuted); }
+  .activeRuns { border-bottom: 1px solid var(--studioRailHover); padding-bottom: 12px; margin-bottom: 12px; }
+  .runEntry { display: flex; align-items: center; gap: 10px; padding: 12px 10px; margin: 4px 0; width: 100%; border: 1px solid transparent; border-radius: var(--ui-radius); color: var(--studioRailMuted); background: transparent; text-align: left; cursor: pointer;
+    > svg { flex-shrink: 0; }
+    &:hover, &.selected { background: var(--studioRailHover); color: var(--studioRailInk); }
+    &.attention { border-color: var(--studioAttention); }
+    .runInfo { min-width: 0; display: grid; gap: 6px; strong { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } span { font-size: 11px; color: var(--studioRailMuted); } }
+    .runDot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--studioRailMuted); &.working { background: var(--studioRailInk); animation: workingPulse 2s ease-in-out infinite; } }
+  }
+}
+@keyframes workingPulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .workHistory .runEntry .runDot.working { animation: none; } }
 .agent {
   display: flex;
   flex-direction: column;

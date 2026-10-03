@@ -70,7 +70,7 @@ export async function uninstall(name: string) {
   const { frontmatter } = parseFrontmatter(await readFile(mainTarget, "utf8"));
   const metadata = frontmatter.metadata && typeof frontmatter.metadata === "object" && !Array.isArray(frontmatter.metadata)
     ? frontmatter.metadata as Record<string, unknown> : {};
-  if (metadata.author === "Toonflow") {
+  if (metadata.author === "Toonflow" || metadata.author === "LITTO") {
     throw Object.assign(new Error("内置技能不能卸载"), { status: 403 });
   }
   if (isDirectorySkill) {

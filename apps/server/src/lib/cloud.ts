@@ -38,7 +38,7 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
 }
 
 /** Routes that install or execute third-party code, or mutate platform-wide assets, are for platform admins only. */
-const ADMIN_ONLY = /^\/(nodes|tools|providers|plugins|agents|skills)\/(?!get|list|read|models|files|renderers|client|export)/;
+const ADMIN_ONLY = /^\/(nodes|tools|providers|plugins|agents|skills)\/(?!get|list|read|models|test|files|renderers|client|export)/;
 export function requireAdminForPlugins(req: Request, res: Response, next: NextFunction) {
   if (!authEnabled() || req.method === "GET" || req.method === "HEAD") return next();
   const tenant = (req as Request & { tenant?: Tenant }).tenant;

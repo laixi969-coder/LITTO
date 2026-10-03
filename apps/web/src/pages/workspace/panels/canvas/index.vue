@@ -14,6 +14,8 @@
     @dragover="dragFilesOver"
     @drop="dropFiles">
     <vue-flow
+      class="flowViewport"
+      :class="{ withShots: shots.length }"
       :id="runtimeKey"
       :only-render-visible-elements="false"
       :nodes-draggable="true"
@@ -94,6 +96,7 @@
         :disabled="!canvasId || !project?.directory" />
       <nodeSearch ref="nodeSearchRef" :disabled="!active || settingsVisible || !canvasId || !project?.directory" />
     </vue-flow>
+    <shotStrip v-if="shots.length" :shots="shots" :directory="project?.directory" @select="selectShot" @finalize="finalizeShot" />
     <teleport to="body">
       <el-button
         v-if="edgeDisconnect && findEdge(edgeDisconnect.id)"
@@ -143,6 +146,8 @@ import {
   type XYPosition,
 } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
+import { getCanvasShots } from "@/lib/canvasShots";
+import shotStrip from "./components/shotStrip.vue";
 import { useCanvasTools } from "./useCanvasTools";
 import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 import { loadNodeComponent } from "./loadNodeComponent";
@@ -265,6 +270,16 @@ function getCanvasContext() {
   return canvasId.value ? createCanvasContext(canvasId.value, canvasController.signal, workspaceController.signal) : undefined;
 }
 const canvasReady = computed(() => !!canvasId.value && !nodeListLoading.value && nodeLoads.size === 0);
+const shots = computed(() => getCanvasShots(flow.nodes.value));
+function selectShot(id: string) {
+  void flow.fitView({ nodes: [id], padding: 0.6, duration: 0 });
+}
+function finalizeShot(id: string, finalized: boolean) {
+  const node = flow.findNode(id);
+  const shot = shots.value.find(shot => shot.id === id);
+  if (!node || !shot?.path) return;
+  flow.updateNodeData(id, { shotFinalizedPath: finalized ? shot.path : undefined });
+}
 provide("canvas", getCanvasContext);
 defineExpose({ canvasId, canvasReady, getCanvasContext, readDocumentNode, saveDocumentNode, flushSave: flushCanvasSave, cancelSave: cancelCanvasSave,
   getMentionNodes: () => flow.nodes.value, findMentionNode: flow.findNode,
@@ -980,6 +995,7 @@ const defaultEdgeOptions = markRaw({
 .canvas {
   width: 100%;
   height: 100%;
+  .flowViewport.withShots { height: calc(100% - 180px); }
 
   &.compositingEnabled :deep(.vue-flow__transformationpane) {
     will-change: transform;

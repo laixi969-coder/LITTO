@@ -5,6 +5,7 @@ import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/pro
 import type { Context, Model } from "@earendil-works/pi-ai";
 import { z } from "zod";
 import conf from "@/utils/conf";
+import { assertPublicHttpUrl, assertPublicUrlLiteral } from "@/utils/ssrf";
 import { readReference } from "@/utils/media/generation";
 import modelContextLimits from "@/utils/ai/modelContextLimits";
 
@@ -49,10 +50,16 @@ export function getConfiguredModel(providerId: string, modelId: string) {
   const provider = parsed.data;
   const model = provider.models.find(item => item.id === modelId);
   if (!model) throw Object.assign(new Error("所选模型不存在，请重新选择"), { status: 400 });
+  assertPublicUrlLiteral(provider.apiUrl); // literal private/loopback addresses never reach the model client
   const baseUrl = new URL(provider.apiUrl);
   if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
   const limits = getModelLimits(providerId, model);
   return { provider, model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens }, baseUrl: baseUrl.href.replace(/\/+$/, "") };
+}
+
+/** Full check including DNS resolution, for the async call sites right before a request is made. */
+export async function assertConfiguredUpstream(configured: ReturnType<typeof getConfiguredModel>) {
+  await assertPublicHttpUrl(configured.baseUrl, { strictDns: false });
 }
 
 export function listAiModels() {

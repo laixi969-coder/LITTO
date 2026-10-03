@@ -26,7 +26,7 @@ export const settingsStorage = {
   },
 };
 
-export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#409eff", fontScale: 100, radius: 8, startupAnimation: true };
+export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#226b63", fontScale: 100, radius: 8, startupAnimation: true };
 export const uiSettings = computed(() => {
   const raw = settings.value.ui;
   const ui = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};

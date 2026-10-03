@@ -7,6 +7,7 @@
         </transition>
       </router-view>
       <ffmpegRequired />
+      <connectModel />
       <updateBox
         v-if="updateBoxBuild && !installFailure"
         v-model="updateBoxVisible"
@@ -57,6 +58,7 @@ import { saveSettings, settings, uiSettings } from "@/stores/settings";
 import { desktopUpdateSnapshot, stopDesktopUpdateObservation } from "@/stores/desktopUpdate";
 import { useMcpControl } from "@/lib/mcpControl";
 import ffmpegRequired from "@/components/settings/ffmpegRequired.vue";
+import connectModel from "@/components/connectModel/index.vue";
 import updateBox from "@/components/updateBox.vue";
 import "element-plus/theme-chalk/dark/css-vars.css";
 
@@ -150,20 +152,22 @@ onBeforeUnmount(() => systemTheme.removeEventListener("change", updateSystemThem
 watchEffect(() => {
   const { theme, primaryColor, fontScale, radius } = uiSettings.value;
   const dark = theme === "system" ? systemDark.value : theme === "dark";
+  const accent = dark && primaryColor === "#226b63" ? "#82c6b7" : primaryColor;
   const root = document.documentElement;
   root.classList.toggle("dark", dark);
   root.setAttribute("theme-mode", dark ? "dark" : "light");
   root.style.colorScheme = dark ? "dark" : "light";
   root.style.fontSize = `${(16 * fontScale) / 100}px`;
   root.style.setProperty("--ui-radius", `${radius}px`);
-  root.style.setProperty("--el-color-primary", primaryColor);
+  root.style.setProperty("--el-color-primary", accent);
+  root.style.setProperty("--studioOnAccent", dark && primaryColor === "#226b63" ? "#1c211e" : "#faf9f6");
   for (let level = 1; level <= 9; level++) {
     root.style.setProperty(
       `--el-color-primary-light-${level}`,
-      `color-mix(in srgb, ${primaryColor} ${100 - level * 10}%, ${dark ? "#141414" : "#fff"})`
+      `color-mix(in srgb, ${accent} ${100 - level * 10}%, ${dark ? "#222320" : "#faf9f6"})`
     );
   }
-  root.style.setProperty("--el-color-primary-dark-2", `color-mix(in srgb, ${primaryColor} 80%, ${dark ? "#fff" : "#000"})`);
+  root.style.setProperty("--el-color-primary-dark-2", `color-mix(in srgb, ${accent} 80%, ${dark ? "#faf9f6" : "#202320"})`);
 });
 </script>
 
@@ -221,26 +225,6 @@ input[inputmode="decimal"],
 .locationPath {
   direction: ltr;
   unicode-bidi: isolate;
-}
-
-// 主题切换圆形扩散动效，坐标由触发点写入 --themeX/--themeY/--themeR。
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
-::view-transition-new(root) {
-  animation: themeReveal 0.4s ease-in forwards;
-}
-
-@keyframes themeReveal {
-  from {
-    clip-path: circle(0 at var(--themeX) var(--themeY));
-  }
-  to {
-    clip-path: circle(var(--themeR) at var(--themeX) var(--themeY));
-  }
 }
 
 .vue-flow {

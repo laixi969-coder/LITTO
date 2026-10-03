@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { bad, forbidden, notFound, now, ulid } from "../util.ts";
 import { config } from "../config.ts";
+import { exportCsv, summary } from "../usage.ts";
 
 export const extra = new Hono();
 
@@ -107,6 +108,10 @@ export function sweepUploads(maxAgeMs = 24 * 3600_000) {
     return n;
 }
 
+// ---------------- usage & spend receipts ----------------
+extra.get("/usage/summary", (c) => { const { a } = ctx(c); return c.json(summary(a.workspaceId, Math.min(365, Number(c.req.query("days") ?? 30) || 30), c.req.query("period") === "month" ? "month" : undefined)); });
+extra.get("/usage/export.csv", (c) => { const { a } = ctx(c); return c.text(exportCsv(a.workspaceId), 200, { "content-type": "text/csv; charset=utf-8", "content-disposition": 'attachment; filename="usage.csv"' }); });
+
 // ---------------- billing ----------------
 extra.get("/billing", (c) => {
     const { a } = ctx(c);
@@ -159,6 +164,7 @@ adminExtra.post("/providers/:id/webhook-secret", (c) => {
     // Shown once; only the encrypted form is stored.
     return c.json({ secret, url: `${config.publicUrl}/webhooks/providers/${c.req.param("id")}`, header: "X-LITTO-Signature: hex(HMAC-SHA256(secret, rawBody))" });
 });
+adminExtra.get("/usage", (c) => c.json(summary(null, Math.min(365, Number(c.req.query("days") ?? 30) || 30))));
 adminExtra.get("/plans", (c) => c.json({ plans: plans(), packs: packs() }));
 adminExtra.put("/workspaces/:id/subscription", async (c) => {
     const b = await body(c, z.object({ planId: z.string(), grantCredits: z.boolean().default(false), custom: z.object({ credits: z.number().optional(), storageGb: z.number().optional(), months: z.number().optional() }).optional() }));

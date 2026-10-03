@@ -1,13 +1,18 @@
 <template>
-  <component v-if="renderer" :is="renderer" :tool="tool" :directory="directory" @copy="emit('copy', $event)" />
+  <section v-if="renderer" class="toolInteraction" :class="{ awaiting: tool.status === 'running' && !!tool.question }">
+    <div v-if="tool.status === 'running' && tool.question" class="attentionHeader"><icon-message-question :size="16" /><strong>需要你确认</strong><a :href="'#toolStep' + tool.id">查看提出此问题的步骤</a></div>
+    <component :is="renderer" :tool="tool" :directory="directory" @copy="emit('copy', $event)" />
+  </section>
   <el-text v-if="rendererError" type="danger">工具界面加载失败，请停止后重试：{{ rendererError }}</el-text>
-  <chat-reasoning v-model:collapsed="collapsed" class="messageReasoning toolCall" expandIconPlacement="left">
+  <chat-reasoning :id="'toolStep' + tool.id" v-model:collapsed="collapsed" class="messageReasoning toolCall" expandIconPlacement="left">
     <template #header>
       <span class="toolHeader" :data-status="tool.status">
         <icon-tool :size="14" />
-        <span class="toolName">{{ renderer ? "操作工具" : tool.name || "工具调用" }}</span>
+        <span class="toolName" :title="tool.name">{{ toolLabel }}</span>
         <span class="toolState">{{ tool.name === 'subAgent' && tool.status === 'success' ? '调用已返回' : toolStatusLabels[tool.status] }}</span>
+        <span v-if="duration !== undefined" class="toolDuration">{{ duration.toFixed(1) }} 秒</span>
       </span>
+      <span v-if="targetPath" class="toolTarget" :title="targetPath">{{ targetPath }}</span>
     </template>
     <div v-if="!collapsed" class="toolDetails">
       <template v-for="(data, index) in [args, result]" :key="index">
@@ -27,12 +32,12 @@
 <script setup lang="ts">
 import { computed, onErrorCaptured, ref, shallowRef, watch, type Component } from "vue";
 import { loadToolComponent } from "@toonflow/tools-scaffold/client";
-import { IconCopy, IconTool } from "@tabler/icons-vue";
+import { IconCopy, IconTool, IconMessageQuestion } from "@tabler/icons-vue";
 import chatReasoning from "@tdesign-vue-next/chat/es/chat-reasoning";
 import type { AgentToolCall } from "@toonflow/server/agent/types";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 
-const { tool, directory } = defineProps<{ tool: AgentToolCall; directory?: string }>();
+const { tool, directory, duration } = defineProps<{ tool: AgentToolCall; directory?: string; duration?: number }>();
 const emit = defineEmits<{ copy: [content: string] }>();
 const renderer = shallowRef<Component>();
 const rendererError = ref("");
@@ -60,6 +65,12 @@ onErrorCaptured(error => {
 });
 const collapsed = defineModel<boolean>("collapsed", { default: true });
 const toolStatusLabels = { running: "调用中…", success: "已完成", error: "调用失败", interrupted: "已中断" };
+const toolLabels: Record<string, string> = { read: "读取文件", write: "写入文件", edit: "修改文件", askUser: "确认创作需求", subAgent: "委派任务", generateImage: "生成图片", generateVideo: "生成视频", generateAudio: "生成音频", getCanvas: "读取画布", getCanvasNodes: "读取画面节点", addCanvasNodes: "添加画面节点", listMediaModels: "读取可用模型" };
+const toolLabel = computed(() => toolLabels[tool.name] || tool.name || "工具调用");
+const targetPath = computed(() => {
+  const path = tool.args?.path ?? tool.args?.filePath ?? tool.args?.canvasId;
+  return typeof path === "string" ? path : undefined;
+});
 const toolCodeOptions = { maxHeight: 240, lineNumbers: false };
 const args = computed(() => formatToolData(tool.args));
 const result = computed(() => formatToolData(tool.result));
@@ -77,8 +88,15 @@ function formatToolData(value: unknown) {
 </script>
 
 <style scoped lang="scss">
+.toolInteraction {
+  &.awaiting { padding: 12px; margin: 8px 0; border: 1px solid var(--studioAttention); border-radius: var(--ui-radius); background: var(--studioAttentionSoft); }
+  .attentionHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--studioAttention); font-size: 12px; margin-bottom: 12px; a { margin-left: auto; color: inherit; } }
+}
 .toolCall {
   min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--studioBorder);
+  .toolTarget { display: block; padding: 4px 0 0 20px; color: var(--studioMuted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .toolHeader {
     display: flex;
@@ -97,6 +115,9 @@ function formatToolData(value: unknown) {
       flex-shrink: 0;
       font-size: 12px;
     }
+
+    .toolDuration { margin-left: auto; flex-shrink: 0; font-size: 11px; font-variant-numeric: tabular-nums; }
+    &[data-status="success"] { color: var(--studioDone); }
 
     &[data-status="error"] .toolState { color: var(--el-color-danger); }
   }

@@ -37,6 +37,8 @@ export async function* readAgentEvents(response: Response, signal: AbortSignal) 
 
 export function createReplyStream(reply: AgentMessage) {
   const parts = reply.parts!;
+  const startedAt = performance.now();
+  const toolStarts = new Map<string, number>();
   let thinkingPart: Extract<AgentMessagePart, { type: "thinking" }> | undefined;
   let thinkingStartedAt = 0;
   let thinkingDuration = 0;
@@ -65,7 +67,12 @@ export function createReplyStream(reply: AgentMessage) {
     }
     if (event.type === "tool") {
       const part = parts.find((part): part is Extract<AgentMessagePart, { type: "tool" }> => part.type === "tool" && part.id === event.blockId);
-      if (part) Object.assign(part.tool, event.tool);
+      if (event.tool.status === "running" && !toolStarts.has(event.blockId)) toolStarts.set(event.blockId, performance.now());
+      if (part) {
+        Object.assign(part.tool, event.tool);
+        const start = toolStarts.get(event.blockId);
+        if (event.tool.status !== "running" && start !== undefined) part.duration = (performance.now() - start) / 1000;
+      }
       else {
         finishThinking();
         parts.push({ id: event.blockId, type: "tool", tool: event.tool });
@@ -97,6 +104,7 @@ export function createReplyStream(reply: AgentMessage) {
     finishThinking();
     reply.content = parts.filter(part => part.type === "text").map(part => part.content).join("\n\n");
     reply.streaming = false;
+    reply.duration = (performance.now() - startedAt) / 1000;
     for (const part of parts) {
       if (part.type === "tool" && part.tool.status === "running") part.tool.status = "interrupted";
     }

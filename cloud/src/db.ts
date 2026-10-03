@@ -84,6 +84,13 @@ CREATE TABLE skills(id TEXT PRIMARY KEY, workspace_id TEXT, slug TEXT NOT NULL, 
 CREATE TABLE skill_installs(workspace_id TEXT NOT NULL, skill_id TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, installed_by TEXT, installed_at TEXT, PRIMARY KEY(workspace_id,skill_id));
 `,
     },
+    {
+        id: "0005_usage",
+        sql: `
+CREATE TABLE usage_events(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, user_id TEXT, kind TEXT NOT NULL, provider_id TEXT, model_id TEXT, units REAL NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT 'call', cost_usd REAL, status TEXT NOT NULL DEFAULT 'ok', duration_ms INTEGER, project TEXT, detail TEXT, created_at TEXT NOT NULL);
+CREATE INDEX idx_usage_ws_time ON usage_events(workspace_id, created_at);
+`,
+    },
 ];
 
 export const db = await openSqlite(config.dbFile);

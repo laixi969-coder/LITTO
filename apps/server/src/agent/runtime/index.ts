@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { recordTextUsage } from "@/utils/usage";
 import { basename } from "node:path";
 import { readFile, stat, unlink } from "@toonflow/file";
 import {
@@ -334,6 +335,7 @@ export async function run(
             send({ type: "tool", blockId, tool: { id: part.id, name: part.name, args: part.arguments, status: "running" } });
           }
         });
+        recordTextUsage(event.message);
         if (firstTokenAt !== undefined && event.message.usage.output > 0) {
           const decodeMs = performance.now() - firstTokenAt;
           if (decodeMs > 0) {
