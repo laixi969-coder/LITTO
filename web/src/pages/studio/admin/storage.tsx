@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { App, Button, InputNumber, Modal, Table } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { bytes, useLoad } from "./util";
 
 export default function Storage() {

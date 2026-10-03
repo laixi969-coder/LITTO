@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { App, Button, Form, Input, Modal, Progress, Select, Tabs, Tag } from "antd";
 import { Lock, Plus, Upload } from "lucide-react";
 
-import { api, uploadMedia } from "@/services/api/filmflow";
+import { api, uploadMedia } from "@/services/api/ovia";
 import { Media } from "./media";
 import { useWorkbench } from "./use-workbench";
 
@@ -126,7 +126,7 @@ function References() {
             <div className="text-[11px] opacity-50">拖到画布上的镜头节点，选择「参考什么」。</div>
             <div className="grid grid-cols-2 gap-2">
                 {wb.refs.map((r) => (
-                    <div key={r.id} draggable onDragStart={(e) => e.dataTransfer.setData("application/x-ff-ref", r.id)} onClick={() => wb.select({ kind: "reference", id: r.id })} className="cursor-grab overflow-hidden rounded border border-black/10 dark:border-white/10">
+                    <div key={r.id} draggable onDragStart={(e) => e.dataTransfer.setData("application/x-ovia-ref", r.id)} onClick={() => wb.select({ kind: "reference", id: r.id })} className="cursor-grab overflow-hidden rounded border border-black/10 dark:border-white/10">
                         {r.kind === "text" ? <div className="h-16 overflow-hidden p-1 text-[11px] opacity-70">{r.text}</div> : <Media media={r.media} className="h-16 w-full" />}
                         <div className="truncate px-1 py-0.5 text-[11px]">{r.name}</div>
                     </div>

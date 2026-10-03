@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { App, Button, Segmented } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { Media } from "./media";
 import { useWorkbench } from "./use-workbench";
 

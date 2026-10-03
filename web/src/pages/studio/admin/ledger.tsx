@@ -1,6 +1,6 @@
 import { Table, Tag } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { time, useLoad } from "./util";
 
 export const LEDGER_COLOR: Record<string, string> = { CREDIT_GRANT: "green", PURCHASE: "blue", GENERATION_HOLD: "gold", GENERATION_CHARGE: "volcano", REFUND: "cyan", ADMIN_ADJUSTMENT: "purple" };

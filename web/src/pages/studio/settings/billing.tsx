@@ -1,14 +1,14 @@
 import { App, Alert, Button, Card, Table, Tag } from "antd";
 
-import { api } from "@/services/api/filmflow";
-import { useFilmflowStore } from "@/stores/use-filmflow-store";
+import { api } from "@/services/api/ovia";
+import { useOviaStore } from "@/stores/use-ovia-store";
 import { time, useLoad } from "../admin/util";
 
 const PERIOD: Record<string, string> = { free: "免费", monthly: "月付", quarterly: "季付", annual: "年付", custom: "定制" };
 
 export default function Billing() {
     const { data: b, reload } = useLoad<any>(() => api.get("/billing"));
-    const role = useFilmflowStore((s) => s.role);
+    const role = useOviaStore((s) => s.role);
     const { message } = App.useApp();
     if (!b) return null;
     const owner = role === "OWNER";

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { App, Alert, Button, Form, Input, InputNumber, Modal, Select, Table, Tag } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { useAct, useLoad } from "./util";
 
 export default function Providers() {

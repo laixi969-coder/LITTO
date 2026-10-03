@@ -46,8 +46,8 @@ export default defineConfig({
             "@": resolve(webDir, "src"),
         },
     },
-    // FilmFlow API (server/) is proxied same-origin so the HttpOnly session cookie works without CORS.
-    server: { proxy: { "/ff-api": { target: process.env.FILMFLOW_API ?? "http://localhost:8787", changeOrigin: true, rewrite: (p) => p.replace(/^\/ff-api/, "") } } },
+    // OVIA API (server/) is proxied same-origin so the HttpOnly session cookie works without CORS.
+    server: { proxy: { "/ovia-api": { target: process.env.OVIA_API ?? "http://localhost:8787", changeOrigin: true, rewrite: (p) => p.replace(/^\/ovia-api/, "") } } },
     define: {
         __APP_VERSION__: JSON.stringify(localVersion),
         __APP_RELEASES__: JSON.stringify(parseChangelog(localChangelog)),

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { api, setWorkspace, WS_KEY } from "@/services/api/filmflow";
+import { api, setWorkspace, WS_KEY } from "@/services/api/ovia";
 
 export type FFUser = { id: string; email: string; isAdmin: boolean };
 type FFStore = {
@@ -15,7 +15,7 @@ type FFStore = {
     logout: () => Promise<void>;
 };
 
-export const useFilmflowStore = create<FFStore>((set) => ({
+export const useOviaStore = create<FFStore>((set) => ({
     ready: false,
     user: null,
     workspaceId: null,
@@ -23,7 +23,7 @@ export const useFilmflowStore = create<FFStore>((set) => ({
     workspaces: [],
     epoch: 0,
     switchWorkspace(id) {
-        const w = useFilmflowStore.getState().workspaces.find((x) => x.id === id);
+        const w = useOviaStore.getState().workspaces.find((x) => x.id === id);
         if (!w) return;
         setWorkspace(id);
         try { sessionStorage.setItem(WS_KEY, id); } catch { /* private mode */ }

@@ -2,19 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "@infinite-canvas/plugi
 import type { CanvasNodeContext } from "@infinite-canvas/plugin-sdk";
 import { NeedLogin } from "./api";
 
-export const CHANGED = "filmflow:changed";
+export const CHANGED = "ovia:changed";
 export type Ctx = CanvasNodeContext;
-export const meta = (ctx: Ctx) => (ctx.node.metadata ?? {}) as { ffProjectId?: string; ffKind?: string; ffId?: string };
+export const meta = (ctx: Ctx) => (ctx.node.metadata ?? {}) as { oviaProjectId?: string; oviaKind?: string; oviaId?: string };
 export const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
 export const KIND_COLOR: Record<string, string> = { world: "#0ea5e9", look: "#a855f7", Character: "#f97316", Wardrobe: "#ec4899", Environment: "#22c55e", Prop: "#eab308", Product: "#eab308", Vehicle: "#eab308", Creature: "#f97316", Custom: "#64748b", shot: "#6366f1", project: "#111827" };
 
-// One shared EventSource per project per page (reference-counted): server SSE "change" events fan out to every FilmFlow node.
+// One shared EventSource per project per page (reference-counted): server SSE "change" events fan out to every OVIA node.
 const feeds = new Map<string, { es: EventSource; subs: Set<() => void>; t?: number }>();
 function subscribeProject(pid: string, cb: () => void) {
     let f = feeds.get(pid);
     if (!f) {
-        const es = new EventSource(`/ff-api/projects/${pid}/events`, { withCredentials: true });
+        const es = new EventSource(`/ovia-api/projects/${pid}/events`, { withCredentials: true });
         const feed = { es, subs: new Set<() => void>() } as { es: EventSource; subs: Set<() => void>; t?: number };
         // debounce: a burst of writes (e.g. a sync or batch) triggers one refetch per node
         es.addEventListener("change", () => { clearTimeout(feed.t); feed.t = window.setTimeout(() => feed.subs.forEach((fn) => fn()), 300); });
@@ -27,7 +27,7 @@ function subscribeProject(pid: string, cb: () => void) {
     };
 }
 
-/** Load a domain entity; refetch when any FilmFlow node mutates something (shared canvas event) and while `poll` is true. */
+/** Load a domain entity; refetch when any OVIA node mutates something (shared canvas event) and while `poll` is true. */
 export function useLive<T>(ctx: Ctx, load: () => Promise<T>, deps: unknown[], poll?: (v: T) => boolean) {
     const [data, setData] = useState<T | null>(null);
     const [err, setErr] = useState<Error | null>(null);
@@ -38,7 +38,7 @@ export function useLive<T>(ctx: Ctx, load: () => Promise<T>, deps: unknown[], po
     }, []);
     useEffect(() => { void reload(); }, [...deps, reload]);
     useEffect(() => ctx.on(CHANGED, () => void reload()), [reload]);
-    const pid = meta(ctx).ffProjectId;
+    const pid = meta(ctx).oviaProjectId;
     useEffect(() => (pid ? subscribeProject(pid, () => void reload()) : undefined), [pid, reload]);
     useEffect(() => {
         if (!data || !poll?.(data)) return;
@@ -67,7 +67,7 @@ export function Problem({ ctx, err }: { ctx: Ctx; err: Error }) {
     const login = err instanceof NeedLogin;
     return (
         <div data-canvas-no-zoom onMouseDown={stop} style={{ padding: 10, fontSize: 12, color: ctx.theme.node.text }}>
-            {login ? <>请先登录 FilmFlow：<a href="/studio/login" target="_blank" rel="noreferrer" style={{ color: "#6366f1" }}>打开登录页</a></> : (err as any).status === 404 ? "该领域对象已被删除（画布节点仍在，可手动删除）" : `加载失败：${err.message}`}
+            {login ? <>请先登录 OVIA：<a href="/studio/login" target="_blank" rel="noreferrer" style={{ color: "#6366f1" }}>打开登录页</a></> : (err as any).status === 404 ? "该领域对象已被删除（画布节点仍在，可手动删除）" : `加载失败：${err.message}`}
         </div>
     );
 }

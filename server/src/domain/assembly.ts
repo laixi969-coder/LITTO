@@ -131,7 +131,7 @@ export async function exportPackage(s: Scope, sequenceId: string) {
         files.push({ name: `grades/shot-${n}.json`, data: Buffer.from(JSON.stringify({ ...sh.grade, lutCube: sh.grade.lutCube ? `grades/shot-${n}.cube` : undefined }, null, 2)) });
         if (sh.grade.lutCube) files.push({ name: `grades/shot-${n}.cube`, data: Buffer.from(sh.grade.lutCube) });
     }
-    const manifest = { format: "filmflow-assembly/1", exportedAt: now(), sequence: { id: seq.id, name: seq.name }, fps: tl.fps, duration: tl.duration, clips, audio, subtitles: tl.subtitles, warnings: tl.warnings };
+    const manifest = { format: "ovia-assembly/1", exportedAt: now(), sequence: { id: seq.id, name: seq.name }, fps: tl.fps, duration: tl.duration, clips, audio, subtitles: tl.subtitles, warnings: tl.warnings };
     files.unshift({ name: "manifest.json", data: Buffer.from(JSON.stringify(manifest, null, 2)) }, { name: "timeline.edl", data: Buffer.from(toEdl(tl, seq.name)) }, { name: "subtitles.srt", data: Buffer.from(toSrt(tl)) });
     return { zip: zip(files), timeline: tl, name: `${seq.name.replace(/[^\w-]+/g, "_") || "sequence"}.zip` };
 }

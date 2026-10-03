@@ -1,6 +1,6 @@
 import { App, Alert, Button, Form, Input, Select, Switch, Table } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { time, useAct, useLoad } from "../admin/util";
 
 export default function Credentials() {

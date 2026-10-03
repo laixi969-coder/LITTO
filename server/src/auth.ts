@@ -77,19 +77,19 @@ export function loginUser(email: string, identity?: { provider: string; subject:
 }
 
 export function setSessionCookie(c: Context, token: string) {
-    setCookie(c, "ff_session", token, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: SESSION_TTL_MS / 1000 });
+    setCookie(c, "ovia_session", token, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: SESSION_TTL_MS / 1000 });
 }
 
 export function logout(c: Context) {
     const t = tokenOf(c);
     if (t) run("DELETE FROM sessions WHERE token_hash=?", sha256(t));
-    deleteCookie(c, "ff_session", { path: "/" });
+    deleteCookie(c, "ovia_session", { path: "/" });
 }
 
 function tokenOf(c: Context): string | null {
     const h = c.req.header("authorization");
     if (h?.startsWith("Bearer ")) return h.slice(7);
-    return getCookie(c, "ff_session") ?? null;
+    return getCookie(c, "ovia_session") ?? null;
 }
 
 /** Resolve session → user and the active workspace (header X-Workspace-Id, default: personal). Membership is verified server-side. */
@@ -98,7 +98,7 @@ export async function authenticate(c: Context, next: Next) {
     const token = tokenOf(c);
     if (!token) throw new HttpError(401, "not authenticated", "unauthenticated");
     // Cookie sessions require a custom header on mutations (CSRF defence; cross-site forms cannot set it).
-    if (!bearer && !["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("x-filmflow-csrf") !== "1") throw forbidden("csrf check failed");
+    if (!bearer && !["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("x-ovia-csrf") !== "1") throw forbidden("csrf check failed");
     const s = get("SELECT s.user_id, s.expires_at, u.email, u.is_admin, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?", sha256(token));
     if (!s || s.expires_at < now() || s.deleted_at || s.status !== "active") throw new HttpError(401, "session invalid", "unauthenticated");
     const wanted = c.req.header("x-workspace-id");

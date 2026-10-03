@@ -3,7 +3,7 @@ import { App, Button, Input, Segmented } from "antd";
 import { Archive, Copy, FolderOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 
 type P = { id: string; name: string; status: string; updatedAt: string; deletedAt?: string };
 

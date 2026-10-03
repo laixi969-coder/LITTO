@@ -1,6 +1,6 @@
 import { Card, Statistic, Table } from "antd";
 
-import { FF_BASE, api } from "@/services/api/filmflow";
+import { OVIA_BASE, api } from "@/services/api/ovia";
 import { bytes, useLoad } from "./util";
 
 export default function Dashboard() {
@@ -13,7 +13,7 @@ export default function Dashboard() {
     ];
     return (
         <div className="space-y-4">
-            <div className="text-right text-xs"><a href={`${FF_BASE}/admin/metrics.txt`} target="_blank" rel="noreferrer">Prometheus 指标 (metrics.txt) ↗</a></div>
+            <div className="text-right text-xs"><a href={`${OVIA_BASE}/admin/metrics.txt`} target="_blank" rel="noreferrer">Prometheus 指标 (metrics.txt) ↗</a></div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{stats.map(([t, v]) => <Card key={t} size="small"><Statistic title={t} value={v} /></Card>)}</div>
             <div className="grid gap-4 md:grid-cols-2">
                 <Card size="small" title="模型成功率"><Table size="small" pagination={false} rowKey="model_id" dataSource={d.modelSuccess} columns={[{ title: "模型", dataIndex: "model_id" }, { title: "总数", dataIndex: "total" }, { title: "成功", dataIndex: "ok" }, { title: "成功率", render: (_, r: any) => `${((r.ok / r.total) * 100).toFixed(0)}%` }]} /></Card>

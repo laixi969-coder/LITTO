@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { App, Alert, Button, Empty, Input, Segmented, Select, Slider, Switch } from "antd";
 import { Flag, Pause, Play, Redo2, RefreshCw, Undo2 } from "lucide-react";
 
-import { FF_BASE, api } from "@/services/api/filmflow";
+import { OVIA_BASE, api } from "@/services/api/ovia";
 import { ClipInspector } from "./nle/clip-inspector";
 import { GradePanel } from "./nle/grade-panel";
 import { Preview } from "./nle/preview";
@@ -54,7 +54,7 @@ export function Assembly() {
     if (!seqId) return <Empty className="mt-16" description="先创建序列并拆出镜头" />;
     if (!edit) return null;
     const clip = edit.clips.find((c) => c.id === sel) ?? null;
-    const dl = (path: string) => window.open(`${FF_BASE}/sequences/${seqId}/${path}`, "_blank");
+    const dl = (path: string) => window.open(`${OVIA_BASE}/sequences/${seqId}/${path}`, "_blank");
     const shotClips = edit.clips.filter((c) => c.type === "shot").sort((a, b) => (a.shotOrder ?? 0) - (b.shotOrder ?? 0));
     const saveSubs = async () => {
         try { await api.put(`/sequences/${seqId}/subtitles`, { lines: Object.entries(subs).map(([shotId, text]) => ({ shotId, text })) }); setSubs({}); message.success("字幕已保存"); await wb.reload(); await load(); } catch (e: any) { message.error(e.message); }

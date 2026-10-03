@@ -2,7 +2,7 @@ import { useState } from "react";
 import { App, Button, Input, Modal, Segmented, Steps, Switch } from "antd";
 import { Sparkles } from "lucide-react";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { useWorkbench } from "./use-workbench";
 
 const LABEL: Record<string, string> = { understand_goal: "理解目标", world_and_assets: "World / 已批准资产", sequence_and_shots: "Sequence / Shots", skills: "Skills", reference_plan: "Reference Plan", freedom_map: "Freedom Map", router: "Router", generate: "Generate", qc: "QC", continuity: "Continuity", repair: "Repair", llm_refine: "LLM 精修" };

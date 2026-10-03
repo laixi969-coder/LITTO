@@ -2,7 +2,7 @@ import type { Scope } from "./db.ts";
 import { createAsset } from "./domain/assets.ts";
 
 /**
- * Adapter between the upstream infinite-canvas project JSON and FilmFlow's domain store.
+ * Adapter between the upstream infinite-canvas project JSON and OVIA's domain store.
  * Upstream nodes stay layout only; image nodes become References (+ optional Character/Prop assets by title convention),
  * text nodes become text References. Upstream format changes are absorbed here, not in the domain.
  */

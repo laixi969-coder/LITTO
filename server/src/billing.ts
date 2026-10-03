@@ -48,10 +48,10 @@ const mockPay: PaymentProvider = { id: "mock", async checkout() { return { compl
 const stripe: PaymentProvider = {
     id: "stripe",
     async checkout({ paymentId, title, amountUsd, returnUrl }) {
-        const key = process.env.FILMFLOW_STRIPE_SECRET;
-        if (!key) throw bad("stripe is not configured (FILMFLOW_STRIPE_SECRET)");
+        const key = process.env.OVIA_STRIPE_SECRET;
+        if (!key) throw bad("stripe is not configured (OVIA_STRIPE_SECRET)");
         const body = new URLSearchParams({ mode: "payment", "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": "usd", "line_items[0][price_data][unit_amount]": String(Math.round(amountUsd * 100)), "line_items[0][price_data][product_data][name]": title, success_url: returnUrl, cancel_url: returnUrl, client_reference_id: paymentId });
-        const r = await fetch(`${process.env.FILMFLOW_STRIPE_API ?? "https://api.stripe.com"}/v1/checkout/sessions`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body });
+        const r = await fetch(`${process.env.OVIA_STRIPE_API ?? "https://api.stripe.com"}/v1/checkout/sessions`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body });
         const j: any = await r.json();
         if (!r.ok) throw bad(`stripe: ${j.error?.message ?? r.status}`);
         return { url: j.url, ref: j.id };

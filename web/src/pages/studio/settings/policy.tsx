@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { App, Button, Form, Select, Switch, Table } from "antd";
 import { Check } from "lucide-react";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { useLoad } from "../admin/util";
 
 const MATRIX = ["text2image", "imageEdit", "identityReference", "multiReference", "compositionReference", "image2video", "startEndFrame", "cameraControl", "nativeAudio"];

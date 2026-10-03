@@ -1,6 +1,6 @@
-export {};// Usage: with the server running → `npm run seed` creates demo@filmflow.local with a ready-to-explore project
+export {};// Usage: with the server running → `npm run seed` creates demo@ovia.local with a ready-to-explore project
 // (World/Look, approved assets, a script broken into shots, references bound). Generation is left for you to click.
-const BASE = process.env.FILMFLOW_URL ?? "http://localhost:8787";
+const BASE = process.env.OVIA_URL ?? "http://localhost:8787";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
 
 let token = "";
@@ -11,7 +11,7 @@ async function call(method: string, path: string, body?: unknown, raw?: Buffer) 
     return j;
 }
 
-const email = process.env.DEMO_EMAIL ?? "demo@filmflow.local";
+const email = process.env.DEMO_EMAIL ?? "demo@ovia.local";
 const { devCode } = await call("POST", "/auth/request-code", { email });
 if (!devCode) throw new Error("server is in production mode; log in through the UI instead");
 token = (await call("POST", "/auth/verify", { email, code: devCode, client: "api" })).token;

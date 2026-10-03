@@ -1,4 +1,4 @@
-# FilmFlow implementation plan & status
+# OVIA（有戏）implementation plan & status
 
 Source of truth: `AI_Virtual_Production_Infinite_Canvas_FINAL_PRD.md`. Status is against PRD §24–§26.
 
@@ -18,4 +18,4 @@ OAuth (GitHub/Google/Apple), team workspaces + full RBAC + invites, auto model r
 - **P3**: advanced NLE, real-time multi-user collaboration, enterprise SSO (SAML/OIDC), 3D/Depth/360, professional color/sound, marketplace / third-party skills.
 - **P2 leftovers**: Apple/Google/Stripe live flows are implemented to spec but only the GitHub-shaped flow and Stripe signature handling are exercised by automated tests (no live credentials here).
 - Vision QC and LLM refinement are verified for plumbing with the mock text model; quality against real models is untested.
-- Domain nodes on the upstream canvas live in the `filmflow` plugin (ADR 0003); upstream connection lines cannot show labels.
+- Domain nodes on the upstream canvas live in the `ovia` plugin (ADR 0003); upstream connection lines cannot show labels.

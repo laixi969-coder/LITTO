@@ -1,10 +1,10 @@
-# FilmFlow
+# OVIA（有戏）
 
 AI 虚拟制片工作台：让几十个 AI 镜头真正属于同一部影片。实现依据 `AI_Virtual_Production_Infinite_Canvas_FINAL_PRD.md`，
 基于 [infinite-canvas](https://github.com/basketikun/infinite-canvas)（锁定 `UPSTREAM_SHA`）扩展。
 
 ```
-server/   FilmFlow 后端：认证/工作区/多租户、领域模型、任务队列、积分账本、Provider 适配器、Admin（Hono + SQLite）
+server/   OVIA 后端：认证/工作区/多租户、领域模型、任务队列、积分账本、Provider 适配器、Admin（Hono + SQLite）
 web/      上游前端 + 新增 /studio 制片工作台、设置、管理后台
 docs/adr  架构决策记录（先读 0001）   docs/PLAN.md  阶段状态
 ```
@@ -14,26 +14,26 @@ docs/adr  架构决策记录（先读 0001）   docs/PLAN.md  阶段状态
 # 1) 后端（Node ≥ 22）
 cd server && npm install && npm run dev        # http://localhost:8787 ，数据在 server/data/
 # 2) 前端
-cd web && bun install && bun run dev           # http://localhost:3000/studio （/ff-api 自动代理到后端）
-# 3) 构建画布领域节点插件（输出到 web/public/plugins/filmflow.js，默认启用）
-cd plugins/canvas/sdk && npm install && cd ../filmflow && npm install && npm run build
+cd web && bun install && bun run dev           # http://localhost:3000/studio （/ovia-api 自动代理到后端）
+# 3) 构建画布领域节点插件（输出到 web/public/plugins/ovia.js，默认启用）
+cd plugins/canvas/sdk && npm install && cd ../ovia && npm install && npm run build
 # 4) 可选：灌一个演示项目
 cd server && npm run seed
 ```
 - 登录：邮箱验证码。未配置 SMTP 时（非 production）验证码会打印在后端日志并回显到登录页。
-- 管理员：邮箱在 `FILMFLOW_ADMIN_EMAILS`（默认 `admin@filmflow.local`）的账号登录后即为超级管理员。
+- 管理员：邮箱在 `OVIA_ADMIN_EMAILS`（默认 `admin@ovia.local`）的账号登录后即为超级管理员。
 - 默认带离线 **Mock Provider**（生成带标注的 SVG 关键帧/Take），无需任何付费 Key 即可跑通整条链路。接真实模型：管理后台启用 `openai-compatible` Provider，填 Base URL 与平台 Key（或用户在「设置 → API Key」填 BYOK），上架对应模型。
 
 ## 环境变量（server）
-`PORT` `FILMFLOW_DATA_DIR` `FILMFLOW_DB` `FILMFLOW_MASTER_KEY`(64 位 hex，生产必设) `FILMFLOW_ADMIN_EMAILS` `FILMFLOW_PUBLIC_URL` `FILMFLOW_WEB_URL` `NODE_ENV=production`
+`PORT` `OVIA_DATA_DIR` `OVIA_DB` `OVIA_MASTER_KEY`(64 位 hex，生产必设) `OVIA_ADMIN_EMAILS` `OVIA_PUBLIC_URL` `OVIA_WEB_URL` `NODE_ENV=production`
 
 | 能力 | 变量 |
 |---|---|
-| OAuth（配置了才启用） | `FILMFLOW_OAUTH_GITHUB_ID/SECRET`、`FILMFLOW_OAUTH_GOOGLE_ID/SECRET`、`FILMFLOW_OAUTH_APPLE_ID/TEAM_ID/KEY_ID/PRIVATE_KEY`；回调地址 `${FILMFLOW_PUBLIC_URL}/auth/oauth/<provider>/callback` |
+| OAuth（配置了才启用） | `OVIA_OAUTH_GITHUB_ID/SECRET`、`OVIA_OAUTH_GOOGLE_ID/SECRET`、`OVIA_OAUTH_APPLE_ID/TEAM_ID/KEY_ID/PRIVATE_KEY`；回调地址 `${OVIA_PUBLIC_URL}/auth/oauth/<provider>/callback` |
 | 企业 SSO | 管理后台 → 企业 SSO：标准 **OIDC**（Okta / Azure AD / Keycloak 等，discovery + PKCE + id_token 的 JWKS 验签）；按邮箱域名发现，可强制 SSO（禁用验证码/OAuth）、自动加入团队工作区。**不支持 SAML** |
-| 支付 | `FILMFLOW_STRIPE_SECRET`、`FILMFLOW_STRIPE_WEBHOOK_SECRET`；非 production 默认 Mock 支付（即时到账，仅测试） |
+| 支付 | `OVIA_STRIPE_SECRET`、`OVIA_STRIPE_WEBHOOK_SECRET`；非 production 默认 Mock 支付（即时到账，仅测试） |
 | 媒体衍生物 / 渲染 | 服务器装有 `ffmpeg` 时自动生成缩略图、480p 代理视频，并可把全部为真实视频的序列渲染成 MP4 |
-| Provider 回调 | 管理后台 → Provider → 生成 Webhook 密钥；回调 `POST /webhooks/providers/:id`，头 `X-FilmFlow-Signature` = HMAC-SHA256(密钥, 原始 body) |
+| Provider 回调 | 管理后台 → Provider → 生成 Webhook 密钥；回调 `POST /webhooks/providers/:id`，头 `X-OVIA-Signature` = HMAC-SHA256(密钥, 原始 body) |
 
 ## 质量门禁
 ```bash
@@ -42,7 +42,7 @@ cd web && bun run typecheck && bun run build
 ```
 
 ## 在上游画布里用领域节点
-先在 `/studio/login` 登录，再打开 `/canvas`：新建节点 →「FilmFlow 项目」，面板里选项目 →「同步领域节点到画布」。资产节点连到镜头节点即把资产加入该镜头；上游图片节点可「登记为参考」并绑定角色。
+先在 `/studio/login` 登录，再打开 `/canvas`：新建节点 →「OVIA 项目」，面板里选项目 →「同步领域节点到画布」。资产节点连到镜头节点即把资产加入该镜头；上游图片节点可「登记为参考」并绑定角色。
 
 ## 实时协作
 项目页订阅 `GET /projects/:id/events`（SSE）：他人的改动会在 ~300ms 内刷新你的视图，右上角显示协作者头像，镜头/资产节点上会出现对方的彩色边框。保存镜头/资产时携带 `expectedUpdatedAt`，他人更晚修改过则返回 412 `stale`。这是「变更推送 + 在线状态 + 乐观并发」，不是 CRDT 式的同字段合并编辑。

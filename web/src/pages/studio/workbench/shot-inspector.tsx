@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { App, Button, Checkbox, Form, Input, InputNumber, Modal, Select, Slider, Tabs, Tag } from "antd";
 import { Check, Crown, RotateCcw, ShieldAlert, Trash2 } from "lucide-react";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { ROLES } from "./bind-dialog";
 import { Media } from "./media";
 import { useAsk } from "./use-ask";

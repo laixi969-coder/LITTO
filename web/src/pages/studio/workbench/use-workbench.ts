@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 
 export type Presence = { userId: string; email: string; color: string; shotId: string | null; assetId: string | null; at: number };
 export type Sel = { kind: "world" | "look" | "asset" | "shot" | "reference"; id: string } | null;

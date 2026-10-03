@@ -14,7 +14,7 @@ const exec = (args: string[]) => new Promise<void>((res, rej) => { const p = spa
  */
 export async function makeDerivatives(media: { id: string; workspaceId: string; projectId: string | null; mime: string; storageKey: string }) {
     if (!/^(video\/(mp4|webm)|image\/(png|jpeg|webp|gif))$/.test(media.mime)) return;
-    const dir = mkdtempSync(join(tmpdir(), "ff-media-"));
+    const dir = mkdtempSync(join(tmpdir(), "ovia-media-"));
     try {
         const src = join(dir, "src");
         writeFileSync(src, await storage.get(media.storageKey));
@@ -50,7 +50,7 @@ export async function probeFile(path: string): Promise<Probe | null> {
     } catch { return null; }
 }
 export async function probeBuffer(data: Buffer): Promise<Probe | null> {
-    const dir = mkdtempSync(join(tmpdir(), "ff-probe-"));
+    const dir = mkdtempSync(join(tmpdir(), "ovia-probe-"));
     try { writeFileSync(join(dir, "m"), data); return await probeFile(join(dir, "m")); } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 export { run2 as runCmd };

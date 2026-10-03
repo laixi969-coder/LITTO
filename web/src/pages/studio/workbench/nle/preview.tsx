@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { api, mediaSrc } from "@/services/api/filmflow";
+import { api, mediaSrc } from "@/services/api/ovia";
 import type { Edit } from "./use-edit";
 
 /** Preview of the video clip under the playhead (real video via <video>, stills/SVG via <img>). Audio tracks are mixed only at render time. */

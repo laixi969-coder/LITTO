@@ -1,4 +1,4 @@
-import { mediaSrc } from "@/services/api/filmflow";
+import { mediaSrc } from "@/services/api/ovia";
 
 /** Keyframes/takes from real providers are png/mp4; the offline mock renders SVG (animated for takes) — <img> handles both. */
 export function Media({ media, className = "", controls }: { media?: { url: string; mime: string } | null; className?: string; controls?: boolean }) {

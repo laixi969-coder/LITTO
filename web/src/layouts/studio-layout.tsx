@@ -3,11 +3,11 @@ import { App, Button, Select, Spin } from "antd";
 import { Clapperboard, LogOut, Settings, Shield } from "lucide-react";
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { useFilmflowStore } from "@/stores/use-filmflow-store";
+import { useOviaStore } from "@/stores/use-ovia-store";
 
-/** FilmFlow shell: session guard + slim header. The upstream canvas stays reachable at /canvas. */
+/** OVIA shell: session guard + slim header. The upstream canvas stays reachable at /canvas. */
 export default function StudioLayout() {
-    const { ready, user, refresh, logout, workspaces, workspaceId, switchWorkspace, epoch } = useFilmflowStore();
+    const { ready, user, refresh, logout, workspaces, workspaceId, switchWorkspace, epoch } = useOviaStore();
     const loc = useLocation();
     const nav = useNavigate();
     const { message } = App.useApp();
@@ -17,7 +17,7 @@ export default function StudioLayout() {
     return (
         <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
             <header className="flex h-11 shrink-0 items-center gap-4 border-b border-black/10 px-4 text-sm dark:border-white/10">
-                <Link to="/studio" className="flex items-center gap-2 font-semibold"><Clapperboard size={16} /> FilmFlow</Link>
+                <Link to="/studio" className="flex items-center gap-2 font-semibold"><Clapperboard size={16} /> OVIA <span className="font-normal opacity-60">有戏</span></Link>
                 <Link to="/studio" className="opacity-70 hover:opacity-100">项目</Link>
                 <Link to="/studio/skills" className="opacity-70 hover:opacity-100">Skills</Link>
                 <Link to="/canvas" className="opacity-70 hover:opacity-100">上游画布</Link>

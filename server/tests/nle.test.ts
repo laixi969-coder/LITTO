@@ -5,10 +5,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "ff-nle-test-"));
+const dir = mkdtempSync(join(tmpdir(), "ovia-nle-test-"));
 const has = (c: string) => spawnSync(c, ["-version"]).status === 0;
 const FF = has("ffmpeg") && has("ffprobe");
-Object.assign(process.env, { FILMFLOW_DATA_DIR: dir, FILMFLOW_QUIET: "1", FILMFLOW_MOCK_LATENCY_MS: "10", FILMFLOW_WORKER_POLL_MS: "30", FILMFLOW_NO_RATELIMIT: "1", NODE_ENV: "test", FILMFLOW_NO_DERIVATIVES: "1" });
+Object.assign(process.env, { OVIA_DATA_DIR: dir, OVIA_QUIET: "1", OVIA_MOCK_LATENCY_MS: "10", OVIA_WORKER_POLL_MS: "30", OVIA_NO_RATELIMIT: "1", NODE_ENV: "test", OVIA_NO_DERIVATIVES: "1" });
 
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");

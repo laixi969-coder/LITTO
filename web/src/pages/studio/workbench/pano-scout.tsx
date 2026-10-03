@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { App, Button, Select } from "antd";
 
-import { api, mediaSrc } from "@/services/api/filmflow";
+import { api, mediaSrc } from "@/services/api/ovia";
 import { PanoViewer, type PanoView } from "./pano-viewer";
 import { useWorkbench } from "./use-workbench";
 

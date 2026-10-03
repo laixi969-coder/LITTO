@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { App, Button, Slider, Tag } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 
 type G = { lift: number[]; gamma: number[]; gain: number[]; saturation: number; contrast: number; temperature: number; exposureStops: number; hasLut?: boolean; lutCube?: string };
 const NEUTRAL: G = { lift: [0, 0, 0], gamma: [0, 0, 0], gain: [0, 0, 0], saturation: 1, contrast: 1, temperature: 0, exposureStops: 0 };

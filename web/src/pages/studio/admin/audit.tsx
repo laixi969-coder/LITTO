@@ -1,6 +1,6 @@
 import { Table } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { time, useLoad } from "./util";
 
 export default function Audit() {

@@ -12,31 +12,31 @@ const open = (pid?: string) => window.open(studioUrl(pid), "_blank");
 // ---------------------------------------------------------------- hub
 export async function syncToCanvas(ctx: Ctx, pid: string) {
     const [world, looks, assets, shots, seqs] = await Promise.all([api.get(`/projects/${pid}/world`), api.get(`/projects/${pid}/looks`), api.get(`/projects/${pid}/assets`), api.get(`/projects/${pid}/shots`), api.get(`/projects/${pid}/sequences`)]);
-    const have = new Set(ctx.getNodes().filter((n) => (n.metadata as any)?.ffId).map((n) => n.id));
+    const have = new Set(ctx.getNodes().filter((n) => (n.metadata as any)?.oviaId).map((n) => n.id));
     const { x, y } = ctx.node.position;
     const ops: any[] = [];
-    const add = (kind: string, ffId: string, nodeType: string, title: string, nx: number, ny: number, size: { width: number; height: number }) => {
-        const id = `ff-${kind}-${ffId}`;
-        if (!have.has(id)) ops.push({ type: "add_node", id, nodeType, title, x: nx, y: ny, ...size, metadata: { ffProjectId: pid, ffKind: kind, ffId } });
+    const add = (kind: string, oviaId: string, nodeType: string, title: string, nx: number, ny: number, size: { width: number; height: number }) => {
+        const id = `ovia-${kind}-${oviaId}`;
+        if (!have.has(id)) ops.push({ type: "add_node", id, nodeType, title, x: nx, y: ny, ...size, metadata: { oviaProjectId: pid, oviaKind: kind, oviaId } });
         return id;
     };
-    const w = add("world", world.id, "filmflow:world", "World", x + 320, y, SIZE.world);
+    const w = add("world", world.id, "ovia:world", "World", x + 320, y, SIZE.world);
     const lk = looks.find((l: any) => l.scope === "project");
-    if (lk) add("look", lk.id, "filmflow:look", "Look", x + 320, y + 110, SIZE.look);
-    assets.forEach((a: any, i: number) => add(`asset`, a.id, "filmflow:asset", a.name, x + 320, y + 240 + i * 110, SIZE.asset));
+    if (lk) add("look", lk.id, "ovia:look", "Look", x + 320, y + 110, SIZE.look);
+    assets.forEach((a: any, i: number) => add(`asset`, a.id, "ovia:asset", a.name, x + 320, y + 240 + i * 110, SIZE.asset));
     const order = new Map<string, number>(seqs.map((s: any, i: number) => [s.id, i]));
     let rowBase = 0;
     for (const s of seqs) {
         const list = shots.filter((sh: any) => sh.sequenceId === s.id).sort((a: any, b: any) => a.ord - b.ord);
         let prev: string | null = null;
-        const seqId = add("sequence", s.id, "filmflow:sequence", `成片 · ${s.name}`, x + 660, y + rowBase - 130, SIZE.sequence);
+        const seqId = add("sequence", s.id, "ovia:sequence", `成片 · ${s.name}`, x + 660, y + rowBase - 130, SIZE.sequence);
         list.forEach((sh: any, i: number) => {
-            const id = add("shot", sh.id, "filmflow:shot", `#${sh.ord + 1} ${sh.title || sh.narrativeFunction}`, x + 660 + (i % 5) * 290, y + rowBase + Math.floor(i / 5) * 190, SIZE.shot);
-            for (const aid of sh.assetIds ?? []) ops.push({ type: "connect_nodes", fromNodeId: `ff-asset-${aid}`, toNodeId: id, label: "uses" });
+            const id = add("shot", sh.id, "ovia:shot", `#${sh.ord + 1} ${sh.title || sh.narrativeFunction}`, x + 660 + (i % 5) * 290, y + rowBase + Math.floor(i / 5) * 190, SIZE.shot);
+            for (const aid of sh.assetIds ?? []) ops.push({ type: "connect_nodes", fromNodeId: `ovia-asset-${aid}`, toNodeId: id, label: "uses" });
             if (prev) ops.push({ type: "connect_nodes", fromNodeId: prev, toNodeId: id, label: "state →" }); // state flows shot → shot
             prev = id;
         });
-        if (list.length) ops.push({ type: "connect_nodes", fromNodeId: `ff-shot-${list[list.length - 1].id}`, toNodeId: seqId, label: "assembles" }); // last shot → assembly
+        if (list.length) ops.push({ type: "connect_nodes", fromNodeId: `ovia-shot-${list[list.length - 1].id}`, toNodeId: seqId, label: "assembles" }); // last shot → assembly
         rowBase += Math.ceil(Math.max(list.length, 1) / 5) * 190 + 120;
     }
     void order;
@@ -48,24 +48,24 @@ export async function syncToCanvas(ctx: Ctx, pid: string) {
 }
 
 function HubContent({ ctx }: { ctx: Ctx }) {
-    const pid = meta(ctx).ffProjectId;
+    const pid = meta(ctx).oviaProjectId;
     const { data, err } = useLive(ctx, async () => (pid ? { p: await api.get(`/projects/${pid}`), shots: await api.get(`/projects/${pid}/shots`), assets: await api.get(`/projects/${pid}/assets`) } : null), [pid]);
     if (err) return <Problem ctx={ctx} err={err} />;
-    return <Card ctx={ctx} color="#111827" title={data?.p?.name ?? "FilmFlow 项目"} sub={pid ? `${data?.assets.length ?? "…"} 资产 · ${data?.shots.length ?? "…"} 镜头 — 打开面板同步领域节点` : "选中后在面板里选择项目"} />;
+    return <Card ctx={ctx} color="#111827" title={data?.p?.name ?? "OVIA 项目"} sub={pid ? `${data?.assets.length ?? "…"} 资产 · ${data?.shots.length ?? "…"} 镜头 — 打开面板同步领域节点` : "选中后在面板里选择项目"} />;
 }
 
 function HubPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
-    const pid = meta(ctx).ffProjectId;
+    const pid = meta(ctx).oviaProjectId;
     const list = useLive(ctx, () => api.get("/projects"), []);
     const [script, setScript] = useState("");
     const [useLlm, setUseLlm] = useState(false);
     const [msg, setMsg] = useState("");
     const [busy, setBusy] = useState(false);
-    const run = (fn: () => Promise<string>) => async () => { setBusy(true); try { setMsg(await fn()); ctx.emit("filmflow:changed"); } catch (e) { setMsg((e as Error).message); } setBusy(false); };
+    const run = (fn: () => Promise<string>) => async () => { setBusy(true); try { setMsg(await fn()); ctx.emit("ovia:changed"); } catch (e) { setMsg((e as Error).message); } setBusy(false); };
     return (
         <div data-canvas-no-zoom onMouseDown={stop} onWheel={stop} style={panelBox(ctx)}>
-            <b>FilmFlow 项目枢纽</b>
-            <select style={input(ctx)} value={pid ?? ""} onChange={(e) => { const p = list.data?.find((x: any) => x.id === e.target.value); ctx.updateMetadata({ ffProjectId: e.target.value, ffKind: "project", ffId: e.target.value } as any); if (p) ctx.updateNode({ title: p.name }); }}>
+            <b>OVIA 项目枢纽</b>
+            <select style={input(ctx)} value={pid ?? ""} onChange={(e) => { const p = list.data?.find((x: any) => x.id === e.target.value); ctx.updateMetadata({ oviaProjectId: e.target.value, oviaKind: "project", oviaId: e.target.value } as any); if (p) ctx.updateNode({ title: p.name }); }}>
                 <option value="">选择项目…</option>
                 {list.data?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -88,7 +88,7 @@ function HubPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
 
 // ---------------------------------------------------------------- world / look
 function WorldLookContent({ ctx, kind }: { ctx: Ctx; kind: "world" | "look" }) {
-    const { ffProjectId: pid } = meta(ctx);
+    const { oviaProjectId: pid } = meta(ctx);
     const { data, err } = useLive(ctx, async () => (kind === "world" ? api.get(`/projects/${pid}/world`) : (await api.get(`/projects/${pid}/looks`)).find((l: any) => l.scope === "project")), [pid]);
     if (err) return <Problem ctx={ctx} err={err} />;
     const sub = kind === "world" ? [data?.era, data?.locationLogic, data?.architecture, data?.weather].filter(Boolean).join(" · ") : [(data?.palette ?? []).join("/"), data?.contrast, data?.grain].filter(Boolean).join(" · ");
@@ -99,7 +99,7 @@ const WORLD_FIELDS: [string, string][] = [["era", "年代"], ["locationLogic", "
 const LOOK_FIELDS: [string, string][] = [["contrast", "对比度"], ["saturation", "饱和度"], ["skinTone", "肤色"], ["blackLevel", "黑位"], ["highlightRolloff", "高光滚降"], ["shadowBehavior", "暗部"], ["grain", "颗粒"], ["halation", "光晕"], ["bloom", "bloom"], ["lensCharacter", "镜头性格"], ["texture", "质感"], ["sharpnessPhilosophy", "锐度哲学"]];
 
 function WorldLookPanel({ ctx, kind, onClose }: { ctx: Ctx; kind: "world" | "look"; onClose: () => void }) {
-    const { ffProjectId: pid } = meta(ctx);
+    const { oviaProjectId: pid } = meta(ctx);
     const { data, changed } = useLive(ctx, async () => (kind === "world" ? api.get(`/projects/${pid}/world`) : (await api.get(`/projects/${pid}/looks`)).find((l: any) => l.scope === "project")), [pid]);
     const [draft, setDraft] = useState<Record<string, string>>({});
     const fields = kind === "world" ? WORLD_FIELDS : LOOK_FIELDS;
@@ -115,8 +115,8 @@ function WorldLookPanel({ ctx, kind, onClose }: { ctx: Ctx; kind: "world" | "loo
 
 // ---------------------------------------------------------------- asset
 function AssetContent({ ctx }: { ctx: Ctx }) {
-    const { ffId } = meta(ctx);
-    const { data: a, err } = useLive(ctx, () => api.get(`/assets/${ffId}`), [ffId]);
+    const { oviaId } = meta(ctx);
+    const { data: a, err } = useLive(ctx, () => api.get(`/assets/${oviaId}`), [oviaId]);
     if (err) return <Problem ctx={ctx} err={err} />;
     if (!a) return null;
     const locked = a.approvalStatus === "approved";
@@ -124,8 +124,8 @@ function AssetContent({ ctx }: { ctx: Ctx }) {
 }
 
 function AssetPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
-    const { ffId } = meta(ctx);
-    const { data: a, changed } = useLive(ctx, () => api.get(`/assets/${ffId}`), [ffId]);
+    const { oviaId } = meta(ctx);
+    const { data: a, changed } = useLive(ctx, () => api.get(`/assets/${oviaId}`), [oviaId]);
     const [msg, setMsg] = useState("");
     const [desc, setDesc] = useState<string | null>(null);
     if (!a) return null;
@@ -138,14 +138,14 @@ function AssetPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
             <textarea rows={3} disabled={locked} style={input(ctx)} value={desc ?? a.description ?? ""} onChange={(e) => setDesc(e.target.value)} />
             <div><b>Invariants</b>：{(a.invariants ?? []).join("；") || "（空：批准前至少填一条）"}</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {!locked && <button style={btn(ctx)} disabled={desc === null} onClick={act(() => api.patch(`/assets/${ffId}`, { description: desc }), "已保存")}>保存</button>}
-                {!locked && <button style={btn(ctx, true)} onClick={act(() => api.post(`/assets/${ffId}/approve`), "已批准并锁定")}>批准（LOCK）</button>}
-                {locked && <button style={btn(ctx)} onClick={act(() => api.post(`/assets/${ffId}/versions`, {}), "已创建新版本（草稿）")}>新版本</button>}
-                <button style={btn(ctx)} onClick={() => open(meta(ctx).ffProjectId)}>在工作台打开</button>
+                {!locked && <button style={btn(ctx)} disabled={desc === null} onClick={act(() => api.patch(`/assets/${oviaId}`, { description: desc }), "已保存")}>保存</button>}
+                {!locked && <button style={btn(ctx, true)} onClick={act(() => api.post(`/assets/${oviaId}/approve`), "已批准并锁定")}>批准（LOCK）</button>}
+                {locked && <button style={btn(ctx)} onClick={act(() => api.post(`/assets/${oviaId}/versions`, {}), "已创建新版本（草稿）")}>新版本</button>}
+                <button style={btn(ctx)} onClick={() => open(meta(ctx).oviaProjectId)}>在工作台打开</button>
                 <button style={btn(ctx)} onClick={onClose}>关闭</button>
             </div>
             <div style={{ opacity: 0.8 }}>版本：{[...(a.versions ?? [])].reverse().map((v: any) => (
-                <span key={v.version} style={{ marginRight: 8 }}>v{v.version}·{v.approvalStatus}{v.approvalStatus === "approved" && v.version !== a.version && <a style={{ marginLeft: 3, cursor: "pointer", color: "#6366f1" }} onClick={act(() => api.post(`/assets/${ffId}/rollback`, { version: v.version }), `已回滚到 v${v.version}`)}>回滚</a>}</span>
+                <span key={v.version} style={{ marginRight: 8 }}>v{v.version}·{v.approvalStatus}{v.approvalStatus === "approved" && v.version !== a.version && <a style={{ marginLeft: 3, cursor: "pointer", color: "#6366f1" }} onClick={act(() => api.post(`/assets/${oviaId}/rollback`, { version: v.version }), `已回滚到 v${v.version}`)}>回滚</a>}</span>
             ))}</div>
             {msg && <div style={{ color: "#6366f1" }}>{msg}</div>}
         </div>
@@ -155,13 +155,13 @@ function AssetPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
 // ---------------------------------------------------------------- shot
 
 function ShotContent({ ctx }: { ctx: Ctx }) {
-    const { ffId } = meta(ctx);
-    const { data: s, err, changed } = useLive(ctx, () => loadShot(ffId!), [ffId], hasPending);
+    const { oviaId } = meta(ctx);
+    const { data: s, err, changed } = useLive(ctx, () => loadShot(oviaId!), [oviaId], hasPending);
     // Canvas connections are the user's gesture; the domain is the truth. Connecting an Asset node to a Shot adds it to the shot.
-    const upstreamAssets = ctx.getUpstream().filter((n) => n.type === "filmflow:asset").map((n) => (n.metadata as any)?.ffId as string).filter(Boolean);
+    const upstreamAssets = ctx.getUpstream().filter((n) => n.type === "ovia:asset").map((n) => (n.metadata as any)?.oviaId as string).filter(Boolean);
     const missing = s ? upstreamAssets.filter((id) => !s.assetIds.includes(id)) : [];
     const key = missing.join(",");
-    useLive(ctx, async () => { if (missing.length) { await api.patch(`/shots/${ffId}`, { assetIds: [...s.assetIds, ...missing] }); changed(); } return null; }, [key]);
+    useLive(ctx, async () => { if (missing.length) { await api.patch(`/shots/${oviaId}`, { assetIds: [...s.assetIds, ...missing] }); changed(); } return null; }, [key]);
     if (err) return <Problem ctx={ctx} err={err} />;
     if (!s) return null;
     const hero = s.keyframes?.find((k: any) => k.status === "hero")?.media;
@@ -181,10 +181,10 @@ function ShotContent({ ctx }: { ctx: Ctx }) {
 // ---------------------------------------------------------------- definitions
 const common = { transparentBackground: false, autoOpenPanel: true, minimapColor: "#6366f1" };
 export const nodes: CanvasNodeDefinition[] = [
-    { ...common, type: "filmflow:project", title: "FilmFlow 项目", icon: "🎬", description: "连接 FilmFlow 项目，把领域节点同步到画布", defaultSize: SIZE.project, defaultMetadata: {}, minimapColor: "#111827", Content: HubContent, Panel: HubPanel, toolbar: (ctx) => [{ id: "open", title: "在工作台打开", label: "工作台", icon: "↗", onClick: () => open(meta(ctx).ffProjectId) }] },
-    { ...common, type: "filmflow:world", title: "World", icon: "🌍", defaultSize: SIZE.world, showInCreateMenu: false, minimapColor: KIND_COLOR.world, Content: (p) => <WorldLookContent ctx={p.ctx} kind="world" />, Panel: (p) => <WorldLookPanel {...p} kind="world" /> },
-    { ...common, type: "filmflow:look", title: "Look", icon: "🎨", defaultSize: SIZE.look, showInCreateMenu: false, minimapColor: KIND_COLOR.look, Content: (p) => <WorldLookContent ctx={p.ctx} kind="look" />, Panel: (p) => <WorldLookPanel {...p} kind="look" /> },
-    { ...common, type: "filmflow:asset", title: "资产", icon: "🧍", defaultSize: SIZE.asset, showInCreateMenu: false, minimapColor: KIND_COLOR.Character, Content: AssetContent, Panel: AssetPanel, resource: (n) => ({ kind: "text", text: `${n.title}` }) },
-    { ...common, type: "filmflow:sequence", title: "成片", icon: "🎬", description: "序列装配：时间线、字幕、导出", defaultSize: SIZE.sequence, showInCreateMenu: false, minimapColor: "#0f766e", Content: SequenceContent, Panel: SequencePanel },
-    { ...common, type: "filmflow:shot", title: "镜头", icon: "🎞", defaultSize: SIZE.shot, showInCreateMenu: false, Content: ShotContent, Panel: ShotPanel },
+    { ...common, type: "ovia:project", title: "OVIA 项目", icon: "🎬", description: "连接 OVIA 项目，把领域节点同步到画布", defaultSize: SIZE.project, defaultMetadata: {}, minimapColor: "#111827", Content: HubContent, Panel: HubPanel, toolbar: (ctx) => [{ id: "open", title: "在工作台打开", label: "工作台", icon: "↗", onClick: () => open(meta(ctx).oviaProjectId) }] },
+    { ...common, type: "ovia:world", title: "World", icon: "🌍", defaultSize: SIZE.world, showInCreateMenu: false, minimapColor: KIND_COLOR.world, Content: (p) => <WorldLookContent ctx={p.ctx} kind="world" />, Panel: (p) => <WorldLookPanel {...p} kind="world" /> },
+    { ...common, type: "ovia:look", title: "Look", icon: "🎨", defaultSize: SIZE.look, showInCreateMenu: false, minimapColor: KIND_COLOR.look, Content: (p) => <WorldLookContent ctx={p.ctx} kind="look" />, Panel: (p) => <WorldLookPanel {...p} kind="look" /> },
+    { ...common, type: "ovia:asset", title: "资产", icon: "🧍", defaultSize: SIZE.asset, showInCreateMenu: false, minimapColor: KIND_COLOR.Character, Content: AssetContent, Panel: AssetPanel, resource: (n) => ({ kind: "text", text: `${n.title}` }) },
+    { ...common, type: "ovia:sequence", title: "成片", icon: "🎬", description: "序列装配：时间线、字幕、导出", defaultSize: SIZE.sequence, showInCreateMenu: false, minimapColor: "#0f766e", Content: SequenceContent, Panel: SequencePanel },
+    { ...common, type: "ovia:shot", title: "镜头", icon: "🎞", defaultSize: SIZE.shot, showInCreateMenu: false, Content: ShotContent, Panel: ShotPanel },
 ];

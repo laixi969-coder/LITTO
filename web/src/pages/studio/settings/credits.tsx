@@ -1,6 +1,6 @@
 import { Card, Statistic, Table } from "antd";
 
-import { api } from "@/services/api/filmflow";
+import { api } from "@/services/api/ovia";
 import { ledgerColumns } from "../admin/ledger";
 import { useLoad } from "../admin/util";
 
