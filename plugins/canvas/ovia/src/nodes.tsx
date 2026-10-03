@@ -103,11 +103,16 @@ function WorldLookPanel({ ctx, kind, onClose }: { ctx: Ctx; kind: "world" | "loo
     const { data, changed } = useLive(ctx, async () => (kind === "world" ? api.get(`/projects/${pid}/world`) : (await api.get(`/projects/${pid}/looks`)).find((l: any) => l.scope === "project")), [pid]);
     const [draft, setDraft] = useState<Record<string, string>>({});
     const fields = kind === "world" ? WORLD_FIELDS : LOOK_FIELDS;
+    const presets = useLive(ctx, () => (kind === "look" ? api.get("/presets/looks") : Promise.resolve([])), [kind]).data ?? [];
     const save = async () => { await (kind === "world" ? api.put(`/projects/${pid}/world`, draft) : api.put(`/projects/${pid}/looks/project`, draft)); setDraft({}); changed(); };
+    const basic = kind === "world" ? ["locationLogic", "time", "weather"] : [];
+    const row = ([k, label]: [string, string]) => <label key={k} style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 6, alignItems: "center" }}>{label}<input style={input(ctx)} value={draft[k] ?? data?.[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} /></label>;
     return (
         <div data-canvas-no-zoom onMouseDown={stop} onWheel={stop} style={panelBox(ctx)}>
-            <b>{kind === "world" ? "World：整部影片共享的物理与文化设定" : "Look：项目级影调"}</b>
-            {fields.map(([k, label]) => <label key={k} style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 6, alignItems: "center" }}>{label}<input style={input(ctx)} value={draft[k] ?? data?.[k] ?? ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} /></label>)}
+            <b>{kind === "world" ? "世界观：地点、时间、天气，写几个词就够" : "影调：选一个风格，需要再微调"}</b>
+            {kind === "look" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>{presets.map((p: any) => <button key={p.id} style={{ ...btn(ctx), textAlign: "left" }} onClick={() => setDraft({ ...p.look })}><b>{p.name}</b><div style={{ opacity: 0.6, fontSize: 11 }}>{p.desc}</div></button>)}</div>}
+            {fields.filter(([k]) => basic.includes(k)).map(row)}
+            <details><summary style={{ cursor: "pointer", opacity: 0.8 }}>{kind === "world" ? "更多设定" : "高级微调（对比度 / 颗粒 / 光晕…）"}</summary><div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>{fields.filter(([k]) => !basic.includes(k)).map(row)}</div></details>
             <div style={{ display: "flex", gap: 6 }}><button style={btn(ctx, true)} disabled={!Object.keys(draft).length} onClick={save}>保存</button><button style={btn(ctx)} onClick={onClose}>关闭</button></div>
         </div>
     );

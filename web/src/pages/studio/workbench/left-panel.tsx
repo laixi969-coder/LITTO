@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { App, Button, Form, Input, Modal, Progress, Select, Tabs, Tag } from "antd";
+import { App, Button, Collapse, Form, Input, Modal, Progress, Select, Tabs, Tag } from "antd";
 import { Lock, Plus, Upload } from "lucide-react";
 
 import { api, uploadMedia } from "@/services/api/ovia";
@@ -22,6 +22,7 @@ function NewAsset({ onClose }: { onClose: () => void }) {
     const ok = async () => {
         const v = await f.validateFields();
         try {
+            if (!v.invariants?.length) { const sug = await api.post(`/projects/${wb.pid}/assets/suggest`, { type: v.type, name: v.name, description: v.description ?? "" }); Object.assign(v, { invariants: sug.invariants, allowedVariations: sug.allowedVariations, forbiddenChanges: sug.forbiddenChanges }); }
             const a = await api.post(`/projects/${wb.pid}/assets`, { type: v.type, name: v.name, description: v.description ?? "", references: v.references ?? [], invariants: v.invariants ?? [], allowedVariations: v.allowedVariations ?? [], forbiddenChanges: v.forbiddenChanges ?? [], attributes: v.wornBy ? { wornBy: v.wornBy } : {} });
             await wb.reload(); wb.select({ kind: "asset", id: a.id }); onClose();
         } catch (e: any) { message.error(e.message); }
@@ -36,11 +37,13 @@ function NewAsset({ onClose }: { onClose: () => void }) {
                 </div>
                 <Form.Item name="description" label="描述"><Input.TextArea rows={2} /></Form.Item>
                 <Form.Item noStyle shouldUpdate={(a, b) => a.type !== b.type}>{({ getFieldValue }) => getFieldValue("type") === "Wardrobe" && <Form.Item name="wornBy" label="穿着者"><Select allowClear options={chars.map((c) => ({ value: c.id, label: c.name }))} /></Form.Item>}</Form.Item>
-                <Form.Item name="references" label="参考（资产的「它是谁」）"><Select mode="multiple" options={wb.refs.map((r) => ({ value: r.id, label: r.name ?? r.text?.slice(0, 20) ?? r.id }))} /></Form.Item>
-                <div className="mb-2 flex items-center justify-between text-sm"><span>不变量 / 允许变化 / 禁止变化</span><Button size="small" onClick={suggest}>Asset Director 建议</Button></div>
+                <div className="mb-2 text-xs opacity-60">创建后会自动填好「必须保持不变」的要点并锁定；想自定义再展开高级。</div>
+                <Collapse ghost size="small" items={[{ key: "adv", forceRender: true, label: "高级（参考图 / 不变量 / 允许与禁止变化）", children: <>
+                <Form.Item name="references" label="参考图（它是谁）"><Select mode="multiple" options={wb.refs.map((r) => ({ value: r.id, label: r.name ?? r.text?.slice(0, 20) ?? r.id }))} /></Form.Item>
+                <div className="mb-2 flex items-center justify-between text-sm"><span>不变量 / 允许变化 / 禁止变化</span><Button size="small" onClick={suggest}>智能填充</Button></div>
                 <Form.Item name="invariants" label="Invariants（必须不变）"><Select mode="tags" /></Form.Item>
                 <Form.Item name="allowedVariations" label="Allowed variations"><Select mode="tags" /></Form.Item>
-                <Form.Item name="forbiddenChanges" label="Forbidden changes"><Select mode="tags" /></Form.Item>
+                <Form.Item name="forbiddenChanges" label="Forbidden changes"><Select mode="tags" /></Form.Item></> }]} />
             </Form>
         </Modal>
     );

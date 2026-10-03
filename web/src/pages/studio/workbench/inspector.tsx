@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { App, Button, Form, Input, Modal, Select, Tag } from "antd";
+import { App, Button, Collapse, Form, Input, Modal, Select, Tag } from "antd";
 import { Lock, RotateCcw } from "lucide-react";
 
 import { api } from "@/services/api/ovia";
@@ -7,6 +7,7 @@ import { Media } from "./media";
 import { PanoScout } from "./pano-scout";
 import { ShotInspector } from "./shot-inspector";
 import { useAsk } from "./use-ask";
+import { useUiMode } from "@/stores/use-ui-mode";
 import { useWorkbench } from "./use-workbench";
 
 const tags = (name: string, label: string) => <Form.Item name={name} label={label} className="!mb-2"><Select mode="tags" size="small" /></Form.Item>;
@@ -14,14 +15,16 @@ const txt = (name: string, label: string, rows = 0) => <Form.Item name={name} la
 
 function WorldForm() {
     const wb = useWorkbench();
+    const pro = useUiMode((u) => u.pro);
     const { message } = App.useApp();
     const [f] = Form.useForm();
     useEffect(() => f.setFieldsValue(wb.world), [wb.world, f]);
     const save = async () => { try { await api.put(`/projects/${wb.pid}/world`, f.getFieldsValue()); message.success("World 已保存"); await wb.reload(); } catch (e: any) { message.error(e.message); } };
     return (
         <Form form={f} layout="vertical" size="small" className="p-3">
-            <div className="mb-2 text-xs opacity-60">World：整部影片共享的物理与文化设定，所有镜头的编译都会引用它。</div>
-            {txt("era", "年代")}{txt("locationLogic", "地点逻辑", 2)}{txt("architecture", "建筑")}{txt("culture", "文化")}{txt("weather", "天气")}{txt("time", "时间")}{txt("material", "材质")}{txt("physics", "物理")}{txt("realism", "真实性")}{tags("environmentalConstraints", "环境约束")}
+            <div className="mb-2 text-xs opacity-60">世界观：故事发生在哪、什么时候、什么天气。写几个词就够，所有镜头都会参照它。</div>
+            {txt("locationLogic", "地点", 2)}{txt("time", "时间")}{txt("weather", "天气")}
+            <Collapse ghost size="small" className="mb-2" defaultActiveKey={pro ? ["m"] : []} items={[{ key: "m", forceRender: true, label: "更多设定（年代 / 建筑 / 材质…）", children: <>{txt("era", "年代")}{txt("architecture", "建筑")}{txt("culture", "文化")}{txt("material", "材质")}{txt("physics", "物理")}{txt("realism", "真实性")}{tags("environmentalConstraints", "环境约束")}</> }]} />
             <Button type="primary" block onClick={save}>保存 World</Button>
         </Form>
     );
@@ -29,6 +32,9 @@ function WorldForm() {
 
 function LookForm({ selId }: { selId?: string }) {
     const wb = useWorkbench();
+    const pro = useUiMode((u) => u.pro);
+    const [presets, setPresets] = useState<any[]>([]);
+    useEffect(() => void api.get("/presets/looks").then(setPresets).catch(() => {}), []);
     const { message } = App.useApp();
     const [f] = Form.useForm();
     // "shot:<id>" is a not-yet-created shot override (from the shot inspector link).
@@ -46,13 +52,13 @@ function LookForm({ selId }: { selId?: string }) {
     };
     return (
         <Form form={f} layout="vertical" size="small" className="p-3">
-            <div className="mb-2 text-xs opacity-60">Look：项目级影调。序列 / 镜头可显式覆盖，编译时优先取镜头 &gt; 序列 &gt; 项目。</div>
-            <div className="mb-2 flex gap-2"><Select size="small" className="!w-24" value={scope} onChange={(v) => { setScope(v); setTarget(undefined); }} options={[{ value: "project", label: "项目" }, { value: "sequence", label: "序列" }, { value: "shot", label: "镜头" }]} />
+            <div className="mb-2 text-xs opacity-60">影调：选一个风格就行，需要微调再展开「高级」。</div>
+            <div className="mb-3 grid grid-cols-2 gap-2">{presets.map((p) => <button type="button" key={p.id} onClick={() => { f.setFieldsValue(p.look); message.success(`已套用「${p.name}」，点保存生效`); }} className="rounded border border-black/10 p-2 text-left hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"><div className="text-sm font-medium">{p.name}</div><div className="text-[11px] opacity-60">{p.desc}</div></button>)}</div>
+            <div className={`mb-2 flex gap-2 ${pro || scope !== "project" ? "" : "hidden"}`}><Select size="small" className="!w-24" value={scope} onChange={(v) => { setScope(v); setTarget(undefined); }} options={[{ value: "project", label: "项目" }, { value: "sequence", label: "序列" }, { value: "shot", label: "镜头" }]} />
                 {scope === "sequence" && <Select size="small" className="flex-1" placeholder="选择序列" value={target} onChange={setTarget} options={wb.sequences.map((q) => ({ value: q.id, label: `${q.name}${wb.looks.some((l) => l.scope === "sequence" && l.scopeId === q.id) ? " ·覆盖" : ""}` }))} />}
                 {scope === "shot" && <Select size="small" className="flex-1" placeholder="选择镜头" value={target} onChange={setTarget} options={wb.shots.map((s) => ({ value: s.id, label: `#${s.ord + 1} ${s.title || s.narrativeFunction}${wb.looks.some((l) => l.scope === "shot" && l.scopeId === s.id) ? " ·覆盖" : ""}` }))} />}</div>
             {scope !== "project" && !found && <div className="mb-2 rounded bg-black/5 p-2 text-xs dark:bg-white/10">尚无覆盖，保存后创建。未填写的字段会是空值（编译时按空处理），建议从项目 Look 复制需要的字段。<Button size="small" type="link" onClick={() => f.setFieldsValue(base)}>复制项目 Look</Button></div>}
-            <div className="grid grid-cols-2 gap-x-2">{txt("contrast", "对比度")}{txt("saturation", "饱和度")}{txt("skinTone", "肤色")}{txt("blackLevel", "黑位")}{txt("highlightRolloff", "高光滚降")}{txt("shadowBehavior", "暗部")}{txt("grain", "颗粒")}{txt("halation", "光晕 halation")}{txt("bloom", "bloom")}{txt("lensCharacter", "镜头性格")}{txt("texture", "质感")}{txt("sharpnessPhilosophy", "锐度哲学")}</div>
-            {tags("palette", "色板")}
+            <Collapse ghost size="small" className="mb-2" defaultActiveKey={pro ? ["adv"] : []} items={[{ key: "adv", forceRender: true, label: "高级微调（对比度 / 颗粒 / 光晕…）", children: <><div className="grid grid-cols-2 gap-x-2">{txt("contrast", "对比度")}{txt("saturation", "饱和度")}{txt("skinTone", "肤色")}{txt("blackLevel", "黑位")}{txt("highlightRolloff", "高光滚降")}{txt("shadowBehavior", "暗部")}{txt("grain", "颗粒")}{txt("halation", "光晕 halation")}{txt("bloom", "bloom")}{txt("lensCharacter", "镜头性格")}{txt("texture", "质感")}{txt("sharpnessPhilosophy", "锐度哲学")}</div>{tags("palette", "色板")}</> }]} />
             <Button type="primary" block onClick={save}>保存 {scope === "project" ? "Look" : "覆盖"}</Button>
         </Form>
     );

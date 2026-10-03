@@ -1,14 +1,16 @@
 import { useEffect } from "react";
-import { App, Button, Select, Spin } from "antd";
+import { App, Button, Select, Spin, Switch } from "antd";
 import { Clapperboard, LogOut, Settings, Shield } from "lucide-react";
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useOviaStore } from "@/stores/use-ovia-store";
+import { useUiMode } from "@/stores/use-ui-mode";
 
 /** OVIA shell: session guard + slim header. The upstream canvas stays reachable at /canvas. */
 export default function StudioLayout() {
     const { ready, user, refresh, logout, workspaces, workspaceId, switchWorkspace, epoch } = useOviaStore();
     const loc = useLocation();
+    const ui = useUiMode();
     const nav = useNavigate();
     const { message } = App.useApp();
     useEffect(() => void refresh(), [refresh]);
@@ -22,6 +24,7 @@ export default function StudioLayout() {
                 <Link to="/studio/skills" className="opacity-70 hover:opacity-100">Skills</Link>
                 <Link to="/canvas" className="opacity-70 hover:opacity-100">上游画布</Link>
                 <div className="flex-1" />
+                <label className="flex items-center gap-1.5 text-xs opacity-80" title="显示摄影机、灯光、状态、QC 等专业参数"><Switch size="small" checked={ui.pro} onChange={(v) => ui.setMode(v ? "pro" : "simple")} />专业模式</label>
                 {workspaces.length > 0 && <Select size="small" variant="borderless" className="!w-44" value={workspaceId ?? undefined} onChange={(v) => { switchWorkspace(v); nav("/studio"); }} options={workspaces.map((w) => ({ value: w.id, label: `${w.kind === "team" ? "👥 " : ""}${w.name} · ${w.role}` }))} />}
                 <span className="opacity-60">{user.email}</span>
                 <Link to="/studio/settings" title="设置 / API Key / 积分"><Settings size={15} /></Link>

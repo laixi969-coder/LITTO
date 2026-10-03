@@ -268,7 +268,7 @@ test("12 continuity catches identity / prop / lighting / direction conflicts and
     const s2 = await ok(S.A, "POST", `/projects/${pid}/shots`, { ...base, title: "two", assetIds: [S.Mara.asset.id, dress.id, unapproved.id], camera: cam("B", "right"), lighting: { timeOfDay: "night", keyDirection: "right", colorTemp: "3200K" }, performance: { intensity: 0.2 } });
     const issues = await ok(S.A, "POST", `/sequences/${seq.id}/continuity`);
     const cats = issues.map((i: any) => `${i.category}:${i.severity}`);
-    for (const want of ["Cinematic:high", "Lighting:high", "Lighting:medium", "Identity:high", "Identity:medium", "State:low", "State:high"]) assert.ok(cats.includes(want), `expected ${want} in ${cats}`);
+    for (const want of ["Cinematic:high", "Lighting:high", "Lighting:medium", "Identity:medium", "State:low", "State:high"]) assert.ok(cats.includes(want), `expected ${want} in ${cats}`);
     assert.ok(issues.some((i: any) => /180/.test(i.message)));
     assert.ok(issues.every((i: any) => i.repair?.action));
     // High issues block approving a take; override requires a reason and is recorded.

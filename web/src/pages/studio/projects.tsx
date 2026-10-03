@@ -1,22 +1,22 @@
 import { useEffect, useState } from "react";
-import { App, Button, Input, Segmented } from "antd";
+import { App, Button, Segmented } from "antd";
 import { Archive, Copy, FolderOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "@/services/api/ovia";
+import { NewProjectModal } from "./new-project";
 
 type P = { id: string; name: string; status: string; updatedAt: string; deletedAt?: string };
 
 export default function ProjectsPage() {
     const [tab, setTab] = useState<"active" | "archived" | "trash">("active");
     const [items, setItems] = useState<P[]>([]);
-    const [name, setName] = useState("");
     const { message, modal } = App.useApp();
     const nav = useNavigate();
     const load = async () => setItems(tab === "trash" ? await api.get("/projects/trash") : await api.get(`/projects${tab === "archived" ? "?archived=1" : ""}`));
     useEffect(() => void load().catch((e) => message.error(e.message)), [tab]);
     const act = (fn: () => Promise<any>, ok?: string) => async () => { try { await fn(); ok && message.success(ok); await load(); } catch (e: any) { message.error(e.message); } };
-    const create = async () => { if (!name.trim()) return; const p = await api.post("/projects", { name }); nav(`/studio/p/${p.id}`); };
+    const [wizard, setWizard] = useState(false);
 
     return (
         <div className="mx-auto h-full max-w-5xl overflow-auto p-8">
@@ -24,8 +24,7 @@ export default function ProjectsPage() {
                 <h1 className="text-xl font-semibold">项目</h1>
                 <Segmented value={tab} onChange={(v) => setTab(v as any)} options={[{ label: "进行中", value: "active" }, { label: "已归档", value: "archived" }, { label: "回收站", value: "trash" }]} />
                 <div className="flex-1" />
-                <Input className="!w-56" placeholder="新项目名称" value={name} onChange={(e) => setName(e.target.value)} onPressEnter={create} />
-                <Button type="primary" icon={<Plus size={14} />} onClick={create}>新建</Button>
+                <Button type="primary" icon={<Plus size={14} />} onClick={() => setWizard(true)}>新建项目</Button>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {items.map((p) => (
@@ -45,8 +44,9 @@ export default function ProjectsPage() {
                         </>}
                     </div>
                 ))}
-                {!items.length && <div className="col-span-full py-16 text-center text-sm opacity-50">{tab === "active" ? "还没有项目，起个名字开始制片。" : "空"}</div>}
+                {!items.length && <div className="col-span-full py-16 text-center text-sm opacity-50">{tab === "active" ? "还没有项目，点右上角「新建项目」，贴上剧本就能开拍。" : "空"}</div>}
             </div>
+            <NewProjectModal open={wizard} onClose={() => setWizard(false)} />
         </div>
     );
 }

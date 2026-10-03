@@ -10,7 +10,7 @@ import { checkSequence } from "../domain/continuity.ts";
 import { applyRepair, OBSERVATION_KINDS, runQc } from "../domain/qc.ts";
 import { approveTake, generateKeyframes, generateTakes, keyframeView, promoteHero, rollbackHero, rollbackTake, takeView } from "../domain/lifecycle.ts";
 import { directorRun } from "../domain/director.ts";
-import { assetDirector, cinematographer, motionDirector, visualDirector } from "../domain/skills.ts";
+import { assetDirector, cinematographer, motionDirector, visualDirector, storyboardDirector } from "../domain/skills.ts";
 import { compileShot } from "../domain/compiler.ts";
 import { mustRoute, resolvePolicy } from "../providers/router.ts";
 import { bad, HttpError, notFound } from "../util.ts";
@@ -277,3 +277,49 @@ production.get(`${P}/shot-strip`, (c) => {
     return c.json(out);
 });
 void get;
+
+// ---- Simple mode: presets + one-step bootstrap ----
+import { LOOK_PRESETS, extractEntities } from "../domain/presets.ts";
+import { createShotsFromDrafts } from "../domain/shots.ts";
+production.get("/presets/looks", (c) => c.json(LOOK_PRESETS));
+production.post(`${P}/bootstrap`, async (c) => {
+    const { s, a } = project(c, c.req.param("pid"), "EDITOR");
+    const pid = c.req.param("pid");
+    const b = await body(c, z.object({ script: z.string().default(""), lookPresetId: z.string().optional(), generate: z.boolean().default(false) }));
+    const preset = LOOK_PRESETS.find((x) => x.id === b.lookPresetId);
+    if (b.lookPresetId && !preset) throw bad("unknown look preset");
+    if (preset) {
+        const l = (s.list("looks", { projectId: pid }) as any[]).find((x) => x.scope === "project");
+        if (l) s.update("looks", l.id, { data: { ...preset.look, colorReferenceIds: [] } });
+    }
+    const out: any = { look: preset?.name ?? null, assets: [], shotIds: [] };
+    if (!b.script.trim()) return c.json(out);
+    const ent = extractEntities(b.script);
+    const w = s.list("worlds", { projectId: pid })[0] as any;
+    const night = ent.environments.some((e) => e.time === "night");
+    const { id: _i, workspaceId: _w, projectId: _p, schemaVersion: _s, createdAt: _c, updatedAt: _u, ...wcur } = w;
+    s.update("worlds", w.id, { data: { ...wcur, locationLogic: ent.environments.map((e) => e.name).join(" / "), time: night ? "night" : "day" } });
+    const existing = new Set((s.list("assets", { projectId: pid }) as any[]).map((x) => x.name.toLowerCase()));
+    const made: any[] = [];
+    const mk = (type: any, name: string, description = "") => {
+        if (existing.has(name.toLowerCase())) return;
+        const sug = assetDirector(type, name, description);
+        const asset = createAsset(s, pid, { type, name, description, attributes: {}, references: [], invariants: sug.invariants, allowedVariations: sug.allowedVariations, forbiddenChanges: sug.forbiddenChanges });
+        made.push(approveAsset(s, asset.id, a.user.id)); // auto-approved: users can version it later; one less step to learn
+    };
+    ent.characters.forEach((n) => mk("Character", n));
+    ent.environments.forEach((e) => mk("Environment", e.name));
+    ent.props.forEach((n) => mk("Prop", n));
+    out.assets = made.map((x) => ({ id: x.id, name: x.name, type: x.type }));
+    const all = s.list("assets", { projectId: pid }) as any[];
+    let seq = (s.list("sequences", { projectId: pid }) as any[])[0];
+    if (!seq) seq = s.insert("sequences", { project_id: pid, name: "主序列", ord: 0, script: b.script, data: {} });
+    else s.update("sequences", seq.id, { script: b.script });
+    const drafts = storyboardDirector(b.script, all.map((x) => ({ id: x.id, name: x.name, type: x.type })), { minShots: 8 });
+    const shots = createShotsFromDrafts(s, pid, seq.id, drafts);
+    out.shotIds = shots.map((x: any) => x.id);
+    out.sequenceId = seq.id;
+    checkSequence(s, seq.id);
+    if (b.generate) out.jobs = shots.map((x: any) => generateKeyframes(s, x.id, a.user.id, { count: 2 }).job.id);
+    return c.json(out);
+});

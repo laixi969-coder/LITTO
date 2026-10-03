@@ -21,7 +21,7 @@ export function checkPair(prev: any | null, shot: any, prevSt: { start: State; r
         const a = of(id);
         if (!a) { add("Identity", "high", `Shot references missing asset ${id}`, "replace_reference", "Remove or replace the missing asset"); continue; }
         if (a.approvalStatus !== "approved") add("Identity", "medium", `${a.type} "${a.name}" is not approved; the model may drift`, "approve_asset", `Approve "${a.name}" so it becomes a LOCK`);
-        if (["Character", "Creature"].includes(a.type) && !(shot.bindings ?? []).some((b: any) => b.role === "IDENTITY" && (b.assetId === id || !b.assetId)) && !(a.references ?? []).length) add("Identity", "high", `"${a.name}" has no IDENTITY reference on this shot`, "reference_replace", `Bind an IDENTITY reference for "${a.name}"`);
+        if (["Character", "Creature"].includes(a.type) && !(shot.bindings ?? []).some((b: any) => b.role === "IDENTITY" && (b.assetId === id || !b.assetId)) && !(a.references ?? []).length) add("Identity", "medium", `"${a.name}" has no reference image, so its look may drift between shots`, "reference_replace", `Upload a picture of "${a.name}" and bind it as IDENTITY`);
     }
     if (prev) {
         const prevIds: string[] = prev.assetIds ?? [];

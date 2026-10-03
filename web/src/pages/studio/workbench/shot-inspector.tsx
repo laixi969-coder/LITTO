@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { App, Button, Checkbox, Form, Input, InputNumber, Modal, Select, Slider, Tabs, Tag } from "antd";
+import { App, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, Select, Slider, Tabs, Tag } from "antd";
 import { Check, Crown, RotateCcw, ShieldAlert, Trash2 } from "lucide-react";
 
 import { api } from "@/services/api/ovia";
 import { ROLES } from "./bind-dialog";
 import { Media } from "./media";
+import { useUiMode } from "@/stores/use-ui-mode";
 import { useAsk } from "./use-ask";
 import { useWorkbench } from "./use-workbench";
 
@@ -41,6 +42,7 @@ function LookOverride({ shot }: { shot: any }) {
 
 function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
     const wb = useWorkbench();
+    const pro = useUiMode((u) => u.pro);
     const { message, modal } = App.useApp();
     const [f] = Form.useForm();
     const [delta, setDelta] = useState(JSON.stringify(shot.intendedStateDelta ?? {}, null, 1));
@@ -69,12 +71,14 @@ function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
     const t = (label: string, name: (string | number)[], el?: React.ReactNode) => <Form.Item key={name.join(".")} label={label} name={name} className="!mb-2">{el ?? <Input size="small" />}</Form.Item>;
     return (
         <Form form={f} layout="vertical" size="small" className="p-3">
-            <LookOverride shot={shot} />
             {t("标题", ["title"])}
-            <div className="grid grid-cols-2 gap-2">{t("叙事功能", ["narrativeFunction"], <Select size="small" options={FUNCS.map((v) => ({ value: v }))} />)}{t("时长(s)", ["duration"], <InputNumber size="small" min={1} max={30} className="!w-full" />)}</div>
-            {t("资产", ["assetIds"], <Select mode="multiple" size="small" options={wb.assets.map((a) => ({ value: a.id, label: `${a.name} (${a.type})` }))} />)}
-            {t("动作", ["action"], <Input.TextArea rows={2} />)}
+            {t("发生了什么（动作）", ["action"], <Input.TextArea rows={2} />)}
             {t("台词 / 字幕", ["subtitle"], <Input.TextArea rows={2} placeholder="出现在成片字幕里" />)}
+            <div className="grid grid-cols-2 gap-2">{t("景别", ["camera", "shotSize"], <Select size="small" options={SIZES.map((v) => ({ value: v }))} />)}{t("时长(s)", ["duration"], <InputNumber size="small" min={1} max={30} className="!w-full" />)}</div>
+            {t("出场资产", ["assetIds"], <Select mode="multiple" size="small" options={wb.assets.map((a) => ({ value: a.id, label: `${a.name} (${a.type})` }))} />)}
+            <Collapse ghost size="small" className="mb-2" defaultActiveKey={pro ? ["pro"] : []} items={[{ key: "pro", forceRender: true, label: "专业参数（表演 / 机位 / 灯光 / 锁定规则 / 状态）", children: <>
+            <LookOverride shot={shot} />
+            {t("叙事功能", ["narrativeFunction"], <Select size="small" options={FUNCS.map((v) => ({ value: v }))} />)}
             <div className="mb-1 mt-2 text-xs font-medium opacity-60">表演</div>
             <div className="grid grid-cols-2 gap-2">{t("情绪", ["performance", "emotion"])}{t("强度", ["performance", "intensity"], <Slider min={0} max={1} step={0.05} />)}{t("视线 Eyeline", ["performance", "eyeline"])}{t("手势", ["performance", "gesture"])}</div>
             <div className="mb-1 mt-2 text-xs font-medium opacity-60">镜头</div>
@@ -94,6 +98,7 @@ function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
             <div className="mb-1 mt-2 text-xs font-medium opacity-60">Freedom Map（空则取默认）</div>
             {(["LOCK", "CONTROL", "ALLOW", "RANDOM"] as const).map((k) => t(k, ["freedomMap", k], <Select mode="tags" size="small" />))}
             <Form.Item label="Intended State Delta (JSON：PreviousState → Delta → ResultState)" className="!mb-2"><Input.TextArea rows={4} value={delta} onChange={(e) => setDelta(e.target.value)} className="font-mono !text-xs" /></Form.Item>
+            </> }]} />
             <Button type="primary" block onClick={save}>保存镜头</Button>
         </Form>
     );
@@ -235,6 +240,7 @@ function History({ shotId }: { shotId: string }) {
 }
 
 export function ShotInspector({ id }: { id: string }) {
+    const pro = useUiMode((u) => u.pro);
     const { message, modal } = App.useApp();
     const wb = useWorkbench();
     const { d, refresh, watch } = useShot(id);
@@ -247,16 +253,16 @@ export function ShotInspector({ id }: { id: string }) {
         const go = async (confirm: boolean) => { try { await api.del(`/shots/${id}${confirm ? "?confirm=1" : ""}`); wb.select(null); await wb.reload(); } catch (e: any) { message.error(e.message); } };
         modal.confirm({ title: "删除镜头？", content: shot.heroKeyframeId || shot.approvedTakeId ? "该镜头已有 Hero Frame / Approved Take，确认后才会删除。" : undefined, okType: "danger", onOk: () => go(!!(shot.heroKeyframeId || shot.approvedTakeId)) });
     };
+    const openIssues = d.issues.filter((i: any) => i.status === "open").length;
     return (
         <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 border-b border-black/10 px-3 py-2 text-sm dark:border-white/10"><b>镜头 #{shot.ord + 1}</b><Tag className="!m-0">{shot.status}</Tag><div className="flex-1" /><Button size="small" type="text" danger icon={<Trash2 size={13} />} onClick={del} /></div>
-            <Tabs size="small" className="min-h-0 flex-1 overflow-auto [&_.ant-tabs-nav]:!mb-0 [&_.ant-tabs-nav]:!px-3" items={[
-                { key: "spec", label: "规格", children: <Spec shot={merged} onSaved={refresh} /> },
-                { key: "ref", label: `参考 ${shot.bindings?.length ?? 0}`, children: <Refs shot={merged} onSaved={refresh} /> },
+            <Tabs size="small" defaultActiveKey="gen" className="min-h-0 flex-1 overflow-auto [&_.ant-tabs-nav]:!mb-0 [&_.ant-tabs-nav]:!px-3" items={[
                 { key: "gen", label: "生成", children: <Gen shot={merged} d={d} refresh={refresh} watch={watch} /> },
-                { key: "qc", label: `QC ${d.issues.filter((i: any) => i.status === "open").length || ""}`, children: <Qc shot={merged} d={d} refresh={refresh} watch={watch} /> },
-                { key: "state", label: "状态", children: <State shot={merged} /> },
-                { key: "hist", label: "历史", children: <History shotId={id} /> },
+                { key: "spec", label: "镜头设定", children: <Spec shot={merged} onSaved={refresh} /> },
+                { key: "ref", label: `参考 ${shot.bindings?.length ?? 0}`, children: <Refs shot={merged} onSaved={refresh} /> },
+                ...(pro || openIssues ? [{ key: "qc", label: `质检${openIssues ? ` ·${openIssues}` : ""}`, children: <Qc shot={merged} d={d} refresh={refresh} watch={watch} /> }] : []),
+                ...(pro ? [{ key: "state", label: "状态", children: <State shot={merged} /> }, { key: "hist", label: "历史", children: <History shotId={id} /> }] : []),
             ]} />
         </div>
     );
