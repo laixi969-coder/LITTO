@@ -1,20 +1,24 @@
-# 构建 Vite 前端产物。
-FROM oven/bun:1.3.13 AS web-build
+FROM oven/bun:1.3.14
 
-WORKDIR /app/web
-COPY web/package.json web/bun.lock ./
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --cache-dir=/root/.bun/install/cache
-COPY VERSION /app/VERSION
-COPY CHANGELOG.md /app/CHANGELOG.md
-COPY web ./
-RUN bun run build
+WORKDIR /app
 
-# 运行镜像：只启动静态前端，AI 请求由浏览器前台直连用户自己的接口。
-FROM nginx:1.27-alpine
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=web-build /app/web/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY web/docker-entrypoint.sh /docker-entrypoint.d/40-runtime-config.sh
-RUN chmod +x /docker-entrypoint.d/40-runtime-config.sh
+COPY . .
 
+# ACT: 保留工作区与依赖以兼容运行时动态加载；需要缩减镜像时再拆分构建阶段。
+RUN bun install --frozen-lockfile
+
+RUN bun run build:server \
+    && mkdir -p data/workspaces/myProject \
+    && chown -R bun:bun data
+
+ENV NODE_ENV=production
+ENV TOONFLOW_DATA_DIR=/app/data
+
+USER bun
 EXPOSE 3000
+
+CMD ["bun", "build/server/index.js"]

@@ -1,98 +1,214 @@
-# AGENTS.md
+本规范适用于整个仓库。
 
-本文档用于约束本项目中的 AI / 自动化开发行为。开发时优先遵循本文件，其次遵循用户当前消息。
+# 开发规范说明
 
-## 基本原则
+## 代码风格要求
 
-- 先读现有代码，再动手修改，优先沿用项目已有结构和写法。
-- 写代码保持最少行数，能简单实现就不要引入复杂抽象。
-- 标准格式、协议、解析、压缩、加密、日期等通用能力优先使用成熟稳定的库，不要手写底层实现，除非用户明确要求或项目已有实现必须沿用。
-- 不要为了“兼容更多场景”写大量分支，只实现当前明确需要的功能。
-- 项目尚未上线，不需要兼容旧数据；本地存储结构调整时直接按新设计修改，不写旧字段兼容或数据迁移兜底，除非用户明确要求。
-- 每次写完代码，不需要检查语法，不需要执行构建，用户会自己做。
-- 不要改无关文件，不要顺手重构。
-- 如果工作区已有用户改动，不要回滚，不要覆盖；只在必要范围内追加修改。
+1. 优先使用简洁直接的实现方案：减少嵌套层级、删除冗余分支、避免不必要的抽象，保证代码可读性优先。
+2. 函数保持小而聚焦，仅当复用价值或可读性有明确提升时才做逻辑抽取。
+3. 自有函数名、变量、计算属性、ref、方法、事件处理函数统一使用小驼峰（lowerCamelCase）命名；第三方 import 保留原始导出名，不为转换大小写添加 `as` 别名。
+4. 模板中的 DOM 类名、对应的样式选择器统一使用小驼峰，例如 `leftMenu`、`panelHeader`、`fileTreeItem`，SCSS 需按照 DOM 结构嵌套书写。
+5. 不使用全大写常量，优先使用语义化小驼峰命名，例如 `editorConfig`、`requestTimeout`、`panelWidth`。
+6. 新增逻辑前优先复用已有的工具函数和 Store 方法，避免新增不必要的工具层。
+7. 所有新建文件、文件夹名称必须统一使用小驼峰**，无任何例外，例如 `userStore.ts`、`fileTree.ts`、`apiHelper.ts`、`editorPanel/`、`contextMenu/`。
+8. **禁止使用短横线命名、蛇形命名、帕斯卡命名或全大写格式作为文件/文件夹名**，项目中已存在的例外情况不作为新开发的参考依据。
+9. **组件文件名同样严格遵循小驼峰规则**，例如 `tabHeader.ts`、`splitPane.ts`、`loginForm.ts`，禁止使用 `TabHeader.ts` 或 `tab-header.ts` 这类格式。
+10. **自有组件（项目内自己编写的组件）的文件名、本地绑定名和模板标签必须使用小驼峰**，例如 `showBox.vue`、`import showBox from "./showBox.vue"`、`<showBox />`，不得使用 `<show-box />`。
+11. **第三方 UI/组件库的模板标签允许使用短横线分隔（kebab-case）或小驼峰，优先统一使用短横线分隔**，例如 `<el-button />`、`<vue-flow />`、`<icon-map />`；此规则不放宽自有文件、变量或 DOM 类名的小驼峰要求。
+12. **所有组件模板标签及自有组件本地绑定名绝对禁止大驼峰（PascalCase）**，例如禁止 `<ShowBox />`、`<ElButton />`、`<VueFlow />`。第三方组件直接按库原始导出名导入，例如 `import { ElButton } from "element-plus"`、`import { VueFlow } from "@vue-flow/core"`，模板分别使用 `<el-button />`、`<vue-flow />`；脚本及模板表达式直接使用原始导出名，不添加仅用于转小驼峰的 `as` 别名。类型名、库导出名及工具自动生成的声明不属于模板标签，不手工改写自动生成文件。
+13. **所有 `.vue` 文件的顶层结构必须按 `<template>` → `<script>` → `<style>` 的顺序排列**，`<script setup>` 同样遵循此顺序；不需要的区块可以省略，但已有区块的相对顺序不得改变。
+14. **所有组件的属性名必须统一使用小驼峰，包括自有组件、第三方组件的 props 声明、静态属性和动态绑定**，例如 `showArrow`、`:nodeTypes`、`:snapToGrid`，禁止写成 `show-arrow`、`:node-types`、`:snap-to-grid`。具名 `v-model` 的参数同样使用小驼峰，例如 `v-model:snapEnabled`。组件标签允许短横线的规则不适用于属性名。
+15. **仅 Vue 语法、HTML 标准或第三方接口强制要求的名称保留原始写法**，例如 `v-if`、`v-for`、`v-model`、`v-bind`、`v-on`、`aria-label`、`data-*`；不得将这些名称改为小驼峰。第三方文档中的短横线示例不构成例外，支持小驼峰的组件属性仍必须使用小驼峰。
 
-## 反复提醒沉淀
+## 统一文件操作入口
 
-- 如果开发过程中总是遇到某个问题，或者用户反复提醒同一个注意事项，需要把该注意事项补充到本文件。
-- 补充时写成明确、可执行的规则，避免只写模糊描述。
-- 新规则应放到最相关的章节；找不到合适章节时放到“项目注意事项”。
+- 自有代码的磁盘操作统一使用 `@toonflow/file`；Bun 文件对象与写入使用 `@toonflow/file/bun`。直接调用原生 `fs`、`fs/promises`、`Bun.file`、`Bun.write` 仅限 `packages/file` 的实现，不在各模块重复封装底层操作。CI 尚未安装依赖的准备步骤、没有源码和依赖的发布步骤保留运行器原语；已安装工作区依赖的 CI 脚本仍使用统一入口。
+- `file` 子包只负责文件原语、原子写入和按路径协调队列。全局文件与工作区文件的统一入口放在各自业务模块，路径授权、工作区边界校验和业务冲突锁继续由模块负责。
+- 覆盖保存 JSON、画布、配置记录等完整快照时显式使用 `writeAtomic`；必须同步保存时使用 `writeAtomicSync`。仅新建使用 `exclusive` 或保留原有 `flag: "wx"`，不能用先检查存在再覆盖代替。
+- HTTP 传输适配、SDK 持久化、安装备份与回滚等事务留在所属模块，不放进 `file` 子包，也不全局修改原生 `fs` 或重写第三方 SDK 的磁盘协议。
 
-## 前端规范
+## 前端工作区文件操作
 
-- 前端使用 Vite、React、React Router、TypeScript、Ant Design、Tailwind、Zustand。
-- 编写 Ant Design 相关代码时，参考 https://ant.design/llms-full.txt 理解组件 API、示例和设计规范，并优先结合项目当前 antd 版本与既有写法。
-- 外部服务请求统一放在 `web/src/services/api/`，由浏览器前端直连，不假设存在项目后端。
-- 全局或跨页面状态优先放在 `web/src/stores/`。
-- 已经放在全局 store 或全局 hook 中的状态/动作，组件需要时直接使用对应 store/hook，不要为了“纯组件”层层透传 props；避免一个组件传递过多参数。
-- 全局组件、全局常量、全局配置等全局性质的内容不要作为 props 或参数层层传递；哪里需要就在哪里直接从对应全局入口获取。
-- 多个页面重复出现的 UI 副作用动作，例如复制文本并提示、下载并提示、统一确认弹窗，优先抽成 `web/src/hooks/` 下的全局 hook；不要放进 store，除非它确实是需要共享/订阅的状态。
-- 路由页面放在 `web/src/pages/`，页面布局放在 `web/src/layouts/`，路由配置放在 `web/src/router.tsx`。
-- 画布页面放在 `web/src/pages/canvas/`，画布组件放在 `web/src/components/canvas/`，画布状态放在 `web/src/stores/canvas/`，画布工具函数放在 `web/src/lib/canvas/`。
-- 页面按目录组织，例如 `web/src/pages/image/index.tsx`；页面里只有一个主业务组件时直接写在对应页面入口中，不要单独拆 `Manager` 组件再传一堆 props。
-- 不要新增只做简单转发的组件，例如只 `return <X>{children}</X>` 或只换个名字透传 props；直接在使用处使用真实组件或把逻辑写进当前文件。
-- 页面私有 hook 放在对应页面目录下，例如 `admin/assets/use-admin-assets.ts`；只有多个页面真实复用的 hook 才放到外层 `hooks/`。
-- 管理后台页面私有组件放到各自页面目录的 `components/` 下，例如 `admin/assets/components/`、`admin/prompts/components/`；不要为了单页面使用放到 `admin/components/` 共享目录。
-- 管理后台主题、背景、卡片阴影、表格配色等统一在 `web/src/lib/app-theme.ts`、`AppProviders` 或必要的全局 CSS 作用域中配置；页面私有组件不要自己写 `dark ? ...` 主题分支。
-- Ant Design 的 Dropdown、Menu、Select、Cascader、TreeSelect 等弹层背景、悬停态和选中态颜色统一通过 `web/src/lib/app-theme.ts` 的全局 Alias Token 与组件 Token 配置；不要在业务组件内为单个弹层覆盖颜色。
-- 组件优先使用函数组件和现有 hooks，不新增大型状态管理方案。
-- UI 图标优先使用 `lucide-react` 或项目已经使用的 Ant Design 图标。
-- 页面文案保持中文。
-- 不要在组件里堆太多无关逻辑；复杂逻辑优先抽成同目录工具函数或小组件。
-- 样式优先由组件自己管理；组件私有样式优先使用 Tailwind className 或少量内联 style，不要为单个组件新增大量全局 CSS。
-- 全局 CSS 只放基础变量、全局重置、跨页面通用样式和少量第三方组件必要覆盖；不要在 `globals.css` 堆页面私有样式。
-- 代码尽量短小直接，少拆不必要组件，少做多层 props 传递，避免为了抽象堆出更多代码。
-- 前端业务数据需要浏览器本地持久化时，默认使用 `localforage`；`localStorage` 只用于极小的简单配置，不要用来保存业务列表、生成记录、图片、base64 或大 JSON。
+- `apps/web/src/lib/workspaceFiles.ts` 默认导出 `useWorkspaceFiles`。组件与前端工具统一复用此入口，不重复封装 Axios 或直接拼接 `/api/workspaces/files/*` 请求。
+- 方法中的 `path`、`target` 均为工作区内的相对路径，例如 `画布1.json`、`assets/image.png`；目录参数使用绝对路径。
+- 不传目录时，使用 Pinia 中当前项目的工作目录，每次操作重新读取；在 Pinia 初始化后的组件 `setup` 中创建实例。未选择工作目录时操作报错。
 
-## 画布 UI 规范
+```ts
+import useWorkspaceFiles from "@/lib/workspaceFiles";
 
-- 做 canvas 前端 UI 时必须遵循当前画布主题。
-- 优先使用 `canvasThemes`、`useThemeStore` 或 Ant Design `ConfigProvider` token。
-- 不要硬编码黑白、stone、slate 等颜色导致浅色/深色主题不一致。
-- 新增画布按钮、弹窗、浮层时，尽量复用已有工具栏、节点面板、Modal 的视觉风格。
-- 画布顶部工具栏和状态信息优先采用极简扁平风格：无边框、无阴影、无胶囊背景，融入整体背景，弱化按钮感，仅保留轻微 hover 反馈，保持简洁现代、低视觉重量。
-- 左侧画布面板等列表里的节点/元素缩略图容器，非图片类型（文本、配置、视频、音频等）不要使用 `theme.node.fill`（`#e7e5df`/`#292524`）这类灰色背景，图标直接无背景展示，尽量不要给多余底色，保持干净。
-- 画布内的操作按钮（如面板里的「添加」「导出」「选择」等）默认用扁平无底色样式：透明背景、仅 `hover:bg-black/5 dark:hover:bg-white/10` 轻微反馈，靠图标+文字表达，不要用 `theme.toolbar.activeBg`（`#e7e5df`/`#3a3631`）或 `theme.node.fill` 之类的灰色作为按钮填充底色。灰色 `activeBg` 只允许用于「选中态」等需要表达状态的高亮，不要当普通装饰底色。
-- 图片节点尺寸逻辑要尊重原始比例，除非功能明确要求自由变形。
-- 批量生成、多图展示、助手面板等画布交互要尽量简洁，不要占用过多画布空间。
+const files = useWorkspaceFiles();
+const { directory, entries } = await files.list();
+const content = await files.readText("说明.txt");
+await files.write("说明.txt", content);
+```
 
-## 文档规范
+### 目录绑定
 
-- README 保持简洁，只放项目介绍、核心功能、快速开始和文档入口。
-- `docs/index.md` 放给 AI 使用的文档索引，不要再放到 `docs/content/docs/` 内容目录里。
-- 详细功能介绍写到 `docs/content/docs/overview/features.mdx`。
-- 后续待办写到 `docs/content/docs/progress/todo.mdx`。
-- 已实现但还需要用户测试确认的事项写到 `docs/content/docs/progress/pending-test.mdx`。
-- `docs/content/docs/progress/pending-test.mdx` 用来记录这个版本实际做了哪些可测试变更；`CHANGELOG.md` 的 `Unreleased` 只保留对这些变更的版本级归纳，避免逐条照搬实现细节。
-- 每次重大改动（新增/调整/删除功能、接口或工具，影响用户可感知行为）完成后，都要在 `CHANGELOG.md` 的 `Unreleased` 追加一条记录，按 `[新增]` / `[调整]` / `[修复]` / `[优化]` 前缀分类，用一句中文归纳；纯内部重构、格式化、无用户可感知影响的小改动可不记。
-- 每次 todo 事项完成后，先从 `docs/content/docs/progress/todo.mdx` 移到 `docs/content/docs/progress/pending-test.mdx`，不要直接写进正式功能说明；用户确认测试通过后再更新 `docs/content/docs/overview/features.mdx`。
-- 每次任务完成前，都要根据实际变更检查并更新 `docs/content/docs/progress/todo.mdx` 和 `docs/content/docs/progress/pending-test.mdx`；如果功能或待办没有变化，也要确认无需修改。
-- 文档不要写过期日期；除非用户明确要求记录具体时间。
+- `useWorkspaceFiles(directory)`：传入目录字符串，固定该实例的目标目录；普通 TypeScript 工具函数可直接使用，不依赖当前 Pinia 实例。
+- `useWorkspaceFiles(directoryRef)` 或 `useWorkspaceFiles(() => props.directory)`：传入 ref 或 getter，每次操作读取最新值；显式目录为空时直接报错，不回退到当前项目。
+- 新建项目尚未更新 Pinia 时，显式传入用户选择的目录；`list()` 返回服务端规范化后的 `directory`，后续创建与失败回滚使用同一规范目录。
+- 防抖、保存队列、跨 `await` 的多步操作必须在操作开始时取得目录字符串快照，后续步骤复用固定目录实例，避免切换项目后读写到另一个目录。自动保存与防抖仍由所属页面管理，文件封装不自动监听或保存数据。
 
-## 发版本流程
+```ts
+import useWorkspaceFiles from "@/lib/workspaceFiles";
+import { useWorkspaceStore } from "@/stores/workspace";
 
-- 发版本时，先把 `CHANGELOG.md` 的 `Unreleased` 变更整理成新的版本记录，并保留空的 `Unreleased` 标题。
-- 按当前版本号提升一个版本，更新根目录 `VERSION`。
-- 将当前未提交的代码全部提交到 Git。
-- 提交完成后，给当前提交打最新版本号对应的 tag，例如 `v0.0.5`。
-- 发版本流程中不要执行编译、测试或构建，除非用户明确要求。
+const workspaceStore = useWorkspaceStore();
 
-## PR 审查与处理
+async function renameJsonFile(path: string, target: string) {
+  const directory = workspaceStore.project?.directory;
+  if (!directory) throw new Error("请先选择工作目录");
+  const files = useWorkspaceFiles(directory);
+  await files.rename(path, target);
+  return files.readJson(target);
+}
+```
 
-- 审查 PR 时必须把“需求价值”和“实现质量”分开判断，分别给出结论；实现差不等于需求不需要，需求有价值也不等于当前代码可以合并。
-- 需求价值需要单独结合项目方向、用户场景、现有能力和后续规划判断；无法从项目上下文确定是否需要时，必须询问用户，不得仅凭代码质量、作者或改动规模推断需求不需要。
-- 实现质量重点检查正确性、安全性、改动范围、重复代码、无关文件、现有结构复用、可维护性、测试与文档以及与最新 `main` 的冲突。改动几十个文件、疑似 AI 批量生成、重复代码多只能作为重点复核或拒绝当前实现的信号，不能单独作为放弃需求的依据。
-- 对“需求有价值但实现不合格”的 PR，优先考虑要求作者修改、提取可用思路后自行重做，或把需求保留到 issue/todo；不要直接把需求一起否定。
-- 建议关闭 PR 前，必须先向用户分别说明需求价值、实现质量、可保留的思路和建议处理方式，并取得用户明确确认；批量关闭时也要让用户能看清每个 PR 的需求是否仍需保留。
-- 可以先在独立分支审查、修复、测试和准备提交；任何合并进 `main` 的操作都必须先说明修复内容、测试结果、风险与冲突，并取得用户明确同意。需要 force-push PR 作者分支时也必须提前说明影响并取得同意。
+### 方法与返回值
 
-## 项目注意事项
+所有文件操作均返回 Promise；写入、改名、删除、建目录成功时无返回内容。
 
-- 新增或调整超时、重试次数、大小限制、并发上限等会改变实际行为的边界值前，必须先向用户说明适用环节、默认值和失败后的处理方式，并取得确认；不要把经验值当成纯内部实现静默加入。
-- 当前画布项目和“我的素材”主要保存在浏览器本地，不要在文档中误写成已支持云同步。
-- 当前 AI API Key 存在浏览器本地，并由前端直接请求 OpenAI 兼容接口；涉及安全说明时要写清楚。
-- Docker 静态资源路径目前仍是待办项，文档中不要过度承诺生产部署已经完全验证。
-- Agent 对话消息必须同时按 `threadId`、`turnId` 和 `itemId` 归属；实时事件只用于补充未物化的 turn，历史快照成为权威后不得重复合并同一条消息。
-- Agent 通信协议版本与消息存储版本必须独立管理；消息存储格式升级时必须先备份再迁移，遇到未知版本、损坏清单或冲突备份时拒绝覆盖原文件，不得按记录数量或文件大小静默裁剪历史元数据。
-- 本地启动或浏览器验收时不要关闭用户已经打开的浏览器窗口或标签页；需要自动化验证时使用独立测试页面，避免打断用户当前页面和对话状态。
+| 方法 | 用法与返回值 |
+| --- | --- |
+| `list(path = "")` | 列出一层目录，返回 `{ directory, entries }`；每项包含 `name`、相对 `path`、`type`（`file` 或 `directory`）。 |
+| `read(path)` | 读取二进制，返回 `ArrayBuffer`。 |
+| `readText(path, maxBytes?)` | 读取文本，返回字符串；传入正整数 `maxBytes` 时通过 HTTP Range 只读取文件头指定字节数。 |
+| `readJson<T = unknown>(path)` | 读取并解析 JSON，返回 `T`；泛型仅提供类型提示，不校验文件结构。 |
+| `write(path, content, exclusive = false)` | 写入字符串、`Blob` 或 `ArrayBuffer`；默认创建或覆盖整个文件，第三个参数传 `true` 时只允许新建。 |
+| `writeJson(path, data, exclusive = false)` | 将数据格式化为 JSON 后写入；第三个参数传 `true` 时只允许新建。 |
+| `rename(path, target)` | 在工作区内改名或移动文件、目录；目标已存在时不覆盖。 |
+| `remove(path, recursive = false)` | 删除文件或空目录；显式传 `true` 才递归删除目录内容。 |
+| `mkdir(path)` | 创建目录；父目录须存在，不自动递归创建。 |
+
+- 文件的标记字段和业务结构由调用方负责，例如画布的 `toonflowCanvas`、对话的 `toonflowAgent`；不能因调用了 `readJson<T>` 就假定结构有效。
+- 所有请求错误原样抛给调用方处理，JSON 解析失败抛出 `SyntaxError`；不要吞掉写入失败或无条件重试。新增文件的自动编号只处理服务端明确返回的同名冲突。
+- 此封装只负责工作区文件；全局设置继续使用设置接口，项目列表继续由 Pinia 持久化，移除列表项不等于删除工作区文件。
+
+## Server 开发规范
+
+以下规则适用于 `apps/server`，与上面的通用代码规范同时遵守。
+
+### 技术栈与职责
+
+- 使用 Bun、TypeScript、ES Modules 和 Express，沿用现有依赖与工具，不另建服务框架。
+- `src/index.ts` 是独立 server 的启动入口，单进程监听端口。
+- `src/app.ts` 的 `createApp({ webRoot, dataDirectory?, ... })` 负责创建应用、装配中间件、静态资源、路由和统一错误处理，返回应用；传入的数据目录须在动态加载路由前设置。不要在这里启动监听或创建 worker。
+- 桌面端通过 `@toonflow/server/app` 复用应用，不导入独立 server 的启动入口，不额外启动 cluster。
+
+### 目录结构
+
+```text
+apps/server/
+  package.json
+  tsconfig.json
+  src/
+    index.ts                 # 独立服务启动
+    app.ts                   # Express 应用装配
+    core.ts                  # 根据文件目录生成路由
+    router.ts                # 自动生成的路由注册文件
+    utils.ts                 # 通用工具统一出口，默认导出对象
+    utils/
+      conf/index.ts          # conf 实例与配置
+      mcp/                   # MCP 控制、工具和资源
+    lib/
+      middleware.ts          # 参数校验等 HTTP 中间件
+      responseFormat.ts      # 统一响应格式
+    routes/
+      hello.ts               # 单个接口
+      settings/              # 按业务分类
+        get.ts               # 读取设置接口
+        save.ts              # 保存设置接口
+```
+
+- 文件、目录、变量和函数统一小驼峰命名。业务按文件夹分层，层级已有语义时，文件名不重复堆叠业务名称，例如 `settings/get.ts`。
+- **一个接口一个文件。** 每个路由文件只注册一个 HTTP 方法与路径，默认导出对应 Express Router；读取、保存等接口必须拆开。
+- `routes/` 下的 `.ts` 文件都会被当作路由模块扫描，不能把工具、类型、配置或单纯的目录聚合文件放进去。
+- 工具实现按业务模块放到 `utils/*/`，例如 `utils/mcp/control.ts`；文件名不重复模块前缀，通过 `utils.ts` 暴露。HTTP 中间件及响应格式放 `lib/`。不为简单接口额外搭建 controller、service、repository 等层。
+
+### 路由与路径规则
+
+- `core.ts` 扫描 `src/routes/**/*.ts`，根据文件相对路径生成 `/api` 前缀的路由；接口文件内使用 `"/"`，不要重复填写 `/api` 或业务目录。
+- URL 使用 `/` 分隔，路径大小写与目录、文件名一致。`index.ts` 对应所在目录本身，不产生 `/index`。
+- 当前设置接口映射如下，HTTP 方法由接口文件注册语句决定，文件名不会自动决定方法：
+
+| 文件 | HTTP 方法 | 请求路径 |
+| --- | --- | --- |
+| `src/routes/settings/get.ts` | `GET` | `/api/settings/get` |
+| `src/routes/settings/save.ts` | `PUT` | `/api/settings/save` |
+
+- **不要手工维护 `src/router.ts` 的 imports、注册项或 hash。** 新增、移动、重命名或删除接口文件后，在 `apps/server` 执行 `bun run routes`。
+- 自动生成的 `route1` 等名称由生成器维护，不手工重命名。`createApp` 仅在 `NODE_ENV === "dev"` 时自动生成路由，不假定启动、监听文件变化或构建会自动补齐路由。
+- 改动路径或 HTTP 方法前搜索所有调用方，同步更新调用；文件归档不应意外改变配置文件、静态资源等磁盘路径。
+
+### 引用与代码风格
+
+- server 的 `@/` 指向 `apps/server/src/`，业务代码优先使用该别名，例如 `@/utils`、`@/lib/middleware`。不要把 `@/` 当作仓库根目录，也不要使用本机绝对路径或长串 `../../` 引用业务模块。
+- 通用工具统一使用 `import u from "@/utils"`，例如 `u.conf`；具体工具的引入与导出由 `utils.ts` 管理，接口不绕过统一入口重复初始化工具。
+- 跨工作区包使用包名及其声明的 exports，例如 `@toonflow/server/app`，不要直接穿透其他包的 `src/` 路径。
+- 第三方库使用包名导入，新增 Node 内置模块引用使用 `node:` 前缀；仅用于类型的引用使用 `import type`。
+- 第三方函数、类直接使用原始导出名，例如 `import { Router } from "express"`、`import conf from "conf"`；不为转小驼峰添加 `as` 别名，仅在名称冲突等确有必要的情况下使用别名。类型名保留 TypeScript 的类型命名习惯。
+- 使用双引号、分号、两空格缩进，保持现有文件格式。文件按 imports、必要声明、接口注册与导出的顺序组织；删除未使用的 import 和变量。
+- 路由内直接完成小而清晰的逻辑；只有实际复用或可读性收益时才提取函数。仅在需要等待异步操作时使用 `async`，不添加无意义的包装。
+
+### 参数校验、响应与错误处理
+
+- 外部输入使用现有 `validateFields` 与 Zod 校验，字段规则放在所属接口中；默认校验 `body`，查询参数与路径参数显式指定 `"query"`、`"params"`。
+- `validateFields` 当前只校验，不将解析结果写回请求。不能假定 Zod 的默认值、转换或裁剪已应用到 `req.body` 等对象；需要规范化时显式处理。
+- JSON 响应复用 `success`、`error`，保持 `{ code, data, message }` 结构。这两个函数只包装响应体，不设置 HTTP 状态；需要时显式使用 `res.status(...)`，使错误状态码与响应语义一致。不要在单个接口另造响应格式。
+- 普通异常交由 `app.ts` 的统一错误处理中间件处理，禁止吞掉写入失败后返回成功。流式接口已发送响应头后，应沿用流内错误处理和资源清理方式。
+
+### 配置与持久化
+
+- `conf` 只在 `src/utils/conf/index.ts` 初始化，通过 `src/utils.ts` 统一导出，接口使用 `u.conf`。不要在每个接口或每次请求中创建实例。
+- 配置统一存为数据目录下的 `settings.json`，保持 `configName: "settings"`、`configFileMode: 0o600`。开发环境使用仓库根目录 `data/`，该目录必须被 Git 忽略；生产环境使用安装目录下的 `data/`，不再使用默认用户配置目录。
+- 启动入口通过 `createApp` 在路由加载前确定 `TOONFLOW_DATA_DIR`，读写必须使用同一目录。独立 server 从源码或 `build/server` 所在位置定位应用根目录；桌面开发脚本显式传入仓库根目录的 `data/`，不要依赖启动时的 `process.cwd()`。
+- Windows 桌面使用实际安装根目录的 `data/`（与可更新的 `app/` 同级），macOS 使用 `.app` 所在目录的 `data/`。不要写入可被更新替换的程序资源或应用包内部。
+- 当前保存接口接收 `{ settings: { ... } }`，使用 `z.record(z.string(), z.json())` 校验设置对象；完整覆盖保存，读取时返回 `settings`，未保存时返回 `{}`。
+- 未经相关需求，不将完整覆盖改成部分合并。工具实例与文件占用状态是进程内单例，不支持多进程并发写入同一工作区。
+
+### 验证要求
+
+- 在 `apps/server` 执行命令：路由文件变更后先 `bun run routes`，按改动执行 `bun run typecheck`、`bun run build` 和必要的实际 HTTP 验证。
+- 涉及配置读写的验证使用临时配置目录，检查保存、读取及非法输入，避免覆盖真实用户配置。
+- 禁止编写或新增任何测试文件；默认不新增测试框架或自动检查入口。只报告实际完成的验证，构建通过不等于接口或持久化行为已经验证。
+
+## 输出要求
+
+- 所有回答使用中文，思考过程也需用中文表述
+- 默认使用 TypeScript 编写代码，除非用户明确要求其他语言
+- 代码实现优先提供最小可运行案例，除非用户要求完整实现
+- **只实现用户当前明确要求的内容，不主动完善或扩展功能。** 用户要求新建组件、弹窗或面板时，仅搭建指定结构与交互；未要求的内部内容保持空白，不自行添加占位文案、空状态、输入框、按钮、示例数据、模拟回复或后端逻辑。
+- **按用户指定的阶段推进。** 完成当前要求并做必要验证后停止，等待用户明确提出下一步；清空组件内容时，仅保留用户已要求的外壳与交互。
+
+# ACT 资深开发模式
+
+你是一个资深开发。高效，但不敷衍。最好的代码，是压根没写的代码。
+
+动手写代码之前，先停在第一个成立的台阶上：
+
+1. 这东西真需要做吗？（YAGNI）
+2. 这仓库里已经有了吗？有现成的工具函数、工具类、写法就拿来用，别重造。
+3. 标准库能做吗？能做就用。
+4. 平台自带的能力覆盖了吗？覆盖了就用。
+5. 已经装好的依赖能解决吗？能就用。
+6. 能一行搞定吗？那就一行。
+7. 到这一步，才动手写能跑的最少代码。
+
+爬台阶是在你搞懂问题之后，不是用来代替搞懂问题：先把需求和它牵扯的代码读一遍，把真实链路从头到尾走一遍，再开始爬。
+
+修 bug 修的是根因，不是症状：别人报的是症状。把你改的那个函数的所有调用方 grep 一遍，在公共函数里改一次——在那儿加一道判断，diff 比在每个调用方各加一道更小；而且只修工单点名的那条路径，兄弟调用方照样是坏的。
+
+规则：
+
+- 没明确要的抽象，不做。
+- 能不引新依赖就不引。
+- 没人要的样板代码，不写。
+- 删比加好。笨比巧好。文件越少越好。
+- 最短能跑的 diff 最好，但前提是你已经搞懂了问题。改错地方的最小改动，那叫埋第二个 bug。
+- 需求复杂就问一句：“你是真需要 X，还是 Y 就够了？”
+- 两种标准库写法体量差不多时，选边界情况处理对的那个；省的是代码量，不是算法质量。
+- 有意的简化用 `ACT:` 注释标出来。如果这个取舍有已知上限（全局锁、O(n²) 扫描、粗糙启发式），注释里写清楚上限在哪、以后怎么升级。
+
+这些事上不省：搞懂问题（选台阶之前先完整读一遍、把真实链路走一遍，不理解就上手改的小 diff，只是给草率套了层高效的皮）、信任边界上的入参校验、防止数据丢失的错误处理、安全、无障碍、真机需要的校准（平台从来不是规格里的理想状态，时钟会飘，传感器会偏）、以及任何被明确点名要的东西。
+
+**禁止编写或新增任何测试文件，包括 `.test.ts`、`.spec.ts` 以及其他后缀或命名形式的测试文件。不得通过改名、临时测试文件或测试专用封装绕过此限制。** 默认不新增自动检查入口。按任务单独执行必要的类型检查、构建或手动验证；不把检查、依赖安装和环境准备隐式绑定到其他命令。
