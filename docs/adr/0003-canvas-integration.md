@@ -1,9 +1,15 @@
 # ADR 0003 — How the production domain relates to the infinite canvas
 
-**Status:** accepted (with a known gap) · **Phase 2**
+**Status:** accepted (supersedes the earlier "known gap" note) · **Phase 2**
 
-PRD §0/§28 forbid rewriting the canvas, and say domain nodes should be the production surface. Upstream's canvas is tightly coupled to its image/video/text node types and its browser-only store.
+PRD §0/§28 forbid rewriting the canvas and want domain nodes on it. Upstream already has the sanctioned extension point: the **Plugin SDK** (`plugins/canvas/sdk`, host contract `web/src/types/canvas-plugin.ts`).
 
-**Decision:** V1 ships a *domain canvas* (`web/src/pages/studio/workbench/domain-canvas.tsx`) driven by the server's domain tables: World / Look / Asset / Shot nodes, semantic edges derived from real relations (uses, reference role, state flow, governs), pan/zoom, drag-to-move (persisted as layout-only JSON), Shift-marquee batch selection, and drag-reference-onto-shot binding. The upstream free canvas stays at `/canvas` for exploration; `importLegacyCanvas()` brings its nodes in as References/Assets.
+**Decision:** domain nodes are an upstream canvas plugin, `plugins/canvas/filmflow` (id `filmflow`), registering `filmflow:project`, `filmflow:world`, `filmflow:look`, `filmflow:asset`, `filmflow:shot`. Zero changes to the canvas engine; one line in `plugin-loader.ts` enables this plugin by default.
 
-**Gap (explicit, not silent):** the domain nodes are *not yet* registered into upstream's own canvas through its Plugin SDK. That is the next step if a single unified canvas is required; the domain API is already sufficient for a plugin to render and edit these nodes. Cost of doing it now: coupling the domain to upstream's store before its contracts stabilise.
+Rules that keep PRD §1 ("core semantics never only in node metadata") true:
+- A node's metadata is **only** `{ ffProjectId, ffKind, ffId }`. Content and Panel read/write the FilmFlow server (`/ff-api`, cookie session); the domain tables stay the source of truth.
+- **Edges are gestures, the domain is truth.** Connecting an Asset node into a Shot node adds that asset to the shot's `assetIds` (reconciled in `ShotContent`). Shot→Shot edges mean state flow. Connecting an upstream *image* node to a Shot offers "register as Reference + bind role" (Reference Routing from existing nodes). Disconnecting does **not** silently remove domain data.
+- The hub node (`filmflow:project`) pulls the project's domain objects onto the canvas idempotently (deterministic node ids) and can run the Director on a pasted script.
+- Mutations broadcast `filmflow:changed` on the plugin event bus so every FilmFlow node refreshes.
+
+**Limits:** upstream connections have no labels, so edge *semantics* are implied by node types rather than drawn; node panels cover the golden path (spec, bind, keyframes/Hero, takes/approve + continuity override, asset approve/version/rollback, World/Look) while QC diagnosis, state view and history stay in the `/studio` workbench. The `/studio` workbench keeps its own domain canvas as a standalone view.

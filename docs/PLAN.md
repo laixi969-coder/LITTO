@@ -12,3 +12,5 @@ Source of truth: `AI_Virtual_Production_Infinite_Canvas_FINAL_PRD.md`. Status is
 | 5 Assembly | shot strip ✅ · sequence assembly/export/audio/subtitles ❌ | partial |
 
 P2/P3 items (OAuth, team RBAC UI, proxy video, timeline, payments) are out of scope for V1 per PRD.
+
+**Canvas integration:** domain nodes run on the upstream canvas as the `filmflow` plugin (ADR 0003); QC / state / history panels remain in `/studio`.

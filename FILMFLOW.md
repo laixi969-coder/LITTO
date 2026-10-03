@@ -15,7 +15,9 @@ docs/adr  架构决策记录（先读 0001）   docs/PLAN.md  阶段状态
 cd server && npm install && npm run dev        # http://localhost:8787 ，数据在 server/data/
 # 2) 前端
 cd web && bun install && bun run dev           # http://localhost:3000/studio （/ff-api 自动代理到后端）
-# 3) 可选：灌一个演示项目
+# 3) 构建画布领域节点插件（输出到 web/public/plugins/filmflow.js，默认启用）
+cd plugins/canvas/sdk && npm install && cd ../filmflow && npm install && npm run build
+# 4) 可选：灌一个演示项目
 cd server && npm run seed
 ```
 - 登录：邮箱验证码。未配置 SMTP 时（非 production）验证码会打印在后端日志并回显到登录页。
@@ -30,3 +32,6 @@ cd server && npm run seed
 cd server && npm run typecheck && npm test     # 15 个黄金路径验收测试（PRD §26）
 cd web && bun run typecheck && bun run build
 ```
+
+## 在上游画布里用领域节点
+先在 `/studio/login` 登录，再打开 `/canvas`：新建节点 →「FilmFlow 项目」，面板里选项目 →「同步领域节点到画布」。资产节点连到镜头节点即把资产加入该镜头；上游图片节点可「登记为参考」并绑定角色。

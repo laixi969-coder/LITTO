@@ -138,7 +138,7 @@ async function loadLocalPlugins() {
                     description: plugin.description,
                     url,
                     source,
-                    enabled: existing?.enabled ?? false, // Preserve the user setting; new discoveries default to disabled.
+                    enabled: existing?.enabled ?? plugin.id === "filmflow", // Preserve the user setting; new discoveries default to disabled (FilmFlow domain nodes are on by default).
                     local: true,
                 });
             } catch (error) {

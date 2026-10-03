@@ -18,7 +18,7 @@ export default function StudioLayout() {
             <header className="flex h-11 shrink-0 items-center gap-4 border-b border-black/10 px-4 text-sm dark:border-white/10">
                 <Link to="/studio" className="flex items-center gap-2 font-semibold"><Clapperboard size={16} /> FilmFlow</Link>
                 <Link to="/studio" className="opacity-70 hover:opacity-100">项目</Link>
-                <Link to="/canvas" className="opacity-70 hover:opacity-100">自由画布</Link>
+                <Link to="/canvas" className="opacity-70 hover:opacity-100">上游画布</Link>
                 <div className="flex-1" />
                 <span className="opacity-60">{user.email}</span>
                 <Link to="/studio/settings" title="设置 / API Key / 积分"><Settings size={15} /></Link>
