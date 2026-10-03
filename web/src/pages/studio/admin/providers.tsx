@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { App, Button, Form, Input, InputNumber, Modal, Select, Table, Tag } from "antd";
+import { App, Alert, Button, Form, Input, InputNumber, Modal, Select, Table, Tag } from "antd";
 
 import { api } from "@/services/api/filmflow";
 import { useAct, useLoad } from "./util";
@@ -10,6 +10,7 @@ export default function Providers() {
     const { message } = App.useApp();
     const [edit, setEdit] = useState<any>(null); // {} = create
     const [keyFor, setKeyFor] = useState<any>(null);
+    const [hook, setHook] = useState<any>(null);
     const [keys, setKeys] = useState<any[]>([]);
     const [form] = Form.useForm();
     const [kform] = Form.useForm();
@@ -38,6 +39,7 @@ export default function Providers() {
                     <Button size="small" type="link" onClick={() => open(p)}>编辑</Button>
                     <Button size="small" type="link" onClick={() => test(p)}>测试连接</Button>
                     <Button size="small" type="link" onClick={() => { setKeyFor(p); loadKeys(p); }}>Key</Button>
+                    <Button size="small" type="link" onClick={() => Modal.confirm({ title: `为 ${p.name} 生成 Webhook 密钥？`, content: p.hasWebhook ? "会替换已有密钥。" : "用于校验 Provider 回调签名。", onOk: async () => { try { setHook({ ...(await api.post(`/admin/providers/${p.id}/webhook-secret`)), name: p.name }); } catch (e: any) { message.error(e.message); } } })}>生成 Webhook 密钥</Button>
                     <Button size="small" type="link" onClick={act(async () => message.info(`同步 ${(await api.post(`/admin/providers/${p.id}/sync-models`)).synced} 个模型`))}>同步模型</Button>
                     <Button size="small" type="link" onClick={act(() => api.patch(`/admin/providers/${p.id}`, { status: p.status === "active" ? "disabled" : "active" }))}>{p.status === "active" ? "停用" : "启用"}</Button></div> },
             ]} />
@@ -53,6 +55,10 @@ export default function Providers() {
                         <Form.Item name="timeoutMs" label="超时 ms"><InputNumber className="!w-full" /></Form.Item>
                     </div>
                 </Form>
+            </Modal>
+            <Modal open={!!hook} title={`Webhook 密钥 · ${hook?.name}`} footer={<Button type="primary" onClick={() => setHook(null)}>我已保存</Button>} closable={false} maskClosable={false}>
+                <Alert type="warning" showIcon message="密钥只显示这一次，关闭后无法再查看（服务端只保存加密形式）。" />
+                {(["secret", "url", "header"] as const).map((k) => <div key={k} className="mt-3"><div className="mb-1 text-xs opacity-60">{{ secret: "密钥", url: "回调地址", header: "签名方式" }[k]}</div><Input.TextArea readOnly autoSize value={hook?.[k]} onFocus={(e) => e.target.select()} /><Button size="small" type="link" onClick={() => { void navigator.clipboard.writeText(hook[k]); message.success("已复制"); }}>复制</Button></div>)}
             </Modal>
             <Modal open={!!keyFor} title={`平台 Key · ${keyFor?.name}`} footer={null} onCancel={() => setKeyFor(null)}>
                 <Table size="small" pagination={false} rowKey="id" dataSource={keys} columns={[{ title: "标签", dataIndex: "label" }, { title: "Key", dataIndex: "masked" }, { title: "最近错误", dataIndex: "lastError" }]} />

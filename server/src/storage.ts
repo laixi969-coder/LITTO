@@ -4,6 +4,7 @@ import { config } from "./config.ts";
 import { all, get, run, scoped } from "./db.ts";
 import { sign, verifySig } from "./crypto.ts";
 import { bad, conflict, now, sha256, ulid } from "./util.ts";
+import { makeDerivatives } from "./media-tools.ts";
 
 /** Storage adapter contract. Local FS is implemented; S3/MinIO plug in by implementing the same 4 methods. */
 export interface StorageAdapter {
@@ -77,10 +78,18 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     const id = ulid();
     const key = `${workspaceId}/${projectId ?? "_"}/${id}`;
     await storage.put(key, data);
-    return scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: opts.duration ?? null, width: s?.width ?? null, height: s?.height ?? null, source: opts.source, storage_key: key });
+    const row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: opts.duration ?? null, width: s?.width ?? null, height: s?.height ?? null, source: opts.source, storage_key: key });
+    if (!process.env.FILMFLOW_NO_DERIVATIVES) void makeDerivatives(row as any);
+    return row;
 }
 
-export const mediaView = (m: any) => m && { id: m.id, mime: m.mime, size: m.size, width: m.width, height: m.height, duration: m.duration, source: m.source, url: storage.signedUrl(m.storageKey, m.id, 3600), createdAt: m.createdAt };
+export const mediaView = (m: any) => {
+    if (!m) return m;
+    const url = storage.signedUrl(m.storageKey, m.id, 3600);
+    // Derivatives are generated asynchronously; the row may not have them yet.
+    const fresh = get("SELECT thumbnail_key, proxy_key FROM media WHERE id=?", m.id);
+    return { id: m.id, mime: m.mime, size: m.size, width: m.width, height: m.height, duration: m.duration, source: m.source, url, thumbnailUrl: fresh?.thumbnail_key ? `${url}&variant=thumb` : null, proxyUrl: fresh?.proxy_key ? `${url}&variant=proxy` : null, createdAt: m.createdAt };
+};
 
 export async function softDeleteMedia(workspaceId: string, id: string) {
     scoped(workspaceId).softDelete("media", id);
@@ -91,6 +100,8 @@ export async function cleanupMedia(olderThanMs = 0) {
     const rows = all("SELECT id, storage_key FROM media WHERE deleted_at IS NOT NULL AND deleted_at<=?", cutoff);
     for (const r of rows) {
         await storage.delete(r.storage_key);
+        const d = get("SELECT thumbnail_key, proxy_key FROM media WHERE id=?", r.id);
+        for (const k of [d?.thumbnail_key, d?.proxy_key]) if (k) await storage.delete(k);
         run("DELETE FROM media WHERE id=?", r.id);
     }
     return rows.length;

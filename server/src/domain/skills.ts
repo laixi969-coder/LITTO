@@ -12,7 +12,7 @@ export type ShotDraft = {
     blocking: { foreground: string; midground: string; background: string };
     camera: { shotSize: string; position: string; height: string; angle: string; lensMm: number; focus: string; depth: string; motion: string; motivation: string; side: "A" | "B" | "none"; screenDirection: "left" | "right" | "none" };
     lighting: { motivatedLight: string; key: string; fill: string; negativeFill: string; practicals: string[]; exposure: string; keyDirection: "left" | "right" | "front" | "back" | "top" | "none"; timeOfDay: string; colorTemp: string };
-    intendedStateDelta: Record<string, any>; duration: number; sceneIndex: number;
+    intendedStateDelta: Record<string, any>; duration: number; sceneIndex: number; subtitle?: string;
 };
 
 const HEADING = /^\s*((?:INT|EXT|I\/E)[./ ].*|内景.*|外景.*|场景.*|SCENE\b.*)$/i;
@@ -94,7 +94,7 @@ export function storyboardDirector(script: string, assets: AssetLite[], opts: { 
             if (turn) dialogueFlip ^= 1;
             const dir = dialogueFlip ? "left" : "right";
             // Shot–reverse-shot: same side of the axis, opposite eyelines.
-            shots.push(base(turn ? "Reaction" : "Rhythm", "MCU", 50, `${b.speaker}: "${b.text.slice(0, 40)}"`, { assetIds: [...new Set([...sceneEnv, ...spk, ...found.map((a) => a.id)])], performance: { emotion: emo?.[1] ?? "neutral", intensity: emo?.[2] ?? 0.45, eyeline: `screen ${dir}`, gesture: "", timing: "on the line" }, camera: { shotSize: "MCU", position: "over-shoulder", height: "eye level", angle: "neutral", lensMm: 50, focus: speaker?.name ?? "", depth: "shallow", motion: "static", motivation: "", side: "A", screenDirection: dir } }));
+            shots.push(base(turn ? "Reaction" : "Rhythm", "MCU", 50, `${b.speaker}: "${b.text.slice(0, 40)}"`, { assetIds: [...new Set([...sceneEnv, ...spk, ...found.map((a) => a.id)])], subtitle: b.text, performance: { emotion: emo?.[1] ?? "neutral", intensity: emo?.[2] ?? 0.45, eyeline: `screen ${dir}`, gesture: "", timing: "on the line" }, camera: { shotSize: "MCU", position: "over-shoulder", height: "eye level", angle: "neutral", lensMm: 50, focus: speaker?.name ?? "", depth: "shallow", motion: "static", motivation: "", side: "A", screenDirection: dir } }));
             prevSpeaker = b.speaker;
             continue;
         }

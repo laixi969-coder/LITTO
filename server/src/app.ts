@@ -4,6 +4,9 @@ import { authenticate } from "./auth.ts";
 import { authPublic, platform } from "./routes/platform.ts";
 import { production } from "./routes/production.ts";
 import { admin } from "./routes/admin.ts";
+import { team } from "./routes/team.ts";
+import { oauth } from "./routes/oauth.ts";
+import { extra, adminExtra } from "./routes/extra.ts";
 import { HttpError, log } from "./util.ts";
 import { get, setting } from "./db.ts";
 import { checkSignedUrl, storage } from "./storage.ts";
@@ -59,17 +62,26 @@ app.get("/media/:id/file", async (c) => {
     if (!exp || !sig || !checkSignedUrl(id, exp, sig)) return c.json({ error: "invalid or expired link" }, 403);
     const m = get("SELECT * FROM media WHERE id=? AND deleted_at IS NULL", id);
     if (!m) return c.json({ error: "not found" }, 404);
-    const buf = await storage.get(m.storage_key);
+    const variant = c.req.query("variant");
+    const key = variant === "thumb" && m.thumbnail_key ? m.thumbnail_key : variant === "proxy" && m.proxy_key ? m.proxy_key : m.storage_key;
+    const mime = key === m.thumbnail_key ? "image/jpeg" : key === m.proxy_key ? "video/mp4" : m.mime;
+    const buf = await storage.get(key);
     // SVG could carry script: serve it inert.
-    return new Response(new Uint8Array(buf), { headers: { "content-type": m.mime, "cache-control": "private, max-age=300", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff" } });
+    return new Response(new Uint8Array(buf), { headers: { "content-type": mime, "cache-control": "private, max-age=300", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff" } });
 });
 
 app.route("/auth", authPublic);
+app.route("/auth/oauth", oauth);
+// Provider/Stripe callbacks authenticate by signature, not by session.
+app.post("/webhooks/*", (c) => extra.fetch(c.req.raw));
 const secured = new Hono();
 secured.use("*", authenticate);
 secured.route("/", platform);
 secured.route("/", production);
+secured.route("/", team);
+secured.route("/", extra);
 secured.route("/admin", admin);
+secured.route("/admin", adminExtra);
 app.route("/", secured);
 
 app.onError((e, c) => {

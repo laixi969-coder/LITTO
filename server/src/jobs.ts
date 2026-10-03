@@ -7,6 +7,7 @@ import { saveMedia, storage } from "./storage.ts";
 import { bad, conflict, j, log, now, sleep, ulid } from "./util.ts";
 import { config } from "./config.ts";
 import { onJobSucceeded } from "./domain/lifecycle.ts";
+import { inc, observe } from "./metrics.ts";
 
 export type JobSpec = {
     workspaceId: string; projectId: string | null; kind: "image" | "video"; targetType?: string; targetId?: string; modelId: string;
@@ -105,6 +106,7 @@ async function execute(jobId: string) {
     const s = scoped(raw.workspace_id);
     const job = s.get("generation_jobs", jobId, true)!;
     const started = Date.now();
+    observe("job_wait_ms", started - new Date(job.createdAt).getTime());
     const model = get("SELECT * FROM models WHERE id=?", job.modelId)!;
     const prov = get("SELECT * FROM providers WHERE id=?", job.providerId)!;
     const adapter = ADAPTERS[prov.adapter];
@@ -125,7 +127,19 @@ async function execute(jobId: string) {
         while (!result) {
             if (get("SELECT status FROM generation_jobs WHERE id=?", jobId)?.status === "CANCELLED") return;
             if (Date.now() > deadline) throw Object.assign(new Error(`timeout after ${prov.timeout_ms}ms`), { timeout: true });
+            // A provider callback (webhook) wins over polling.
+            const ev = get("SELECT payload FROM webhook_events WHERE job_id=? ORDER BY id DESC LIMIT 1", jobId);
+            if (ev) {
+                const hook = JSON.parse(ev.payload);
+                if (hook.status === "failed") throw Object.assign(new Error(hook.error ?? "provider reported failure"), { retryable: false });
+                const outputs = [];
+                for (const o of hook.outputs ?? []) outputs.push(o.b64 ? { data: Buffer.from(o.b64, "base64"), mime: o.mime ?? "image/png", duration: o.duration } : await (async () => { const r = await fetch(o.url); if (!r.ok) throw new Error(`callback output HTTP ${r.status}`); return { data: Buffer.from(await r.arrayBuffer()), mime: o.mime ?? r.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream", duration: o.duration }; })());
+                result = { outputs, costUsd: Number(hook.costUsd ?? 0.04 * outputs.length) };
+                break;
+            }
+            const t0 = Date.now();
             const r = await adapter.poll(taskId!, { apiKey, baseUrl: prov.base_url });
+            observe(`provider_${prov.id}_poll_ms`, Date.now() - t0);
             if (r.status === "done") result = r.result;
             else if (r.status === "failed") throw Object.assign(new Error(r.error), { retryable: r.retryable });
             else await sleep(Math.min(config.workerPollMs, 250));
@@ -141,6 +155,8 @@ async function execute(jobId: string) {
 }
 
 async function finish(job: any, result: GenResult, durationMs: number) {
+    observe("job_run_ms", durationMs);
+    inc(`job_succeeded_model_${job.modelId}`);
     const s = scoped(job.workspaceId);
     const mediaIds: string[] = [];
     for (const [i, o] of result.outputs.entries()) {
@@ -167,7 +183,9 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
     const cur = get("SELECT * FROM generation_jobs WHERE id=?", job.id)!;
     if (cur.status === "CANCELLED") return;
     const retryable = err.retryable !== false;
+    inc(`provider_${cur.provider_id}_errors`);
     if (retryable && cur.attempts < cur.max_attempts) {
+        inc("job_retries");
         const prov = get("SELECT retry_policy FROM providers WHERE id=?", cur.provider_id)!;
         const backoff = (JSON.parse(prov.retry_policy).backoffMs ?? 500) * cur.attempts;
         run("UPDATE generation_jobs SET status='QUEUED', provider_task_id=NULL, run_after=?, error=? WHERE id=?", new Date(Date.now() + backoff).toISOString(), err.message.slice(0, 300), job.id);
@@ -185,6 +203,7 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
         if (next && get("SELECT 1 FROM models WHERE id=? AND status='active'", next.modelId)) {
             const nm = get("SELECT * FROM models WHERE id=?", next.modelId)!;
             const est = estimate(next.modelId, cur.kind, p);
+            inc("job_fallbacks");
             // Re-price the hold for the fallback model.
             tx(() => {
                 release(cur.workspace_id, cur.id, cur.held, "fallback re-price");
@@ -194,6 +213,7 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
             return;
         }
     }
+    inc(`job_failed_model_${cur.model_id}`);
     tx(() => {
         run("UPDATE generation_jobs SET status=?, error=?, duration_ms=?, finished_at=?, held=0 WHERE id=?", err.timeout ? "TIMEOUT" : "FAILED", err.message.slice(0, 300), durationMs, now(), job.id);
         release(cur.workspace_id, cur.id, cur.held, "job failed: refund hold");

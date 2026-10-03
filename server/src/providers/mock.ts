@@ -60,6 +60,12 @@ function build(req: Task["req"]): GenResult {
 export const mockAdapter: ProviderAdapter = {
     requiresKey: false,
     async submit(req) {
+        // Text kind (LLM layer plumbing): echoes JSON placed after <<ECHO_JSON>>, otherwise a harmless empty object.
+        if (req.kind === "text") {
+            const i = req.prompt.indexOf("<<ECHO_JSON>>");
+            const txt = i >= 0 ? req.prompt.slice(i + 13).trim() : req.prompt.includes("QC_OBSERVE") ? '{"observations":[]}' : "{}";
+            return { done: { outputs: [{ data: Buffer.from(txt), mime: "text/plain" }], costUsd: 0.002 } };
+        }
         if (req.baseUrl === "mock://fail") throw new Error("mock provider unavailable (503)");
         if (req.baseUrl === "mock://flaky" && req.attempt === 1) throw new Error("mock transient error (502)");
         const slim = { kind: req.kind, externalModelId: req.externalModelId, prompt: req.prompt, params: req.params, attempt: req.attempt, label: req.label, baseUrl: req.baseUrl } as Task["req"] & { inputs?: never };
@@ -69,6 +75,8 @@ export const mockAdapter: ProviderAdapter = {
     },
     async poll(taskId) {
         const t = dec(taskId);
+        // "mock://callback": the provider only reports through its webhook; polling never completes.
+        if (t.req.baseUrl === "mock://callback") return { status: "running" } satisfies PollResult;
         if (Date.now() < t.readyAt) return { status: "running" } satisfies PollResult;
         const req = { ...t.req } as any;
         return { status: "done", result: build({ ...req, inputs: req.inputs }) };

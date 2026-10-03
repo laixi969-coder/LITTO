@@ -17,6 +17,9 @@ type WB = {
     jobs: any[];
     canvas: { nodes: any[]; edges: any[]; viewport: { x: number; y: number; k: number } };
     sel: Sel;
+    view: "canvas" | "grid" | "assembly";
+    setView: (v: "canvas" | "grid" | "assembly") => void;
+    looks: any[];
     multi: string[]; // multi-selected shot ids (marquee batch)
     activeSeq: string | null;
     open: (pid: string) => Promise<void>;
@@ -31,7 +34,7 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useWorkbench = create<WB>((set, get) => ({
     pid: "", project: null, world: null, look: null, assets: [], refs: [], sequences: [], shots: [], strip: [], jobs: [],
-    canvas: { nodes: [], edges: [], viewport: { x: 40, y: 40, k: 1 } }, sel: null, multi: [], activeSeq: null,
+    canvas: { nodes: [], edges: [], viewport: { x: 40, y: 40, k: 1 } }, sel: null, view: "canvas", looks: [], setView: (view) => set({ view }), multi: [], activeSeq: null,
     async open(pid) {
         set({ pid, sel: null, multi: [], activeSeq: null });
         await get().reload();
@@ -44,7 +47,7 @@ export const useWorkbench = create<WB>((set, get) => ({
             api.get(`/projects/${pid}/references`), api.get(`/projects/${pid}/sequences`), api.get(`/projects/${pid}/shots`), api.get(`/projects/${pid}/shot-strip`),
             api.get(`/generations?projectId=${pid}`), api.get(`/projects/${pid}/canvas`),
         ]);
-        set((s) => ({ project, world, look: looks.find((l: any) => l.scope === "project"), assets, refs, sequences, shots, strip, jobs, canvas: { ...canvas, viewport: s.canvas.viewport.k !== 1 || s.canvas.nodes.length ? s.canvas.viewport : canvas.viewport }, activeSeq: s.activeSeq ?? sequences[0]?.id ?? null }));
+        set((s) => ({ looks, project, world, look: looks.find((l: any) => l.scope === "project"), assets, refs, sequences, shots, strip, jobs, canvas: { ...canvas, viewport: s.canvas.viewport.k !== 1 || s.canvas.nodes.length ? s.canvas.viewport : canvas.viewport }, activeSeq: s.activeSeq ?? sequences[0]?.id ?? null }));
     },
     select: (sel) => set({ sel }),
     setMulti: (multi) => set({ multi }),

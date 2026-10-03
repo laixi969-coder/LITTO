@@ -26,18 +26,33 @@ function WorldForm() {
     );
 }
 
-function LookForm() {
+function LookForm({ selId }: { selId?: string }) {
     const wb = useWorkbench();
     const { message } = App.useApp();
     const [f] = Form.useForm();
-    useEffect(() => f.setFieldsValue(wb.look), [wb.look, f]);
-    const save = async () => { try { await api.put(`/projects/${wb.pid}/looks/project`, f.getFieldsValue()); message.success("Look 已保存"); await wb.reload(); } catch (e: any) { message.error(e.message); } };
+    // "shot:<id>" is a not-yet-created shot override (from the shot inspector link).
+    const pre = selId?.startsWith("shot:") ? selId.slice(5) : null;
+    const preOwn = pre ? wb.looks.find((l) => l.scope === "shot" && l.scopeId === pre) : null;
+    const [scope, setScope] = useState<"project" | "sequence" | "shot">(pre ? "shot" : "project");
+    const [target, setTarget] = useState<string | undefined>(pre ?? undefined);
+    useEffect(() => { if (pre) { setScope("shot"); setTarget(pre); } }, [pre]);
+    const found = wb.looks.find((l) => l.scope === scope && (scope === "project" || l.scopeId === target));
+    const base = wb.looks.find((l) => l.scope === "project");
+    useEffect(() => { f.resetFields(); f.setFieldsValue(found ?? (scope === "project" ? base : {})); }, [found, scope, target, f, preOwn]);
+    const save = async () => {
+        if (scope !== "project" && !target) return message.info(scope === "shot" ? "选择镜头" : "选择序列");
+        try { await api.put(`/projects/${wb.pid}/looks/${scope}${scope === "project" ? "" : `/${target}`}`, f.getFieldsValue()); message.success(scope === "project" ? "Look 已保存" : "覆盖已保存（仅填写的字段与项目不同）"); await wb.reload(); } catch (e: any) { message.error(e.message); }
+    };
     return (
         <Form form={f} layout="vertical" size="small" className="p-3">
-            <div className="mb-2 text-xs opacity-60">Look：项目级影调。Sequence / Shot 可显式覆盖。</div>
+            <div className="mb-2 text-xs opacity-60">Look：项目级影调。序列 / 镜头可显式覆盖，编译时优先取镜头 &gt; 序列 &gt; 项目。</div>
+            <div className="mb-2 flex gap-2"><Select size="small" className="!w-24" value={scope} onChange={(v) => { setScope(v); setTarget(undefined); }} options={[{ value: "project", label: "项目" }, { value: "sequence", label: "序列" }, { value: "shot", label: "镜头" }]} />
+                {scope === "sequence" && <Select size="small" className="flex-1" placeholder="选择序列" value={target} onChange={setTarget} options={wb.sequences.map((q) => ({ value: q.id, label: `${q.name}${wb.looks.some((l) => l.scope === "sequence" && l.scopeId === q.id) ? " ·覆盖" : ""}` }))} />}
+                {scope === "shot" && <Select size="small" className="flex-1" placeholder="选择镜头" value={target} onChange={setTarget} options={wb.shots.map((s) => ({ value: s.id, label: `#${s.ord + 1} ${s.title || s.narrativeFunction}${wb.looks.some((l) => l.scope === "shot" && l.scopeId === s.id) ? " ·覆盖" : ""}` }))} />}</div>
+            {scope !== "project" && !found && <div className="mb-2 rounded bg-black/5 p-2 text-xs dark:bg-white/10">尚无覆盖，保存后创建。未填写的字段会是空值（编译时按空处理），建议从项目 Look 复制需要的字段。<Button size="small" type="link" onClick={() => f.setFieldsValue(base)}>复制项目 Look</Button></div>}
             <div className="grid grid-cols-2 gap-x-2">{txt("contrast", "对比度")}{txt("saturation", "饱和度")}{txt("skinTone", "肤色")}{txt("blackLevel", "黑位")}{txt("highlightRolloff", "高光滚降")}{txt("shadowBehavior", "暗部")}{txt("grain", "颗粒")}{txt("halation", "光晕 halation")}{txt("bloom", "bloom")}{txt("lensCharacter", "镜头性格")}{txt("texture", "质感")}{txt("sharpnessPhilosophy", "锐度哲学")}</div>
             {tags("palette", "色板")}
-            <Button type="primary" block onClick={save}>保存 Look</Button>
+            <Button type="primary" block onClick={save}>保存 {scope === "project" ? "Look" : "覆盖"}</Button>
         </Form>
     );
 }
@@ -85,7 +100,7 @@ export function Inspector() {
     const sel = useWorkbench((s) => s.sel);
     if (!sel) return <div className="p-4 text-xs leading-6 opacity-60">选中画布上的节点（World / Look / 资产 / 镜头）查看结构化属性。<br />Inspector 编辑的是领域对象；画布只记录坐标。</div>;
     if (sel.kind === "world") return <WorldForm />;
-    if (sel.kind === "look") return <LookForm />;
+    if (sel.kind === "look") return <LookForm selId={sel.id} />;
     if (sel.kind === "asset") return <AssetInspector id={sel.id} />;
     if (sel.kind === "shot") return <ShotInspector key={sel.id} id={sel.id} />;
     return <ReferenceInspector id={sel.id} />;

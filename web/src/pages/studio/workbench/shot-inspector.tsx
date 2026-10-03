@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { App, Button, Form, Input, InputNumber, Modal, Select, Slider, Tabs, Tag } from "antd";
+import { App, Button, Checkbox, Form, Input, InputNumber, Modal, Select, Slider, Tabs, Tag } from "antd";
 import { Check, Crown, RotateCcw, ShieldAlert, Trash2 } from "lucide-react";
 
 import { api } from "@/services/api/filmflow";
@@ -31,9 +31,17 @@ function useShot(id: string) {
     return { d, refresh, watch: () => setPoll(1) };
 }
 
+function LookOverride({ shot }: { shot: any }) {
+    const wb = useWorkbench();
+    const own = wb.looks.find((l) => l.scope === "shot" && l.scopeId === shot.id);
+    const seq = wb.looks.find((l) => l.scope === "sequence" && l.scopeId === shot.sequenceId);
+    const eff = own ? "镜头" : seq ? "序列" : "项目";
+    return <div className="mb-2 flex items-center gap-2 rounded bg-black/5 px-2 py-1 text-xs dark:bg-white/10"><span>生效 Look：<Tag className="!m-0">{eff}</Tag></span><span className="flex-1" /><Button size="small" type="link" onClick={() => wb.select({ kind: "look", id: own?.id ?? `shot:${shot.id}` })}>{own ? "编辑镜头 Look 覆盖" : "创建镜头 Look 覆盖"}</Button></div>;
+}
+
 function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
     const wb = useWorkbench();
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const [f] = Form.useForm();
     const [delta, setDelta] = useState(JSON.stringify(shot.intendedStateDelta ?? {}, null, 1));
     useEffect(() => { f.setFieldsValue(shot); setDelta(JSON.stringify(shot.intendedStateDelta ?? {}, null, 1)); }, [shot.id, f]);
@@ -42,17 +50,25 @@ function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
         let intendedStateDelta;
         try { intendedStateDelta = JSON.parse(delta || "{}"); } catch { return message.error("State delta 不是合法 JSON"); }
         try {
-            await api.patch(`/shots/${shot.id}`, { title: v.title, narrativeFunction: v.narrativeFunction, assetIds: v.assetIds, action: v.action, performance: v.performance, blocking: v.blocking, camera: v.camera, lighting: v.lighting, freedomMap: v.freedomMap, duration: v.duration, intendedStateDelta });
-            message.success("已保存，状态链已重算"); await wb.reload(); onSaved();
+            const body = { title: v.title, subtitle: v.subtitle, narrativeFunction: v.narrativeFunction, assetIds: v.assetIds, action: v.action, performance: v.performance, blocking: v.blocking, camera: v.camera, lighting: v.lighting, freedomMap: v.freedomMap, duration: v.duration, intendedStateDelta };
+            const done = async () => { message.success("已保存，状态链已重算"); await wb.reload(); onSaved(); };
+            try { await api.patch(`/shots/${shot.id}`, body); await done(); }
+            catch (e: any) {
+                if (e.code !== "needs_confirmation") throw e;
+                const names: Record<string, string> = { narrativeFunction: "叙事功能", action: "动作", assetIds: "资产" };
+                modal.confirm({ title: "修改核心镜头意图？", content: `你正在修改「${(e.details?.fields ?? []).map((f: string) => names[f] ?? f).join("、")}」，而该镜头已有 Hero Frame / Approved Take。已批准内容不会被覆盖，但它们可能与新意图不一致。`, okText: "确认修改", onOk: async () => { try { await api.patch(`/shots/${shot.id}`, { ...body, confirm: true }); await done(); } catch (e2: any) { message.error(e2.message); } } });
+            }
         } catch (e: any) { message.error(e.message); }
     };
     const t = (label: string, name: (string | number)[], el?: React.ReactNode) => <Form.Item label={label} name={name} className="!mb-2">{el ?? <Input size="small" />}</Form.Item>;
     return (
         <Form form={f} layout="vertical" size="small" className="p-3">
+            <LookOverride shot={shot} />
             {t("标题", ["title"])}
             <div className="grid grid-cols-2 gap-2">{t("叙事功能", ["narrativeFunction"], <Select size="small" options={FUNCS.map((v) => ({ value: v }))} />)}{t("时长(s)", ["duration"], <InputNumber size="small" min={1} max={30} className="!w-full" />)}</div>
             {t("资产", ["assetIds"], <Select mode="multiple" size="small" options={wb.assets.map((a) => ({ value: a.id, label: `${a.name} (${a.type})` }))} />)}
             {t("动作", ["action"], <Input.TextArea rows={2} />)}
+            {t("台词 / 字幕", ["subtitle"], <Input.TextArea rows={2} placeholder="出现在成片字幕里" />)}
             <div className="mb-1 mt-2 text-xs font-medium opacity-60">表演</div>
             <div className="grid grid-cols-2 gap-2">{t("情绪", ["performance", "emotion"])}{t("强度", ["performance", "intensity"], <Slider min={0} max={1} step={0.05} />)}{t("视线 Eyeline", ["performance", "eyeline"])}{t("手势", ["performance", "gesture"])}</div>
             <div className="mb-1 mt-2 text-xs font-medium opacity-60">镜头</div>
@@ -169,12 +185,13 @@ function Qc({ shot, d, refresh, watch }: { shot: any; d: any; refresh: () => voi
     const [all, setAll] = useState<string[]>([]);
     const [target, setTarget] = useState<string>();
     const [last, setLast] = useState<any>(null);
+    const [auto, setAuto] = useState(false);
     useEffect(() => void api.get("/qc/observation-kinds").then(setAll), []);
     const targets = [...d.takes.map((t: any) => ({ v: `take:${t.id}`, l: `Take ${t.status} ${t.id.slice(-4)}` })), ...d.keyframes.map((k: any) => ({ v: `keyframe:${k.id}`, l: `Keyframe ${k.status} ${k.id.slice(-4)}` }))];
     const runQc = async () => {
         if (!target) return message.info("选一个 Keyframe / Take");
         const [targetType, targetId] = target.split(":");
-        try { setLast(await api.post(`/shots/${shot.id}/qc`, { targetType, targetId, observations: kinds.map((kind) => ({ kind })) })); await refresh(); await wb.reload(); } catch (e: any) { message.error(e.message); }
+        try { setLast(await api.post(`/shots/${shot.id}/qc`, { targetType, targetId, auto, observations: kinds.map((kind) => ({ kind })) })); await refresh(); await wb.reload(); } catch (e: any) { message.error(e.message); }
     };
     const apply = async (id: string) => { try { const r = await api.post(`/repair-actions/${id}/apply`); r.applied ? (watch(), message.success("已创建修复任务（新变体，旧版保留）")) : message.info(r.message); await refresh(); } catch (e: any) { message.error(e.message); } };
     return (
@@ -188,8 +205,8 @@ function Qc({ shot, d, refresh, watch }: { shot: any; d: any; refresh: () => voi
                 </div>))}
             {!d.issues.length && <div className="text-xs opacity-50">无连续性问题。</div>}
             <div className="border-t border-black/10 pt-2 dark:border-white/10"><b>QC / Failure Diagnosis</b>
-                <div className="mt-1 flex gap-1"><Select size="small" placeholder="目标" value={target} onChange={setTarget} options={targets.map((t) => ({ value: t.v, label: t.l }))} className="!w-40" /><Select size="small" mode="multiple" placeholder="观察到的问题" value={kinds} onChange={setKinds} options={all.map((k) => ({ value: k }))} className="flex-1" /><Button size="small" type="primary" onClick={runQc}>诊断</Button></div></div>
-            {last && <div className="space-y-1.5"><div>得分 <b>{last.report.score}</b></div>{last.report.findings.map((f: any, i: number) => { const ra = last.repairActions[i]; return <div key={i} className="rounded bg-black/5 p-2 text-xs dark:bg-white/10"><div><Tag color={sev(f.severity)} className="!m-0">{f.severity}</Tag> <b>{f.cause}</b></div><div className="opacity-70">→ {f.action}：{f.detail}</div>{ra && <Button size="small" type="link" onClick={() => apply(ra.id)}>应用修复</Button>}</div>; })}</div>}
+                <div className="mt-1 flex gap-1"><Select size="small" placeholder="目标" value={target} onChange={setTarget} options={targets.map((t) => ({ value: t.v, label: t.l }))} className="!w-40" /><Select size="small" mode="multiple" placeholder="观察到的问题" value={kinds} onChange={setKinds} options={all.map((k) => ({ value: k }))} className="flex-1" /><Button size="small" type="primary" onClick={runQc}>诊断</Button></div><Checkbox className="!mt-1 !text-xs" checked={auto} onChange={(e) => setAuto(e.target.checked)}>视觉自动诊断（视觉模型看画面）</Checkbox></div>
+            {last && <div className="space-y-1.5"><div>得分 <b>{last.report.score}</b></div>{last.vision && <div className="text-xs opacity-70">视觉诊断：{last.vision.used ? `已使用 ${last.vision.model}` : `未使用（${last.vision.reason}）`}</div>}{last.report.findings.map((f: any, i: number) => { const ra = last.repairActions[i]; return <div key={i} className="rounded bg-black/5 p-2 text-xs dark:bg-white/10"><div><Tag color={sev(f.severity)} className="!m-0">{f.severity}</Tag> <b>{f.cause}</b></div><div className="opacity-70">→ {f.action}：{f.detail}</div>{ra && <Button size="small" type="link" onClick={() => apply(ra.id)}>应用修复</Button>}</div>; })}</div>}
         </div>
     );
 }

@@ -18,6 +18,16 @@ async function fetchBytes(u: string, key?: string) {
 export const openaiAdapter: ProviderAdapter = {
     requiresKey: true,
     async submit(req: GenRequest) {
+        if (req.kind === "text") {
+            const imgs = req.inputs.filter((i) => i.data && i.mime.startsWith("image/"));
+            const user: any = imgs.length ? [{ type: "text", text: req.prompt }, ...imgs.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mime};base64,${i.data!.toString("base64")}` } }))] : req.prompt;
+            const r = await fetch(url(req.baseUrl, "/chat/completions"), { method: "POST", headers: { ...hdr(req.apiKey), "content-type": "application/json" }, body: JSON.stringify({ model: req.externalModelId, messages: [...(req.params.system ? [{ role: "system", content: String(req.params.system) }] : []), { role: "user", content: user }], response_format: req.params.json ? { type: "json_object" } : undefined }) });
+            if (!r.ok) await fail(r);
+            const j: any = await r.json();
+            const u = j.usage ?? {};
+            const cost = ((u.prompt_tokens ?? 0) * Number(req.params.inPer1k ?? 0.0025) + (u.completion_tokens ?? 0) * Number(req.params.outPer1k ?? 0.01)) / 1000;
+            return { done: { outputs: [{ data: Buffer.from(j.choices?.[0]?.message?.content ?? ""), mime: "text/plain" }], costUsd: cost || 0.002 } };
+        }
         if (req.kind === "image") {
             const size = req.params.width && req.params.height ? `${req.params.width}x${req.params.height}` : "auto";
             const imgs = req.inputs.filter((i) => i.data && i.mime.startsWith("image/"));

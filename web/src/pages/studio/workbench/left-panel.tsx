@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { App, Button, Form, Input, Modal, Select, Tabs, Tag } from "antd";
+import { App, Button, Form, Input, Modal, Progress, Select, Tabs, Tag } from "antd";
 import { Lock, Plus, Upload } from "lucide-react";
 
 import { api, uploadMedia } from "@/services/api/filmflow";
@@ -104,20 +104,24 @@ function References() {
     const { message } = App.useApp();
     const input = useRef<HTMLInputElement>(null);
     const [text, setText] = useState("");
+    const [progress, setProgress] = useState<Record<string, number>>({});
     const upload = async (files: FileList | null) => {
         try {
             for (const file of Array.from(files ?? [])) {
-                const m = await uploadMedia(file, wb.pid);
+                const key = `${file.name}:${file.size}:${Math.random()}`;
+                setProgress((p) => ({ ...p, [key]: 0 }));
+                const m = await uploadMedia(file, wb.pid, (pct) => setProgress((p) => ({ ...p, [key]: pct }))).finally(() => setProgress((p) => { const { [key]: _x, ...rest } = p; return rest; }));
                 await api.post(`/projects/${wb.pid}/references`, { kind: m.mime.startsWith("video/") ? "video" : m.mime.startsWith("audio/") ? "audio" : "image", name: file.name, mediaId: m.id });
             }
             await wb.reload();
-        } catch (e: any) { message.error(e.message); }
+        } catch (e: any) { message.error(e.message); setProgress({}); }
     };
     const addText = async () => { if (!text.trim()) return; await api.post(`/projects/${wb.pid}/references`, { kind: "text", name: text.slice(0, 20), text }); setText(""); await wb.reload(); };
     return (
         <div className="space-y-2 p-2">
             <input ref={input} type="file" hidden multiple accept="image/*,video/*,audio/*" onChange={(e) => upload(e.target.files)} />
             <Button size="small" block icon={<Upload size={13} />} onClick={() => input.current?.click()}>上传参考（图/视频/音频）</Button>
+            {Object.entries(progress).map(([k, pct]) => <div key={k} className="text-[11px]"><div className="truncate opacity-70">{k.split(":")[0]}</div><Progress size="small" percent={pct} /></div>)}
             <div className="flex gap-1"><Input size="small" placeholder="文字参考" value={text} onChange={(e) => setText(e.target.value)} onPressEnter={addText} /><Button size="small" onClick={addText}>+</Button></div>
             <div className="text-[11px] opacity-50">拖到画布上的镜头节点，选择「参考什么」。</div>
             <div className="grid grid-cols-2 gap-2">

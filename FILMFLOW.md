@@ -25,11 +25,18 @@ cd server && npm run seed
 - 默认带离线 **Mock Provider**（生成带标注的 SVG 关键帧/Take），无需任何付费 Key 即可跑通整条链路。接真实模型：管理后台启用 `openai-compatible` Provider，填 Base URL 与平台 Key（或用户在「设置 → API Key」填 BYOK），上架对应模型。
 
 ## 环境变量（server）
-`PORT` `FILMFLOW_DATA_DIR` `FILMFLOW_DB` `FILMFLOW_MASTER_KEY`(64 位 hex，生产必设) `FILMFLOW_ADMIN_EMAILS` `NODE_ENV=production`
+`PORT` `FILMFLOW_DATA_DIR` `FILMFLOW_DB` `FILMFLOW_MASTER_KEY`(64 位 hex，生产必设) `FILMFLOW_ADMIN_EMAILS` `FILMFLOW_PUBLIC_URL` `FILMFLOW_WEB_URL` `NODE_ENV=production`
+
+| 能力 | 变量 |
+|---|---|
+| OAuth（配置了才启用） | `FILMFLOW_OAUTH_GITHUB_ID/SECRET`、`FILMFLOW_OAUTH_GOOGLE_ID/SECRET`、`FILMFLOW_OAUTH_APPLE_ID/TEAM_ID/KEY_ID/PRIVATE_KEY`；回调地址 `${FILMFLOW_PUBLIC_URL}/auth/oauth/<provider>/callback` |
+| 支付 | `FILMFLOW_STRIPE_SECRET`、`FILMFLOW_STRIPE_WEBHOOK_SECRET`；非 production 默认 Mock 支付（即时到账，仅测试） |
+| 媒体衍生物 / 渲染 | 服务器装有 `ffmpeg` 时自动生成缩略图、480p 代理视频，并可把全部为真实视频的序列渲染成 MP4 |
+| Provider 回调 | 管理后台 → Provider → 生成 Webhook 密钥；回调 `POST /webhooks/providers/:id`，头 `X-FilmFlow-Signature` = HMAC-SHA256(密钥, 原始 body) |
 
 ## 质量门禁
 ```bash
-cd server && npm run typecheck && npm test     # 15 个黄金路径验收测试（PRD §26）
+cd server && npm run typecheck && npm test     # 23 个测试：黄金路径验收（PRD §26）+ 团队/OAuth/订阅/Webhook/成片/LLM
 cd web && bun run typecheck && bun run build
 ```
 

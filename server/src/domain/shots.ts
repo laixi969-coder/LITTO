@@ -1,5 +1,5 @@
 import { all, run, tx, type Scope } from "../db.ts";
-import { bad, notFound } from "../util.ts";
+import { bad, conflict, notFound } from "../util.ts";
 import { SCHEMA_VERSION, shotInput, cameraSchema, lightingSchema, type ShotInput } from "./schema.ts";
 import { recomputeStates } from "./state.ts";
 import type { ShotDraft } from "./skills.ts";
@@ -25,9 +25,13 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
     });
 }
 
-export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>) {
+/** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
+const CORE = ["narrativeFunction", "action", "assetIds"] as const;
+export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
+    const changed = CORE.filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(shot[k]));
+    if (changed.length && (shot.heroKeyframeId || shot.approvedTakeId) && !confirm) throw conflict(`changing ${changed.join(", ")} affects an approved Hero Frame/Take; resend with confirm:true`, "needs_confirmation", { fields: changed, heroKeyframeId: shot.heroKeyframeId, approvedTakeId: shot.approvedTakeId });
     for (const aid of patch.assetIds ?? []) if (!s.get("assets", aid)) throw bad(`unknown asset ${aid}`);
     const { id: _i, workspaceId, projectId, sequenceId, sceneId, ord, schemaVersion, status, heroKeyframeId, approvedTakeId, createdAt, updatedAt, deletedAt, ...data } = shot;
     const { sequenceId: _s, sceneId: _c, order, ...rest } = patch;
@@ -70,7 +74,7 @@ export function createShotsFromDrafts(s: Scope, projectId: string, sequenceId: s
         for (const d of drafts) {
             if (!scenes.has(d.sceneIndex)) scenes.set(d.sceneIndex, s.insert("scenes", { project_id: projectId, sequence_id: sequenceId, name: d.sceneName, ord: d.sceneIndex, data: {} }).id);
             const ord = all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", sequenceId, s.workspaceId)[0].n;
-            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration } });
+            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration } });
             out.push(shot);
         }
         recomputeStates(s, sequenceId);

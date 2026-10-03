@@ -36,11 +36,18 @@ export function verifyCode(email: string, code: string) {
         throw new HttpError(401, "invalid code", "bad_code");
     }
     run("DELETE FROM login_codes WHERE email=?", email);
+    return loginUser(email);
+}
+
+/** Shared by OTP and OAuth: find-or-create the user (+ Personal Workspace), apply pending invites, open a session. */
+export function loginUser(email: string, identity?: { provider: string; subject: string }) {
+    email = email.trim().toLowerCase();
     const user = tx(() => {
         let u = get("SELECT * FROM users WHERE email=?", email);
         if (u?.deleted_at) throw forbidden("account deleted");
         if (u?.status === "disabled") throw forbidden("account disabled");
         if (!u) {
+            if (!setting("registrationOpen", true)) throw forbidden("registration closed");
             const id = ulid();
             const isAdmin = config.adminEmails.includes(email) ? 1 : 0;
             run("INSERT INTO users VALUES(?,?,?,?,?,?,NULL)", id, email, "active", isAdmin, now(), now());
@@ -49,15 +56,20 @@ export function verifyCode(email: string, code: string) {
             run("INSERT INTO workspaces(id,name,owner_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", wid, `${email.split("@")[0]}'s Workspace`, id, "personal", now(), now());
             run("INSERT INTO workspace_members VALUES(?,?,?,?)", wid, id, "OWNER", now());
             run("INSERT INTO credit_accounts VALUES(?,0,0,?)", wid, now());
-            run("INSERT INTO subscriptions VALUES(?,?,?,?,?,?,?)", ulid(), wid, "free", "free", "active", now(), now());
+            run("INSERT INTO subscriptions(id,workspace_id,plan,period,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ulid(), wid, "free", "free", "active", now(), now());
             grant(wid, setting("defaultCredits", 200), "CREDIT_GRANT", "signup grant");
             u = get("SELECT * FROM users WHERE id=?", id)!;
         }
+        for (const inv of all("SELECT * FROM workspace_invites WHERE email=? AND status='pending'", email)) {
+            run("INSERT OR IGNORE INTO workspace_members VALUES(?,?,?,?)", inv.workspace_id, u.id, inv.role, now());
+            run("UPDATE workspace_invites SET status='accepted' WHERE id=?", inv.id);
+        }
+        if (identity) run("INSERT OR IGNORE INTO oauth_identities VALUES(?,?,?,?)", identity.provider, identity.subject, u.id, now());
         return u;
     });
     const token = randomBytes(32).toString("base64url");
     run("INSERT INTO sessions VALUES(?,?,?,?,?)", ulid(), user.id, sha256(token), new Date(Date.now() + SESSION_TTL_MS).toISOString(), now());
-    audit(user.id, "auth.login", user.id);
+    audit(user.id, "auth.login", user.id, identity ? { via: identity.provider } : undefined);
     return { token, user: { id: user.id, email: user.email, isAdmin: !!user.is_admin } };
 }
 

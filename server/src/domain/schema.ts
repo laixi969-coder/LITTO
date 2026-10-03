@@ -62,6 +62,7 @@ export const shotInput = z.object({
     intendedStateDelta: z.record(z.any()).default({}),
     freedomMap: freedomMapSchema.optional(), constraints: z.array(z.string()).default([]),
     duration: z.number().default(4),
+    subtitle: z.string().default(""),
     modelOverride: z.any().optional(),
 });
 export type ShotInput = z.infer<typeof shotInput>;

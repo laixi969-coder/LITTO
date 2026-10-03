@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { App, Button, Input } from "antd";
 import { Clapperboard } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { api } from "@/services/api/filmflow";
+import { FF_BASE, api } from "@/services/api/filmflow";
 import { useFilmflowStore } from "@/stores/use-filmflow-store";
 
 export default function LoginPage() {
@@ -15,6 +15,8 @@ export default function LoginPage() {
     const nav = useNavigate();
     const from = (useLocation().state as any)?.from ?? "/studio";
     const refresh = useFilmflowStore((s) => s.refresh);
+    const [oauth, setOauth] = useState<string[]>([]);
+    useEffect(() => void api.get("/auth/oauth/providers").then(setOauth).catch(() => {}), []);
 
     const send = async () => {
         setBusy(true);
@@ -41,6 +43,7 @@ export default function LoginPage() {
                 {sent && <Input size="large" placeholder="6 位验证码" value={code} onChange={(e) => setCode(e.target.value)} onPressEnter={verify} autoFocus maxLength={6} />}
                 {sent ? <div className="flex gap-2"><Button type="primary" size="large" block loading={busy} onClick={verify}>登录</Button><Button size="large" onClick={() => setSent(false)}>换邮箱</Button></div>
                     : <Button type="primary" size="large" block loading={busy} onClick={send} disabled={!email.includes("@")}>获取验证码</Button>}
+                {oauth.length > 0 && <div className="space-y-2 pt-2"><div className="text-center text-xs opacity-50">或使用</div>{oauth.map((p) => <Button key={p} block size="large" href={`${FF_BASE}/auth/oauth/${p}/start`}>{({ github: "GitHub", google: "Google", apple: "Apple" } as Record<string, string>)[p] ?? p} 登录</Button>)}</div>}
             </div>
         </div>
     );

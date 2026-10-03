@@ -61,6 +61,19 @@ CREATE TABLE qc_reports(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project
 CREATE TABLE repair_actions(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, qc_report_id TEXT, issue_id TEXT, shot_id TEXT NOT NULL, action TEXT NOT NULL, cause TEXT NOT NULL, detail TEXT, status TEXT NOT NULL DEFAULT 'suggested', created_at TEXT);
 `,
     },
+    {
+        id: "0003_team_billing_assembly",
+        sql: `
+CREATE TABLE workspace_invites(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, email TEXT NOT NULL, role TEXT NOT NULL, invited_by TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT, UNIQUE(workspace_id,email));
+CREATE TABLE oauth_identities(provider TEXT NOT NULL, subject TEXT NOT NULL, user_id TEXT NOT NULL, created_at TEXT, PRIMARY KEY(provider,subject));
+ALTER TABLE providers ADD COLUMN webhook_secret TEXT;
+CREATE TABLE webhook_events(id TEXT PRIMARY KEY, job_id TEXT NOT NULL, provider_id TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT);
+CREATE TABLE payments(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, kind TEXT NOT NULL, item_id TEXT NOT NULL, amount_usd REAL NOT NULL, credits REAL NOT NULL, provider TEXT NOT NULL, provider_ref TEXT, status TEXT NOT NULL, created_at TEXT, updated_at TEXT);
+ALTER TABLE subscriptions ADD COLUMN period_end TEXT;
+ALTER TABLE media ADD COLUMN proxy_key TEXT;
+CREATE TABLE renders(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, sequence_id TEXT NOT NULL, status TEXT NOT NULL, manifest TEXT, media_id TEXT, error TEXT, created_by TEXT, created_at TEXT, updated_at TEXT);
+`,
+    },
 ];
 
 export const db = new DatabaseSync(config.dbFile);
@@ -119,7 +132,7 @@ const JSON_COLS: Record<string, string[]> = {
     worlds: ["data"], looks: ["data"], assets: ["data"], sequences: ["data"], scenes: ["data"], shots: ["data"],
     shot_states: ["data"], state_deltas: ["data"], keyframes: ["meta"], takes: ["meta"], qc_reports: ["findings"],
     projects: ["canvas"], asset_versions: ["snapshot"], reference_bindings: ["crop", "provider_compat"],
-    generation_jobs: ["parameters", "input_refs", "fallback_chain"], generation_outputs: ["meta"], continuity_issues: ["repair"],
+    generation_jobs: ["parameters", "input_refs", "fallback_chain"], renders: ["manifest"], generation_outputs: ["meta"], continuity_issues: ["repair"],
 };
 export const camel = (s: string) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export const snake = (s: string) => s.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());

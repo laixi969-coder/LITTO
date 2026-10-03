@@ -14,6 +14,7 @@ export class FFError extends Error {
 }
 
 let workspaceId: string | null = null;
+export const WS_KEY = "ff:workspace";
 export const setWorkspace = (id: string | null) => (workspaceId = id);
 
 export async function ff<T = any>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
@@ -35,10 +36,21 @@ export const api = {
     del: <T = any>(p: string) => ff<T>("DELETE", p),
 };
 
-export async function uploadMedia(file: Blob, projectId?: string) {
-    const res = await fetch(`${FF_BASE}/media${projectId ? `?projectId=${projectId}` : ""}`, { method: "POST", credentials: "include", headers: { "x-filmflow-csrf": "1", ...(workspaceId ? { "x-workspace-id": workspaceId } : {}) }, body: file });
-    const json = await res.json();
-    if (!res.ok) throw new FFError(res.status, json.error);
-    return json as { id: string; url: string; mime: string };
+export function uploadMedia(file: Blob, projectId?: string, onProgress?: (pct: number) => void) {
+    return new Promise<{ id: string; url: string; mime: string }>((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open("POST", `${FF_BASE}/media${projectId ? `?projectId=${projectId}` : ""}`);
+        x.withCredentials = true;
+        x.setRequestHeader("x-filmflow-csrf", "1");
+        if (workspaceId) x.setRequestHeader("x-workspace-id", workspaceId);
+        x.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
+        x.onerror = () => reject(new FFError(0, "网络错误"));
+        x.onload = () => {
+            let json: any = {};
+            try { json = JSON.parse(x.responseText); } catch { /* keep empty */ }
+            x.status < 300 ? resolve(json) : reject(new FFError(x.status, json.error ?? "上传失败"));
+        };
+        x.send(file);
+    });
 }
 export const mediaSrc = (url?: string | null) => (url ? FF_BASE + url : "");

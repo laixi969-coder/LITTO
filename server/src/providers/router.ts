@@ -19,7 +19,7 @@ const ROLE_CAP: Record<string, { cap: string; fallback: string; hard?: boolean }
     AUDIO: { cap: "nativeAudio", fallback: "native audio unsupported; audio must be added in assembly" },
 };
 
-export type Policy = { optimize?: "quality" | "cost" | "latency" | "balanced"; imageModelId?: string; videoModelId?: string; disabledModelIds?: string[]; allowFallback?: boolean };
+export type Policy = { optimize?: "quality" | "cost" | "latency" | "balanced"; imageModelId?: string; videoModelId?: string; textModelId?: string; disabledModelIds?: string[]; allowFallback?: boolean };
 export type Candidate = { modelId: string; providerId: string; score: number; degradations: { role: string; strategy: string }[]; usable: boolean; reason?: string };
 
 /** System Default → Workspace Default → Project Default → Shot Override. */
@@ -32,9 +32,9 @@ export function resolvePolicy(workspaceId: string, projectId: string | null, sho
 
 const CLASS = { low: 0, mid: 1, high: 2 } as Record<string, number>;
 
-export function route(opts: { kind: "image" | "video"; workspaceId: string; projectId: string | null; roles: string[]; policy: Policy; exclude?: string[] }): { chosen: Candidate | null; candidates: Candidate[] } {
+export function route(opts: { kind: "image" | "video" | "text"; need?: string[]; workspaceId: string; projectId: string | null; roles: string[]; policy: Policy; exclude?: string[] }): { chosen: Candidate | null; candidates: Candidate[] } {
     const pol = opts.policy;
-    const forced = opts.kind === "image" ? pol.imageModelId : pol.videoModelId;
+    const forced = opts.kind === "image" ? pol.imageModelId : opts.kind === "video" ? pol.videoModelId : pol.textModelId;
     const out: Candidate[] = [];
     for (const m of listModels(true)) {
         if (m.type !== opts.kind || pol.disabledModelIds?.includes(m.id) || opts.exclude?.includes(m.id)) continue;
@@ -42,8 +42,8 @@ export function route(opts: { kind: "image" | "video"; workspaceId: string; proj
         const needsKey = ADAPTERS[prov.adapter].requiresKey;
         const usable = !needsKey || !!credentialFor(prov.id, opts.workspaceId, opts.projectId);
         const caps = m.capabilities;
-        const base = opts.kind === "video" ? (caps.image2video || caps.text2video) : caps.text2image;
-        if (!base) continue;
+        const base = opts.kind === "video" ? (caps.image2video || caps.text2video) : opts.kind === "text" ? caps.chat : caps.text2image;
+        if (!base || (opts.need ?? []).some((n) => !caps[n])) continue;
         const degradations: Candidate["degradations"] = [];
         let penalty = 0;
         for (const role of new Set(opts.roles)) {

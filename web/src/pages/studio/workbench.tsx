@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { App, Result, Spin } from "antd";
+import { App, Result, Segmented, Spin } from "antd";
 import { useParams } from "react-router-dom";
 
+import { Assembly } from "./workbench/assembly";
 import { DirectorBar } from "./workbench/director-bar";
 import { DomainCanvas } from "./workbench/domain-canvas";
+import { GridView } from "./workbench/grid-view";
 import { Inspector } from "./workbench/inspector";
 import { LeftPanel } from "./workbench/left-panel";
 import { ShotStrip } from "./workbench/shot-strip";
@@ -28,7 +30,10 @@ export default function Workbench() {
             <DirectorBar />
             <div className="flex min-h-0 flex-1">
                 <aside className="w-[260px] shrink-0 overflow-auto border-r border-black/10 dark:border-white/10"><LeftPanel /></aside>
-                <section className="min-w-0 flex-1"><DomainCanvas /></section>
+                <section className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex shrink-0 items-center border-b border-black/10 px-3 py-1 dark:border-white/10"><Segmented size="small" value={wb.view} onChange={(v) => wb.setView(v as any)} options={[{ label: "画布", value: "canvas" }, { label: "分镜网格", value: "grid" }, { label: "成片", value: "assembly" }]} /></div>
+                    <div className="min-h-0 flex-1">{wb.view === "canvas" ? <DomainCanvas /> : wb.view === "grid" ? <GridView /> : <Assembly />}</div>
+                </section>
                 <aside className="w-[400px] shrink-0 overflow-auto border-l border-black/10 dark:border-white/10"><Inspector /></aside>
             </div>
             <ShotStrip />

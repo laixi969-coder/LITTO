@@ -17,6 +17,7 @@ import { bad, notFound } from "../util.ts";
 import { importLegacyCanvas } from "../legacy.ts";
 import { mediaView } from "../storage.ts";
 import { estimate } from "../jobs.ts";
+import { autoObserve } from "../domain/qc-vision.ts";
 
 export const production = new Hono();
 const P = "/projects/:pid";
@@ -127,7 +128,7 @@ production.get("/shots/:id", (c) => {
     if (!sh) throw notFound("shot");
     return c.json({ ...withState(s, sh), bindings: s.list("reference_bindings", { targetType: "shot", targetId: sh.id }), keyframes: s.list("keyframes", { shotId: sh.id }).map(keyframeView), takes: s.list("takes", { shotId: sh.id }).map(takeView), issues: s.list("continuity_issues", { shotId: sh.id }), qc: s.list("qc_reports", { shotId: sh.id }), repairs: s.list("repair_actions", { shotId: sh.id }) });
 });
-production.patch("/shots/:id", async (c) => { const { s } = ctx(c, "EDITOR"); return c.json(updateShot(s, c.req.param("id"), await body(c, shotPartial))); });
+production.patch("/shots/:id", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, shotPartial.extend({ confirm: z.boolean().optional() })); const { confirm, ...patch } = b; return c.json(updateShot(s, c.req.param("id"), patch, !!confirm)); });
 production.post("/shots/:id/move", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, z.object({ order: z.number().int() })); return c.json(moveShot(s, c.req.param("id"), b.order)); });
 production.delete("/shots/:id", (c) => {
     const { s } = ctx(c, "EDITOR");
@@ -225,17 +226,21 @@ production.post("/continuity-issues/:id/override", async (c) => {
 });
 production.get("/qc/observation-kinds", (c) => c.json(OBSERVATION_KINDS));
 production.post("/shots/:id/qc", async (c) => {
-    const { s } = ctx(c, "EDITOR");
-    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
-    return c.json(runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, b.observations));
+    const { s, a } = ctx(c, "EDITOR");
+    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), auto: z.boolean().default(false), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
+    const obs = [...b.observations];
+    let vision: any = null;
+    if (b.auto) vision = await autoObserve(s, c.req.param("id"), b.targetType, b.targetId, a.user.id);
+    if (vision?.observations) obs.push(...vision.observations);
+    return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs), vision: vision && { used: vision.used, reason: vision.reason, model: vision.model } });
 });
 production.post("/repair-actions/:id/apply", (c) => { const { s, a } = ctx(c, "EDITOR"); return c.json(applyRepair(s, c.req.param("id"), a.user.id)); });
 
 // ---- Director Agent ----
 production.post(`${P}/director/run`, async (c) => {
     const { s, a } = project(c, c.req.param("pid"), "EDITOR");
-    const b = await body(c, z.object({ goal: z.string().optional(), script: z.string(), sequenceId: z.string().optional(), mode: z.enum(["simple", "director"]).default("simple"), generate: z.boolean().default(false), confirm: z.boolean().default(false), replace: z.boolean().default(false), minShots: z.number().int().min(1).max(60).optional() }));
-    return c.json(directorRun(s, c.req.param("pid"), a.user.id, b));
+    const b = await body(c, z.object({ goal: z.string().optional(), script: z.string(), sequenceId: z.string().optional(), mode: z.enum(["simple", "director"]).default("simple"), generate: z.boolean().default(false), confirm: z.boolean().default(false), replace: z.boolean().default(false), useLlm: z.boolean().default(false), minShots: z.number().int().min(1).max(60).optional() }));
+    return c.json(await directorRun(s, c.req.param("pid"), a.user.id, b));
 });
 
 // ---- Canvas (layout only; semantics live in the domain tables) + legacy import ----

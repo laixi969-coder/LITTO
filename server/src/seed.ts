@@ -1,11 +1,11 @@
-// Usage: with the server running → `npm run seed` creates demo@filmflow.local with a ready-to-explore project
+export {};// Usage: with the server running → `npm run seed` creates demo@filmflow.local with a ready-to-explore project
 // (World/Look, approved assets, a script broken into shots, references bound). Generation is left for you to click.
 const BASE = process.env.FILMFLOW_URL ?? "http://localhost:8787";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
 
 let token = "";
 async function call(method: string, path: string, body?: unknown, raw?: Buffer) {
-    const r = await fetch(BASE + path, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(raw ? { "content-type": "image/png" } : body ? { "content-type": "application/json" } : {}) }, body: raw ?? (body ? JSON.stringify(body) : undefined) });
+    const r = await fetch(BASE + path, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(raw ? { "content-type": "image/png" } : body ? { "content-type": "application/json" } : {}) }, body: (raw ? new Uint8Array(raw) : body ? JSON.stringify(body) : undefined) as BodyInit | undefined });
     const j: any = await r.json();
     if (!r.ok) throw new Error(`${method} ${path}: ${r.status} ${JSON.stringify(j)}`);
     return j;

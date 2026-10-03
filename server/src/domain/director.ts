@@ -2,9 +2,12 @@ import { type Scope } from "../db.ts";
 import { bad, notFound } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
 import { createShotsFromDrafts } from "./shots.ts";
-import { storyboardDirector, visualDirector, assetDirector } from "./skills.ts";
+import { storyboardDirector, visualDirector, assetDirector, type ShotDraft } from "./skills.ts";
 import { generateKeyframes } from "./lifecycle.ts";
 import { mustRoute, resolvePolicy } from "../providers/router.ts";
+import { parseJson, runText } from "../llm.ts";
+import { cameraSchema, lightingSchema, NARRATIVE_FUNCTIONS } from "./schema.ts";
+import { z } from "zod";
 
 type Step = { step: string; status: "done" | "skipped" | "needs_confirmation"; detail: any };
 
@@ -13,7 +16,28 @@ type Step = { step: string; status: "done" | "skipped" | "needs_confirmation"; d
  * Freedom map → Router → Generate → QC → Continuity → Repair.
  * Anything that touches LOCKed content, approved assets or core shot intent needs `confirm: true`.
  */
-export function directorRun(s: Scope, projectId: string, actor: string, input: { goal?: string; script: string; sequenceId?: string; mode?: "simple" | "director"; generate?: boolean; confirm?: boolean; replace?: boolean; minShots?: number }) {
+const refined = z.object({ shots: z.array(z.object({ title: z.string(), narrativeFunction: z.enum(NARRATIVE_FUNCTIONS), action: z.string(), performance: z.object({ emotion: z.string(), intensity: z.number().min(0).max(1), eyeline: z.string(), gesture: z.string(), timing: z.string() }), camera: cameraSchema, lighting: lightingSchema, duration: z.number().min(1).max(30), subtitle: z.string().optional() }).passthrough()) });
+
+/**
+ * LLM refinement on top of the deterministic storyboard: the model may rewrite function / action / performance / camera / lighting / timing,
+ * but never the shot count, order, scene assignment or asset ids (those carry continuity). Anything invalid → keep the rule-based draft.
+ */
+async function refineWithLlm(s: Scope, projectId: string, actor: string, script: string, drafts: ShotDraft[], world: any) {
+    const system = "You are a film storyboard director and cinematographer. Refine the draft shot list. Return ONLY JSON {\"shots\":[...]} with exactly the same number of shots in the same order; keep each shot's fields (title, narrativeFunction, action, performance{emotion,intensity,eyeline,gesture,timing}, camera{shotSize,position,height,angle,lensMm,focus,depth,motion,motivation,side,screenDirection}, lighting{motivatedLight,key,fill,negativeFill,practicals,exposure,keyDirection,timeOfDay,colorTemp}, duration, subtitle). Respect: cut by narrative function, stay on one side of the 180-degree axis within a scene, motivate every camera move, keep lighting consistent within a scene. No filler words like 8K or cinematic.";
+    const slim = drafts.map((d) => ({ title: d.title, narrativeFunction: d.narrativeFunction, action: d.action, performance: d.performance, camera: d.camera, lighting: d.lighting, duration: d.duration, subtitle: d.subtitle ?? "" }));
+    const r = await runText({ workspaceId: s.workspaceId, projectId, actor, system, prompt: `WORLD: ${JSON.stringify(world ?? {})}\nSCRIPT:\n${script}\nDRAFT:\n${JSON.stringify({ shots: slim })}`, json: true, label: "director.refine", mockEcho: JSON.stringify({ shots: slim }) });
+    if (!r) return { used: false, reason: "no usable text model" };
+    try {
+        const parsed = refined.parse(parseJson(r.text));
+        if (parsed.shots.length !== drafts.length) throw new Error(`shot count changed ${drafts.length} → ${parsed.shots.length}`);
+        parsed.shots.forEach((x, i) => Object.assign(drafts[i], { title: x.title, narrativeFunction: x.narrativeFunction, action: x.action, performance: x.performance, camera: x.camera, lighting: x.lighting, duration: x.duration, subtitle: x.subtitle ?? drafts[i].subtitle }));
+        return { used: true, model: r.modelId, jobId: r.jobId };
+    } catch (e) {
+        return { used: false, reason: `LLM reply rejected (${(e as Error).message}); kept rule-based draft`, model: r.modelId };
+    }
+}
+
+export async function directorRun(s: Scope, projectId: string, actor: string, input: { useLlm?: boolean; goal?: string; script: string; sequenceId?: string; mode?: "simple" | "director"; generate?: boolean; confirm?: boolean; replace?: boolean; minShots?: number }) {
     const steps: Step[] = [];
     const project = s.get("projects", projectId);
     if (!project) throw notFound("project");
@@ -38,7 +62,9 @@ export function directorRun(s: Scope, projectId: string, actor: string, input: {
     else s.update("sequences", seq.id, { script: input.script });
 
     const drafts = storyboardDirector(input.script, assets.map((a) => ({ id: a.id, name: a.name, type: a.type })), { minShots: input.minShots ?? 8 });
+    const llm = input.useLlm ? await refineWithLlm(s, projectId, actor, input.script, drafts, world) : null;
     const shots = createShotsFromDrafts(s, projectId, seq.id, drafts, { replace: input.replace });
+    if (llm) steps.push({ step: "llm_refine", status: llm.used ? "done" : "skipped", detail: llm });
     steps.push({ step: "sequence_and_shots", status: "done", detail: { sequenceId: seq.id, shotCount: shots.length, functions: shots.map((x: any) => x.narrativeFunction) } });
 
     const vis = visualDirector(`${world?.realism ?? ""} ${input.goal ?? ""}`);
