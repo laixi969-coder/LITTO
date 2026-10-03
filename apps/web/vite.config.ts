@@ -14,6 +14,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      "/cloud": { target: "http://127.0.0.1:3000", changeOrigin: false },
       "/mcp": { target: "http://127.0.0.1:3000", changeOrigin: false },
       "/a2a": { target: "http://127.0.0.1:3000", changeOrigin: false },
       "/api": {

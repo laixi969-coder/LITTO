@@ -5,6 +5,10 @@
       <el-badge isDot :hidden="!hasDesktopUpdate">
         <el-button round size="large" :icon="IconSettings" :aria-label="hasDesktopUpdate ? '设置，有新版本可用' : '设置'" @click="settingsVisible = true">设置</el-button>
       </el-badge>
+      <el-space v-if="accounts" class="accountBar" :size="12">
+        <el-text class="accountEmail" :title="me?.user.email">{{ me?.user.email }}</el-text>
+        <el-button round size="large" @click="logout()">退出登录</el-button>
+      </el-space>
     </el-header>
     <el-main class="pageContent">
       <section class="creationPanel" aria-label="创建项目">
@@ -25,15 +29,16 @@
             <el-input ref="promptInput" v-model="prompt" type="textarea" :rows="4" resize="none" :disabled="creating || opening" :placeholder="promptPlaceholder" aria-label="创作描述" @paste.capture="pasteText" />
             <template #footer>
               <div class="composerFooter">
-                <workspacePicker ref="promptWorkspacePicker" v-model="workspaceDirectory" :disabled="creating || opening" />
+                <workspacePicker v-if="!accounts" ref="promptWorkspacePicker" v-model="workspaceDirectory" :disabled="creating || opening" />
+                <span v-else />
                 <el-space class="sendActions" wrap :size="12">
                   <modelPopover v-model="selectedModel" v-model:reasoningEffort="reasoningEffort" class="modelSelect" :disabled="creating || opening" />
-                  <el-button class="sendButton" type="primary" :circle="!!workspaceDirectory" :icon="workspaceDirectory ? IconArrowUp : IconFolder" :loading="creating" :disabled="creating || opening" :aria-label="workspaceDirectory ? '发送' : '选择工作目录'" @click="workspaceDirectory ? createProject() : promptWorkspacePicker?.chooseDirectory()">
-                    <template v-if="!workspaceDirectory" #default>选择工作目录</template>
+                  <el-button class="sendButton" type="primary" :circle="canSend" :icon="canSend ? IconArrowUp : IconFolder" :loading="creating" :disabled="creating || opening" :aria-label="canSend ? '发送' : '选择工作目录'" @click="canSend ? createProject() : promptWorkspacePicker?.chooseDirectory()">
+                    <template v-if="!canSend" #default>选择工作目录</template>
                   </el-button>
                 </el-space>
               </div>
-              <p v-if="!workspaceDirectory" class="workspaceHint" role="status">请先选择一个空文件夹作为工作目录，画布和素材会保存在这里。</p>
+              <p v-if="!accounts && !workspaceDirectory" class="workspaceHint" role="status">请先选择一个空文件夹作为工作目录，画布和素材会保存在这里。</p>
             </template>
           </el-card>
         </div>
@@ -42,7 +47,7 @@
         <div class="sectionHeader">
           <h2 id="projectListTitle">项目列表</h2>
           <el-space wrap>
-            <el-button :icon="iconFolderOpen" :disabled="creating || opening" @click="openProject()">导入项目</el-button>
+            <el-button v-if="!accounts" :icon="iconFolderOpen" :disabled="creating || opening" @click="openProject()">导入项目</el-button>
             <el-button :icon="IconFolderPlus" :disabled="creating || opening" @click="createProject(false)">添加项目</el-button>
             <el-button circle :icon="sortDescending ? IconSortDescending : IconSortAscending" :aria-label="sortDescending ? '按时间降序' : '按时间升序'" @click="sortDescending = !sortDescending" />
             <el-radio-group v-model="viewMode" aria-label="项目视图">
@@ -57,7 +62,7 @@
               <icon-folder class="projectIcon" :size="28" aria-hidden="true" />
               <span class="projectInfo">
                 <span class="projectName" :title="project.name">{{ project.name }}</span>
-                <span class="projectPath" :title="project.directory">{{ project.directory }}</span>
+                <span v-if="!accounts" class="projectPath" :title="project.directory">{{ project.directory }}</span>
                 <span class="projectTime">最近打开 {{ new Date(project.lastOpenedAt).toLocaleString(locale, { hour12: false }) }}</span>
               </span>
             </button>
@@ -98,9 +103,13 @@ import { hasDesktopUpdate } from "@/stores/desktopUpdate";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import settings from "@/components/settings/index.vue";
 import bg from "./bg.vue";
+import { getMe, isAuthDisabled, logout } from "@/lib/session";
 import workspacePicker from "./workspacePicker.vue";
 
 const settingsVisible = ref(false);
+const me = getMe();
+const accounts = !isAuthDisabled();
+const canSend = computed(() => accounts || !!workspaceDirectory.value);
 const router = useRouter();
 const creating = ref(false);
 const opening = ref(false);
@@ -238,11 +247,15 @@ async function renameProject(project: Project) {
 }
 
 async function createProject(fromPrompt = true) {
-  if (creating.value || opening.value || (fromPrompt && !workspaceDirectory.value)) return;
+  if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
   creating.value = true;
   try {
     let path = workspaceDirectory.value;
-    if (!fromPrompt) {
+    if (accounts) {
+      // Accounts mode: the server makes an empty project folder inside the caller's own workspace; no folder picking.
+      const title = fromPrompt ? prompt.value.trim().split(/\n/)[0]?.slice(0, 24) : "";
+      path = (await axios.post<{ data: { directory: string } }>("/api/workspaces/createProject", { name: title })).data.data.directory;
+    } else if (!fromPrompt) {
       const confirmed = await ElMessageBox.confirm("请选择一个空文件夹作为项目目录，画布和素材将保存在其中。", "添加项目", {
         confirmButtonText: "选择空文件夹", cancelButtonText: "取消", type: "info",
       }).then(() => true, () => false);

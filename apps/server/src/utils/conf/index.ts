@@ -40,4 +40,36 @@ if (!config.has("settings.customProviders")) {
     ({ id, label, version, apiUrl, protocol, models, apiKey: "" })));
 }
 
-export default config;
+// ── Multi-tenant settings ─────────────────────────────────────────────────
+// Every call site does `conf.get/set(...)`. The default export is a proxy that routes each call to the *current workspace's*
+// settings file (data/tenants/<workspaceId>/settings.json, mode 0600) so provider keys and preferences are never shared across tenants.
+// Outside an authenticated request (startup, background work) or with LITTO_AUTH=off it falls back to the global data/settings.json.
+import { currentTenant, authEnabled, tenantDir } from "@/utils/tenant";
+
+type Settings = typeof config;
+const tenantConfigs = new Map<string, Settings>();
+function activeConfig(): Settings {
+  const tenant = currentTenant();
+  if (!tenant || !authEnabled()) return config;
+  let c = tenantConfigs.get(tenant.workspaceId);
+  if (!c) {
+    const cwd = tenantDir(tenant.workspaceId);
+    mkdirSync(cwd, { recursive: true });
+    c = new conf({ cwd, configName: "settings", configFileMode: 0o600, watch: false }) as Settings;
+    tenantConfigs.set(tenant.workspaceId, c);
+  }
+  return c;
+}
+
+const tenantConf = new Proxy(config, {
+  get(_target, prop) {
+    // `conf.path` identifies the *system* data directory (many helpers derive data/ from it), so it never switches per tenant.
+    if (prop === "path") return config.path;
+    const c = activeConfig();
+    const value = Reflect.get(c, prop, c);
+    return typeof value === "function" ? value.bind(c) : value;
+  },
+}) as Settings;
+
+
+export default tenantConf;

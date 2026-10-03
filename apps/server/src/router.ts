@@ -92,14 +92,15 @@ import route89 from "./routes/tools/save";
 import route90 from "./routes/tools/setEnabled";
 import route91 from "./routes/tools/uninstall";
 import route92 from "./routes/workspaces/check";
-import route93 from "./routes/workspaces/files/list";
-import route94 from "./routes/workspaces/files/mkdir";
-import route95 from "./routes/workspaces/files/read";
-import route96 from "./routes/workspaces/files/remove";
-import route97 from "./routes/workspaces/files/rename";
-import route98 from "./routes/workspaces/files/write";
-import route99 from "./routes/workspaces/list";
-import route100 from "./routes/workspaces/selectDirectory";
+import route93 from "./routes/workspaces/createProject";
+import route94 from "./routes/workspaces/files/list";
+import route95 from "./routes/workspaces/files/mkdir";
+import route96 from "./routes/workspaces/files/read";
+import route97 from "./routes/workspaces/files/remove";
+import route98 from "./routes/workspaces/files/rename";
+import route99 from "./routes/workspaces/files/write";
+import route100 from "./routes/workspaces/list";
+import route101 from "./routes/workspaces/selectDirectory";
 
 export default (app: Express) => {
   app.use("/api/agent", route1);
@@ -194,12 +195,13 @@ export default (app: Express) => {
   app.use("/api/tools/setEnabled", route90);
   app.use("/api/tools/uninstall", route91);
   app.use("/api/workspaces/check", route92);
-  app.use("/api/workspaces/files/list", route93);
-  app.use("/api/workspaces/files/mkdir", route94);
-  app.use("/api/workspaces/files/read", route95);
-  app.use("/api/workspaces/files/remove", route96);
-  app.use("/api/workspaces/files/rename", route97);
-  app.use("/api/workspaces/files/write", route98);
-  app.use("/api/workspaces/list", route99);
-  app.use("/api/workspaces/selectDirectory", route100);
+  app.use("/api/workspaces/createProject", route93);
+  app.use("/api/workspaces/files/list", route94);
+  app.use("/api/workspaces/files/mkdir", route95);
+  app.use("/api/workspaces/files/read", route96);
+  app.use("/api/workspaces/files/remove", route97);
+  app.use("/api/workspaces/files/rename", route98);
+  app.use("/api/workspaces/files/write", route99);
+  app.use("/api/workspaces/list", route100);
+  app.use("/api/workspaces/selectDirectory", route101);
 }

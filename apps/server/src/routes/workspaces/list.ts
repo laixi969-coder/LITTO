@@ -3,13 +3,14 @@ import { mkdir, readdir, realpath } from "@toonflow/file";
 import { dirname, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import u from "@/utils";
+import { workspacesRoot } from "@/utils/tenant";
 import { validateFields } from "@/lib/middleware";
 import { error, success } from "@/lib/responseFormat";
 
 const router = Router();
 
 export default router.get("/", validateFields({ path: z.string().max(4096).optional() }, "query"), async (req, res) => {
-  const workspaceRoot = resolve(dirname(u.conf.path), "workspaces");
+  const workspaceRoot = workspacesRoot();
   await mkdir(workspaceRoot, { recursive: true });
   const root = await realpath(workspaceRoot);
   const target = resolve(root, (req.query.path as string | undefined) ?? "");

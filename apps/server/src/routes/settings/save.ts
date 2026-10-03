@@ -5,6 +5,7 @@ import { validateFields } from "@/lib/middleware";
 import { success } from "@/lib/responseFormat";
 import { maxSystemPromptLength } from "@/agent/runtime/prompt";
 import { t } from "@/lib/i18n";
+import { restoreSecrets } from "@/utils/secrets";
 
 const router = Router();
 
@@ -18,7 +19,7 @@ export default router.put("/", validateFields({ settings: z.record(z.string(), z
   path: ["desktopUpdateCustomUrl"], message: "选择自定义更新源前，请先填写有效地址",
 }) }), async (req, res) => {
   u.mcpControl.assertAppRequest(req);
-  const { settings } = req.body;
+  const settings = restoreSecrets(req.body.settings, u.conf.get("settings", {}));
   u.removeLegacySettings(settings);
   u.conf.set("settings", settings);
   await u.mcpRuntime.reloadMcpRuntime();

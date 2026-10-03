@@ -6,6 +6,8 @@ import type { Request, Response, NextFunction } from "express";
 import buildRoute from "@/core";
 import { error } from "@/lib/responseFormat";
 import desktopRequest from "@/lib/desktop";
+import { mountCloud, requireAdminForPlugins, requireSession } from "@/lib/cloud";
+import { authEnabled } from "@/utils/tenant";
 import initializePlugins from "@/utils/plugins/initialize";
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
@@ -51,31 +53,37 @@ export async function createApp({
     await buildRoute();
     app.use(logger("dev"));
   }
-  app.use(cors());
+  // Same-origin by default; set LITTO_CORS_ORIGINS=a,b for split deployments.
+  app.use(process.env.LITTO_CORS_ORIGINS ? cors({ origin: process.env.LITTO_CORS_ORIGINS.split(","), credentials: true }) : authEnabled() ? (_req, _res, next) => next() : cors());
   app.use(languageRequest);
+  await mountCloud(app);
   app.use("/a2a", express.json({ limit: "2mb" }));
   app.use(["/api/workspaces/files/write", "/api/assets/save"], express.raw({ type: "application/octet-stream", limit: "100mb" }));
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ extended: true, limit: "100mb" }));
   app.use("/api/desktop", desktopRequest);
+  app.use("/api", requireSession, requireAdminForPlugins);
 
   const { default: initializeProviderModels } = await import("@/utils/ai/initialize");
   await initializeProviderModels();
   const router = await import("@/router");
   router.default(app);
-  const [{ createMcpRouter }, { getMcpTools }, { authorizeMcp }, { skillResources }] = await Promise.all([
-    import("@toonflow/mcp"),
-    import("@/utils/mcp/tools"),
-    import("@/utils/mcp/control"),
-    import("@/utils/mcp/resources"),
-  ]);
-  app.use("/mcp", createMcpRouter({ getTools: getMcpTools, authorize: authorizeMcp, resources: skillResources,
-    runInRequest: (request, operation) => runWithLocale(resolveRequestLocale(request.get("accept-language")), operation),
-    translate: translateMessage,
-    translateError,
-  }));
-  const { createA2aRouter } = await import("@/agent/a2a");
-  app.use("/a2a", createA2aRouter());
+  // MCP / A2A are single-instance, token-per-process control surfaces: off in multi-tenant mode (they would cross tenants).
+  if (!authEnabled()) {
+    const [{ createMcpRouter }, { getMcpTools }, { authorizeMcp }, { skillResources }] = await Promise.all([
+      import("@toonflow/mcp"),
+      import("@/utils/mcp/tools"),
+      import("@/utils/mcp/control"),
+      import("@/utils/mcp/resources"),
+    ]);
+    app.use("/mcp", createMcpRouter({ getTools: getMcpTools, authorize: authorizeMcp, resources: skillResources,
+      runInRequest: (request, operation) => runWithLocale(resolveRequestLocale(request.get("accept-language")), operation),
+      translate: translateMessage,
+      translateError,
+    }));
+    const { createA2aRouter } = await import("@/agent/a2a");
+    app.use("/a2a", createA2aRouter());
+  }
   app.use(express.static(webRoot));
 
   // 错误处理
