@@ -3,12 +3,12 @@ import { App, Button, Select, Spin, Switch } from "antd";
 import { Clapperboard, LogOut, Settings, Shield } from "lucide-react";
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { useOviaStore } from "@/stores/use-ovia-store";
+import { useLittoStore } from "@/stores/use-litto-store";
 import { useUiMode } from "@/stores/use-ui-mode";
 
-/** OVIA shell: session guard + slim header. The upstream canvas stays reachable at /canvas. */
+/** LITTO shell: session guard + slim header. The upstream canvas stays reachable at /canvas. */
 export default function StudioLayout() {
-    const { ready, user, refresh, logout, workspaces, workspaceId, switchWorkspace, epoch } = useOviaStore();
+    const { ready, user, refresh, logout, workspaces, workspaceId, switchWorkspace, epoch } = useLittoStore();
     const loc = useLocation();
     const ui = useUiMode();
     const nav = useNavigate();
@@ -19,7 +19,7 @@ export default function StudioLayout() {
     return (
         <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
             <header className="flex h-11 shrink-0 items-center gap-4 border-b border-black/10 px-4 text-sm dark:border-white/10">
-                <Link to="/studio" className="flex items-center gap-2 font-semibold"><Clapperboard size={16} /> OVIA <span className="font-normal opacity-60">有戏</span></Link>
+                <Link to="/studio" className="flex items-center gap-2 font-semibold"><Clapperboard size={16} /> LITTO <span className="font-normal opacity-60">里头</span></Link>
                 <Link to="/studio" className="opacity-70 hover:opacity-100">项目</Link>
                 <Link to="/studio/skills" className="opacity-70 hover:opacity-100">Skills</Link>
                 <Link to="/canvas" className="opacity-70 hover:opacity-100">上游画布</Link>

@@ -4,8 +4,8 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "ovia-test-"));
-Object.assign(process.env, { OVIA_DATA_DIR: dir, OVIA_MOCK_LATENCY_MS: "30", OVIA_WORKER_POLL_MS: "40", OVIA_NO_RATELIMIT: "1", NODE_ENV: "test" });
+const dir = mkdtempSync(join(tmpdir(), "litto-test-"));
+Object.assign(process.env, { LITTO_DATA_DIR: dir, LITTO_MOCK_LATENCY_MS: "30", LITTO_WORKER_POLL_MS: "40", LITTO_NO_RATELIMIT: "1", NODE_ENV: "test" });
 
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");
@@ -91,7 +91,7 @@ test("1-2 auth, personal workspace and tenant isolation", async () => {
 });
 
 test("3 admin configures providers/models, tests connection, toggles models", async () => {
-    S.ADMIN = await login("admin@ovia.local");
+    S.ADMIN = await login("admin@litto.local");
     assert.equal((await call(S.A, "GET", "/admin/dashboard")).status, 403);
     const providers = await ok(S.ADMIN, "GET", "/admin/providers");
     assert.ok(providers.find((p: any) => p.id === "mock"));
@@ -118,7 +118,7 @@ test("4 BYOK: key is encrypted, masked, never stored in plaintext", async () => 
     assert.equal((await call(S.B, "GET", "/credentials")).json.length, 0);
     // 20: plaintext must not appear anywhere in the db files.
     db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-    for (const f of readdirSync(dir).filter((x) => x.startsWith("ovia.db"))) {
+    for (const f of readdirSync(dir).filter((x) => x.startsWith("litto.db"))) {
         const bytes = readFileSync(join(dir, f)).toString("latin1");
         assert.ok(!bytes.includes(SECRET), `${f} contains plaintext key`);
         assert.ok(!bytes.includes("PLATFORM-0123456789"), `${f} contains plaintext platform key`);

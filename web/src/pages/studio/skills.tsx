@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Form, Input, InputNumber, Select, Switch, Tag } from "antd";
 import { Play, Puzzle } from "lucide-react";
 
-import { api } from "@/services/api/ovia";
-import { useOviaStore } from "@/stores/use-ovia-store";
+import { api } from "@/services/api/litto";
+import { useLittoStore } from "@/stores/use-litto-store";
 
 type Skill = { id: string; slug: string; name: string; version: string; author: string; description: string; builtin: boolean; target: string; runnable: boolean; installed?: boolean; inputSchema?: any; apply?: { to: string; from: string }[] };
 const TARGET_LABEL: Record<string, string> = { shot: "镜头", asset: "资产", sequence: "序列", project: "项目" };
@@ -97,7 +97,7 @@ function RunDrawer({ skill, onClose }: { skill: Skill; onClose: () => void }) {
 /** Skills marketplace: built-in directors + published third-party (declarative) skills. */
 export default function SkillsPage() {
     const { message } = App.useApp();
-    const role = useOviaStore((s) => s.role);
+    const role = useLittoStore((s) => s.role);
     const canInstall = role === "OWNER" || role === "ADMIN";
     const [list, setList] = useState<Skill[]>([]);
     const [q, setQ] = useState("");

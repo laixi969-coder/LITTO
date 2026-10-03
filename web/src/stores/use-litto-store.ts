@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { api, setWorkspace, WS_KEY } from "@/services/api/ovia";
+import { api, setWorkspace, WS_KEY } from "@/services/api/litto";
 
 export type FFUser = { id: string; email: string; isAdmin: boolean };
 type FFStore = {
@@ -15,7 +15,7 @@ type FFStore = {
     logout: () => Promise<void>;
 };
 
-export const useOviaStore = create<FFStore>((set) => ({
+export const useLittoStore = create<FFStore>((set) => ({
     ready: false,
     user: null,
     workspaceId: null,
@@ -23,7 +23,7 @@ export const useOviaStore = create<FFStore>((set) => ({
     workspaces: [],
     epoch: 0,
     switchWorkspace(id) {
-        const w = useOviaStore.getState().workspaces.find((x) => x.id === id);
+        const w = useLittoStore.getState().workspaces.find((x) => x.id === id);
         if (!w) return;
         setWorkspace(id);
         try { sessionStorage.setItem(WS_KEY, id); } catch { /* private mode */ }

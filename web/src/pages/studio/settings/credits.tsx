@@ -1,6 +1,6 @@
 import { Card, Statistic, Table } from "antd";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { ledgerColumns } from "../admin/ledger";
 import { useLoad } from "../admin/util";
 

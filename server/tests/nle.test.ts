@@ -5,10 +5,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "ovia-nle-test-"));
+const dir = mkdtempSync(join(tmpdir(), "litto-nle-test-"));
 const has = (c: string) => spawnSync(c, ["-version"]).status === 0;
 const FF = has("ffmpeg") && has("ffprobe");
-Object.assign(process.env, { OVIA_DATA_DIR: dir, OVIA_QUIET: "1", OVIA_MOCK_LATENCY_MS: "10", OVIA_WORKER_POLL_MS: "30", OVIA_NO_RATELIMIT: "1", NODE_ENV: "test", OVIA_NO_DERIVATIVES: "1" });
+Object.assign(process.env, { LITTO_DATA_DIR: dir, LITTO_QUIET: "1", LITTO_MOCK_LATENCY_MS: "10", LITTO_WORKER_POLL_MS: "30", LITTO_NO_RATELIMIT: "1", NODE_ENV: "test", LITTO_NO_DERIVATIVES: "1" });
 
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");

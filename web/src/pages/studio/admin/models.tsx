@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { App, Button, Checkbox, Form, Input, InputNumber, Modal, Select, Switch, Table, Tag } from "antd";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { CAPS, useAct, useLoad } from "./util";
 
 const CLS = [{ value: "low" }, { value: "mid" }, { value: "high" }];

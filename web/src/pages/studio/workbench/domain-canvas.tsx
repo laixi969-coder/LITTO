@@ -90,7 +90,7 @@ export function DomainCanvas() {
     };
     const onDrop = (e: React.DragEvent) => {
         e.preventDefault();
-        const refId = e.dataTransfer.getData("application/x-ovia-ref");
+        const refId = e.dataTransfer.getData("application/x-litto-ref");
         if (!refId) return;
         const w = toWorld(e.clientX, e.clientY);
         const hit = nodes.find((n) => n.kind === "shot" && w.x >= n.x && w.x <= n.x + W && w.y >= n.y && w.y <= n.y + H);

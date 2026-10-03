@@ -6,8 +6,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "ovia-test3-"));
-Object.assign(process.env, { OVIA_DATA_DIR: dir, OVIA_QUIET: "1", OVIA_MOCK_LATENCY_MS: "20", OVIA_WORKER_POLL_MS: "30", OVIA_NO_RATELIMIT: "1", OVIA_NO_DERIVATIVES: "1", NODE_ENV: "test", OVIA_PUBLIC_URL: "http://ff.test" });
+const dir = mkdtempSync(join(tmpdir(), "litto-test3-"));
+Object.assign(process.env, { LITTO_DATA_DIR: dir, LITTO_QUIET: "1", LITTO_MOCK_LATENCY_MS: "20", LITTO_WORKER_POLL_MS: "30", LITTO_NO_RATELIMIT: "1", LITTO_NO_DERIVATIVES: "1", NODE_ENV: "test", LITTO_PUBLIC_URL: "http://ff.test" });
 
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");
@@ -167,7 +167,7 @@ const server: Server = createServer(async (req, res) => {
         if (n.challenge && createHash("sha256").update(form.get("code_verifier") ?? "").digest("base64url") !== n.challenge) { res.statusCode = 400; return json({ error: "invalid_grant" }); }
         if (form.get("client_secret") !== "s3cr3t-client-secret-value") { res.statusCode = 401; return json({ error: "invalid_client" }); }
         const now = Math.floor(Date.now() / 1000);
-        const claims = { iss: n.iss ?? idpUrl, aud: n.aud ?? "ovia-client", sub: n.sub ?? "u-1", email: n.email, email_verified: n.email_verified ?? true, nonce: n.nonce, iat: now, exp: n.exp ?? now + 300 };
+        const claims = { iss: n.iss ?? idpUrl, aud: n.aud ?? "litto-client", sub: n.sub ?? "u-1", email: n.email, email_verified: n.email_verified ?? true, nonce: n.nonce, iat: now, exp: n.exp ?? now + 300 };
         return json({ id_token: n.idToken ?? jwt(claims, n.sign), access_token: "x", token_type: "Bearer" });
     }
     res.statusCode = 404; res.end();
@@ -183,18 +183,18 @@ async function ssoLogin(id: string, n: Record<string, unknown>, tamper?: { state
     const loc = new URL(start.headers.get("location")!);
     assert.equal(loc.origin, idpUrl);
     assert.equal(loc.searchParams.get("code_challenge_method"), "S256");
-    assert.equal(loc.searchParams.get("client_id"), "ovia-client");
+    assert.equal(loc.searchParams.get("client_id"), "litto-client");
     idp.next = { nonce: loc.searchParams.get("nonce"), challenge: loc.searchParams.get("code_challenge"), ...n };
     const cookie = start.headers.get("set-cookie")!.split(";")[0];
     return app.request(`/auth/sso/${id}/callback?code=abc&state=${tamper?.state ?? loc.searchParams.get("state")}`, { headers: tamper?.noCookie ? {} : { cookie } });
 }
 
 test("SSO: admin CRUD never exposes the secret; lookup; happy path joins the workspace", async () => {
-    const admin = await login("admin@ovia.local");
+    const admin = await login("admin@litto.local");
     const { owner, ws: _ws } = { owner: S.owner, ws: null };
     const team = await ok(owner, "POST", "/workspaces", { name: "Acme" });
     const SECRET = "s3cr3t-client-secret-value";
-    const mk = await call(admin, "POST", "/admin/sso", { name: "Acme Okta", issuer: idpUrl, clientId: "ovia-client", clientSecret: SECRET, domains: ["@Acme.test"], workspaceId: team.id, role: "EDITOR" });
+    const mk = await call(admin, "POST", "/admin/sso", { name: "Acme Okta", issuer: idpUrl, clientId: "litto-client", clientSecret: SECRET, domains: ["@Acme.test"], workspaceId: team.id, role: "EDITOR" });
     assert.equal(mk.status, 201, JSON.stringify(mk.json));
     S.conn = mk.json;
     assert.ok(!JSON.stringify(mk.json).includes(SECRET) && mk.json.hasSecret === true);
@@ -206,7 +206,7 @@ test("SSO: admin CRUD never exposes the secret; lookup; happy path joins the wor
     assert.equal((await call(admin, "POST", "/admin/sso", { name: "p", issuer: idpUrl, clientId: "x", clientSecret: "y", domains: ["other.test"], workspaceId: (await ok(owner, "GET", "/auth/me")).workspaceId })).status, 400);
     // secret never in plaintext in the DB or audit log
     db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-    for (const f of readdirSync(dir).filter((x) => x.startsWith("ovia.db"))) assert.ok(!readFileSync(join(dir, f)).toString("latin1").includes(SECRET), `${f} has plaintext secret`);
+    for (const f of readdirSync(dir).filter((x) => x.startsWith("litto.db"))) assert.ok(!readFileSync(join(dir, f)).toString("latin1").includes(SECRET), `${f} has plaintext secret`);
     assert.ok(!JSON.stringify(await ok(admin, "GET", "/admin/audit")).includes(SECRET));
 
     assert.deepEqual(await ok(null, "GET", "/auth/sso/lookup?email=Jane@ACME.test"), { id: S.conn.id, name: "Acme Okta", enforce: false });
@@ -215,8 +215,8 @@ test("SSO: admin CRUD never exposes the secret; lookup; happy path joins the wor
     const r = await ssoLogin(S.conn.id, { email: "jane@acme.test", sub: "jane-1" });
     assert.equal(r.status, 302, await r.clone().text());
     assert.equal(idp.lastToken.grant_type, "authorization_code");
-    const session = r.headers.get("set-cookie")!.match(/ovia_session=([^;]+)/)![1];
-    const me = await (await app.request("/auth/me", { headers: { cookie: `ovia_session=${session}` } })).json() as any;
+    const session = r.headers.get("set-cookie")!.match(/litto_session=([^;]+)/)![1];
+    const me = await (await app.request("/auth/me", { headers: { cookie: `litto_session=${session}` } })).json() as any;
     assert.equal(me.user.email, "jane@acme.test");
     assert.ok(me.workspaces.some((w: any) => w.id === team.id && w.role === "EDITOR"), "auto-joined the team workspace");
     // logging in again keeps a role an admin changed (no silent upgrade/downgrade)
@@ -232,15 +232,15 @@ test("SSO: forged / replayed / invalid tokens are rejected", async () => {
         const r = await ssoLogin(id, { email: "mallory@acme.test", ...n }, tamper);
         assert.equal(r.status, status, `${JSON.stringify(Object.keys(n))} → ${r.status} ${await r.clone().text()}`);
         if (code) assert.equal(((await r.json()) as any).code, code);
-        assert.ok(!(r.headers.get("set-cookie") ?? "").includes("ovia_session="), "no session on failure");
+        assert.ok(!(r.headers.get("set-cookie") ?? "").includes("litto_session="), "no session on failure");
     };
     await bad({ nonce: "wrong" }, 401, "sso_bad_token");
     await bad({ aud: "someone-else" }, 401, "sso_bad_token");
     await bad({ exp: Math.floor(Date.now() / 1000) - 3600 }, 401, "sso_bad_token");
     await bad({ iss: "https://evil.example" }, 401, "sso_bad_token");
     await bad({ sign: { key: other.privateKey } }, 401, "sso_bad_token"); // forged signature
-    await bad({ idToken: jwt({ iss: idpUrl, aud: "ovia-client", email: "mallory@acme.test", nonce: "x", exp: 9999999999 }, { alg: "none" }) }, 401, "sso_bad_token");
-    await bad({ idToken: jwt({ iss: idpUrl, aud: "ovia-client", email: "mallory@acme.test", nonce: "x", exp: 9999999999 }, { alg: "HS256" }) }, 401, "sso_bad_token");
+    await bad({ idToken: jwt({ iss: idpUrl, aud: "litto-client", email: "mallory@acme.test", nonce: "x", exp: 9999999999 }, { alg: "none" }) }, 401, "sso_bad_token");
+    await bad({ idToken: jwt({ iss: idpUrl, aud: "litto-client", email: "mallory@acme.test", nonce: "x", exp: 9999999999 }, { alg: "HS256" }) }, 401, "sso_bad_token");
     await bad({ sign: { kid: "unknown" } }, 401, "sso_bad_token");
     await bad({ email_verified: false }, 403, "unverified_email");
     await bad({ email: "mallory@evil.test" }, 403, "domain_not_allowed");
@@ -252,7 +252,7 @@ test("SSO: forged / replayed / invalid tokens are rejected", async () => {
 });
 
 test("SSO: enforce blocks OTP and generic OAuth for the domain; disable lifts it", async () => {
-    const admin = await login("admin@ovia.local");
+    const admin = await login("admin@litto.local");
     await ok(admin, "PATCH", `/admin/sso/${S.conn.id}`, { enforce: true });
     assert.equal((await ok(null, "GET", "/auth/sso/lookup?email=x@acme.test")).enforce, true);
     const r = await call(null, "POST", "/auth/request-code", { email: "bob@acme.test" });
@@ -277,7 +277,7 @@ test("SSO: enforce blocks OTP and generic OAuth for the domain; disable lifts it
 });
 
 test("provider list exposes hasWebhookSecret (never the secret)", async () => {
-    const admin = await login("admin@ovia.local");
+    const admin = await login("admin@litto.local");
     const before = (await ok(admin, "GET", "/admin/providers")).find((p: any) => p.id === "mock");
     assert.equal(before.hasWebhookSecret, false);
     const { secret } = await ok(admin, "POST", "/admin/providers/mock/webhook-secret");

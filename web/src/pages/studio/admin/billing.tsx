@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { App, Button, Card, Form, InputNumber, Select, Switch, Table, Tag } from "antd";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { time, useLoad } from "./util";
 
 export default function Billing() {

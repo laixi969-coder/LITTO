@@ -138,7 +138,7 @@ async function loadLocalPlugins() {
                     description: plugin.description,
                     url,
                     source,
-                    enabled: existing?.enabled ?? plugin.id === "ovia", // Preserve the user setting; new discoveries default to disabled (OVIA domain nodes are on by default).
+                    enabled: existing?.enabled ?? plugin.id === "litto", // Preserve the user setting; new discoveries default to disabled (LITTO domain nodes are on by default).
                     local: true,
                 });
             } catch (error) {

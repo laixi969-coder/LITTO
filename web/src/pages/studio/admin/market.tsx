@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { App, Button, Input, Popconfirm, Switch, Table, Tag } from "antd";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { time, useAct, useLoad } from "./util";
 
 const EXAMPLE = {

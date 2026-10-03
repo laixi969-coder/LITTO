@@ -20,7 +20,7 @@ type RenderOpts = { normalizeAudio?: boolean; targetLufs?: number; burnSubtitles
 
 export async function startNleRender(workspaceId: string, projectId: string, sequenceId: string, renderId: string, opts: RenderOpts) {
     const s = scoped(workspaceId);
-    const dir = mkdtempSync(join(tmpdir(), "ovia-nle-"));
+    const dir = mkdtempSync(join(tmpdir(), "litto-nle-"));
     try {
         const media = await renderTimeline(s, sequenceId, dir, opts);
         const saved = await saveMedia(workspaceId, projectId, readFileSync(media.file), { source: "render", duration: media.duration });
@@ -179,7 +179,7 @@ export async function audioReport(s: Scope, sequenceId: string) {
     if (!render) throw conflict("render the sequence first", "no_render");
     const m = s.get("media", render.mediaId);
     if (!m) throw conflict("render media is gone", "no_render");
-    const dir = mkdtempSync(join(tmpdir(), "ovia-rep-"));
+    const dir = mkdtempSync(join(tmpdir(), "litto-rep-"));
     try {
         const f = join(dir, "r.mp4");
         writeFileSync(f, await storage.get(m.storageKey));

@@ -16,7 +16,7 @@ export const viewOf = (cam: any): View | null => (typeof cam?.viewYaw === "numbe
 export function cropPanorama(src: Buffer, v: View, w = 1280, h = 720): Buffer {
     if (!ffmpegSync()) throw Object.assign(new Error("ffmpeg is not installed on the server; panorama crops are unavailable"), { unavailable: true });
     const vfov = (2 * Math.atan(Math.tan((v.fov * Math.PI) / 360) * (h / w)) * 180) / Math.PI;
-    const dir = mkdtempSync(join(tmpdir(), "ovia-pano-"));
+    const dir = mkdtempSync(join(tmpdir(), "litto-pano-"));
     try {
         writeFileSync(join(dir, "in"), src);
         const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2", "-i", join(dir, "in"), "-vf", `v360=e:flat:yaw=${v.yaw}:pitch=${v.pitch}:h_fov=${v.fov}:v_fov=${vfov.toFixed(3)}:w=${w}:h=${h}`, "-frames:v", "1", "-f", "image2", "-c:v", "png", join(dir, "out.png")]);

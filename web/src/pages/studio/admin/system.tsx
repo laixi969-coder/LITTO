@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Alert, App, Button, Form, Input, InputNumber, Switch } from "antd";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { useLoad } from "./util";
 
 export default function System() {

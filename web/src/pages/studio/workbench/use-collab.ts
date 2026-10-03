@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 
-import { api, OVIA_BASE } from "@/services/api/ovia";
-import { useOviaStore } from "@/stores/use-ovia-store";
+import { api, LITTO_BASE } from "@/services/api/litto";
+import { useLittoStore } from "@/stores/use-litto-store";
 import { useWorkbench } from "./use-workbench";
 
 /** Real-time collaboration: SSE change feed (debounced reload) + presence heartbeat. Everything else stays server-authoritative. */
 export function useCollab(pid: string) {
-    const me = useOviaStore((s) => s.user?.id);
+    const me = useLittoStore((s) => s.user?.id);
     const sel = useWorkbench((s) => s.sel);
     const selKey = sel?.kind === "shot" ? `shot:${sel.id}` : sel?.kind === "asset" ? `asset:${sel.id}` : "";
 
@@ -15,7 +15,7 @@ export function useCollab(pid: string) {
         const { reload, setPresence } = useWorkbench.getState();
         const others = (list: any[]) => setPresence((list ?? []).filter((p) => p.userId !== me));
         let t: ReturnType<typeof setTimeout> | undefined;
-        const es = new EventSource(`${OVIA_BASE}/projects/${pid}/events`, { withCredentials: true });
+        const es = new EventSource(`${LITTO_BASE}/projects/${pid}/events`, { withCredentials: true });
         es.addEventListener("hello", (e) => others(JSON.parse((e as MessageEvent).data).presence));
         es.addEventListener("presence", (e) => others(JSON.parse((e as MessageEvent).data)));
         es.addEventListener("change", () => { clearTimeout(t); t = setTimeout(() => void useWorkbench.getState().reload().catch(() => {}), 300); });

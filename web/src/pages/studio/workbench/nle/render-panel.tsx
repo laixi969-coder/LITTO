@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { App, Button, InputNumber, Select, Slider, Switch, Tag } from "antd";
 
-import { OVIA_BASE, api } from "@/services/api/ovia";
+import { LITTO_BASE, api } from "@/services/api/litto";
 import type { Edit } from "./use-edit";
 
 /** Render options, ducking, render history with status polling, and the loudness report of the latest render. */
@@ -40,7 +40,7 @@ export function RenderPanel({ seqId, edit, run }: { seqId: string; edit: Edit; r
             </div>
             {report && <div className="flex flex-wrap gap-3 rounded border border-black/10 p-2 dark:border-white/10"><span>积分响度 <b>{report.integratedLufs.toFixed(1)} LUFS</b></span><span>真峰值 <b>{report.truePeakDb.toFixed(1)} dBTP</b></span><span>响度范围 <b>{report.lra.toFixed(1)} LU</b></span><span className="opacity-50">渲染 {report.renderId.slice(-6)}</span></div>}
             <div className="space-y-1">
-                {renders.map((r) => <div key={r.id} className="flex flex-wrap items-center gap-2"><Tag color={r.status === "SUCCEEDED" ? "success" : r.status === "FAILED" ? "error" : "processing"}>{r.status}</Tag><span className="opacity-60">{new Date(r.createdAt).toLocaleString()}</span>{r.media && <a href={OVIA_BASE + r.media.url} target="_blank" rel="noreferrer">下载 MP4</a>}{r.error && <span className="text-red-500">{r.error}</span>}</div>)}
+                {renders.map((r) => <div key={r.id} className="flex flex-wrap items-center gap-2"><Tag color={r.status === "SUCCEEDED" ? "success" : r.status === "FAILED" ? "error" : "processing"}>{r.status}</Tag><span className="opacity-60">{new Date(r.createdAt).toLocaleString()}</span>{r.media && <a href={LITTO_BASE + r.media.url} target="_blank" rel="noreferrer">下载 MP4</a>}{r.error && <span className="text-red-500">{r.error}</span>}</div>)}
                 <div className="opacity-50">渲染需要服务端安装 ffmpeg，且每个视频片段都是真实视频；否则请使用「导出交换包」。</div>
             </div>
         </div>

@@ -8,7 +8,7 @@
 - **Tenancy:** every tenant table has `workspace_id`; handlers only get a repository from `scoped(workspaceId)` where the workspace comes from the *session* (+ verified membership for `X-Workspace-Id`), never from the body. Cross-tenant ids return 404 (not 403) to avoid existence leaks.
 - **Core semantics are tables, not canvas metadata** (PRD §1 rule): canvas JSON is `{nodes:[{id,kind,refId,x,y}],edges,viewport}` only.
 - **`schemaVersion`** on projects, worlds, looks, assets, shots (and canvas JSON).
-- **Auth:** email OTP (hashed, 10 min, 5 attempts), opaque session tokens stored hashed, HttpOnly SameSite=Lax cookie + `X-OVIA-CSRF` header on cookie-authenticated mutations; `Authorization: Bearer` for API clients. OAuth/SSO = P2.
-- **Secrets:** AES-256-GCM, master key from `OVIA_MASTER_KEY` (dev: generated file, 0600). API responses carry only `••••last4`; logger redacts key-shaped strings; audit logs never receive secrets. Test `4 BYOK` greps the DB+WAL bytes for plaintext.
+- **Auth:** email OTP (hashed, 10 min, 5 attempts), opaque session tokens stored hashed, HttpOnly SameSite=Lax cookie + `X-LITTO-CSRF` header on cookie-authenticated mutations; `Authorization: Bearer` for API clients. OAuth/SSO = P2.
+- **Secrets:** AES-256-GCM, master key from `LITTO_MASTER_KEY` (dev: generated file, 0600). API responses carry only `••••last4`; logger redacts key-shaped strings; audit logs never receive secrets. Test `4 BYOK` greps the DB+WAL bytes for plaintext.
 - **Ledger:** append-only, enforced by SQLite triggers; `balance`/`held` snapshots on each row. Provider cost, platform cost and user charge are separate columns.
 - **Media:** `StorageAdapter` (local FS implemented; S3/MinIO = implement 4 methods). Type by magic bytes; signed expiring URLs; SVG served with a sandbox CSP.

@@ -3,11 +3,11 @@ import * as api from "./api";
 import { Card, Problem, btn, input, meta, panelBox, stop, useLive, type Ctx } from "./shared";
 
 const COLOR: Record<string, string> = { take: "#22c55e", hero: "#6366f1", missing: "#94a3b8" };
-const dl = (path: string) => window.open(`/ovia-api${path}`, "_blank");
+const dl = (path: string) => window.open(`/litto-api${path}`, "_blank");
 
 export function SequenceContent({ ctx }: { ctx: Ctx }) {
-    const { oviaId } = meta(ctx);
-    const { data, err } = useLive(ctx, async () => ({ seq: (await api.get(`/projects/${meta(ctx).oviaProjectId}/sequences`)).find((q: any) => q.id === oviaId), tl: await api.get(`/sequences/${oviaId}/timeline`) }), [oviaId]);
+    const { littoId } = meta(ctx);
+    const { data, err } = useLive(ctx, async () => ({ seq: (await api.get(`/projects/${meta(ctx).littoProjectId}/sequences`)).find((q: any) => q.id === littoId), tl: await api.get(`/sequences/${littoId}/timeline`) }), [littoId]);
     if (err) return <Problem ctx={ctx} err={err} />;
     if (!data) return null;
     const { seq, tl } = data;
@@ -15,7 +15,7 @@ export function SequenceContent({ ctx }: { ctx: Ctx }) {
 }
 
 export function SequencePanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
-    const { oviaId: id } = meta(ctx);
+    const { littoId: id } = meta(ctx);
     const { data: tl, changed } = useLive(ctx, () => api.get(`/sequences/${id}/timeline`), [id]);
     const renders = useLive<any[]>(ctx, () => api.get(`/sequences/${id}/renders`), [id], (r) => r.some((x) => x.status === "RUNNING"));
     const [edits, setEdits] = useState<Record<string, string>>({});

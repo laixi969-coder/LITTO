@@ -133,7 +133,7 @@ const BUILTINS: Builtin[] = [
     { id: "builtin:failureDiagnostician", name: "Failure Diagnostician", description: "QC → cause + repair action. Use POST /shots/:id/qc.", target: "shot", inputSchema: objOf({}) },
 ];
 export const builtinById = (id: string) => BUILTINS.find((b) => b.id === id);
-const builtinView = (b: Builtin): CatalogSkill => ({ id: b.id, slug: b.id.slice(8), name: b.name, version: "builtin", author: "OVIA", description: b.description, builtin: true, target: b.target, runnable: !!b.run, status: "published", inputSchema: b.inputSchema, apply: b.apply ?? [], installed: true });
+const builtinView = (b: Builtin): CatalogSkill => ({ id: b.id, slug: b.id.slice(8), name: b.name, version: "builtin", author: "LITTO", description: b.description, builtin: true, target: b.target, runnable: !!b.run, status: "published", inputSchema: b.inputSchema, apply: b.apply ?? [], installed: true });
 const rowView = (r: any, installed: Set<string>): CatalogSkill => { const m: Manifest = JSON.parse(r.manifest); return { id: r.id, slug: r.slug, name: r.name, version: r.version, author: r.author ?? "", description: r.description ?? "", builtin: false, target: m.target, runnable: true, status: r.status, inputSchema: m.inputSchema, outputSchema: m.outputSchema, apply: m.apply, installed: installed.has(r.id) }; };
 
 export function catalog(ws: string, includeDrafts = false): CatalogSkill[] {

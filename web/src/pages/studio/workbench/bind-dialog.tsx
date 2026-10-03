@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { App, InputNumber, Modal, Radio, Select } from "antd";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { useWorkbench } from "./use-workbench";
 
 export const ROLES = ["IDENTITY", "GEOMETRY", "WARDROBE", "ENVIRONMENT", "COMPOSITION", "LIGHTING", "LOOK", "PERFORMANCE", "CAMERA_MOTION", "START_FRAME", "END_FRAME", "AUDIO", "DEPTH", "PANORAMA"];

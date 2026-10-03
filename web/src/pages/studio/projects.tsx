@@ -3,7 +3,7 @@ import { App, Button, Segmented } from "antd";
 import { Archive, Copy, FolderOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { NewProjectModal } from "./new-project";
 
 type P = { id: string; name: string; status: string; updatedAt: string; deletedAt?: string };

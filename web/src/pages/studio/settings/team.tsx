@@ -2,15 +2,15 @@ import { useState } from "react";
 import { App, Alert, Button, Card, Form, Input, Modal, Select, Table, Tag } from "antd";
 import { useNavigate } from "react-router-dom";
 
-import { api, ff } from "@/services/api/ovia";
-import { useOviaStore } from "@/stores/use-ovia-store";
+import { api, ff } from "@/services/api/litto";
+import { useLittoStore } from "@/stores/use-litto-store";
 import { time, useAct, useLoad } from "../admin/util";
 
 const ROLES = ["ADMIN", "EDITOR", "VIEWER"];
 
 /** Team workspaces (P2). UI mirrors server RBAC: OWNER > ADMIN > EDITOR > VIEWER; admins cannot manage admins. */
 export default function Team() {
-    const { role, workspaces, workspaceId, user, refresh, switchWorkspace } = useOviaStore();
+    const { role, workspaces, workspaceId, user, refresh, switchWorkspace } = useLittoStore();
     const cur = workspaces.find((w) => w.id === workspaceId);
     const personal = cur?.kind === "personal";
     const { data, reload } = useLoad<any>(() => api.get("/workspaces/current/members"), [workspaceId]);

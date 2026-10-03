@@ -41,6 +41,6 @@ export function redact(s: string): string {
     return s.replace(/(sk|key|tok|Bearer)[-_ ]?[A-Za-z0-9_\-]{12,}/g, "$1-***");
 }
 export const log = {
-    info: (...a: unknown[]) => !process.env.OVIA_QUIET && console.log(redact(a.map(String).join(" "))),
-    error: (...a: unknown[]) => !process.env.OVIA_QUIET && console.error(redact(a.map(String).join(" "))),
+    info: (...a: unknown[]) => !process.env.LITTO_QUIET && console.log(redact(a.map(String).join(" "))),
+    error: (...a: unknown[]) => !process.env.LITTO_QUIET && console.error(redact(a.map(String).join(" "))),
 };

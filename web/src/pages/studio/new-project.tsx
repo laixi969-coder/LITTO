@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { App, Input, Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 
 const SAMPLE = `INT. APARTMENT - NIGHT
 Mara stands by the window, watching the rain. Eli enters, quiet.

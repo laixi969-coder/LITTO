@@ -7,9 +7,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "ovia-test2-"));
+const dir = mkdtempSync(join(tmpdir(), "litto-test2-"));
 const hasFfmpeg = (() => { try { execSync("ffmpeg -version", { stdio: "ignore" }); return true; } catch { return false; } })();
-Object.assign(process.env, { OVIA_DATA_DIR: dir, OVIA_QUIET: "1", OVIA_MOCK_LATENCY_MS: "20", OVIA_WORKER_POLL_MS: "30", OVIA_NO_RATELIMIT: "1", NODE_ENV: "test", OVIA_PUBLIC_URL: "http://ff.test", OVIA_STRIPE_WEBHOOK_SECRET: "whsec_test", OVIA_OAUTH_GITHUB_ID: "gh-id", OVIA_OAUTH_GITHUB_SECRET: "gh-secret", ...(hasFfmpeg ? {} : { OVIA_NO_DERIVATIVES: "1" }) });
+Object.assign(process.env, { LITTO_DATA_DIR: dir, LITTO_QUIET: "1", LITTO_MOCK_LATENCY_MS: "20", LITTO_WORKER_POLL_MS: "30", LITTO_NO_RATELIMIT: "1", NODE_ENV: "test", LITTO_PUBLIC_URL: "http://ff.test", LITTO_STRIPE_WEBHOOK_SECRET: "whsec_test", LITTO_OAUTH_GITHUB_ID: "gh-id", LITTO_OAUTH_GITHUB_SECRET: "gh-secret", ...(hasFfmpeg ? {} : { LITTO_NO_DERIVATIVES: "1" }) });
 
 // A fake GitHub: /login/oauth/access_token, /user, /user/emails
 let ghEmail = { email: "octo@example.com", verified: true };
@@ -21,8 +21,8 @@ const idp = createServer((req, res) => {
     res.statusCode = 404; res.end();
 });
 await new Promise<void>((r) => idp.listen(0, r));
-process.env.OVIA_OAUTH_GITHUB_BASE = `http://127.0.0.1:${(idp.address() as any).port}`;
-process.env.OVIA_OAUTH_GITHUB_API = process.env.OVIA_OAUTH_GITHUB_BASE;
+process.env.LITTO_OAUTH_GITHUB_BASE = `http://127.0.0.1:${(idp.address() as any).port}`;
+process.env.LITTO_OAUTH_GITHUB_API = process.env.LITTO_OAUTH_GITHUB_BASE;
 
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");
@@ -108,8 +108,8 @@ test("OAuth (GitHub flow against a fake IdP): state, verified email, session", a
     assert.equal((await app.request(`/auth/oauth/github/callback?code=c&state=${state}`)).status, 400, "no state cookie");
     const cb = await app.request(`/auth/oauth/github/callback?code=c&state=${state}`, { headers: { cookie } });
     assert.equal(cb.status, 302);
-    const session = cb.headers.get("set-cookie")!.match(/ovia_session=([^;]+)/)![1];
-    const me = await app.request("/auth/me", { headers: { cookie: `ovia_session=${session}` } });
+    const session = cb.headers.get("set-cookie")!.match(/litto_session=([^;]+)/)![1];
+    const me = await app.request("/auth/me", { headers: { cookie: `litto_session=${session}` } });
     assert.equal((await me.json() as any).user.email, "octo@example.com");
     // unverified email is refused
     ghEmail = { email: "x@example.com", verified: false };
@@ -145,7 +145,7 @@ test("billing: plans, packs, subscription lifecycle, Stripe webhook", async () =
     assert.equal((await app.request("/webhooks/stripe", { method: "POST", body: raw, headers: { "stripe-signature": sig(raw, "wrong") } })).status, 400);
     assert.equal((await ok(u, "GET", "/credits")).balance, bal0 + 5000, "fulfilled once despite retry");
     // admin: custom enterprise plan; lapse → free
-    const admin = await login("admin@ovia.local");
+    const admin = await login("admin@litto.local");
     await ok(admin, "PUT", `/admin/workspaces/${ws}/subscription`, { planId: "custom", grantCredits: true, custom: { credits: 777, storageGb: 500 } });
     assert.equal((await ok(u, "GET", "/billing")).subscription.plan, "custom");
     db.prepare("UPDATE subscriptions SET period_end='2000-01-01T00:00:00.000Z' WHERE workspace_id=?").run(ws);
@@ -154,7 +154,7 @@ test("billing: plans, packs, subscription lifecycle, Stripe webhook", async () =
 });
 
 test("provider webhook (callback-only provider), signed", async () => {
-    const admin = await login("admin@ovia.local");
+    const admin = await login("admin@litto.local");
     const u = await login("hook@example.com");
     await ok(admin, "POST", "/admin/providers", { id: "cb", name: "Callback provider", adapter: "mock", baseUrl: "mock://callback", priority: 1 });
     await ok(admin, "POST", "/admin/models", { id: "cb-image", providerId: "cb", externalModelId: "cb", name: "CB", type: "image", capabilities: { text2image: true, costClass: "low", latencyClass: "low", maxInputs: 0 }, price: { perImage: 0.01 } });
@@ -173,8 +173,8 @@ test("provider webhook (callback-only provider), signed", async () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="36"><rect width="64" height="36" fill="red"/></svg>').toString("base64");
     const raw = JSON.stringify({ taskId: task, status: "done", outputs: [{ b64: svg, mime: "image/svg+xml" }], costUsd: 0.01 });
     const sign = (secret: string) => createHmac("sha256", secret).update(raw).digest("hex");
-    assert.equal((await app.request("/webhooks/providers/cb", { method: "POST", body: raw, headers: { "x-ovia-signature": sign("nope") } })).status, 400);
-    assert.equal((await app.request("/webhooks/providers/cb", { method: "POST", body: raw, headers: { "x-ovia-signature": sign(secret) } })).status, 200);
+    assert.equal((await app.request("/webhooks/providers/cb", { method: "POST", body: raw, headers: { "x-litto-signature": sign("nope") } })).status, 400);
+    assert.equal((await app.request("/webhooks/providers/cb", { method: "POST", body: raw, headers: { "x-litto-signature": sign(secret) } })).status, 200);
     await wait(u, [g.job.id]);
     assert.equal((await ok(u, "GET", `/shots/${sh.id}`)).keyframes.length, 1);
     assert.equal((await call(null, "POST", "/webhooks/providers/mock", undefined)).status, 404, "unconfigured provider has no webhook");
@@ -284,11 +284,11 @@ test("confirm gate on core shot intent; LLM refine; vision QC; metrics", async (
     assert.equal(q2.vision.used, true);
     assert.equal(q2.vision.model, "mock-text");
     // metrics
-    const admin = await login("admin@ovia.local");
+    const admin = await login("admin@litto.local");
     const m = await call(admin, "GET", "/admin/metrics.txt");
-    assert.match(m.json as string, /ovia_queue_depth\{status="QUEUED"\}/);
-    assert.match(m.json as string, /ovia_job_run_ms_avg/);
-    assert.match(m.json as string, /ovia_job_succeeded_model_mock_image_(pro|lite)/);
+    assert.match(m.json as string, /litto_queue_depth\{status="QUEUED"\}/);
+    assert.match(m.json as string, /litto_job_run_ms_avg/);
+    assert.match(m.json as string, /litto_job_succeeded_model_mock_image_(pro|lite)/);
     assert.equal((await call(u, "GET", "/admin/metrics.txt")).status, 403);
     void seq;
 });

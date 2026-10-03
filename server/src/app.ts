@@ -27,7 +27,7 @@ app.use("*", async (c, next) => {
     if (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         c.header("Access-Control-Allow-Origin", origin);
         c.header("Access-Control-Allow-Credentials", "true");
-        c.header("Access-Control-Allow-Headers", "content-type, authorization, x-workspace-id, x-ovia-csrf, idempotency-key");
+        c.header("Access-Control-Allow-Headers", "content-type, authorization, x-workspace-id, x-litto-csrf, idempotency-key");
         c.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
         c.header("Vary", "Origin");
     }
@@ -45,7 +45,7 @@ app.use("*", async (c, next) => {
     if (Date.now() - b.t > 60_000) (b.t = Date.now()), (b.n = 0);
     b.n++;
     buckets.set(key, b);
-    if (b.n > limit && !process.env.OVIA_NO_RATELIMIT) return c.json({ error: "rate limited", code: "rate_limited" }, 429);
+    if (b.n > limit && !process.env.LITTO_NO_RATELIMIT) return c.json({ error: "rate limited", code: "rate_limited" }, 429);
     const t = Date.now();
     await next();
     observe("api_latency_ms", Date.now() - t);

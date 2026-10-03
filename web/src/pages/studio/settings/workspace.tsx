@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { App, Button, Card, Input, Modal, Statistic } from "antd";
 import { useNavigate } from "react-router-dom";
 
-import { api, ff } from "@/services/api/ovia";
-import { useOviaStore } from "@/stores/use-ovia-store";
+import { api, ff } from "@/services/api/litto";
+import { useLittoStore } from "@/stores/use-litto-store";
 import { bytes, useLoad } from "../admin/util";
 
 export default function Workspace() {
@@ -13,7 +13,7 @@ export default function Workspace() {
     const [confirm, setConfirm] = useState("");
     const { message } = App.useApp();
     const nav = useNavigate();
-    const logout = useOviaStore((s) => s.logout);
+    const logout = useLittoStore((s) => s.logout);
     useEffect(() => w && setName(w.name), [w]);
     if (!w) return null;
     const rename = async () => { try { await api.patch("/workspaces/current", { name }); message.success("已重命名"); reload(); } catch (e: any) { message.error(e.message); } };

@@ -1,9 +1,9 @@
 {
-    "name": "canvas-plugin-ovia",
+    "name": "canvas-plugin-litto",
     "version": "1.0.0",
     "private": true,
     "type": "module",
-    "description": "OVIA 领域节点:项目枢纽 / World / Look / 资产 / 镜头,数据来自 OVIA 服务端",
+    "description": "LITTO 领域节点:项目枢纽 / World / Look / 资产 / 镜头,数据来自 LITTO 服务端",
     "scripts": {
         "build": "node build.mjs",
         "dev": "node build.mjs --watch",

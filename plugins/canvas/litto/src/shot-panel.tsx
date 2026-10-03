@@ -55,7 +55,7 @@ function Spec({ ctx, s, changed, say }: PanelProps) {
 
 // ------------------------------------------------------------------ 参考
 function Refs({ ctx, s, changed, say }: PanelProps) {
-    const { oviaProjectId: pid } = meta(ctx);
+    const { littoProjectId: pid } = meta(ctx);
     const [role, setRole] = useState<Record<string, string>>({});
     const upstreamImages = ctx.getUpstream().filter((n) => n.type === "image");
     const bindImage = async (n: any) => {
@@ -235,8 +235,8 @@ function History({ ctx, s }: PanelProps) {
 
 // ------------------------------------------------------------------ panel
 export function ShotPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
-    const { oviaId, oviaProjectId: pid } = meta(ctx);
-    const { data: s, changed } = useLive(ctx, () => loadShot(oviaId!), [oviaId], hasPending);
+    const { littoId, littoProjectId: pid } = meta(ctx);
+    const { data: s, changed } = useLive(ctx, () => loadShot(littoId!), [littoId], hasPending);
     const [tab, setTab] = useState("spec");
     const [msg, setMsg] = useState("");
     if (!s) return null;

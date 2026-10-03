@@ -119,7 +119,7 @@ extra.post("/billing/checkout", async (c) => {
 });
 /** Stripe webhook: signature verified over the raw body; fulfilment is idempotent. */
 extra.post("/webhooks/stripe", async (c) => {
-    const secret = process.env.OVIA_STRIPE_WEBHOOK_SECRET;
+    const secret = process.env.LITTO_STRIPE_WEBHOOK_SECRET;
     if (!secret) return c.json({ error: "not configured" }, 404);
     const raw = await c.req.text();
     if (!verifyStripe(raw, c.req.header("stripe-signature"), secret)) return c.json({ error: "bad signature" }, 400);
@@ -131,14 +131,14 @@ extra.post("/webhooks/stripe", async (c) => {
 // ---------------- provider callbacks (PRD §16: Callback/Webhook) ----------------
 /**
  * Providers that finish asynchronously POST here. Body: {taskId, status:'done'|'failed', outputs?:[{b64,mime,duration?}|{url,mime?}], costUsd?, error?}.
- * Header X-OVIA-Signature = hex HMAC-SHA256(provider webhook secret, raw body).
+ * Header X-LITTO-Signature = hex HMAC-SHA256(provider webhook secret, raw body).
  */
 extra.post("/webhooks/providers/:providerId", async (c) => {
     const p = get("SELECT * FROM providers WHERE id=?", c.req.param("providerId"));
     if (!p?.webhook_secret) return c.json({ error: "not configured" }, 404);
     const raw = await c.req.text();
     const want = createHmac("sha256", decrypt(JSON.parse(p.webhook_secret))).update(raw).digest("hex");
-    const got = c.req.header("x-ovia-signature") ?? "";
+    const got = c.req.header("x-litto-signature") ?? "";
     if (want.length !== got.length || !timingSafeEqual(Buffer.from(want), Buffer.from(got))) return c.json({ error: "bad signature" }, 400);
     const payload = JSON.parse(raw);
     const job = get("SELECT id FROM generation_jobs WHERE provider_id=? AND provider_task_id=?", p.id, String(payload.taskId));
@@ -157,7 +157,7 @@ adminExtra.post("/providers/:id/webhook-secret", (c) => {
     run("UPDATE providers SET webhook_secret=? WHERE id=?", JSON.stringify(encrypt(secret)), c.req.param("id"));
     audit(authOf(c).user.id, "provider.webhook_secret", c.req.param("id"));
     // Shown once; only the encrypted form is stored.
-    return c.json({ secret, url: `${config.publicUrl}/webhooks/providers/${c.req.param("id")}`, header: "X-OVIA-Signature: hex(HMAC-SHA256(secret, rawBody))" });
+    return c.json({ secret, url: `${config.publicUrl}/webhooks/providers/${c.req.param("id")}`, header: "X-LITTO-Signature: hex(HMAC-SHA256(secret, rawBody))" });
 });
 adminExtra.get("/plans", (c) => c.json({ plans: plans(), packs: packs() }));
 adminExtra.put("/workspaces/:id/subscription", async (c) => {
@@ -173,9 +173,9 @@ adminExtra.get("/payments", (c) => c.json(all("SELECT * FROM payments ORDER BY c
 adminExtra.get("/metrics.txt", (c) => {
     const m = snapshot();
     const q = (st: string) => get("SELECT COUNT(*) n FROM generation_jobs WHERE status=?", st)!.n;
-    const lines = [`ovia_queue_depth{status="QUEUED"} ${q("QUEUED")}`, `ovia_queue_depth{status="RUNNING"} ${q("RUNNING")}`, `ovia_storage_bytes ${get("SELECT COALESCE(SUM(size),0) b FROM media WHERE deleted_at IS NULL")!.b}`];
-    for (const [k, v] of Object.entries(m.counters)) lines.push(`ovia_${k.replace(/[^\w]/g, "_")} ${v}`);
-    for (const [k, v] of Object.entries(m.latency)) lines.push(`ovia_${k.replace(/[^\w]/g, "_")}_avg ${v.avgMs.toFixed(2)}`, `ovia_${k.replace(/[^\w]/g, "_")}_count ${v.count}`);
+    const lines = [`litto_queue_depth{status="QUEUED"} ${q("QUEUED")}`, `litto_queue_depth{status="RUNNING"} ${q("RUNNING")}`, `litto_storage_bytes ${get("SELECT COALESCE(SUM(size),0) b FROM media WHERE deleted_at IS NULL")!.b}`];
+    for (const [k, v] of Object.entries(m.counters)) lines.push(`litto_${k.replace(/[^\w]/g, "_")} ${v}`);
+    for (const [k, v] of Object.entries(m.latency)) lines.push(`litto_${k.replace(/[^\w]/g, "_")}_avg ${v.avgMs.toFixed(2)}`, `litto_${k.replace(/[^\w]/g, "_")}_count ${v.count}`);
     return c.text(lines.join("\n") + "\n");
 });
 void project; void forbidden; void bad; void setting; void storage;

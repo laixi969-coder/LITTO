@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { App, Button, Collapse, Form, Input, Modal, Select, Tag } from "antd";
 import { Lock, RotateCcw } from "lucide-react";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { Media } from "./media";
 import { PanoScout } from "./pano-scout";
 import { ShotInspector } from "./shot-inspector";

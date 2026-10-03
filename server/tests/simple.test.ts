@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "ovia-test-simple-"));
-Object.assign(process.env, { OVIA_DATA_DIR: dir, OVIA_QUIET: "1", OVIA_MOCK_LATENCY_MS: "20", OVIA_WORKER_POLL_MS: "30", OVIA_NO_RATELIMIT: "1", OVIA_NO_DERIVATIVES: "1", NODE_ENV: "test" });
+const dir = mkdtempSync(join(tmpdir(), "litto-test-simple-"));
+Object.assign(process.env, { LITTO_DATA_DIR: dir, LITTO_QUIET: "1", LITTO_MOCK_LATENCY_MS: "20", LITTO_WORKER_POLL_MS: "30", LITTO_NO_RATELIMIT: "1", LITTO_NO_DERIVATIVES: "1", NODE_ENV: "test" });
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");
 const { seedProviders } = await import("../src/providers/registry.ts");

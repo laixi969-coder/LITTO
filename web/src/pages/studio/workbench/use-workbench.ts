@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 
 export type Presence = { userId: string; email: string; color: string; shotId: string | null; assetId: string | null; at: number };
 export type Sel = { kind: "world" | "look" | "asset" | "shot" | "reference"; id: string } | null;

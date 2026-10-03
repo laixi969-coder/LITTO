@@ -27,7 +27,7 @@ ssoPublic.get("/:id/start", async (c) => {
     const d = await discover(conn.issuer);
     const { verifier, challenge } = pkce();
     const payload = Buffer.from(JSON.stringify({ id: conn.id, state: randomBytes(16).toString("base64url"), nonce: randomBytes(16).toString("base64url"), verifier })).toString("base64url");
-    setCookie(c, "ovia_sso", `${payload}.${sign(payload)}`, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: 600 });
+    setCookie(c, "litto_sso", `${payload}.${sign(payload)}`, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: 600 });
     const st = JSON.parse(Buffer.from(payload, "base64url").toString());
     const q = new URLSearchParams({ client_id: conn.client_id, redirect_uri: redirectUri(conn.id), response_type: "code", scope: "openid email profile", state: st.state, nonce: st.nonce, code_challenge: challenge, code_challenge_method: "S256" });
     return c.redirect(`${d.authorization_endpoint}${d.authorization_endpoint.includes("?") ? "&" : "?"}${q}`);
@@ -36,10 +36,10 @@ ssoPublic.get("/:id/start", async (c) => {
 ssoPublic.get("/:id/callback", async (c) => {
     const conn = get("SELECT * FROM sso_connections WHERE id=? AND enabled=1", c.req.param("id"));
     if (!conn) throw notFound("sso connection");
-    const [payload, sig] = (getCookie(c, "ovia_sso") ?? "").split(".");
+    const [payload, sig] = (getCookie(c, "litto_sso") ?? "").split(".");
     if (!payload || !sig || !verifySig(payload, sig)) throw new HttpError(400, "invalid sso state", "bad_state");
     const st = JSON.parse(Buffer.from(payload, "base64url").toString());
-    deleteCookie(c, "ovia_sso", { path: "/" });
+    deleteCookie(c, "litto_sso", { path: "/" });
     if (st.id !== conn.id || !c.req.query("state") || c.req.query("state") !== st.state || !c.req.query("code")) throw new HttpError(400, "invalid sso state", "bad_state");
     const d = await discover(conn.issuer);
     const tr = await fetch(d.token_endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: new URLSearchParams({ grant_type: "authorization_code", code: c.req.query("code")!, redirect_uri: redirectUri(conn.id), client_id: conn.client_id, client_secret: decrypt(JSON.parse(conn.secret_enc)), code_verifier: st.verifier }), signal: AbortSignal.timeout(10_000) });
@@ -55,7 +55,7 @@ ssoPublic.get("/:id/callback", async (c) => {
         run("INSERT OR IGNORE INTO workspace_members VALUES(?,?,?,?)", conn.workspace_id, r.user.id, conn.role, now());
     }
     setSessionCookie(c, r.token);
-    return c.redirect(process.env.OVIA_WEB_URL ?? "/studio");
+    return c.redirect(process.env.LITTO_WEB_URL ?? "/studio");
 });
 
 // ---------------- admin CRUD (mounted under /admin) ----------------

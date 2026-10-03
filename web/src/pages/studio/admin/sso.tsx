@@ -2,7 +2,7 @@ import { useState } from "react";
 import { App, Button, Form, Input, Modal, Select, Switch, Table, Tag } from "antd";
 import { Plus } from "lucide-react";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { useAct, useLoad } from "./util";
 
 type Conn = { id: string; name: string; issuer: string; clientId: string; hasSecret: boolean; domains: string[]; workspaceId: string | null; role: string; enforce: boolean; enabled: boolean };

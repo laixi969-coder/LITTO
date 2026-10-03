@@ -1,6 +1,6 @@
 import { Button, Table } from "antd";
 
-import { api } from "@/services/api/ovia";
+import { api } from "@/services/api/litto";
 import { StatusTag, time, useAct, useLoad } from "../admin/util";
 
 export default function Generations() {
