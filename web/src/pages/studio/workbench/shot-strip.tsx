@@ -17,7 +17,7 @@ export function ShotStrip() {
                 <button key={s.shotId} onClick={() => wb.select({ kind: "shot", id: s.shotId })} style={w[0] ? { borderColor: w[0].color, boxShadow: `0 0 0 2px ${w[0].color}66` } : undefined} className={`relative w-[132px] shrink-0 overflow-hidden rounded border text-left ${wb.sel?.id === s.shotId ? "border-indigo-500" : "border-black/10 dark:border-white/10"}`}>
                     {w[0] && <span style={{ background: w[0].color }} className="absolute left-0 top-0 z-10 max-w-full truncate rounded-br px-1 text-[10px] text-white">{w.map((x) => x.email.split("@")[0]).join(", ")}</span>}
                     <Media media={s.approvedTake?.media ?? s.hero?.media} className="h-[64px] w-full" />
-                    <div className="px-1.5 pt-0.5 text-[11px]"><span className="opacity-50">#{s.order + 1}</span> <span className="truncate">{s.title}</span></div>
+                    <div className="flex min-w-0 gap-1 px-1.5 pt-0.5 text-[11px]"><span className="shrink-0 opacity-50">#{s.order + 1}</span><span className="min-w-0 flex-1 truncate">{s.title}</span></div>
                     <div className="flex items-center gap-1 px-1.5 text-[10px]">
                         <span style={{ background: bar("hero") }} className={`h-1.5 w-1.5 rounded-full ${s.hero ? "" : "opacity-20"}`} title="Hero Frame" />
                         <span style={{ background: bar("take") }} className={`h-1.5 w-1.5 rounded-full ${s.approvedTake ? "" : "opacity-20"}`} title="Approved Take" />

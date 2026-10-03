@@ -29,7 +29,7 @@ export async function syncToCanvas(ctx: Ctx, pid: string) {
     for (const s of seqs) {
         const list = shots.filter((sh: any) => sh.sequenceId === s.id).sort((a: any, b: any) => a.ord - b.ord);
         let prev: string | null = null;
-        const seqId = add("sequence", s.id, "filmflow:sequence", `成片 · ${s.name}`, x + 660 - 290, y + rowBase, SIZE.sequence);
+        const seqId = add("sequence", s.id, "filmflow:sequence", `成片 · ${s.name}`, x + 660, y + rowBase - 130, SIZE.sequence);
         list.forEach((sh: any, i: number) => {
             const id = add("shot", sh.id, "filmflow:shot", `#${sh.ord + 1} ${sh.title || sh.narrativeFunction}`, x + 660 + (i % 5) * 290, y + rowBase + Math.floor(i / 5) * 190, SIZE.shot);
             for (const aid of sh.assetIds ?? []) ops.push({ type: "connect_nodes", fromNodeId: `ff-asset-${aid}`, toNodeId: id, label: "uses" });
@@ -179,7 +179,7 @@ function ShotContent({ ctx }: { ctx: Ctx }) {
 }
 
 // ---------------------------------------------------------------- definitions
-const common = { transparentBackground: false, autoOpenPanel: false, minimapColor: "#6366f1" };
+const common = { transparentBackground: false, autoOpenPanel: true, minimapColor: "#6366f1" };
 export const nodes: CanvasNodeDefinition[] = [
     { ...common, type: "filmflow:project", title: "FilmFlow 项目", icon: "🎬", description: "连接 FilmFlow 项目，把领域节点同步到画布", defaultSize: SIZE.project, defaultMetadata: {}, minimapColor: "#111827", Content: HubContent, Panel: HubPanel, toolbar: (ctx) => [{ id: "open", title: "在工作台打开", label: "工作台", icon: "↗", onClick: () => open(meta(ctx).ffProjectId) }] },
     { ...common, type: "filmflow:world", title: "World", icon: "🌍", defaultSize: SIZE.world, showInCreateMenu: false, minimapColor: KIND_COLOR.world, Content: (p) => <WorldLookContent ctx={p.ctx} kind="world" />, Panel: (p) => <WorldLookPanel {...p} kind="world" /> },

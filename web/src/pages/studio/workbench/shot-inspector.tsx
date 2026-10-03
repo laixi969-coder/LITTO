@@ -66,7 +66,7 @@ function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
             }
         } catch (e: any) { message.error(e.message); }
     };
-    const t = (label: string, name: (string | number)[], el?: React.ReactNode) => <Form.Item label={label} name={name} className="!mb-2">{el ?? <Input size="small" />}</Form.Item>;
+    const t = (label: string, name: (string | number)[], el?: React.ReactNode) => <Form.Item key={name.join(".")} label={label} name={name} className="!mb-2">{el ?? <Input size="small" />}</Form.Item>;
     return (
         <Form form={f} layout="vertical" size="small" className="p-3">
             <LookOverride shot={shot} />

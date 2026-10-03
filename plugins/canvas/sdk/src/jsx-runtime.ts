@@ -22,7 +22,14 @@ export function jsx(type: unknown, props: Record<string, unknown> | null, key?: 
 }
 
 // jsxs 用于静态多子节点;转发逻辑与 jsx 一致(children 已在 props 内)。
-export const jsxs = jsx;
+// Static multi-child elements: pass children as varargs so React treats them as static (no "unique key" warnings).
+export function jsxs(type: unknown, props: Record<string, unknown> | null, key?: unknown): React.ReactElement {
+    const react = getReact();
+    const { children, ...rest } = (props ?? {}) as { children?: unknown };
+    const resolvedType = type === Fragment ? react.Fragment : type;
+    const config = key === undefined ? rest : { ...rest, key };
+    return react.createElement(resolvedType as never, config as never, ...((Array.isArray(children) ? children : [children]) as never[]));
+}
 
 // 让 `jsxImportSource` 指向本包的编译器能从这里取到 JSX 内建标签类型(复用 @types/react)。
 export namespace JSX {
