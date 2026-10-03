@@ -30,6 +30,7 @@ cd server && npm run seed
 | 能力 | 变量 |
 |---|---|
 | OAuth（配置了才启用） | `FILMFLOW_OAUTH_GITHUB_ID/SECRET`、`FILMFLOW_OAUTH_GOOGLE_ID/SECRET`、`FILMFLOW_OAUTH_APPLE_ID/TEAM_ID/KEY_ID/PRIVATE_KEY`；回调地址 `${FILMFLOW_PUBLIC_URL}/auth/oauth/<provider>/callback` |
+| 企业 SSO | 管理后台 → 企业 SSO：标准 **OIDC**（Okta / Azure AD / Keycloak 等，discovery + PKCE + id_token 的 JWKS 验签）；按邮箱域名发现，可强制 SSO（禁用验证码/OAuth）、自动加入团队工作区。**不支持 SAML** |
 | 支付 | `FILMFLOW_STRIPE_SECRET`、`FILMFLOW_STRIPE_WEBHOOK_SECRET`；非 production 默认 Mock 支付（即时到账，仅测试） |
 | 媒体衍生物 / 渲染 | 服务器装有 `ffmpeg` 时自动生成缩略图、480p 代理视频，并可把全部为真实视频的序列渲染成 MP4 |
 | Provider 回调 | 管理后台 → Provider → 生成 Webhook 密钥；回调 `POST /webhooks/providers/:id`，头 `X-FilmFlow-Signature` = HMAC-SHA256(密钥, 原始 body) |
@@ -42,3 +43,6 @@ cd web && bun run typecheck && bun run build
 
 ## 在上游画布里用领域节点
 先在 `/studio/login` 登录，再打开 `/canvas`：新建节点 →「FilmFlow 项目」，面板里选项目 →「同步领域节点到画布」。资产节点连到镜头节点即把资产加入该镜头；上游图片节点可「登记为参考」并绑定角色。
+
+## 实时协作
+项目页订阅 `GET /projects/:id/events`（SSE）：他人的改动会在 ~300ms 内刷新你的视图，右上角显示协作者头像，镜头/资产节点上会出现对方的彩色边框。保存镜头/资产时携带 `expectedUpdatedAt`，他人更晚修改过则返回 412 `stale`。这是「变更推送 + 在线状态 + 乐观并发」，不是 CRDT 式的同字段合并编辑。

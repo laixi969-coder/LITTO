@@ -8,8 +8,9 @@ import { team } from "./routes/team.ts";
 import { oauth } from "./routes/oauth.ts";
 import { extra, adminExtra } from "./routes/extra.ts";
 import { collab } from "./routes/collab.ts";
+import { ssoPublic, sso } from "./routes/sso.ts";
 import { nle } from "./routes/nle.ts";
-import { market } from "./routes/market.ts";
+import { market, marketAdmin } from "./routes/market.ts";
 import { HttpError, log } from "./util.ts";
 import { get, setting } from "./db.ts";
 import { checkSignedUrl, storage } from "./storage.ts";
@@ -75,6 +76,7 @@ app.get("/media/:id/file", async (c) => {
 
 app.route("/auth", authPublic);
 app.route("/auth/oauth", oauth);
+app.route("/auth/sso", ssoPublic);
 // Provider/Stripe callbacks authenticate by signature, not by session.
 app.post("/webhooks/*", (c) => extra.fetch(c.req.raw));
 const secured = new Hono();
@@ -88,6 +90,8 @@ secured.route("/", nle);
 secured.route("/", market);
 secured.route("/admin", admin);
 secured.route("/admin", adminExtra);
+secured.route("/admin", marketAdmin);
+secured.route("/admin", sso);
 app.route("/", secured);
 
 app.onError((e, c) => {

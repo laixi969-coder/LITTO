@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { config } from "./config.ts";
 import { j, now, ulid } from "./util.ts";
+import { publishChange, TRACKED } from "./events.ts";
 
 export type Row = Record<string, any>;
 
@@ -181,6 +182,7 @@ export function scoped(workspaceId: string) {
             const rec = { id: ulid(), created_at: now(), ...row, workspace_id: workspaceId } as Row;
             const cols = Object.keys(rec);
             run(`INSERT INTO ${table}(${cols.join(",")}) VALUES(${cols.map(() => "?").join(",")})`, ...cols.map((c) => (rec[c] !== null && typeof rec[c] === "object" ? j(rec[c]) : rec[c])));
+            publishChange(table, rec.id, workspaceId, rec.project_id ?? null);
             return this.get(table, rec.id, true)!;
         },
         update(table: string, id: string, patch: Row) {
@@ -190,10 +192,13 @@ export function scoped(workspaceId: string) {
                 const hasUpdated = colsOf(table).includes("updated_at");
                 run(`UPDATE ${table} SET ${cols.map((c) => `${c}=?`).join(",")}${hasUpdated ? ",updated_at=?" : ""} WHERE id=? AND workspace_id=?`, ...vals, ...(hasUpdated ? [now()] : []), id, workspaceId);
             }
-            return this.get(table, id, true)!;
+            const out = this.get(table, id, true)!;
+            publishChange(table, id, workspaceId, (out as any)?.projectId ?? null);
+            return out;
         },
         softDelete(table: string, id: string) {
             run(`UPDATE ${table} SET deleted_at=? WHERE id=? AND workspace_id=?`, now(), id, workspaceId);
+            if (TRACKED.has(table)) publishChange(table, id, workspaceId, table === "projects" ? id : ((get(`SELECT project_id FROM ${table} WHERE id=?`, id) as any)?.project_id ?? null));
         },
     };
 }

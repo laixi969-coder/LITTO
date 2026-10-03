@@ -3163,6 +3163,7 @@ function InfiniteCanvasPage() {
                                 from={from}
                                 to={to}
                                 active={selectedConnectionId === connection.id || relatedHighlight.connectionIds.has(connection.id)}
+                                scale={viewport.k}
                                 onSelect={() => {
                                     setSelectedConnectionId(connection.id);
                                     setSelectedNodeIds(new Set());

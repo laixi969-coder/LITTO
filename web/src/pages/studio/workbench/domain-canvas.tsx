@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { App } from "antd";
 
+import { watchersOf } from "./use-collab";
 import { useWorkbench } from "./use-workbench";
 import { BindDialog } from "./bind-dialog";
 import { Media } from "./media";
@@ -116,9 +117,12 @@ export function DomainCanvas() {
                 {nodes.map((n) => {
                     const selected = wb.sel?.id === n.refId || wb.multi.includes(n.refId);
                     const hero = n.shot?.heroKeyframe?.media;
+                    const watchers = n.kind === "shot" || n.kind === "asset" ? watchersOf(wb.presence, n.kind, n.refId) : [];
+                    const ring = watchers[0]?.color;
                     return (
-                        <div key={n.id} onPointerDown={(e) => down(e, n.id)} style={{ left: n.x, top: n.y, width: W, height: H, borderColor: selected ? n.color : undefined, boxShadow: selected ? `0 0 0 2px ${n.color}55` : undefined }} className="absolute cursor-grab select-none overflow-hidden rounded-lg border border-black/15 bg-white/90 dark:border-white/15 dark:bg-neutral-900/90">
+                        <div key={n.id} onPointerDown={(e) => down(e, n.id)} style={{ left: n.x, top: n.y, width: W, height: H, borderColor: ring ?? (selected ? n.color : undefined), boxShadow: ring ? `0 0 0 2px ${ring}88` : selected ? `0 0 0 2px ${n.color}55` : undefined }} className="absolute cursor-grab select-none overflow-hidden rounded-lg border border-black/15 bg-white/90 dark:border-white/15 dark:bg-neutral-900/90">
                             <div style={{ background: n.color }} className="absolute inset-y-0 left-0 w-1" />
+                            {watchers[0] && <span style={{ background: ring }} className="absolute right-0 top-0 z-10 max-w-[70%] truncate rounded-bl px-1 text-[10px] text-white">{watchers.map((x) => x.email.split("@")[0]).join(", ")}</span>}
                             {n.kind === "shot" && <Media media={hero} className="absolute right-0 top-0 h-full w-[84px] opacity-90" />}
                             <div className="relative h-full pl-3 pr-2 pt-1.5" style={n.kind === "shot" ? { paddingRight: 90 } : undefined}>
                                 <div className="truncate text-[13px] font-medium">{n.title} {n.approved && <span title="Approved · LOCK">🔒</span>}</div>

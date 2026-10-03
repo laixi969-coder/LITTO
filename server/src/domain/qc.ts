@@ -50,9 +50,32 @@ export function applyRepair(s: Scope, repairId: string, actor: string) {
     const lock = ["identity_drift", "reference_replace"].includes(r.action) ? ["IDENTITY at weight 1.0 — do not alter facial geometry"] : r.action === "geometry_lock" || r.action === "environment_lock" ? ["geometry of environment and key props — do not alter layout"] : [];
     const o = { repair: { addLock: lock, note: r.detail }, count: video ? 1 : 2 };
     let res: any;
-    if (["inpaint_local", "look_normalization"].includes(r.action)) return { applied: false, manual: true, message: r.action === "inpaint_local" ? "Local inpaint needs a mask — use the editor on the selected frame." : "Colour normalisation is applied in post; nothing to regenerate.", repairActionId: r.id };
+    if (r.action === "look_normalization") return normalizeLook(s, r);
+    if (["inpaint_local"].includes(r.action)) return { applied: false, manual: true, message: r.action === "inpaint_local" ? "Local inpaint needs a mask — use the editor on the selected frame." : "Colour normalisation is applied in post; nothing to regenerate.", repairActionId: r.id };
     const policy = r.action === "switch_model" ? { disabledModelIds: qc ? [(s.get(video ? "takes" : "keyframes", qc.targetId) as any)?.meta?.modelId].filter(Boolean) : [] } : undefined;
     res = video ? generateTakes(s, r.shotId, actor, { ...o, policy }) : generateKeyframes(s, r.shotId, actor, { ...o, policy });
     s.update("repair_actions", repairId, { status: "applied" });
     return { applied: true, ...res };
+}
+
+
+const kelvin = (t?: string) => { const m = /(\d{3,5})\s*k/i.exec(t ?? ""); return m ? Number(m[1]) : null; };
+/**
+ * look_normalization is a real fix now: it writes a suggested parametric grade on the shot that nudges
+ * colour temperature toward the previous shot's declared lighting and saturation toward the project Look.
+ */
+function normalizeLook(s: Scope, r: any) {
+    const shot = s.get("shots", r.shotId)!;
+    const prev = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter((x: any) => x.ord < shot.ord).pop() as any;
+    const look = (s.list("looks", { projectId: shot.projectId }) as any[]).find((l) => l.scope === "project");
+    const k0 = kelvin(prev?.lighting?.colorTemp), k1 = kelvin(shot.lighting?.colorTemp);
+    // this shot cooler than the previous one → warm it up (positive) and vice versa; 1000 K ≈ 25 points
+    const temperature = k0 && k1 ? Math.max(-100, Math.min(100, Math.round((k0 - k1) / 40))) : 0;
+    const sat = /muted|desat/i.test(look?.saturation ?? "") ? 0.85 : /rich|vivid|satur/i.test(look?.saturation ?? "") ? 1.15 : 1;
+    const base = { lift: [0, 0, 0], gamma: [0, 0, 0], gain: [0, 0, 0], saturation: 1, contrast: 1, temperature: 0, exposureStops: 0, ...(shot.grade ?? {}) };
+    const grade = { ...base, saturation: shot.grade?.saturation ?? sat, temperature: k0 && k1 ? temperature : base.temperature };
+    const { id, workspaceId, projectId, sequenceId, sceneId, ord, schemaVersion, status, heroKeyframeId, approvedTakeId, createdAt, updatedAt, deletedAt, ...data } = shot;
+    s.update("shots", shot.id, { data: { ...data, grade } });
+    s.update("repair_actions", r.id, { status: "applied" });
+    return { applied: true, grade, message: k0 && k1 ? `Temperature ${temperature >= 0 ? "+" : ""}${temperature} to match the previous shot (${k1}K → ${k0}K); applied at render.` : "No colour temperatures to compare; saturation aligned with the project Look. Fine-tune in the grade panel.", repairActionId: r.id };
 }

@@ -101,6 +101,7 @@ export type CanvasConnection = {
     id: string;
     fromNodeId: string;
     toNodeId: string;
+    label?: string; // Optional text drawn on the connection line (e.g. plugin semantics such as "uses").
 };
 
 export type CanvasAssistantReference = {

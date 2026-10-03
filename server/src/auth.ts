@@ -6,6 +6,7 @@ import { config } from "./config.ts";
 import { bad, forbidden, HttpError, log, now, sha256, ulid } from "./util.ts";
 import { grant } from "./credits.ts";
 import { purgeWorkspace } from "./storage.ts";
+import { assertNotSsoEnforced } from "./sso-policy.ts";
 
 export type Role = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
 const RANK: Record<Role, number> = { VIEWER: 0, EDITOR: 1, ADMIN: 2, OWNER: 3 };
@@ -18,6 +19,7 @@ const SESSION_TTL_MS = 30 * 24 * 3600_000;
 export function requestCode(email: string): { devCode?: string } {
     email = email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw bad("invalid email");
+    assertNotSsoEnforced(email);
     const existing = get("SELECT id FROM users WHERE email=? AND deleted_at IS NULL", email);
     if (!existing && !setting("registrationOpen", true)) throw forbidden("registration closed");
     const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -29,6 +31,7 @@ export function requestCode(email: string): { devCode?: string } {
 
 export function verifyCode(email: string, code: string) {
     email = email.trim().toLowerCase();
+    assertNotSsoEnforced(email);
     const rec = get("SELECT * FROM login_codes WHERE email=?", email);
     if (!rec || rec.expires_at < now() || rec.attempts >= 5) throw new HttpError(401, "code expired or too many attempts", "bad_code");
     if (rec.code_hash !== sha256(email + code)) {

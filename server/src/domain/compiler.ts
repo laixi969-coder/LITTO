@@ -2,6 +2,7 @@ import { all, get, type Scope } from "../db.ts";
 import { statesOf } from "./state.ts";
 import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
+import { ensureCropMedia, viewOf } from "./panorama.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -41,7 +42,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         return r.clean;
     };
 
-    const roleCap: Record<string, string> = { IDENTITY: "identityReference", GEOMETRY: "multiReference", WARDROBE: "multiReference", ENVIRONMENT: "multiReference", COMPOSITION: "compositionReference", LIGHTING: "multiReference", LOOK: "multiReference", PERFORMANCE: "motionReference", CAMERA_MOTION: "cameraControl", START_FRAME: "image2video", END_FRAME: "startEndFrame", AUDIO: "nativeAudio" };
+    const roleCap: Record<string, string> = { IDENTITY: "identityReference", GEOMETRY: "multiReference", WARDROBE: "multiReference", ENVIRONMENT: "multiReference", COMPOSITION: "compositionReference", LIGHTING: "multiReference", LOOK: "multiReference", DEPTH: "depthReference", PANORAMA: "panoramaReference", PERFORMANCE: "motionReference", CAMERA_MOTION: "cameraControl", START_FRAME: "image2video", END_FRAME: "startEndFrame", AUDIO: "nativeAudio" };
     const maxInputs = Number(caps.maxInputs ?? 0);
     const degradations: Compiled["degradations"] = [];
     const inputs: Compiled["inputs"] = [];
@@ -59,6 +60,24 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             inputs.push({ referenceId: b.referenceId, mediaId: ref?.mediaId ?? null, text: ref?.text ?? ref?.name, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: false });
         }
     }
+    // 360° panorama of the shot's Environment: VIEW section + (capability-gated) panorama input + auto perspective crop as COMPOSITION.
+    let viewText = "";
+    const view = viewOf(shot.camera);
+    const envAsset = assets.find((a) => a.type === "Environment" && s.list("reference_bindings", { targetType: "asset", targetId: a.id }).some((b: any) => b.role === "PANORAMA"));
+    if (view && envAsset) {
+        const pb = (s.list("reference_bindings", { targetType: "asset", targetId: envAsset.id }) as any[]).find((b) => b.role === "PANORAMA")!;
+        const pref = s.get("refs", pb.referenceId);
+        viewText = `camera inside ${envAsset.name} facing yaw ${view.yaw}° pitch ${view.pitch}°, fov ${view.fov}° — 0° yaw = panorama centre/front, positive = turn right`;
+        if (!inputs.some((i) => i.role === "PANORAMA")) {
+            if (caps.panoramaReference && used < maxInputs && pref?.mediaId) { inputs.push({ referenceId: pb.referenceId, mediaId: pref.mediaId, role: "PANORAMA", weight: pb.weight, lockLevel: pb.lockLevel, sent: true }); used++; }
+            else { degradations.push({ role: "PANORAMA", strategy: "no panorama input: view direction and layout described textually, panorama used as a plain environment reference" }); textFallback.push(`panorama environment "${pref?.name ?? pb.referenceId}"`); }
+        }
+        if (kind === "image" && caps.compositionReference && used < maxInputs) {
+            const crop = ensureCropMedia(s, proj, pb.referenceId, view);
+            if (crop.mediaId) { inputs.push({ referenceId: pb.referenceId, mediaId: crop.mediaId, role: "COMPOSITION", weight: 0.8, lockLevel: "CONTROL", sent: true }); used++; }
+            else if (crop.warning) warnings.push(crop.warning);
+        }
+    }
     if (kind === "video" && extra.startFrameMediaId && !inputs.some((i) => i.role === "START_FRAME")) inputs.unshift({ referenceId: "hero", mediaId: extra.startFrameMediaId, role: "START_FRAME", weight: 1, lockLevel: "LOCK", sent: true });
 
     const cam = shot.camera ?? {}, lt = shot.lighting ?? {};
@@ -74,6 +93,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         action: clean(shot.action || shot.title, "action"),
         performance: J([shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`, shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`, shot.performance?.gesture && `gesture ${shot.performance.gesture}`, shot.performance?.timing && `timing ${shot.performance.timing}`]),
         blocking: J([shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`, shot.blocking?.midground && `midground: ${shot.blocking.midground}`, shot.blocking?.background && `background: ${shot.blocking.background}`]),
+        view: viewText,
         camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.focus && `focus on ${cam.focus}`, kind === "video" && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
         lighting: J([lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
         world: world ? J([world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",

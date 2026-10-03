@@ -4,6 +4,7 @@ import { Lock, RotateCcw } from "lucide-react";
 
 import { api } from "@/services/api/filmflow";
 import { Media } from "./media";
+import { PanoScout } from "./pano-scout";
 import { ShotInspector } from "./shot-inspector";
 import { useAsk } from "./use-ask";
 import { useWorkbench } from "./use-workbench";
@@ -83,6 +84,7 @@ function AssetInspector({ id }: { id: string }) {
                 <Button size="small" onClick={async () => { const name = await ask("变体名称"); if (name) void act(() => api.post(`/assets/${id}/variants`, { name }), "变体已创建")(); }}>变体</Button>
                 <Button size="small" danger onClick={() => modal.confirm({ title: `删除「${a.name}」？`, content: locked ? "这是已批准资产，引用它的镜头将失去它。" : undefined, okType: "danger", onOk: act(async () => { await api.del(`/assets/${id}${locked ? "?confirm=1" : ""}`); wb.select(null); }) })}>删除</Button>
             </div>
+            {a.type === "Environment" && <PanoScout asset={a} onChanged={load} />}
             <div className="border-t border-black/10 pt-2 text-xs dark:border-white/10"><div className="mb-1 font-medium">版本历史</div>
                 {[...a.versions].reverse().map((v: any) => <div key={v.version} className="flex items-center gap-2 py-0.5">v{v.version} <Tag className="!m-0">{v.approvalStatus}</Tag><span className="opacity-50">{new Date(v.createdAt).toLocaleString()}</span>{v.approvalStatus === "approved" && v.version !== a.version && <Button size="small" type="text" icon={<RotateCcw size={11} />} onClick={act(() => api.post(`/assets/${id}/rollback`, { version: v.version }), `已回滚到 v${v.version}（作为新版本）`)}>回滚</Button>}</div>)}</div>
         </div>

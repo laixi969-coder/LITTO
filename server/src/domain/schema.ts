@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const SCHEMA_VERSION = 1;
 
-export const ROLES = ["IDENTITY", "GEOMETRY", "WARDROBE", "ENVIRONMENT", "COMPOSITION", "LIGHTING", "LOOK", "PERFORMANCE", "CAMERA_MOTION", "START_FRAME", "END_FRAME", "AUDIO"] as const;
+export const ROLES = ["IDENTITY", "GEOMETRY", "WARDROBE", "ENVIRONMENT", "COMPOSITION", "LIGHTING", "LOOK", "PERFORMANCE", "CAMERA_MOTION", "START_FRAME", "END_FRAME", "AUDIO", "DEPTH", "PANORAMA"] as const;
 export const ASSET_TYPES = ["Character", "Wardrobe", "Environment", "Prop", "Product", "Vehicle", "Creature", "Custom"] as const;
 export const LOCK_LEVELS = ["LOCK", "CONTROL", "ALLOW", "RANDOM"] as const;
 export const NARRATIVE_FUNCTIONS = ["Establish", "Reveal", "Reaction", "Contrast", "Transition", "Match", "Rhythm"] as const;
@@ -40,6 +40,8 @@ export const cameraSchema = z.object({
     lensMm: z.number().default(35), focus: z.string().default(""), depth: z.string().default(""), motion: z.string().default("static"), motivation: z.string().default(""),
     side: z.enum(["A", "B", "none"]).default("none"), // which side of the 180° axis
     screenDirection: z.enum(["left", "right", "none"]).default("none"),
+    // 360° view into the Environment panorama (optional so existing shots stay valid)
+    viewYaw: z.number().min(-180).max(180).optional(), viewPitch: z.number().min(-90).max(90).optional(), viewFov: z.number().min(10).max(140).optional(),
 });
 export const lightingSchema = z.object({
     motivatedLight: z.string().default(""), key: z.string().default(""), fill: z.string().default(""), negativeFill: z.string().default(""),

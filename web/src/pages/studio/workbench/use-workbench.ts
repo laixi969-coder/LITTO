@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { api } from "@/services/api/filmflow";
 
+export type Presence = { userId: string; email: string; color: string; shotId: string | null; assetId: string | null; at: number };
 export type Sel = { kind: "world" | "look" | "asset" | "shot" | "reference"; id: string } | null;
 
 type WB = {
@@ -20,6 +21,8 @@ type WB = {
     view: "canvas" | "grid" | "assembly";
     setView: (v: "canvas" | "grid" | "assembly") => void;
     looks: any[];
+    presence: Presence[]; // other collaborators (self excluded), pushed by the server
+    setPresence: (p: Presence[]) => void;
     multi: string[]; // multi-selected shot ids (marquee batch)
     activeSeq: string | null;
     open: (pid: string) => Promise<void>;
@@ -34,7 +37,7 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useWorkbench = create<WB>((set, get) => ({
     pid: "", project: null, world: null, look: null, assets: [], refs: [], sequences: [], shots: [], strip: [], jobs: [],
-    canvas: { nodes: [], edges: [], viewport: { x: 40, y: 40, k: 1 } }, sel: null, view: "canvas", looks: [], setView: (view) => set({ view }), multi: [], activeSeq: null,
+    canvas: { nodes: [], edges: [], viewport: { x: 40, y: 40, k: 1 } }, sel: null, view: "canvas", looks: [], presence: [], setPresence: (presence) => set({ presence }), setView: (view) => set({ view }), multi: [], activeSeq: null,
     async open(pid) {
         set({ pid, sel: null, multi: [], activeSeq: null });
         await get().reload();

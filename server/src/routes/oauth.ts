@@ -5,6 +5,7 @@ import { loginUser, setSessionCookie } from "../auth.ts";
 import { config } from "../config.ts";
 import { sign, verifySig } from "../crypto.ts";
 import { HttpError } from "../util.ts";
+import { assertNotSsoEnforced } from "../sso-policy.ts";
 
 /**
  * P2 OAuth: GitHub, Google, Apple. Each is enabled only when its env credentials exist.
@@ -91,6 +92,7 @@ async function callback(c: any, code: string | undefined, state: string | undefi
     deleteCookie(c, "ff_oauth_state", { path: "/" });
     const id = await p.exchange(code, redirectUri(p.id));
     if (!id.email || !id.verified) throw new HttpError(403, "the provider did not return a verified email", "unverified_email");
+    assertNotSsoEnforced(id.email);
     const r = loginUser(id.email, { provider: p.id, subject: id.subject });
     setSessionCookie(c, r.token);
     return c.redirect(env("FILMFLOW_WEB_URL") ?? "/studio");

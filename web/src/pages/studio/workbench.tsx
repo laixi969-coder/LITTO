@@ -9,6 +9,7 @@ import { GridView } from "./workbench/grid-view";
 import { Inspector } from "./workbench/inspector";
 import { LeftPanel } from "./workbench/left-panel";
 import { ShotStrip } from "./workbench/shot-strip";
+import { useCollab } from "./workbench/use-collab";
 import { useWorkbench } from "./workbench/use-workbench";
 
 /** Production workbench: left Project/Assets/Sequences/References · center domain canvas · right Inspector · bottom Shot Strip · top Director Command. */
@@ -17,6 +18,7 @@ export default function Workbench() {
     const { message } = App.useApp();
     const wb = useWorkbench();
     useEffect(() => void wb.open(pid).catch((e) => message.error(e.message)), [pid]);
+    useCollab(pid);
     // keep job state fresh while anything is generating (survives refresh: state lives on the server)
     useEffect(() => {
         if (!wb.jobs.some((j) => j.status === "QUEUED" || j.status === "RUNNING")) return;

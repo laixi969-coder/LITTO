@@ -9,6 +9,24 @@ export const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
 export const KIND_COLOR: Record<string, string> = { world: "#0ea5e9", look: "#a855f7", Character: "#f97316", Wardrobe: "#ec4899", Environment: "#22c55e", Prop: "#eab308", Product: "#eab308", Vehicle: "#eab308", Creature: "#f97316", Custom: "#64748b", shot: "#6366f1", project: "#111827" };
 
+// One shared EventSource per project per page (reference-counted): server SSE "change" events fan out to every FilmFlow node.
+const feeds = new Map<string, { es: EventSource; subs: Set<() => void>; t?: number }>();
+function subscribeProject(pid: string, cb: () => void) {
+    let f = feeds.get(pid);
+    if (!f) {
+        const es = new EventSource(`/ff-api/projects/${pid}/events`, { withCredentials: true });
+        const feed = { es, subs: new Set<() => void>() } as { es: EventSource; subs: Set<() => void>; t?: number };
+        // debounce: a burst of writes (e.g. a sync or batch) triggers one refetch per node
+        es.addEventListener("change", () => { clearTimeout(feed.t); feed.t = window.setTimeout(() => feed.subs.forEach((fn) => fn()), 300); });
+        feeds.set(pid, (f = feed));
+    }
+    f.subs.add(cb);
+    return () => {
+        f!.subs.delete(cb);
+        if (!f!.subs.size) { clearTimeout(f!.t); f!.es.close(); feeds.delete(pid); }
+    };
+}
+
 /** Load a domain entity; refetch when any FilmFlow node mutates something (shared canvas event) and while `poll` is true. */
 export function useLive<T>(ctx: Ctx, load: () => Promise<T>, deps: unknown[], poll?: (v: T) => boolean) {
     const [data, setData] = useState<T | null>(null);
@@ -20,6 +38,8 @@ export function useLive<T>(ctx: Ctx, load: () => Promise<T>, deps: unknown[], po
     }, []);
     useEffect(() => { void reload(); }, [...deps, reload]);
     useEffect(() => ctx.on(CHANGED, () => void reload()), [reload]);
+    const pid = meta(ctx).ffProjectId;
+    useEffect(() => (pid ? subscribeProject(pid, () => void reload()) : undefined), [pid, reload]);
     useEffect(() => {
         if (!data || !poll?.(data)) return;
         const t = setInterval(() => void reload(), 1500);

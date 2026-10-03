@@ -14,7 +14,7 @@ export const CAPABILITIES = [
 
 export const providerView = (p: any) => ({
     id: p.id, name: p.name, adapter: p.adapter, baseUrl: p.base_url, authType: p.auth_type, status: p.status, priority: p.priority,
-    concurrency: p.concurrency, timeoutMs: p.timeout_ms, retryPolicy: JSON.parse(p.retry_policy), hasPlatformCredential: !!credentialFor(p.id, null, null, true),
+    concurrency: p.concurrency, timeoutMs: p.timeout_ms, retryPolicy: JSON.parse(p.retry_policy), hasPlatformCredential: !!credentialFor(p.id, null, null, true), hasWebhookSecret: !!p.webhook_secret,
 });
 
 export function modelView(m: any) {
@@ -112,7 +112,7 @@ export function seedProviders() {
     upsertProvider(null, { id: "mock", name: "Mock Studio (offline)", adapter: "mock", priority: 10, concurrency: 8 });
     upsertProvider(null, { id: "openai-compatible", name: "OpenAI-compatible relay", adapter: "openai-compatible", baseUrl: "https://api.openai.com/v1", status: "disabled", priority: 50 });
     const img = { resolutions: ["1280x720", "1920x1080", "1024x1024"], aspectRatios: ["16:9", "9:16", "1:1", "2.39:1"], limits: { maxInputs: 8 } };
-    upsertModel(null, { id: "mock-image-pro", providerId: "mock", externalModelId: "mock-image-pro", name: "Mock Image Pro", type: "image", ...img, price: { perImage: 0.04 }, priority: 10, capabilities: { text2image: true, imageEdit: true, identityReference: true, multiReference: true, compositionReference: true, costClass: "mid", latencyClass: "mid", maxInputs: 8, async: true } });
+    upsertModel(null, { id: "mock-image-pro", providerId: "mock", externalModelId: "mock-image-pro", name: "Mock Image Pro", type: "image", ...img, price: { perImage: 0.04 }, priority: 10, capabilities: { text2image: true, imageEdit: true, identityReference: true, multiReference: true, compositionReference: true, depthReference: true, panoramaReference: true, costClass: "mid", latencyClass: "mid", maxInputs: 8, async: true } });
     upsertModel(null, { id: "mock-image-lite", providerId: "mock", externalModelId: "mock-image-lite", name: "Mock Image Lite", type: "image", ...img, price: { perImage: 0.01 }, priority: 20, capabilities: { text2image: true, costClass: "low", latencyClass: "low", maxInputs: 0, async: true } });
     const vid = { resolutions: ["1280x720", "1920x1080"], aspectRatios: ["16:9", "9:16"], durations: [4, 6, 8], limits: { maxDuration: 8 } };
     upsertModel(null, { id: "mock-video-pro", providerId: "mock", externalModelId: "mock-video-pro", name: "Mock Video Pro", type: "video", ...vid, price: { perSecond: 0.05 }, priority: 10, capabilities: { image2video: true, text2video: true, startEndFrame: true, cameraControl: true, motionReference: true, costClass: "high", latencyClass: "high", maxInputs: 3, async: true }, fallbackModelId: "mock-video-lite" });

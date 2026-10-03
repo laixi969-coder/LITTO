@@ -4,8 +4,8 @@ import { App, InputNumber, Modal, Radio, Select } from "antd";
 import { api } from "@/services/api/filmflow";
 import { useWorkbench } from "./use-workbench";
 
-export const ROLES = ["IDENTITY", "GEOMETRY", "WARDROBE", "ENVIRONMENT", "COMPOSITION", "LIGHTING", "LOOK", "PERFORMANCE", "CAMERA_MOTION", "START_FRAME", "END_FRAME", "AUDIO"];
-export const ROLE_HINT: Record<string, string> = { IDENTITY: "这个人/物是谁", GEOMETRY: "形状与尺寸", WARDROBE: "服装", ENVIRONMENT: "空间/场景", COMPOSITION: "构图", LIGHTING: "光线", LOOK: "影调质感", PERFORMANCE: "表演", CAMERA_MOTION: "运镜", START_FRAME: "起始帧", END_FRAME: "结束帧", AUDIO: "声音" };
+export const ROLES = ["IDENTITY", "GEOMETRY", "WARDROBE", "ENVIRONMENT", "COMPOSITION", "LIGHTING", "LOOK", "PERFORMANCE", "CAMERA_MOTION", "START_FRAME", "END_FRAME", "AUDIO", "DEPTH", "PANORAMA"];
+export const ROLE_HINT: Record<string, string> = { IDENTITY: "这个人/物是谁", GEOMETRY: "形状与尺寸", WARDROBE: "服装", ENVIRONMENT: "空间/场景", COMPOSITION: "构图", LIGHTING: "光线", LOOK: "影调质感", PERFORMANCE: "表演", CAMERA_MOTION: "运镜", START_FRAME: "起始帧", END_FRAME: "结束帧", AUDIO: "声音", DEPTH: "深度图", PANORAMA: "360° 全景环境" };
 
 /** "Drag a reference onto a shot → choose what it references" (PRD §7). */
 export function BindDialog({ shotId, referenceId, onClose }: { shotId: string; referenceId: string; onClose: () => void }) {

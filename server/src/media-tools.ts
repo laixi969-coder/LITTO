@@ -34,3 +34,23 @@ export async function makeDerivatives(media: { id: string; workspaceId: string; 
         log.info("derivatives skipped:", (e as Error).message.slice(0, 120));
     } finally { rmSync(dir, { recursive: true, force: true }); }
 }
+
+export type Probe = { duration: number | null; width: number | null; height: number | null; hasVideo: boolean; hasAudio: boolean };
+const run2 = (cmd: string, args: string[]) => new Promise<{ code: number; out: string; err: string }>((res) => { const p = spawn(cmd, args); let out = "", err = ""; p.stdout.on("data", (d) => (out += d)); p.stderr.on("data", (d) => (err += d)); p.on("error", () => res({ code: -1, out, err })); p.on("exit", (code) => res({ code: code ?? -1, out, err })); });
+
+/** ffprobe a file on disk; null when ffprobe is unavailable or the file is unreadable. */
+export async function probeFile(path: string): Promise<Probe | null> {
+    const r = await run2("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path]);
+    if (r.code !== 0) return null;
+    try {
+        const j = JSON.parse(r.out);
+        const v = (j.streams ?? []).find((s: any) => s.codec_type === "video" && s.disposition?.attached_pic !== 1);
+        const d = Number(j.format?.duration ?? v?.duration);
+        return { duration: Number.isFinite(d) ? d : null, width: v?.width ?? null, height: v?.height ?? null, hasVideo: !!v, hasAudio: (j.streams ?? []).some((s: any) => s.codec_type === "audio") };
+    } catch { return null; }
+}
+export async function probeBuffer(data: Buffer): Promise<Probe | null> {
+    const dir = mkdtempSync(join(tmpdir(), "ff-probe-"));
+    try { writeFileSync(join(dir, "m"), data); return await probeFile(join(dir, "m")); } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+export { run2 as runCmd };

@@ -9,6 +9,7 @@ export function ConnectionPath({
     from,
     to,
     active,
+    scale = 1,
     onSelect,
     onContextMenu,
 }: {
@@ -16,6 +17,7 @@ export function ConnectionPath({
     from: CanvasNodeData;
     to: CanvasNodeData;
     active: boolean;
+    scale?: number;
     onSelect: () => void;
     onContextMenu?: (event: ReactMouseEvent<SVGPathElement>) => void;
 }) {
@@ -55,6 +57,12 @@ export function ConnectionPath({
                 fill="none"
                 style={{ filter: active ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined, pointerEvents: "none" }}
             />
+            {/* Cubic Bezier midpoint (t=0.5) is the average of the endpoints because both control offsets are symmetric. */}
+            {connection.label && scale >= 0.4 && (
+                <text x={(startX + endX) / 2} y={(startY + endY) / 2 - 4} textAnchor="middle" fontSize={11} fill={theme.node.text} stroke={theme.node.fill} strokeWidth={4} paintOrder="stroke" opacity={0.85} style={{ pointerEvents: "none", userSelect: "none" }}>
+                    {connection.label}
+                </text>
+            )}
         </g>
     );
 }

@@ -26,11 +26,12 @@ extra.get("/sequences/:id/export", async (c) => {
     const r = await exportPackage(s, c.req.param("id"));
     return new Response(new Uint8Array(r.zip), { headers: { "content-type": "application/zip", "content-disposition": `attachment; filename="${r.name}"` } });
 });
-extra.post("/sequences/:id/render", (c) => {
+extra.post("/sequences/:id/render", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
     const q = s.get("sequences", c.req.param("id"));
     if (!q) throw notFound("sequence");
-    return c.json(startRender(a.workspaceId, q.projectId, q.id, a.user.id), 202);
+    const o = await body(c, z.object({ normalizeAudio: z.boolean().default(true), targetLufs: z.number().min(-40).max(-5).default(-16), burnSubtitles: z.boolean().default(false) }));
+    return c.json(startRender(a.workspaceId, q.projectId, q.id, a.user.id, o), 202);
 });
 extra.get("/sequences/:id/renders", (c) => {
     const { s } = ctx(c);

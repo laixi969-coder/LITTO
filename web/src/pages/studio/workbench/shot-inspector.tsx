@@ -44,16 +44,22 @@ function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
     const { message, modal } = App.useApp();
     const [f] = Form.useForm();
     const [delta, setDelta] = useState(JSON.stringify(shot.intendedStateDelta ?? {}, null, 1));
-    useEffect(() => { f.setFieldsValue(shot); setDelta(JSON.stringify(shot.intendedStateDelta ?? {}, null, 1)); }, [shot.id, f]);
+    const overwrite = useRef(false); // user chose "keep my edits" after a stale warning → next save is last-write-wins
+    useEffect(() => { overwrite.current = false; f.setFieldsValue(shot); setDelta(JSON.stringify(shot.intendedStateDelta ?? {}, null, 1)); }, [shot.id, f]);
     const save = async () => {
         const v = f.getFieldsValue(true);
         let intendedStateDelta;
         try { intendedStateDelta = JSON.parse(delta || "{}"); } catch { return message.error("State delta 不是合法 JSON"); }
         try {
-            const body = { title: v.title, subtitle: v.subtitle, narrativeFunction: v.narrativeFunction, assetIds: v.assetIds, action: v.action, performance: v.performance, blocking: v.blocking, camera: v.camera, lighting: v.lighting, freedomMap: v.freedomMap, duration: v.duration, intendedStateDelta };
+            const body = { title: v.title, subtitle: v.subtitle, narrativeFunction: v.narrativeFunction, assetIds: v.assetIds, action: v.action, performance: v.performance, blocking: v.blocking, camera: v.camera, lighting: v.lighting, freedomMap: v.freedomMap, duration: v.duration, intendedStateDelta, expectedUpdatedAt: overwrite.current ? undefined : shot.updatedAt ?? shot.createdAt };
             const done = async () => { message.success("已保存，状态链已重算"); await wb.reload(); onSaved(); };
             try { await api.patch(`/shots/${shot.id}`, body); await done(); }
             catch (e: any) {
+                if (e.code === "stale") {
+                    // optimistic concurrency: someone else saved this shot after we loaded it
+                    modal.confirm({ title: "其他协作者刚修改了这个镜头", content: "载入最新版本后再改（你尚未保存的修改会被替换）。", okText: "载入最新", cancelText: "保留我的修改", onCancel: () => { overwrite.current = true; }, onOk: () => { const cur = e.details?.current; if (cur) { f.setFieldsValue(cur); setDelta(JSON.stringify(cur.intendedStateDelta ?? {}, null, 1)); } onSaved(); void wb.reload(); } });
+                    return;
+                }
                 if (e.code !== "needs_confirmation") throw e;
                 const names: Record<string, string> = { narrativeFunction: "叙事功能", action: "动作", assetIds: "资产" };
                 modal.confirm({ title: "修改核心镜头意图？", content: `你正在修改「${(e.details?.fields ?? []).map((f: string) => names[f] ?? f).join("、")}」，而该镜头已有 Hero Frame / Approved Take。已批准内容不会被覆盖，但它们可能与新意图不一致。`, okText: "确认修改", onOk: async () => { try { await api.patch(`/shots/${shot.id}`, { ...body, confirm: true }); await done(); } catch (e2: any) { message.error(e2.message); } } });
@@ -78,6 +84,7 @@ function Spec({ shot, onSaved }: { shot: any; onSaved: () => void }) {
                 {t("景深", ["camera", "depth"])}{t("运动", ["camera", "motion"])}{t("运动动机", ["camera", "motivation"])}
                 {t("180°轴侧", ["camera", "side"], <Select size="small" options={["A", "B", "none"].map((v) => ({ value: v }))} />)}{t("屏幕方向", ["camera", "screenDirection"], <Select size="small" options={["left", "right", "none"].map((v) => ({ value: v }))} />)}
             </div>
+            {typeof shot.camera?.viewYaw === "number" && <div className="mt-1 text-xs opacity-70">360° 视角：yaw {shot.camera.viewYaw}° · pitch {shot.camera.viewPitch}° · fov {shot.camera.viewFov ?? 90}°（在场景资产的「360° 勘景」里调整）</div>}
             <div className="mb-1 mt-2 text-xs font-medium opacity-60">灯光</div>
             <div className="grid grid-cols-3 gap-2">
                 {t("动机光源", ["lighting", "motivatedLight"])}{t("主光", ["lighting", "key"])}{t("补光", ["lighting", "fill"])}

@@ -4,11 +4,14 @@ import { config } from "./config.ts";
 import { all, get, run, scoped } from "./db.ts";
 import { sign, verifySig } from "./crypto.ts";
 import { bad, conflict, now, sha256, ulid } from "./util.ts";
-import { makeDerivatives } from "./media-tools.ts";
+import { makeDerivatives, probeBuffer } from "./media-tools.ts";
 
 /** Storage adapter contract. Local FS is implemented; S3/MinIO plug in by implementing the same 4 methods. */
 export interface StorageAdapter {
     put(key: string, data: Buffer): Promise<void>;
+    /** Optional synchronous write (used by the sync prompt compiler for cached derived inputs). */
+    putSync?(key: string, data: Buffer): void;
+    getSync?(key: string): Buffer;
     get(key: string): Promise<Buffer>;
     delete(key: string): Promise<void>;
     signedUrl(key: string, mediaId: string, ttlSec: number): string;
@@ -17,6 +20,13 @@ export interface StorageAdapter {
 class LocalStorage implements StorageAdapter {
     private path = (k: string) => join(config.mediaDir, k);
     async put(key: string, data: Buffer) {
+        mkdirSync(dirname(this.path(key)), { recursive: true });
+        writeFileSync(this.path(key), data);
+    }
+    getSync(key: string) {
+        return readFileSync(this.path(key));
+    }
+    putSync(key: string, data: Buffer) {
         mkdirSync(dirname(this.path(key)), { recursive: true });
         writeFileSync(this.path(key), data);
     }
@@ -75,10 +85,13 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     const mime = s?.mime ?? opts.mime ?? "application/octet-stream";
     const ws = get("SELECT quota_bytes FROM workspaces WHERE id=?", workspaceId)!;
     if (usage(workspaceId).bytes + data.length > ws.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
+    // Real video/audio: record true duration and size (needed for trim limits in the editor). Best effort, needs ffprobe.
+    let probed: { duration: number | null; width: number | null; height: number | null } | null = null;
+    if (/^(video|audio)\//.test(mime) && !process.env.FILMFLOW_NO_PROBE) probed = await probeBuffer(data);
     const id = ulid();
     const key = `${workspaceId}/${projectId ?? "_"}/${id}`;
     await storage.put(key, data);
-    const row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: opts.duration ?? null, width: s?.width ?? null, height: s?.height ?? null, source: opts.source, storage_key: key });
+    const row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: opts.duration ?? probed?.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });
     if (!process.env.FILMFLOW_NO_DERIVATIVES) void makeDerivatives(row as any);
     return row;
 }

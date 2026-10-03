@@ -32,15 +32,15 @@ export async function syncToCanvas(ctx: Ctx, pid: string) {
         const seqId = add("sequence", s.id, "filmflow:sequence", `成片 · ${s.name}`, x + 660 - 290, y + rowBase, SIZE.sequence);
         list.forEach((sh: any, i: number) => {
             const id = add("shot", sh.id, "filmflow:shot", `#${sh.ord + 1} ${sh.title || sh.narrativeFunction}`, x + 660 + (i % 5) * 290, y + rowBase + Math.floor(i / 5) * 190, SIZE.shot);
-            for (const aid of sh.assetIds ?? []) ops.push({ type: "connect_nodes", fromNodeId: `ff-asset-${aid}`, toNodeId: id });
-            if (prev) ops.push({ type: "connect_nodes", fromNodeId: prev, toNodeId: id }); // state flows shot → shot
+            for (const aid of sh.assetIds ?? []) ops.push({ type: "connect_nodes", fromNodeId: `ff-asset-${aid}`, toNodeId: id, label: "uses" });
+            if (prev) ops.push({ type: "connect_nodes", fromNodeId: prev, toNodeId: id, label: "state →" }); // state flows shot → shot
             prev = id;
         });
-        if (list.length) ops.push({ type: "connect_nodes", fromNodeId: `ff-shot-${list[list.length - 1].id}`, toNodeId: seqId }); // last shot → assembly
+        if (list.length) ops.push({ type: "connect_nodes", fromNodeId: `ff-shot-${list[list.length - 1].id}`, toNodeId: seqId, label: "assembles" }); // last shot → assembly
         rowBase += Math.ceil(Math.max(list.length, 1) / 5) * 190 + 120;
     }
     void order;
-    ops.push({ type: "connect_nodes", fromNodeId: ctx.node.id, toNodeId: w });
+    ops.push({ type: "connect_nodes", fromNodeId: ctx.node.id, toNodeId: w, label: "governs" });
     // node ops must land before connections referencing them
     ctx.applyOps(ops.filter((o) => o.type === "add_node"));
     setTimeout(() => ctx.applyOps(ops.filter((o) => o.type === "connect_nodes")), 50);

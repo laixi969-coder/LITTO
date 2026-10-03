@@ -13,7 +13,7 @@ import { directorRun } from "../domain/director.ts";
 import { assetDirector, cinematographer, motionDirector, visualDirector } from "../domain/skills.ts";
 import { compileShot } from "../domain/compiler.ts";
 import { mustRoute, resolvePolicy } from "../providers/router.ts";
-import { bad, notFound } from "../util.ts";
+import { bad, HttpError, notFound } from "../util.ts";
 import { importLegacyCanvas } from "../legacy.ts";
 import { mediaView } from "../storage.ts";
 import { estimate } from "../jobs.ts";
@@ -59,7 +59,14 @@ production.post(`${P}/assets/suggest`, async (c) => {
     return c.json(assetDirector(b.type, b.name, b.description));
 });
 production.get("/assets/:id", (c) => { const { s } = ctx(c); const a = s.get("assets", c.req.param("id")); if (!a) throw notFound("asset"); return c.json({ ...a, versions: assetVersions(s, a.id), bindings: s.list("reference_bindings", { targetType: "asset", targetId: a.id }) }); });
-production.patch("/assets/:id", async (c) => { const { s } = ctx(c, "EDITOR"); return c.json(updateAsset(s, c.req.param("id"), await body(c, assetInput.partial()))); });
+/** Optimistic concurrency: a client that sends expectedUpdatedAt loses (412 "stale") if the row changed after that timestamp. */
+const fresh = (s: any, table: string, id: string, expected?: string) => {
+    if (!expected) return;
+    const cur = s.get(table, id);
+    const at = cur?.updatedAt ?? cur?.createdAt; // rows never edited have no updatedAt yet
+    if (cur && at && at > expected) throw new HttpError(412, "changed by another collaborator", "stale", { current: cur });
+};
+production.patch("/assets/:id", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, assetInput.partial().extend({ expectedUpdatedAt: z.string().optional() })); const { expectedUpdatedAt, ...patch } = b; fresh(s, "assets", c.req.param("id"), expectedUpdatedAt ?? c.req.header("if-unmodified-since")); return c.json(updateAsset(s, c.req.param("id"), patch)); });
 production.post("/assets/:id/approve", (c) => { const { s, a, audit } = ctx(c, "EDITOR"); const r = approveAsset(s, c.req.param("id"), a.user.id); audit("asset.approve", r.id); return c.json(r); });
 production.post("/assets/:id/versions", async (c) => { const { s } = ctx(c, "EDITOR"); return c.json(newAssetVersion(s, c.req.param("id"), await body(c, assetInput.partial())), 201); });
 production.post("/assets/:id/rollback", async (c) => { const { s, a } = ctx(c, "EDITOR"); const b = await body(c, z.object({ version: z.number().int() })); return c.json(rollbackAsset(s, c.req.param("id"), b.version, a.user.id)); });
@@ -128,7 +135,7 @@ production.get("/shots/:id", (c) => {
     if (!sh) throw notFound("shot");
     return c.json({ ...withState(s, sh), bindings: s.list("reference_bindings", { targetType: "shot", targetId: sh.id }), keyframes: s.list("keyframes", { shotId: sh.id }).map(keyframeView), takes: s.list("takes", { shotId: sh.id }).map(takeView), issues: s.list("continuity_issues", { shotId: sh.id }), qc: s.list("qc_reports", { shotId: sh.id }), repairs: s.list("repair_actions", { shotId: sh.id }) });
 });
-production.patch("/shots/:id", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, shotPartial.extend({ confirm: z.boolean().optional() })); const { confirm, ...patch } = b; return c.json(updateShot(s, c.req.param("id"), patch, !!confirm)); });
+production.patch("/shots/:id", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, shotPartial.extend({ confirm: z.boolean().optional(), expectedUpdatedAt: z.string().optional() })); const { confirm, expectedUpdatedAt, ...patch } = b; fresh(s, "shots", c.req.param("id"), expectedUpdatedAt ?? c.req.header("if-unmodified-since")); return c.json(updateShot(s, c.req.param("id"), patch, !!confirm)); });
 production.post("/shots/:id/move", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, z.object({ order: z.number().int() })); return c.json(moveShot(s, c.req.param("id"), b.order)); });
 production.delete("/shots/:id", (c) => {
     const { s } = ctx(c, "EDITOR");

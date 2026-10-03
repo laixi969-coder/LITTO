@@ -39,7 +39,7 @@ export default function Providers() {
                     <Button size="small" type="link" onClick={() => open(p)}>编辑</Button>
                     <Button size="small" type="link" onClick={() => test(p)}>测试连接</Button>
                     <Button size="small" type="link" onClick={() => { setKeyFor(p); loadKeys(p); }}>Key</Button>
-                    <Button size="small" type="link" onClick={() => Modal.confirm({ title: `为 ${p.name} 生成 Webhook 密钥？`, content: p.hasWebhook ? "会替换已有密钥。" : "用于校验 Provider 回调签名。", onOk: async () => { try { setHook({ ...(await api.post(`/admin/providers/${p.id}/webhook-secret`)), name: p.name }); } catch (e: any) { message.error(e.message); } } })}>生成 Webhook 密钥</Button>
+                    <Button size="small" type="link" onClick={() => Modal.confirm({ title: `为 ${p.name} 生成 Webhook 密钥？`, content: p.hasWebhookSecret ? "会替换已有密钥。" : "用于校验 Provider 回调签名。", onOk: async () => { try { setHook({ ...(await api.post(`/admin/providers/${p.id}/webhook-secret`)), name: p.name }); } catch (e: any) { message.error(e.message); } } })}>生成 Webhook 密钥</Button>
                     <Button size="small" type="link" onClick={act(async () => message.info(`同步 ${(await api.post(`/admin/providers/${p.id}/sync-models`)).synced} 个模型`))}>同步模型</Button>
                     <Button size="small" type="link" onClick={act(() => api.patch(`/admin/providers/${p.id}`, { status: p.status === "active" ? "disabled" : "active" }))}>{p.status === "active" ? "停用" : "启用"}</Button></div> },
             ]} />

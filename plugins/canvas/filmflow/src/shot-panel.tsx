@@ -2,7 +2,7 @@ import { useState } from "@infinite-canvas/plugin-sdk";
 import * as api from "./api";
 import { btn, input, meta, panelBox, stop, useLive, type Ctx } from "./shared";
 
-const ROLES = ["IDENTITY", "GEOMETRY", "WARDROBE", "ENVIRONMENT", "COMPOSITION", "LIGHTING", "LOOK", "PERFORMANCE", "CAMERA_MOTION", "START_FRAME", "END_FRAME", "AUDIO"];
+const ROLES = ["IDENTITY", "GEOMETRY", "WARDROBE", "ENVIRONMENT", "COMPOSITION", "LIGHTING", "LOOK", "PERFORMANCE", "CAMERA_MOTION", "START_FRAME", "END_FRAME", "AUDIO", "DEPTH", "PANORAMA"];
 const TABS: [string, string][] = [["spec", "规格"], ["ref", "参考"], ["gen", "生成"], ["qc", "QC"], ["state", "状态"], ["hist", "历史"]];
 const SEV: Record<string, string> = { high: "#ef4444", medium: "#f59e0b", low: "#94a3b8" };
 const openStudio = (pid?: string) => window.open(`/studio${pid ? `/p/${pid}` : ""}`, "_blank");

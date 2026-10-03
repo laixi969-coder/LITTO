@@ -1,18 +1,40 @@
 import { spawn } from "node:child_process";
 import { crc32 } from "node:zlib";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { get, scoped, type Scope } from "../db.ts";
 import { saveMedia, storage } from "../storage.ts";
 import { bad, notFound, now } from "../util.ts";
+import { end as clipEnd, getEdit, hasEdit, resolveClip } from "./nle.ts";
+import { startNleRender } from "./nle-render.ts";
 
 /** Basic assembly timeline (PRD Phase 5 / P2 "基础 Timeline"): approved Take per shot, in shot order, with subtitles and audio references. */
-export type Clip = { shotId: string; order: number; title: string; kind: "take" | "hero" | "missing"; mediaId: string | null; mime: string | null; start: number; duration: number; subtitle: string };
-export type Timeline = { fps: number; duration: number; clips: Clip[]; subtitles: { start: number; end: number; text: string; shotId: string }[]; audio: { referenceId: string; mediaId: string | null; name: string | null; shotId: string; start: number; duration: number }[]; missing: string[]; warnings: string[] };
+export type Clip = { shotId: string; order: number; title: string; kind: "take" | "hero" | "missing"; mediaId: string | null; mime: string | null; start: number; duration: number; subtitle: string; clipId?: string; srcIn?: number; srcOut?: number; speed?: number; transition?: { type: string; duration: number } };
+export type Timeline = { edited?: boolean; fps: number; duration: number; clips: Clip[]; subtitles: { start: number; end: number; text: string; shotId: string }[]; audio: { referenceId: string; mediaId: string | null; name: string | null; shotId: string; start: number; duration: number }[]; missing: string[]; warnings: string[] };
+
+/** Once an editable timeline exists, the public timeline is derived from it (V1 = clips, audio tracks = audio, shot subtitles follow their clips). */
+function fromEdit(s: Scope, sequenceId: string): Timeline {
+    const e = getEdit(s, sequenceId, false);
+    const tl: Timeline = { edited: true, fps: e.fps, duration: 0, clips: [], subtitles: [], audio: [], missing: [], warnings: [] };
+    const track = new Map(e.tracks.map((t) => [t.id, t]));
+    const v1 = e.clips.filter((c) => track.get(c.trackId)?.kind === "video").sort((a, b) => a.start - b.start);
+    for (const [i, c] of v1.entries()) {
+        const r = resolveClip(s, c);
+        const sh = c.shotId ? s.get("shots", c.shotId) : null;
+        const kind = r.kind === "media" ? (r.mime?.startsWith("video/") ? "take" : r.mediaId ? "hero" : "missing") : r.kind;
+        if (kind !== "take") { tl.missing.push(c.shotId ?? c.id); tl.warnings.push(`${sh ? `shot #${sh.ord + 1}` : `clip ${c.label || c.id}`} has no Approved Take${kind === "hero" ? " (Hero Frame stills used as placeholder)" : ""}`); }
+        tl.clips.push({ shotId: c.shotId ?? "", clipId: c.id, order: sh?.ord ?? i, title: c.label || sh?.title || "", kind, mediaId: r.mediaId, mime: r.mime, start: c.start, duration: c.duration, subtitle: sh?.subtitle ?? "", srcIn: c.in, srcOut: c.in + c.duration * c.speed, speed: c.speed, transition: c.transition });
+        if (sh?.subtitle) tl.subtitles.push({ start: c.start, end: c.start + c.duration, text: sh.subtitle, shotId: sh.id });
+    }
+    for (const c of e.clips.filter((x) => track.get(x.trackId)?.kind === "audio").sort((a, b) => a.start - b.start)) {
+        const r = resolveClip(s, c);
+        tl.audio.push({ referenceId: c.refId ?? c.id, mediaId: r.mediaId, name: c.label || null, shotId: c.shotId ?? c.refId?.split(":")[0] ?? "", start: c.start, duration: c.duration });
+    }
+    tl.duration = Math.max(0, ...e.clips.map(clipEnd));
+    return tl;
+}
 
 export function buildTimeline(s: Scope, sequenceId: string): Timeline {
     if (!s.get("sequences", sequenceId)) throw notFound("sequence");
+    if (hasEdit(s, sequenceId)) return fromEdit(s, sequenceId);
     const shots = s.list("shots", { sequenceId }, "ord");
     const bindings = s.list("reference_bindings", { targetType: "shot" });
     let t = 0;
@@ -44,8 +66,16 @@ const srtTime = (sec: number) => new Date(Math.round(sec * 1000)).toISOString().
 
 export const toSrt = (tl: Timeline) => tl.subtitles.map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join("\n");
 /** CMX3600 EDL: opens in Premiere / Resolve / FCP. */
-export const toEdl = (tl: Timeline, title: string) =>
-    `TITLE: ${title}\nFCM: NON-DROP FRAME\n\n` + tl.clips.map((c, i) => `${String(i + 1).padStart(3, "0")}  AX       V     C        ${tc(0)} ${tc(c.duration)} ${tc(c.start)} ${tc(c.start + c.duration)}\n* FROM CLIP NAME: shot-${String(c.order + 1).padStart(2, "0")}${c.mediaId ? `-${c.mediaId}` : ""}\n* COMMENT: ${c.kind.toUpperCase()} ${c.title}`).join("\n\n") + "\n";
+/** CMX3600 EDL: opens in Premiere / Resolve / FCP. Source in/out reflect trims & speed; dissolves are written as `D <frames>` events. */
+export const toEdl = (tl: Timeline, title: string) => {
+    const fps = tl.fps || 24;
+    return `TITLE: ${title}\nFCM: NON-DROP FRAME\n\n` + tl.clips.map((c, i) => {
+        const sIn = c.srcIn ?? 0, sOut = c.srcOut ?? c.duration;
+        const d = c.transition?.type === "dissolve" ? c.transition.duration : 0;
+        const kind = d > 0 ? `D    ${String(Math.round(d * fps)).padStart(3, "0")}` : "C       ";
+        return `${String(i + 1).padStart(3, "0")}  AX       V     ${kind} ${tc(sIn, fps)} ${tc(sOut, fps)} ${tc(c.start, fps)} ${tc(c.start + c.duration, fps)}\n* FROM CLIP NAME: shot-${String(c.order + 1).padStart(2, "0")}${c.mediaId ? `-${c.mediaId}` : ""}\n* COMMENT: ${c.kind.toUpperCase()} ${c.title}${c.transition && c.transition.type === "fade_black" ? ` [FADE THROUGH BLACK ${c.transition.duration}s]` : ""}${c.speed && c.speed !== 1 ? ` [SPEED ${Math.round(c.speed * 100)}%]` : ""}`;
+    }).join("\n\n") + "\n";
+};
 
 // ---- minimal ZIP writer (stored, no compression; fine for media that is already compressed) ----
 function zip(files: { name: string; data: Buffer }[]) {
@@ -88,45 +118,32 @@ export async function exportPackage(s: Scope, sequenceId: string) {
     for (const c of tl.clips) clips.push({ ...c, file: await put(c.mediaId, `shot-${String(c.order + 1).padStart(2, "0")}`) });
     const audio = [];
     for (const a of tl.audio) audio.push({ ...a, file: await put(a.mediaId, "audio") });
+    const edit = hasEdit(s, sequenceId) ? getEdit(s, sequenceId, false) : null;
+    if (edit) {
+        const { history, future, ...pub } = edit;
+        files.push({ name: "timeline-edit.json", data: Buffer.from(JSON.stringify({ ...pub, grade: pub.grade ? { ...pub.grade, lutCube: pub.grade.lutCube ? "grades/sequence.cube" : undefined } : null }, null, 2)) });
+        if (edit.grade) { files.push({ name: "grades/sequence.json", data: Buffer.from(JSON.stringify({ ...edit.grade, lutCube: edit.grade.lutCube ? "grades/sequence.cube" : undefined }, null, 2)) }); if (edit.grade.lutCube) files.push({ name: "grades/sequence.cube", data: Buffer.from(edit.grade.lutCube) }); }
+    }
+    for (const c of tl.clips) {
+        const sh = c.shotId ? s.get("shots", c.shotId) : null;
+        if (!sh?.grade) continue;
+        const n = String(sh.ord + 1).padStart(2, "0");
+        files.push({ name: `grades/shot-${n}.json`, data: Buffer.from(JSON.stringify({ ...sh.grade, lutCube: sh.grade.lutCube ? `grades/shot-${n}.cube` : undefined }, null, 2)) });
+        if (sh.grade.lutCube) files.push({ name: `grades/shot-${n}.cube`, data: Buffer.from(sh.grade.lutCube) });
+    }
     const manifest = { format: "filmflow-assembly/1", exportedAt: now(), sequence: { id: seq.id, name: seq.name }, fps: tl.fps, duration: tl.duration, clips, audio, subtitles: tl.subtitles, warnings: tl.warnings };
     files.unshift({ name: "manifest.json", data: Buffer.from(JSON.stringify(manifest, null, 2)) }, { name: "timeline.edl", data: Buffer.from(toEdl(tl, seq.name)) }, { name: "subtitles.srt", data: Buffer.from(toSrt(tl)) });
     return { zip: zip(files), timeline: tl, name: `${seq.name.replace(/[^\w-]+/g, "_") || "sequence"}.zip` };
 }
 
-// ---- optional ffmpeg render (only when every clip is a real video) ----
+// ---- optional ffmpeg render (see nle-render.ts) ----
 export const ffmpegAvailable = () => new Promise<boolean>((r) => { const p = spawn("ffmpeg", ["-version"]); p.on("error", () => r(false)); p.on("exit", (c) => r(c === 0)); });
-const sh = (cmd: string, args: string[]) => new Promise<void>((res, rej) => { const p = spawn(cmd, args); let err = ""; p.stderr.on("data", (d) => (err += d)); p.on("error", rej); p.on("exit", (c) => (c === 0 ? res() : rej(new Error(err.slice(-400))))); });
 
-export function startRender(workspaceId: string, projectId: string, sequenceId: string, actor: string) {
+export function startRender(workspaceId: string, projectId: string, sequenceId: string, actor: string, opts: { normalizeAudio?: boolean; targetLufs?: number; burnSubtitles?: boolean } = {}) {
     const s = scoped(workspaceId);
     const tl = buildTimeline(s, sequenceId);
-    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: tl, created_by: actor, updated_at: now() });
-    void (async () => {
-        const dir = mkdtempSync(join(tmpdir(), "ff-render-"));
-        try {
-            if (!(await ffmpegAvailable())) throw new Error("ffmpeg is not installed on the server; use the export package instead");
-            const bad = tl.clips.find((c) => c.kind !== "take" || !c.mime?.startsWith("video/"));
-            if (bad) throw new Error(`clip for shot #${bad.order + 1} is not an approved video Take (${bad.kind}${bad.mime ? ", " + bad.mime : ""}); render needs real video for every shot`);
-            const list: string[] = [];
-            for (const [i, c] of tl.clips.entries()) {
-                const m = get("SELECT * FROM media WHERE id=?", c.mediaId)!;
-                const src = join(dir, `s${i}.mp4`), out = join(dir, `n${i}.mp4`);
-                writeFileSync(src, await storage.get(m.storage_key));
-                // normalise every clip to the same size/fps/codec so concat is safe; add silent audio if a clip has none
-                await sh("ffmpeg", ["-y", "-i", src, "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", String(c.duration), "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p", "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-c:a", "aac", "-shortest", out]);
-                list.push(`file '${out}'`);
-            }
-            writeFileSync(join(dir, "list.txt"), list.join("\n"));
-            const args = ["-y", "-f", "concat", "-safe", "0", "-i", join(dir, "list.txt")];
-            if (tl.subtitles.length) { writeFileSync(join(dir, "s.srt"), toSrt(tl)); args.push("-i", join(dir, "s.srt"), "-c:v", "copy", "-c:a", "copy", "-c:s", "mov_text"); } else args.push("-c", "copy");
-            args.push(join(dir, "final.mp4"));
-            await sh("ffmpeg", args);
-            const media = await saveMedia(workspaceId, projectId, readFileSync(join(dir, "final.mp4")), { source: "render", duration: tl.duration });
-            s.update("renders", r.id, { status: "SUCCEEDED", media_id: media.id });
-        } catch (e) {
-            s.update("renders", r.id, { status: "FAILED", error: (e as Error).message.slice(0, 500) });
-        } finally { rmSync(dir, { recursive: true, force: true }); }
-    })();
+    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts }, created_by: actor, updated_at: now() });
+    void startNleRender(workspaceId, projectId, sequenceId, r.id, opts);
     return r;
 }
 void bad;
