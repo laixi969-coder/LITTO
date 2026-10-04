@@ -40,6 +40,12 @@ async function call(who: Who | null, method: string, path: string, body?: unknow
     return { status: res.status, json, buf, headers: res.headers };
 }
 const ok = async (who: Who | null, m: string, p: string, b?: unknown, h?: Record<string, string>) => { const r = await call(who, m, p, b, h); assert.ok(r.status < 300, `${m} ${p} → ${r.status} ${JSON.stringify(r.json).slice(0, 300)}`); return r.json; };
+// Hero/Take 采用前须完成人工真实感检查（realism.requireReviewed）；用例模拟审阅者确认已看过输出。
+const reviewed = (who: Who | null, shotId: string, targetType: "keyframe" | "take", targetId: string) => ok(who, "POST", `/shots/${shotId}/qc`, {
+    targetType, targetId, note: "已查看实际输出",
+    reviewed: targetType === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"],
+    ...(targetType === "take" ? { observedStateDelta: {} } : {}),
+});
 async function login(email: string): Promise<Who> {
     const { devCode } = await ok(null, "POST", "/auth/request-code", { email });
     return { token: (await ok(null, "POST", "/auth/verify", { email, code: devCode, client: "api" })).token, email };
@@ -191,10 +197,12 @@ async function approvedTake(u: Who, shotId: string) {
     const g = await ok(u, "POST", `/shots/${shotId}/keyframes`, { count: 1 });
     await wait(u, [g.job.id]);
     const kf = (await ok(u, "GET", `/shots/${shotId}`)).keyframes[0];
+    await reviewed(u, shotId, "keyframe", kf.id);
     await ok(u, "POST", `/keyframes/${kf.id}/promote`);
     const t = await ok(u, "POST", `/shots/${shotId}/takes`, { count: 1 });
     await wait(u, t.jobs.map((j: any) => j.id));
     const take = (await ok(u, "GET", `/shots/${shotId}`)).takes[0];
+    await reviewed(u, shotId, "take", take.id);
     await ok(u, "POST", `/takes/${take.id}/approve`, {});
     return take;
 }
@@ -256,12 +264,13 @@ test("confirm gate on core shot intent; LLM refine; vision QC; metrics", async (
     await wait(u, [g.job.id]);
     const kf = (await ok(u, "GET", `/shots/${sh.id}`)).keyframes[0];
     await ok(u, "PATCH", `/shots/${sh.id}`, { action: "free to change before approval" });
+    await reviewed(u, sh.id, "keyframe", kf.id);
     await ok(u, "POST", `/keyframes/${kf.id}/promote`);
     const blocked = await call(u, "PATCH", `/shots/${sh.id}`, { action: "now it changes" });
     assert.equal(blocked.status, 409);
     assert.equal(blocked.json.code, "needs_confirmation");
     assert.deepEqual(blocked.json.details.fields, ["action"]);
-    await ok(u, "PATCH", `/shots/${sh.id}`, { camera: { shotSize: "CU", lensMm: 85 } }); // non-core edits are free
+    await ok(u, "PATCH", `/shots/${sh.id}`, { title: "renamed after Hero" }); // non-core edits are free
     await ok(u, "PATCH", `/shots/${sh.id}`, { action: "now it changes", confirm: true });
     // LLM refine on top of rules (mock echo): step is reported and shots still come out
     const a = await ok(u, "POST", `/projects/${p.id}/assets`, { type: "Character", name: "Mara", invariants: ["face"] });
@@ -275,14 +284,16 @@ test("confirm gate on core shot intent; LLM refine; vision QC; metrics", async (
     // vision QC: SVG frames are not readable → skipped with a reason; a PNG frame goes to the vision model
     const q1 = await ok(u, "POST", `/shots/${sh.id}/qc`, { targetType: "keyframe", targetId: kf.id, auto: true });
     assert.equal(q1.vision.used, false);
-    assert.match(q1.vision.reason, /raster/);
+    assert.match(q1.vision.reason, /尚不支持自动观察/);
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
     const media = await (await app.request(`/media?projectId=${p.id}`, { method: "POST", headers: { authorization: `Bearer ${u.token}` }, body: png })).json() as any;
     const ws = (await ok(u, "GET", "/workspaces/current")).id;
     db.prepare("INSERT INTO keyframes(id,workspace_id,project_id,shot_id,media_id,status,meta,created_at) VALUES('kfpng',?,?,?,?,?,?,?)").run(ws, p.id, sh.id, media.id, "variant", "{}", new Date().toISOString());
     const q2 = await ok(u, "POST", `/shots/${sh.id}/qc`, { targetType: "keyframe", targetId: "kfpng", auto: true });
-    assert.equal(q2.vision.used, true);
+    // 请求到达了视觉模型，但模拟模型只回显文本、不是合规的观察 JSON，必须被拒绝而不是当作通过依据。
+    assert.equal(q2.vision.used, false);
     assert.equal(q2.vision.model, "mock-text");
+    assert.match(q2.vision.reason, /格式无效/);
     // metrics
     const admin = await login("admin@litto.local");
     const m = await call(admin, "GET", "/admin/metrics.txt");

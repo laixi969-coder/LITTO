@@ -308,8 +308,8 @@ test("export package + EDL carry trims, dissolves, edit timeline and grade files
 });
 
 test("QC look_normalization is a real fix: it writes a grade toward the previous shot", { skip: !FF }, async () => {
-    await ok(S.u, "PATCH", `/shots/${S.shots[0].id}`, { lighting: { colorTemp: "5600K", timeOfDay: "day" } });
-    await ok(S.u, "PATCH", `/shots/${S.shots[1].id}`, { lighting: { colorTemp: "3200K", timeOfDay: "day" } });
+    await ok(S.u, "PATCH", `/shots/${S.shots[0].id}`, { lighting: { colorTemp: "5600K", timeOfDay: "day" }, confirm: true });
+    await ok(S.u, "PATCH", `/shots/${S.shots[1].id}`, { lighting: { colorTemp: "3200K", timeOfDay: "day" }, confirm: true });
     const qc = await ok(S.u, "POST", `/shots/${S.shots[1].id}/qc`, { targetType: "take", targetId: "take1", observations: [{ kind: "color_shift" }] });
     const ra = qc.repairActions.find((a: any) => a.action === "look_normalization");
     assert.ok(ra, "diagnosis proposes look_normalization");

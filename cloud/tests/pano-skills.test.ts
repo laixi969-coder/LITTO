@@ -28,6 +28,12 @@ async function call(who: Who | null, method: string, path: string, body?: unknow
     return { status: res.status, json, buf, headers: res.headers };
 }
 const ok = async (who: Who | null, m: string, p: string, b?: unknown, h?: Record<string, string>) => { const r = await call(who, m, p, b, h); assert.ok(r.status < 300, `${m} ${p} → ${r.status} ${JSON.stringify(r.json).slice(0, 400)}`); return r.json; };
+// Hero/Take 采用前须完成人工真实感检查（realism.requireReviewed）；用例模拟审阅者确认已看过输出。
+const reviewed = (who: Who | null, shotId: string, targetType: "keyframe" | "take", targetId: string) => ok(who, "POST", `/shots/${shotId}/qc`, {
+    targetType, targetId, note: "已查看实际输出",
+    reviewed: targetType === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"],
+    ...(targetType === "take" ? { observedStateDelta: {} } : {}),
+});
 async function login(email: string): Promise<Who> {
     const { devCode } = await ok(null, "POST", "/auth/request-code", { email });
     return { token: (await ok(null, "POST", "/auth/verify", { email, code: devCode, client: "api" })).token, email };
@@ -218,6 +224,7 @@ test("publishing: strict manifests, admin only, draft/unpublish, injection safet
     const g = await ok(u, "POST", `/shots/${shot.id}/keyframes`, { count: 1 });
     for (const t = Date.now(); (await ok(u, "GET", `/generations/${g.job.id}`)).status !== "SUCCEEDED"; ) { assert.ok(Date.now() - t < 8000); await new Promise((x) => setTimeout(x, 40)); }
     const kf = (await ok(u, "GET", `/shots/${shot.id}`)).keyframes[0];
+    await reviewed(u, shot.id, "keyframe", kf.id);
     await ok(u, "POST", `/keyframes/${kf.id}/promote`);
     const gate = await call(u, "POST", `/skills/${pub.id}/apply`, { shotId: shot.id, patches: [{ to: "shot.action", value: "new action" }] });
     assert.equal(gate.status, 409);

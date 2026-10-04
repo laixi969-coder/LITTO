@@ -18,6 +18,12 @@ async function call(tok: string, m: string, p: string, b?: unknown) {
     return { status: r.status, json: await r.json() as any };
 }
 const ok = async (t: string, m: string, p: string, b?: unknown) => { const r = await call(t, m, p, b); assert.ok(r.status < 300, `${m} ${p} ${r.status} ${JSON.stringify(r.json).slice(0, 300)}`); return r.json; };
+// Hero/Take 采用前须完成人工真实感检查（realism.requireReviewed）；用例模拟审阅者确认已看过输出。
+const reviewed = (who: string, shotId: string, targetType: "keyframe" | "take", targetId: string) => ok(who, "POST", `/shots/${shotId}/qc`, {
+    targetType, targetId, note: "已查看实际输出",
+    reviewed: targetType === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"],
+    ...(targetType === "take" ? { observedStateDelta: {} } : {}),
+});
 
 test("one-step project: script + style → assets, look, world, shots, no manual fields", async () => {
     const r0 = await app.request("/auth/request-code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "easy@example.com" }) });
@@ -45,10 +51,12 @@ test("one-step project: script + style → assets, look, world, shots, no manual
     const g = await ok(tok, "POST", `/shots/${sh.id}/keyframes`, { count: 1 });
     for (let i = 0; i < 100; i++) { if ((await ok(tok, "GET", `/generations/${g.job.id}`)).status === "SUCCEEDED") break; await new Promise((x) => setTimeout(x, 40)); }
     const kf = (await ok(tok, "GET", `/shots/${sh.id}`)).keyframes[0];
+    await reviewed(tok, sh.id, "keyframe", kf.id);
     await ok(tok, "POST", `/keyframes/${kf.id}/promote`);
     const t = await ok(tok, "POST", `/shots/${sh.id}/takes`, { count: 1 });
     for (let i = 0; i < 100; i++) { if ((await ok(tok, "GET", `/generations/${t.jobs[0].id}`)).status === "SUCCEEDED") break; await new Promise((x) => setTimeout(x, 40)); }
     const take = (await ok(tok, "GET", `/shots/${sh.id}`)).takes[0];
+    await reviewed(tok, sh.id, "take", take.id);
     assert.equal((await ok(tok, "POST", `/takes/${take.id}/approve`, {})).status, "approved");
     // idempotent: running again does not duplicate assets
     const again = await ok(tok, "POST", `/projects/${p.id}/bootstrap`, { script });

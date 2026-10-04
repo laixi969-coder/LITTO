@@ -26,7 +26,9 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     || !required.every(key => evidence.reviewed?.includes(key))) {
     throw conflict("请先查看实际输出并完成真实感检查；规格改变后须重新检查", "review_required");
   }
-  if (latest.findings.some((finding: { severity: string }) => finding.severity === "high")) {
+  // 连续性问题由 approveTake 的连续性门禁处理，可记录理由强制通过（PRD §20）；这里只拦画面本身的严重缺陷，
+  // 否则该强制通过入口永远走不到，且有连续性冲突的镜头连 Hero 都无法采用。
+  if (latest.findings.some((finding: { severity: string; kind: string }) => finding.severity === "high" && !finding.kind.startsWith("continuity:"))) {
     throw conflict("真实感检查有严重问题，请修复后重新检查", "qc_blocked");
   }
   return evidence;

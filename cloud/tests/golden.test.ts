@@ -28,6 +28,12 @@ const ok = async (who: Who | null, method: string, path: string, body?: unknown,
     assert.ok(r.status < 300, `${method} ${path} → ${r.status} ${JSON.stringify(r.json).slice(0, 400)}`);
     return r.json;
 };
+// Hero/Take 采用前须完成人工真实感检查（realism.requireReviewed）；用例模拟审阅者确认已看过输出。
+const reviewed = (who: Who | null, shotId: string, targetType: "keyframe" | "take", targetId: string) => ok(who, "POST", `/shots/${shotId}/qc`, {
+    targetType, targetId, note: "已查看实际输出",
+    reviewed: targetType === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"],
+    ...(targetType === "take" ? { observedStateDelta: {} } : {}),
+});
 async function login(email: string): Promise<Who> {
     const { devCode } = await ok(null, "POST", "/auth/request-code", { email });
     const r = await ok(null, "POST", "/auth/verify", { email, code: devCode, client: "api" });
@@ -196,11 +202,13 @@ test("9 keyframes → Hero Frame (LOCK) with compiled, non-fluff prompt", async 
     await waitJobs(S.A, [gen.job.id]);
     const detail = await ok(S.A, "GET", `/shots/${sh.id}`);
     assert.equal(detail.keyframes.length, 3);
+    await reviewed(S.A, sh.id, "keyframe", detail.keyframes[0].id);
     const hero = await ok(S.A, "POST", `/keyframes/${detail.keyframes[0].id}/promote`);
     assert.equal(hero.status, "hero");
     S.heroShot = sh;
     S.kf = detail.keyframes;
     // promoting another keeps history (no silent overwrite)
+    await reviewed(S.A, sh.id, "keyframe", detail.keyframes[1].id);
     await ok(S.A, "POST", `/keyframes/${detail.keyframes[1].id}/promote`);
     const d2 = await ok(S.A, "GET", `/shots/${sh.id}`);
     assert.equal(d2.keyframes.find((k: any) => k.id === detail.keyframes[0].id).status, "superseded");
@@ -227,9 +235,11 @@ test("10 takes from Hero Frame and approval; 13 QC → repair actions", async ()
     const ap = await ok(S.A, "POST", `/repair-actions/${qc.repairActions.find((a: any) => a.action === "reference_replace").id}/apply`);
     assert.equal(ap.applied, true);
     await waitJobs(S.A, ap.jobs.map((j: any) => j.id));
+    await reviewed(S.A, sh.id, "take", detail.takes[0].id);
     const approved = await ok(S.A, "POST", `/takes/${detail.takes[0].id}/approve`, {});
     assert.equal(approved.status, "approved");
     // 14: rollback approved take
+    await reviewed(S.A, sh.id, "take", detail.takes[1].id);
     await ok(S.A, "POST", `/takes/${detail.takes[1].id}/approve`, {});
     const rb = await ok(S.A, "POST", `/shots/${sh.id}/take/rollback`, { takeId: detail.takes[0].id });
     assert.equal(rb.id, detail.takes[0].id);
@@ -279,10 +289,12 @@ test("12 continuity catches identity / prop / lighting / direction conflicts and
     const g = await ok(S.A, "POST", `/shots/${s2.id}/keyframes`, { count: 1 });
     await waitJobs(S.A, [g.job.id]);
     const kfs = (await ok(S.A, "GET", `/shots/${s2.id}`)).keyframes;
+    await reviewed(S.A, s2.id, "keyframe", kfs[0].id);
     await ok(S.A, "POST", `/keyframes/${kfs[0].id}/promote`);
     const tk = await ok(S.A, "POST", `/shots/${s2.id}/takes`, { count: 1 });
     await waitJobs(S.A, tk.jobs.map((j: any) => j.id));
     const take = (await ok(S.A, "GET", `/shots/${s2.id}`)).takes[0];
+    await reviewed(S.A, s2.id, "take", take.id);
     const blocked = await call(S.A, "POST", `/takes/${take.id}/approve`, {});
     assert.equal(blocked.status, 409);
     assert.equal(blocked.json.code, "continuity_blocked");
