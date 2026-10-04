@@ -1,6 +1,6 @@
-# LITTO｜里头 PRD V3.0
+# LITTO｜里头 PRD V3.1
 
-**版本：V3.0｜Coding Agent 唯一真源｜2026-10**
+**版本：V3.1｜Coding Agent 唯一真源｜2026-10｜V3.1 新增：创意入口、剧本拆解、导演 Agent 默认托管镜头规格**
 
 ## 0. GitHub 底座
 
@@ -21,6 +21,8 @@ LITTO
 Take、音乐、状态、连续性和质检放进同一个持续存在的创作世界，从构想到成片。
 
 核心价值：**让几十个 AI 镜头真正属于同一部影片。**
+
+主链路：`创意入口 → 剧本/Treatment → 拆解 → World 与 Asset → 导演 Agent 出镜头规格 → Keyframe → Take → QC → 成片`。普通用户只表达创意与意图，专业镜头参数由导演 Agent 托管，专业用户可逐项覆盖。
 
 不是单纯 Prompt、生图、视频聚合、ComfyUI、Storyboard 或 Premiere
 替代品。
@@ -58,11 +60,47 @@ OWNER。所有服务端查询必须校验
 workspaceId。Project、Asset、Reference、Media、Shot、Take、GenerationJob、Credential、Ledger
 等必须有 workspaceId，不得靠前端隐藏实现租户隔离。
 
+# 4A. Creative Entry｜创意入口（V3.1 新增，产品第一入口）
+
+新建 Project 的第一步是创意入口，不是空白 World。入口固定存在，用户从四条通道之一进入，任一通道的终点都是同一份 **SceneList**（场次/段落表）。
+
+| 通道 | 用户带来 | 能力 | 中间产物 |
+|---|---|---|---|
+| 故事 | 一句话、想法、已有故事 | Story Writer（基于 hiccai-story） | 故事核 → 大纲 → 剧本 |
+| 创意（广告/品牌） | brief、产品、卖点 | Creative Writer（基于 hiccai-creative / hiccai-insight） | 洞察 → 创意概念 → 广告脚本 |
+| MV | 歌曲、歌词 | §14A Music Analysis / Lyrics Intelligence / Creative Direction | Treatment → 段落与节拍表 |
+| 已有素材 | 现成剧本、参考片、参考图 | 导入、诊断、改稿 | 整理为统一结构 |
+
+规则：
+1. 已有剧本的用户走第四通道，等于跳过前两步；其余通道不得跳过用户确认。
+2. 每一级产物（故事核、大纲、剧本/Treatment）都必须经用户确认后才进入下一级；上游修改会把下游标记为"待更新"，不得静默覆盖。
+3. 支持局部改写（如只重写第 3 场），保留版本，禁止覆盖已确认版本。
+4. MV 通道的中间产物是 Treatment，不是剧本；其音乐时间轴与段落绑定沿用 §14A，不另建流水线。
+5. Story Writer 必须同时输出结构化 SceneList：`sceneId, order, location, timeOfDay, characters[], props[], wardrobe[], emotionBeat, narrativeFunction, durationHint`；正文与 SceneList 来自同一次生成，不得事后解析正文猜测。
+6. 面向拍摄的约束：Story Writer 须考虑角色数量、场景数量与当前模型可稳定生成的范围，不写拍不出来的戏；剧本质检用固定清单（情感锚点、欲望、困境、因果、情绪可拍摄等），不向用户展示模型自评分数。
+7. 数据：`story_drafts, script_versions, creative_briefs, scene_lists`，均带 workspaceId、projectId、schemaVersion。
+
+实现状态（V3.1）：四条通道已由技能落地，`packages/skills` 下 `story`（故事通道与已有素材整理）、`adfilm`（创意/广告）、`musicfilm`（MV）、`breakdown`（§4B），首页创作入口按通道调用。确认环节复用 `askUser`；SceneList 与拆解清单暂存画布文本节点，上述数据表为后续迁移目标。MV 通道在音频分析、歌词对齐与 Music Timeline 工具就绪前，只交付到段落场次表与镜头规划，结构与节拍须标注为推断。
+
+# 4B. Script Breakdown｜剧本拆解（V3.1 新增）
+
+拆解是创意入口与生产层之间的枢纽：把 SceneList 变成可确认的资产清单与世界设定草案。
+
+产出 `breakdown_items`：Character、Wardrobe、Environment、Prop/Product、Vehicle、Creature，每项记录出现的 sceneId 列表、首次出现、必须保持不变的特征（invariants 候选）、以及时间/情绪依赖。同时产出 World 草案（时代、地点逻辑、气候、材质、现实约束）与 Look 草案。
+
+规则：
+1. 拆解结果以"待确认清单"呈现，用户逐项确认、合并、拆分或删除；确认后写入 Asset Registry（§6）与 World/Look（§5），并保留回链到场次。
+2. 资产可反查所在场次，供 Continuity（§10）使用。
+3. 剧本改动后重新拆解只产生差异（新增/变更/移除），不覆盖已 Approved 资产。
+4. 拆解不产生镜头；镜头由导演 Agent 在 §13 阶段生成。
+
 # 5. Project / World / Look
 
 Project 支持新建、复制、重命名、归档、软删除、恢复、永久删除；独立拥有
 World、Look、Assets、References、Sequences、Shots、States、Generations、QC、Model
 Policy。
+
+World 与 Look 默认由 §4B 拆解草案推导，用户确认或修改，不再从空白表单开始。
 
 World：Era、Location
 Logic、Architecture、Culture、Weather、Time、Material、Physics、Realism、Environmental
@@ -158,7 +196,10 @@ Direction、LookDev、视觉母题、Palette、Material Language。\
 Lock。\
 **Cinematographer**：Blocking、Composition、Lens、Camera、Exposure、Lighting、Optical
 Behavior。\
-**Storyboard Director**：Script→Sequence→Shot、Shot
+**Story Writer**：故事核、大纲、剧本、局部改写，输出正文与 SceneList（§4A）。\
+**Creative Writer**：洞察、创意概念、广告脚本（§4A）。\
+**Script Breakdown**：SceneList → 资产清单、World/Look 草案（§4B）。\
+**Storyboard Director**：SceneList + 已确认资产 → Sequence/Shot、Shot
 Function、Axis、Eyeline、Match、Rhythm。\
 **Motion Director**：Biomechanics、Center of
 Mass、Contact、Inertia、Secondary Motion、Camera Inertia、Performance
@@ -171,6 +212,8 @@ Skill 输出结构化 spec，不是只输出长 Prompt。
 # 13. Director Agent / UX
 
 流程：`理解目标 → World/Approved Assets → Sequence/Shot → Skills → Reference Plan → Freedom Map → Router → Generate → QC → Continuity → Repair`
+
+**镜头规格默认由导演 Agent 托管。** Simple Mode 下用户只表达意图（如"这一镜要压迫感、人物显得渺小"），Agent 编译为完整 ShotSpec（Shot Size、Lens、Camera、Lighting、Blocking 等）；Director Mode 在 Inspector 中折叠展示全部专业字段，标注"AI 填写"，用户可逐项覆盖或锁定。覆盖/锁定过的字段不得被 Agent 静默改写。
 
 提供 Simple Mode 与 Director Mode。涉及 LOCK、删除 Approved、改变核心
 Shot 意图时必须确认。
@@ -401,7 +444,7 @@ Project/Asset/Shot/State/Generation/QC/Billing。Media Store 保存文件。
 必须有 migration 与 `importLegacyCanvas()`；上游更新经 Adapter 层进入。
 
 建议核心表：
-`users, workspaces, workspace_members, projects, worlds, looks, assets, asset_versions, references, reference_bindings, sequences, scenes, shots, shot_states, state_deltas, keyframes, takes, generation_jobs, generation_outputs, continuity_issues, qc_reports, repair_actions, providers, models, model_capabilities, api_credentials, workspace_model_policies, project_model_policies, media, credit_accounts, credit_ledger, subscriptions, audit_logs, system_settings`
+`users, workspaces, workspace_members, projects, story_drafts, script_versions, creative_briefs, scene_lists, breakdown_items, worlds, looks, assets, asset_versions, references, reference_bindings, sequences, scenes, shots, shot_states, state_deltas, keyframes, takes, generation_jobs, generation_outputs, continuity_issues, qc_reports, repair_actions, providers, models, model_capabilities, api_credentials, workspace_model_policies, project_model_policies, media, credit_accounts, credit_ledger, subscriptions, audit_logs, system_settings`
 
 业务表使用 UUID/ULID；关键表 createdAt/updatedAt；可删除实体 deletedAt。
 
@@ -422,7 +465,7 @@ depth。日志不得含完整 API Key。
 **P0 地基**：Fork/Audit、Auth、Workspace、多租户、Domain
 Schema、Migration、Storage、Credential、Provider/Model Registry、Job
 Queue、Generation History、Admin 基础。\
-**P1 黄金路径**：World/Look、Asset Registry、Reference
+**P1 黄金路径**：创意入口（故事/创意/MV/已有素材）、剧本拆解、World/Look、Asset Registry、Reference
 Routing、Sequence/Shot、Storyboard、Keyframe/Hero、Take/Approve、State、Continuity
 基础、QC、核心 Skills、Director Agent、Shot Strip、Cost Ledger。\
 **P2 增强**：OAuth、团队 Workspace、完整 RBAC、更多 Reference
@@ -436,6 +479,7 @@ Color/Sound、Marketplace/第三方 Skill。
 node/edge/store/generation/agent/plugin 边界。\
 **Phase 1 --- Platform Foundation**：User/Workspace/Auth、Domain
 Store、Storage、Credentials、Provider/Model、Queue、Admin 基础。\
+**Phase 1.5 --- Creative Entry & Breakdown**：创意入口四通道、Story Writer、SceneList、剧本版本与局部改写、Script Breakdown、确认门禁。\
 **Phase 2 --- Production
 Foundation**：World/Look、Asset、Reference、Sequence/Shot、Keyframe/Take、版本审批。\
 **Phase 3 --- Intelligence**：深度 Skills、Director Agent、Capability
@@ -453,9 +497,11 @@ Assembly、基础音频/字幕引用、导出；更强 NLE 后续参考 BeatDesi
 2.  A 用户无法读取 B 用户 Project/Media/Credential。
 3.  Admin 可配置 Provider/Model，测试连接、上下架模型。
 4.  用户可使用平台 Key 或 BYOK。
-5.  新建 Project，定义 World/Look。
-6.  创建至少 2 Character、1 Environment、2 Props 并 Approved。
-7.  从剧本产生至少 8 Shots。
+5.  新建 Project，从创意入口输入一句话，生成故事核、大纲并经用户确认。
+6.  确认并生成剧本与 SceneList，局部改写某一场后下游被标记为待更新。
+7.  拆解出资产清单与 World/Look 草案，用户确认后创建至少 2 Character、1 Environment、2 Props 并 Approved。
+7a. 导演 Agent 基于已确认资产生成至少 8 Shots，用户仅用意图描述即可，无需填写专业字段；专业字段可展开并覆盖。
+7b. MV 通道与已有剧本通道可各自走通到同一份 SceneList。
 8.  每 Shot 明确 Asset 与 ReferenceRole。
 9.  生成多个 Keyframe 并 Promote Hero Frame。
 10. 基于 Hero Frame 生成多个 Take 并 Approved。

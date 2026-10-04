@@ -1,4 +1,5 @@
 words:
+  - adfilm
   - Authenticode
   - axios
   - bootstrapper
@@ -9,12 +10,16 @@ words:
   - Dweb
   - earendil
   - electrobun
+  - ffprobe
   - graphlib
   - HBAI
+  - hiccai
   - INPUTCHARSET
+  - litto
   - mainview
   - makensis
   - modelcontextprotocol
+  - musicfilm
   - nodrag
   - nologo
   - nopan

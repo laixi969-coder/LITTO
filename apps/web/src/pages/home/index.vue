@@ -97,19 +97,17 @@
             </template>
           </el-card>
           <div class="creationChoices">
-            <button type="button" class="creationChoice" :disabled="creating || opening" @click="openBrief('cinema')">
-              <icon-movie :size="28" />
+            <button
+              v-for="lane in creationLanes"
+              :key="lane.kind"
+              type="button"
+              class="creationChoice"
+              :disabled="creating || opening"
+              @click="openBrief(lane.kind)">
+              <component :is="lane.icon" :size="28" />
               <span>
-                <strong>拍一部电影</strong>
-                <span>以好莱坞电影质感，打磨故事、表演与镜头。</span>
-              </span>
-              <icon-arrow-up-right :size="20" />
-            </button>
-            <button type="button" class="creationChoice" :disabled="creating || opening" @click="openBrief('adfilm')">
-              <icon-speakerphone :size="28" />
-              <span>
-                <strong>拍一支广告</strong>
-                <span>围绕产品与受众，把卖点拍清楚。</span>
+                <strong>{{ lane.title }}</strong>
+                <span>{{ lane.desc }}</span>
               </span>
               <icon-arrow-up-right :size="20" />
             </button>
@@ -189,18 +187,18 @@
     </div>
     <el-dialog
       v-model="briefVisible"
-      :title="briefKind === 'cinema' ? '拍一部电影' : '拍一支广告'"
+      :title="currentLane.title"
       width="min(560px, calc(100vw - 32px))"
       alignCenter
       :closeOnClickModal="!creating">
       <el-form class="briefForm" labelPosition="top" @submit.prevent="startBrief">
-        <el-form-item :label="briefKind === 'cinema' ? '故事想法' : '产品与卖点'" required>
+        <el-form-item :label="currentLane.label" required>
           <el-input
             v-model="brief.subject"
             type="textarea"
             :rows="3"
             :disabled="creating"
-            :placeholder="briefKind === 'cinema' ? '主角是谁？发生了什么？' : '要介绍什么产品？最想让人记住什么？'" />
+            :placeholder="currentLane.placeholder" />
         </el-form-item>
         <el-form-item label="给谁看"><el-input v-model="brief.audience" :disabled="creating" placeholder="填写目标受众" /></el-form-item>
         <el-form-item label="时长"><el-input v-model="brief.duration" :disabled="creating" placeholder="填写期望时长" /></el-form-item>
@@ -230,6 +228,8 @@ import {
   IconLayoutGrid,
   IconMovie,
   IconSpeakerphone,
+  IconMusic,
+  IconFileImport,
   IconArrowUpRight,
   IconList,
   IconSortDescending,
@@ -459,12 +459,21 @@ async function createProject(fromPrompt = true) {
   }
 }
 const briefVisible = ref(false);
-const briefKind = ref<"cinema" | "adfilm">("cinema");
+// 四条创意通道，每条都对应一个技能；“已有素材”走 story 的定稿剧本整理分支。
+const creationLanes = [
+  { kind: "story", skill: "story", icon: IconMovie, title: "写一个故事", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
+  { kind: "creative", skill: "adfilm", icon: IconSpeakerphone, title: "做一支广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
+  { kind: "musicFilm", skill: "musicfilm", icon: IconMusic, title: "拍一支 MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法", placeholder: "哪首歌？想要什么感觉？歌词可以稍后上传。" },
+  { kind: "existing", skill: "story", icon: IconFileImport, title: "已有剧本或素材", desc: "导入剧本、参考片或参考图，整理后继续。", label: "手上有什么", placeholder: "粘贴剧本，或说明你的参考素材。" },
+] as const;
+type LaneKind = (typeof creationLanes)[number]["kind"];
+const briefKind = ref<LaneKind>("story");
+const currentLane = computed(() => creationLanes.find((lane) => lane.kind === briefKind.value)!);
 const brief = reactive({ subject: "", audience: "", duration: "", style: "" });
 function showProjects() {
   document.getElementById("projectListTitle")?.scrollIntoView();
 }
-function openBrief(kind: "cinema" | "adfilm") {
+function openBrief(kind: LaneKind) {
   briefKind.value = kind;
   Object.assign(brief, { subject: prompt.value, audience: "", duration: "", style: "" });
   briefVisible.value = true;
@@ -472,7 +481,7 @@ function openBrief(kind: "cinema" | "adfilm") {
 async function startBrief() {
   if (!brief.subject.trim() || creating.value) return;
   prompt.value = [
-    "/skill:" + briefKind.value + " " + brief.subject.trim(),
+    (currentLane.value.skill ? "/skill:" + currentLane.value.skill + " " : "【" + currentLane.value.title + "】") + brief.subject.trim(),
     brief.audience && "目标受众：" + brief.audience,
     brief.duration && "时长：" + brief.duration,
     brief.style && "画面风格：" + brief.style,
