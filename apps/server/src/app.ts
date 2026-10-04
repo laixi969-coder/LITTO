@@ -7,6 +7,7 @@ import buildRoute from "@/core";
 import { error } from "@/lib/responseFormat";
 import desktopRequest from "@/lib/desktop";
 import { mountCloud, requireAdminForPlugins, requireSession } from "@/lib/cloud";
+import { noStoreApi, rateLimit, securityHeaders, staticCacheHeaders } from "@/lib/security";
 import { authEnabled } from "@/utils/tenant";
 import initializePlugins from "@/utils/plugins/initialize";
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
@@ -48,6 +49,10 @@ export async function createApp({
   if (dataDirectory && skillsRoot) await initializePlugins(resolve(dataDirectory, "skills"), skillsRoot);
   if (dataDirectory && agentsRoot) await initializePlugins(resolve(dataDirectory, "agents"), agentsRoot);
   const app = express();
+  app.disable("x-powered-by");
+  // 只有部署在可信反向代理之后才采用 x-forwarded-for，否则客户端可伪造来源绕过限流。
+  if (process.env.LITTO_TRUST_PROXY === "1") app.set("trust proxy", 1);
+  app.use(securityHeaders);
 
   if (process.env.NODE_ENV === "dev") {
     await buildRoute();
@@ -62,7 +67,9 @@ export async function createApp({
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ extended: true, limit: "100mb" }));
   app.use("/api/desktop", desktopRequest);
-  app.use("/api", requireSession, requireAdminForPlugins);
+  // 账号模式面向多人开放才需要限流；单机桌面模式只有本机一个用户。
+  if (authEnabled()) app.use("/api", rateLimit(2400));
+  app.use("/api", noStoreApi, requireSession, requireAdminForPlugins);
 
   const { default: initializeProviderModels } = await import("@/utils/ai/initialize");
   await initializeProviderModels();
@@ -84,7 +91,7 @@ export async function createApp({
     const { createA2aRouter } = await import("@/agent/a2a");
     app.use("/a2a", createA2aRouter());
   }
-  app.use(express.static(webRoot));
+  app.use(express.static(webRoot, { setHeaders: staticCacheHeaders }));
 
   // 错误处理
   app.use((err: Error & { status?: number }, request: Request, response: Response, next: NextFunction) => {
