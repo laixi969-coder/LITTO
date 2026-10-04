@@ -31,10 +31,11 @@ export async function logout() { await post("/auth/logout", {}).catch(() => {});
 /** Any 401 from the engine API means the session ended: go back to the login page. */
 export function registerSessionGuard() {
   const nativeFetch = window.fetch.bind(window);
-  window.fetch = async (...args) => {
+  // 保留原 fetch 上的静态成员（如 preconnect），包装后的类型与 typeof fetch 一致。
+  window.fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
     const response = await nativeFetch(...args);
     const url = typeof args[0] === "string" ? args[0] : args[0] instanceof Request ? args[0].url : String(args[0]);
     if (response.status === 401 && url.includes("/api/") && !authDisabled) { location.hash = "#/login"; location.reload(); }
     return response;
-  };
+  }, window.fetch);
 }

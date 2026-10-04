@@ -459,7 +459,7 @@ async function createProject(fromPrompt = true) {
   }
 }
 const briefVisible = ref(false);
-// 四条创意通道，每条都对应一个技能；“已有素材”走 story 的定稿剧本整理分支。
+// 四条创意通道各对应一个技能；“已有素材”走 story 的定稿剧本整理分支。
 const creationLanes = [
   { kind: "story", skill: "story", icon: IconMovie, title: "写一个故事", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
   { kind: "creative", skill: "adfilm", icon: IconSpeakerphone, title: "做一支广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
@@ -481,7 +481,7 @@ function openBrief(kind: LaneKind) {
 async function startBrief() {
   if (!brief.subject.trim() || creating.value) return;
   prompt.value = [
-    (currentLane.value.skill ? "/skill:" + currentLane.value.skill + " " : "【" + currentLane.value.title + "】") + brief.subject.trim(),
+    "/skill:" + currentLane.value.skill + " " + brief.subject.trim(),
     brief.audience && "目标受众：" + brief.audience,
     brief.duration && "时长：" + brief.duration,
     brief.style && "画面风格：" + brief.style,
@@ -562,6 +562,7 @@ watch(
       strong {
         font-size: 22px;
         letter-spacing: -0.04em;
+        white-space: nowrap;
       }
       small {
         font-size: 12px;
