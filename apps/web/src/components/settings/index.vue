@@ -31,6 +31,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, shallowRef } from "vue";
 import { hasDesktopUpdate } from "@/stores/desktopUpdate";
+import { getMe, isAuthDisabled } from "@/lib/session";
 import {
   IconPalette,
   IconSettings,
@@ -44,6 +45,9 @@ import {
   IconSubtitlesAi,
 } from "@tabler/icons-vue";
 
+// 账号模式下服务端不提供 MCP，插件安装与供应商调试仅限平台管理员；普通用户看不到用不了的入口。
+const accounts = !isAuthDisabled();
+const hiddenPanels = accounts ? (getMe()?.user.isAdmin ? ["mcp"] : ["mcp", "pluginMarket", "developer"]) : [];
 const settingsPanels = [
   { id: "ui", label: "界面设置", icon: IconPalette, component: defineAsyncComponent(() => import("./panels/ui.vue")) },
   { id: "general", label: "常规配置", icon: IconSettings, component: defineAsyncComponent(() => import("./panels/general/index.vue")) },
@@ -62,12 +66,12 @@ const settingsPanels = [
     groupLabel: "市场",
     component: defineAsyncComponent(() => import("./panels/pluginMarket/index.vue")),
   },
-  { id: "mcp", label: "MCP", icon: IconPlugConnected, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/mcp/index.vue")) },
-  { id: "personalization", label: "个性化", icon: IconUserCog, component: defineAsyncComponent(() => import("./panels/personalization.vue")) },
+  { id: "personalization", label: "个性化", icon: IconUserCog, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/personalization.vue")) },
   { id: "privacy", label: "隐私", icon: IconShieldLock, component: defineAsyncComponent(() => import("./panels/privacy.vue")) },
+  { id: "mcp", label: "MCP", icon: IconPlugConnected, component: defineAsyncComponent(() => import("./panels/mcp/index.vue")) },
   { id: "developer", label: "开发者选项", icon: IconCode, component: defineAsyncComponent(() => import("./panels/developer/index.vue")) },
   { id: "about", label: "关于", icon: IconInfoCircle, component: defineAsyncComponent(() => import("./panels/about.vue")) },
-];
+].filter((panel) => !hiddenPanels.includes(panel.id));
 const activePanel = shallowRef(settingsPanels[0]!);
 const visible = defineModel<boolean>({ default: false });
 </script>

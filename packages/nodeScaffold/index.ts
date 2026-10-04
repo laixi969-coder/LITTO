@@ -90,6 +90,11 @@ export function createNodeConfig(config: NodeConfig, configUrl: string) {
       },
       rolldownOptions: {
         external: ["vue", "@vue/runtime-core", "@vue/runtime-dom", "@vue-flow/core", "element-plus", "@earendil-works/pi-agent-core", "@earendil-works/pi-ai"],
+        // 宿主只提供下方 globals；其他依赖解析不到时打包会静默外置成不存在的全局变量，节点到运行时才崩，这里直接中止构建。
+        onLog(level, log, handler) {
+          if (log.code === "UNRESOLVED_IMPORT") throw new Error(`节点 ${nodeName} 有依赖未能解析：${log.message}`);
+          handler(level, log);
+        },
         output: {
           exports: "default",
           globals: {

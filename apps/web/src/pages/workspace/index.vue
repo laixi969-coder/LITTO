@@ -4,7 +4,7 @@
       <router-link class="railBrand" to="/home">LITTO <small>里头</small></router-link>
       <span class="projectTitle" :title="workspaceStore.project?.name">{{ workspaceStore.project?.name }}</span>
       <div ref="historyTarget" class="historyTarget" />
-      <div class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起执行流' : '打开执行流' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
+      <div class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起助手' : '打开助手' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
     </aside>
     <canvasPanel
       :key="workspaceStore.project?.directory"

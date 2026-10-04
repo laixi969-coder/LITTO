@@ -51,19 +51,21 @@
             aria-label="验证码"
             autofocus />
         </template>
-        <el-button v-if="!sent" type="primary" size="large" :loading="busy" :disabled="!email.includes('@')" @click="send">获取验证码</el-button>
+        <el-button v-if="!sent" type="primary" size="large" nativeType="submit" :loading="busy" :disabled="!email.includes('@')">获取验证码</el-button>
         <template v-else>
-          <el-button type="primary" size="large" :loading="busy" :disabled="code.length < 6" @click="submit">登录</el-button>
-          <el-button
-            size="large"
-            link
-            :disabled="busy"
-            @click="
-              sent = false;
-              code = '';
-            ">
-            换个邮箱
-          </el-button>
+          <el-button type="primary" size="large" nativeType="submit" :loading="busy" :disabled="code.length < 6">登录</el-button>
+          <div class="codeActions">
+            <el-button link :disabled="busy || cooldown > 0" @click="send">{{ cooldown > 0 ? `${cooldown} 秒后可重新发送` : "重新发送验证码" }}</el-button>
+            <el-button
+              link
+              :disabled="busy"
+              @click="
+                sent = false;
+                code = '';
+              ">
+              换个邮箱
+            </el-button>
+          </div>
         </template>
       </el-form>
       <p class="hint">输入邮箱即可登录，首次使用会自动创建你的个人工作区。</p>
@@ -72,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onBeforeUnmount, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { requestCode, verifyCode } from "@/lib/session";
 import logoUrl from "@toonflow/assets/logo.svg";
@@ -81,13 +83,26 @@ const email = ref("");
 const code = ref("");
 const sent = ref(false);
 const busy = ref(false);
+// 与服务端同一邮箱的发送间隔一致，避免反复点击后才看到限流报错。
+const cooldown = ref(0);
+let cooldownTimer: ReturnType<typeof setInterval> | undefined;
+onBeforeUnmount(() => clearInterval(cooldownTimer));
+
+function startCooldown() {
+  cooldown.value = 60;
+  clearInterval(cooldownTimer);
+  cooldownTimer = setInterval(() => {
+    if (--cooldown.value <= 0) clearInterval(cooldownTimer);
+  }, 1000);
+}
 
 async function send() {
-  if (busy.value || !email.value.includes("@")) return;
+  if (busy.value || cooldown.value > 0 || !email.value.includes("@")) return;
   busy.value = true;
   try {
     const result = await requestCode(email.value.trim());
     sent.value = true;
+    startCooldown();
     // Outside production there is no mail transport: the server echoes the code so local trials work.
     if (result.devCode) {
       code.value = result.devCode;
@@ -193,6 +208,13 @@ async function submit() {
       .el-button {
         margin: 12px 0 0;
         min-height: 44px;
+      }
+      .codeActions {
+        display: flex;
+        justify-content: space-between;
+        .el-button {
+          margin: 0;
+        }
       }
     }
     .hint {

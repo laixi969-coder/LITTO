@@ -11,7 +11,6 @@ words:
   - earendil
   - electrobun
   - ffprobe
-  - shootable
   - graphlib
   - HBAI
   - hiccai
@@ -24,6 +23,7 @@ words:
   - nodrag
   - nologo
   - nopan
+  - nosniff
   - notmatch
   - nowheel
   - NSIS
@@ -34,7 +34,9 @@ words:
   - pxtorem
   - qwen
   - rankdir
+  - SAMEORIGIN
   - Seedance
+  - shootable
   - skus
   - tabler
   - tdesign

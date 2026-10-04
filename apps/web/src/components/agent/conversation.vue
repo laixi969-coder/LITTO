@@ -292,8 +292,9 @@ const contextWindow = computed(() => contextUsage.value?.contextWindow ?? select
 const contextPercent = computed(() => (contextUsage.value?.tokens ?? 0) / contextWindow.value * 100);
 const inputTokens = computed(() => stats.value ? stats.value.tokens.input + stats.value.tokens.cacheRead + stats.value.tokens.cacheWrite : 0);
 const welcomeSuggestions = [
-  { label: "搭建创作画布", description: "把创意串成清晰的节点流程", icon: IconLayoutGrid, prompt: "帮我搭建一个创作画布，先和我确认需要的节点与流程。" },
-  { label: "梳理故事分镜", description: "拆解故事，安排画面与镜头", icon: IconMovie, prompt: "帮我把故事整理成分镜，先和我确认故事内容、时长和画面风格。" },
+  // 与创作主链路一致：先有故事和剧本，再拆解出角色场景，最后做画面。
+  { label: "写一个故事", description: "从一句想法出发，打磨故事与剧本", icon: IconMovie, prompt: "/skill:story 帮我写一个故事。先问我的想法，开始前只追问必要的缺失信息，最多 4 个问题。" },
+  { label: "拆解剧本", description: "整理出角色、场景和道具清单", icon: IconLayoutGrid, prompt: "/skill:breakdown 帮我拆解剧本，先和我确认要拆解的是哪一版剧本。" },
   { label: "生成图片素材", description: "为角色和场景寻找视觉方向", icon: IconPhoto, prompt: "帮我生成图片素材，先和我确认画面内容、风格和使用的模型。" },
 ];
 watch([locked, () => props.active], ([locked, active]) => {

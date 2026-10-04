@@ -200,9 +200,7 @@
             :disabled="creating"
             :placeholder="currentLane.placeholder" />
         </el-form-item>
-        <el-form-item label="给谁看"><el-input v-model="brief.audience" :disabled="creating" placeholder="填写目标受众" /></el-form-item>
-        <el-form-item label="时长"><el-input v-model="brief.duration" :disabled="creating" placeholder="填写期望时长" /></el-form-item>
-        <el-form-item label="画面风格"><el-input v-model="brief.style" :disabled="creating" placeholder="描述你想要的画面风格" /></el-form-item>
+        <p class="briefHint">受众、时长和画面风格不用现在想好，助手会在需要时再问你。</p>
         <div class="briefActions">
           <el-button :disabled="creating" @click="briefVisible = false">取消</el-button>
           <el-button type="primary" :loading="creating" :disabled="!brief.subject.trim()" @click="startBrief">开始创作</el-button>
@@ -296,7 +294,25 @@ const creating = ref(false);
 const opening = ref(false);
 const promptWorkspacePicker = ref<InstanceType<typeof workspacePicker>>();
 const relocationPicker = ref<InstanceType<typeof workspacePicker>>();
-const prompt = ref("");
+// 首页想法按账号存在本机浏览器：刷新、返回或进项目后回来都不丢，开始创作成功后清除。
+const draftKey = `littoHomeDraft:${me?.user.id ?? "local"}`;
+const prompt = ref(
+  (() => {
+    try {
+      return localStorage.getItem(draftKey) ?? "";
+    } catch {
+      return "";
+    }
+  })(),
+);
+watch(prompt, (value) => {
+  try {
+    if (value) localStorage.setItem(draftKey, value);
+    else localStorage.removeItem(draftKey);
+  } catch {
+    /* per-viewer convenience only */
+  }
+});
 const promptInput = ref<InputInstance>();
 const promptAttachments = ref<AgentAttachment[]>([]);
 const workspaceStore = useWorkspaceStore();
@@ -394,10 +410,11 @@ async function renameProject(project: Project) {
   if (result) workspaceStore.renameProject(project.directory, result.value);
 }
 
-async function createProject(fromPrompt = true) {
+// message 默认取首页输入框；通道弹窗传入带技能指令的消息，不能写回输入框，否则用户会看到内部指令。
+async function createProject(fromPrompt = true, message = prompt.value) {
   if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
   // Sending an idea without a text model would just fail: take the person to the one-minute wizard instead.
-  if (fromPrompt && prompt.value.trim() && !hasTextModel.value) {
+  if (fromPrompt && message.trim() && !hasTextModel.value) {
     briefVisible.value = false;
     return openConnectModel("text");
   }
@@ -407,7 +424,7 @@ async function createProject(fromPrompt = true) {
     if (accounts) {
       // Accounts mode: the server makes an empty project folder inside the caller's own workspace; no folder picking.
       const title = fromPrompt
-        ? prompt.value
+        ? message
             .trim()
             .replace(/^\/skill:\S+\s*/, "")
             .split(/\n/)[0]
@@ -435,16 +452,18 @@ async function createProject(fromPrompt = true) {
       true,
     );
     await workspaceStore.openProject(directory);
-    if (fromPrompt && (prompt.value.trim() || promptAttachments.value.length)) {
+    if (fromPrompt && (message.trim() || promptAttachments.value.length)) {
       workspaceStore.pendingAgentMessage = {
         directory: workspaceStore.project!.directory,
-        prompt: prompt.value,
+        prompt: message,
         attachments: [...promptAttachments.value],
         model: selectedModel.value,
         reasoningEffort: reasoningEffort.value,
       };
     }
     briefVisible.value = false;
+    // 想法已交给项目里的助手，清掉首页草稿。
+    if (fromPrompt) prompt.value = "";
     await router.push("/workspace");
   } catch (err) {
     ElMessage.error(
@@ -469,31 +488,24 @@ const creationLanes = [
 type LaneKind = (typeof creationLanes)[number]["kind"];
 const briefKind = ref<LaneKind>("story");
 const currentLane = computed(() => creationLanes.find((lane) => lane.kind === briefKind.value)!);
-const brief = reactive({ subject: "", audience: "", duration: "", style: "" });
+const brief = reactive({ subject: "" });
 function showProjects() {
   document.getElementById("projectListTitle")?.scrollIntoView();
 }
 function openBrief(kind: LaneKind) {
   briefKind.value = kind;
-  Object.assign(brief, { subject: prompt.value, audience: "", duration: "", style: "" });
+  brief.subject = prompt.value;
   briefVisible.value = true;
 }
 async function startBrief() {
   if (!brief.subject.trim() || creating.value) return;
-  prompt.value = [
-    "/skill:" + currentLane.value.skill + " " + brief.subject.trim(),
-    brief.audience && "目标受众：" + brief.audience,
-    brief.duration && "时长：" + brief.duration,
-    brief.style && "画面风格：" + brief.style,
-    "开始前只追问必要的缺失信息，最多 4 个问题。",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  // 受众、时长、风格等由技能按需追问，弹窗只收核心想法。
+  const message = `/skill:${currentLane.value.skill} ${brief.subject.trim()}\n开始前只追问必要的缺失信息，最多 4 个问题。`;
   if (!accounts && !workspaceDirectory.value) {
     workspaceDirectory.value = (await relocationPicker.value?.chooseDirectory()) ?? "";
     if (!workspaceDirectory.value) return;
   }
-  await createProject();
+  await createProject(true, message);
 }
 const projectSummaries = ref<Record<string, { count: number; generated: number; preview?: CanvasShot; error?: string }>>({});
 watch(
@@ -595,6 +607,11 @@ watch(
       display: grid;
       gap: 8px;
       .el-button {
+        // 文字按钮悬停默认用全局浅色填充，放在深色侧栏里会变成浅底浅字，改用侧栏自己的悬停色。
+        --el-fill-color-light: var(--studioRailHover);
+        --el-fill-color: var(--studioRailHover);
+        --el-button-hover-text-color: var(--studioRailInk);
+        --el-button-active-color: var(--studioRailInk);
         justify-content: flex-start;
         width: 100%;
         min-height: 44px;
@@ -959,6 +976,12 @@ watch(
   }
 }
 .briefForm {
+  .briefHint {
+    margin: -4px 0 16px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--studioMuted);
+  }
   .briefActions {
     display: flex;
     justify-content: flex-end;
