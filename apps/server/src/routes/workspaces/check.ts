@@ -8,5 +8,5 @@ const router = Router();
 
 export default router.get("/", validateFields({ directory: z.string().min(1).max(4096) }, "query"), async (req, res) => {
   const directory = await u.workspace.resolveWorkspace(req, req.query.directory as string);
-  res.set("Cache-Control", "no-store").json(success({ directory }));
+  res.set("Cache-Control", "no-store").json(success({ directory, projectId: u.mediaJobs.workspaceProject(directory) }));
 });

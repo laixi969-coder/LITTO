@@ -149,6 +149,15 @@ async function requestModel(input: NodeAiRequest, context: Context, model: Model
   return stream;
 }
 
+async function delayMediaPoll(signal: AbortSignal) {
+  signal.throwIfAborted();
+  await new Promise<void>((resolve, reject) => {
+    const cancel = () => { clearTimeout(timer); reject(signal.reason); };
+    const timer = setTimeout(() => { signal.removeEventListener("abort", cancel); resolve(); }, 750);
+    signal.addEventListener("abort", cancel, { once: true });
+  });
+}
+
 export function useNodeAi() {
   const controller = new AbortController();
   onScopeDispose(() => controller.abort());
@@ -162,21 +171,60 @@ export function useNodeAi() {
     return readModels<NodeMediaModel>("/api/ai/media/models", requestSignal(signal));
   }
 
-  async function generateMedia<T extends "image" | "video">(mediaType: T, input: NodeImageRequest | NodeVideoRequest, signal?: AbortSignal) {
-    return readResult<{ path: string; mimeType: string; mediaType: T }[]>(await fetch("/api/ai/media/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
-      body: JSON.stringify({ ...input, mediaType }),
-      signal: requestSignal(signal),
+  async function readMediaJob(jobId: string, signal: AbortSignal) {
+    const response = await fetch(`/cloud/generations/${encodeURIComponent(jobId)}`, { cache: "no-store", signal });
+    const job = await response.json();
+    if (!response.ok) throw new Error(job.error?.message || job.message || "生成任务读取失败");
+    return job as { status: string; error?: string; settled: boolean; files: { path: string; mimeType: string; mediaType: "image" | "video" }[] };
+  }
+
+  async function waitMediaJob(jobId: string, signal?: AbortSignal) {
+    const watching = requestSignal(signal);
+    while (true) {
+      watching.throwIfAborted();
+      const job = await readMediaJob(jobId, watching);
+      if (job.status === "SUCCEEDED") return job.files;
+      if (["FAILED", "TIMEOUT", "CANCELLED"].includes(job.status)) throw new Error(job.error || "生成已停止");
+      await delayMediaPoll(watching);
+    }
+  }
+
+  async function cancelMediaRequest(mediaType: "image" | "video", pending: { input: NodeImageRequest | NodeVideoRequest; requestId: string }) {
+    return readResult<{ jobId: string | null }>(await fetch("/api/ai/media/cancel", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
+      body: JSON.stringify({ ...pending.input, mediaType, requestId: pending.requestId }), signal: AbortSignal.timeout(60000),
     }));
   }
 
-  function generateImage(input: NodeImageRequest, signal?: AbortSignal) {
-    return generateMedia("image", input, signal);
+  async function cancelMediaJob(jobId: string) {
+    // 删除节点时须等工作区写入停止；卸载只中断观察，不调用此方法。
+    const signal = AbortSignal.timeout(60000);
+    const current = await readMediaJob(jobId, signal);
+    if (["QUEUED", "RUNNING"].includes(current.status)) {
+      const response = await fetch(`/cloud/generations/${encodeURIComponent(jobId)}/cancel`, { method: "POST", headers: { "x-litto-csrf": "1" }, signal });
+      if (!response.ok && response.status !== 409) throw new Error("停止生成失败");
+    }
+    while (!(await readMediaJob(jobId, signal)).settled) await delayMediaPoll(signal);
   }
 
-  function generateVideo(input: NodeVideoRequest, signal?: AbortSignal) {
-    return generateMedia("video", input, signal);
+  async function generateMedia<T extends "image" | "video">(mediaType: T, input: NodeImageRequest | NodeVideoRequest, signal?: AbortSignal, onJob?: (id: string) => void, requestId?: string) {
+    const result = await readResult<{ jobId: string } | { path: string; mimeType: string; mediaType: T }[]>(await fetch("/api/ai/media/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
+      body: JSON.stringify({ ...input, mediaType, requestId }),
+      signal: requestSignal(signal),
+    }));
+    if (Array.isArray(result)) return result;
+    onJob?.(result.jobId);
+    return waitMediaJob(result.jobId, signal);
+  }
+
+  function generateImage(input: NodeImageRequest, signal?: AbortSignal, onJob?: (id: string) => void, requestId?: string) {
+    return generateMedia("image", input, signal, onJob, requestId);
+  }
+
+  function generateVideo(input: NodeVideoRequest, signal?: AbortSignal, onJob?: (id: string) => void, requestId?: string) {
+    return generateMedia("video", input, signal, onJob, requestId);
   }
 
   async function generate(input: NodeAiRequest): Promise<NodeAiResult> {
@@ -229,5 +277,5 @@ export function useNodeAi() {
     return { text, ...(reasoning ? { reasoning } : {}) };
   }
 
-  return { getModels, getMediaModels, generateImage, generateVideo, generate };
+  return { getModels, getMediaModels, generateImage, generateVideo, waitMediaJob, cancelMediaJob, cancelMediaRequest, generate };
 }

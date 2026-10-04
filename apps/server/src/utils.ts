@@ -1,6 +1,7 @@
 import * as assets from "@/utils/assets";
 import * as desktop from "@/utils/desktop";
 import * as providerDebug from "@/utils/media/debug";
+import * as mediaJobs from "@/utils/media/jobs";
 import * as mediaGeneration from "@/utils/media/generation";
 import * as mediaProvider from "@/utils/media/provider";
 import * as ffmpeg from "@/utils/ffmpeg";
@@ -27,6 +28,7 @@ export default {
   desktop,
   providerDebug,
   mediaGeneration,
+  mediaJobs,
   mediaProvider,
   ffmpeg,
   pluginInstall,

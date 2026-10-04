@@ -72,7 +72,7 @@
             :disabled="deleting || uploading || (!generating && (!generationPrompt || !selectedModel))"
             :title="generating ? '停止生成' : '生成视频'"
             :aria-label="generating ? '停止生成' : '生成视频'"
-            @click="generating ? generationController?.abort() : startGeneration().catch((error) => showNodeError(error, '视频生成失败'))" />
+            @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration().catch((error) => showNodeError(error, '视频生成失败'))" />
         </div>
       </el-card>
     </template>
@@ -103,7 +103,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "视频生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
+const data = computed(() => node.data as { generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -121,7 +121,7 @@ const deleting = ref(false);
 const player = ref<InstanceType<typeof videoPlayer>>();
 const videoWidth = ref(0);
 let generationController: AbortController | undefined;
-const generationState = useNodeGeneration(outputs, () => generationController?.abort());
+const generationState = useNodeGeneration(outputs, () => { void cancelGeneration().catch(error => showNodeError(error, "停止生成失败")); });
 const { generating } = generationState;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
@@ -194,7 +194,10 @@ const previewUrl = files.useFileUrl(
   (error) => showNodeError(error, "视频读取失败")
 );
 
-onMounted(() => loadModels().catch((error) => showNodeError(error, "模型读取失败")));
+onMounted(() => {
+  void loadModels().catch((error) => showNodeError(error, "模型读取失败"));
+  if (data.value.generationPending) resumeGeneration();
+});
 onScopeDispose(() => {
   disposed = true;
   generationController?.abort();
@@ -228,7 +231,7 @@ function loadModels() {
   if (modelsRequest) return modelsRequest;
   modelsLoading.value = true;
   modelsRequest = ai.getMediaModels().then((items) => {
-    if (generating.value || deleting.value) return;
+    if (deleting.value) return;
     models.value = items.filter((item) => item.type === "video");
     // ACT: 只给空配置选默认模型，保留暂时不可用的旧选择及其参数。
     if (!data.value.model) {
@@ -271,24 +274,56 @@ async function startGeneration() {
     audios: refList.value.flatMap((item) => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
   };
   generationController = controller;
-  // ACT: 工具立即返回，任务由节点持有，停止或卸载时取消。
-  generation = generationState.run(() => workspace
-    .list()
-    .then(({ directory }) => {
-      controller.signal.throwIfAborted();
-      return ai.generateVideo({ ...input, directory }, controller.signal);
-    })
-    .then(([result]) => {
-      controller.signal.throwIfAborted();
-      if (!result) throw new Error("供应商未返回视频");
-      outputs.value.video = { dataType: "VIDEO", value: { url: result.path, mimeType: result.mimeType } };
-    }))
-    .catch((error) => showNodeError(error, "视频生成失败"))
-    .finally(() => {
-      generationController = undefined;
-    });
+  data.value.generationPending = true;
+  data.value.generationJobId = undefined;
+  generation = observeGeneration(() => workspace.list().then(({ directory }) => {
+    controller.signal.throwIfAborted();
+    const pending = { requestId: crypto.randomUUID(), input: { ...input, directory } };
+    data.value.generationRequest = pending;
+    return ai.generateVideo(pending.input, controller.signal, rememberJob, pending.requestId);
+  }), controller);
   return { status: "generating" };
 }
+
+function rememberJob(jobId: string) {
+  data.value.generationJobId = jobId;
+  data.value.generationRequest = undefined;
+}
+
+function observeGeneration(task: () => Promise<{ path: string; mimeType: string }[]>, controller: AbortController) {
+  return generationState.run(async () => {
+    const [result] = await task();
+    controller.signal.throwIfAborted();
+    if (!result) throw new Error("供应商未返回视频");
+    outputs.value.video = { dataType: "VIDEO", value: { url: result.path, mimeType: result.mimeType } };
+  }).catch(error => { if (!disposed) showNodeError(error, "视频生成失败"); }).finally(() => {
+    if (!disposed) { data.value.generationPending = false; data.value.generationRequest = undefined; }
+    generationController = undefined;
+  });
+}
+
+function resumeGeneration() {
+  const controller = new AbortController();
+  generationController = controller;
+  const pending = data.value.generationRequest;
+  const jobId = data.value.generationJobId;
+  generation = observeGeneration(() => jobId ? ai.waitMediaJob(jobId, controller.signal)
+    : pending ? ai.generateVideo(pending.input, controller.signal, rememberJob, pending.requestId)
+    : Promise.reject(new Error("未找到已保存的生成任务")), controller);
+}
+
+async function cancelGeneration() {
+  const pending = data.value.generationRequest;
+  // 请求已经发送而 ID 尚未返回时，利用同一幂等键找回任务，再停止。
+  if (!data.value.generationJobId && pending) {
+    const result = await ai.cancelMediaRequest("video", pending);
+    if (result.jobId) rememberJob(result.jobId);
+  }
+  if (data.value.generationJobId) await ai.cancelMediaJob(data.value.generationJobId);
+  generationController?.abort();
+}
+
+nodeEvent.on("copy", () => ({ generationPending: false, generationJobId: undefined, generationRequest: undefined }));
 
 nodeEvent.on("save", (reason) => {
   if (reason === "reload" && (generating.value || uploading.value || deleting.value)) throw new Error("视频处理中，请完成后再刷新节点");
@@ -296,8 +331,8 @@ nodeEvent.on("save", (reason) => {
 nodeEvent.on("delete", async () => {
   if (uploading.value) throw new Error("视频正在替换，请稍后删除节点");
   deleting.value = true;
-  generationController?.abort();
   try {
+    if (generating.value) await cancelGeneration();
     await generation;
     await files.removeNodeFiles();
   } finally {

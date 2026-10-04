@@ -198,7 +198,7 @@ async function generateMediaUnrecorded(
 }
 
 /** Every media generation (from the canvas nodes, the agent tools, or the HTTP route) is recorded for the user's usage receipts. */
-export async function generateMedia(
+export async function generateMediaDirect(
   cwd: string,
   mediaType: "image" | "video" | "audio",
   request: MediaGenerationRequest,
@@ -214,6 +214,37 @@ export async function generateMedia(
     return files;
   } catch (error) {
     recordUsage({ ...base, units: 0, unit: mediaType === "video" ? "second" : mediaType === "image" ? "image" : "call", status: signal?.aborted ? "cancelled" : "error", durationMs: Date.now() - started });
+    throw error;
+  }
+}
+
+
+/** Agent tools keep their awaitable contract; the actual generation is owned by the persistent worker. */
+export async function generateMedia(cwd: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]> {
+  const { cloud } = await import("@/lib/cloud");
+  const { currentTenant } = await import("@/utils/tenant");
+  const api = cloud();
+  if (!api || !currentTenant() || mediaType === "audio") return generateMediaDirect(cwd, mediaType, request, signal);
+  signal?.throwIfAborted();
+  const { enqueueMedia } = await import("@/utils/media/jobs");
+  const job = await enqueueMedia(cwd, mediaType, request, crypto.randomUUID());
+  try {
+    while (true) {
+      signal?.throwIfAborted();
+      const state = api.jobView(api.scoped(currentTenant()!.workspaceId).get("generation_jobs", job.id, true));
+      if (state.status === "SUCCEEDED") return state.files;
+      if (["FAILED", "CANCELLED", "TIMEOUT"].includes(state.status)) throw new Error(state.error || "媒体生成已停止");
+      await new Promise<void>((resolve, reject) => {
+        const cancel = () => { clearTimeout(timer); reject(signal?.reason); };
+        const timer = setTimeout(() => { signal?.removeEventListener("abort", cancel); resolve(); }, 500);
+        signal?.addEventListener("abort", cancel, { once: true });
+      });
+    }
+  } catch (error) {
+    if (signal?.aborted && signal.reason?.code !== "observerDisconnected") {
+      const state = api.scoped(currentTenant()!.workspaceId).get("generation_jobs", job.id, true);
+      if (state && ["QUEUED", "RUNNING"].includes(state.status)) api.cancelJob(state.workspaceId, job.id, currentTenant()!.userId);
+    }
     throw error;
   }
 }

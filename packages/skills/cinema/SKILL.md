@@ -15,7 +15,7 @@ metadata:
 
 ## 分工与执行边界
 
-- [workflow](../workflow/SKILL.md)：剧本改编、资产制作、画布制作阶段和模型执行；进入 Seedance 执行态后，生成分段、时长与提示词格式以其规则为准。
+- [workflow](../workflow/SKILL.md)：剧本改编、资产制作、画布制作阶段和模型执行；先读现场模型能力；只有明确选用 Seedance 后，其专用规则才约束分段上限和提示词格式，不覆盖电影创作意图。
 - [canvas](../canvas/SKILL.md)：查询实际节点、配置、参考顺序并操作画布，不猜节点能力。
 - [continuity](../continuity/SKILL.md)：身份、服装、道具、空间、动作、光线与情绪的跨镜状态；锁定资产与版本修复。
 - 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)。

@@ -1,3 +1,6 @@
+import { currentTenant, authEnabled, tenantDir } from "@/utils/tenant";
+import { cloud } from "@/lib/cloud";
+import { decryptSecrets, encryptSecrets, hasPlainSecrets } from "@/utils/secrets";
 import conf from "conf";
 import { mkdirSync, realpathSync } from "@toonflow/file";
 import { resolve } from "node:path";
@@ -44,7 +47,6 @@ if (!config.has("settings.customProviders")) {
 // Every call site does `conf.get/set(...)`. The default export is a proxy that routes each call to the *current workspace's*
 // settings file (data/tenants/<workspaceId>/settings.json, mode 0600) so provider keys and preferences are never shared across tenants.
 // Outside an authenticated request (startup, background work) or with LITTO_AUTH=off it falls back to the global data/settings.json.
-import { currentTenant, authEnabled, tenantDir } from "@/utils/tenant";
 
 type Settings = typeof config;
 const tenantConfigs = new Map<string, Settings>();
@@ -66,6 +68,17 @@ const tenantConf = new Proxy(config, {
     // `conf.path` identifies the *system* data directory (many helpers derive data/ from it), so it never switches per tenant.
     if (prop === "path") return config.path;
     const c = activeConfig();
+    const crypto = authEnabled() && currentTenant() ? cloud() : null;
+    if (crypto && prop === "get") return (key: string, fallback?: unknown) => {
+      const raw = c.get(key as never, fallback as never);
+      // ACT: 首次读取迁移旧明文，conf 负责原子快照保存；迁移失败直接报错。
+      if (hasPlainSecrets(raw, key.split(".").at(-1))) c.set(key as never, encryptSecrets(raw, crypto.encrypt, key.split(".").at(-1)) as never);
+      return decryptSecrets(raw, crypto.decrypt);
+    };
+    if (crypto && prop === "set") return (key: string | Record<string, unknown>, value?: unknown) => {
+      if (typeof key === "string") c.set(key as never, encryptSecrets(value, crypto.encrypt, key.split(".").at(-1)) as never);
+      else c.set(encryptSecrets(key, crypto.encrypt) as never);
+    };
     const value = Reflect.get(c, prop, c);
     return typeof value === "function" ? value.bind(c) : value;
   },

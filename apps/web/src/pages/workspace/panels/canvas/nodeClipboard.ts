@@ -45,7 +45,9 @@ export async function copyNodesToClipboard(nodes: Node[], edges: Edge[], directo
   const snapshot = JSON.parse(JSON.stringify({
     nodes: nodes.map(node => {
       const { computedPosition, handleBounds, selected, dimensions, isParent, resizing, dragging, events, initialized, ...saved } = node as GraphNode & { initialized?: boolean };
-      return { ...saved, data: saved.data ?? {} };
+      const data = { ...saved.data };
+      for (const key of ["generationPending", "generationJobId", "generationRequest"]) Reflect.deleteProperty(data, key);
+      return { ...saved, data };
     }),
     edges: edges.filter(edge => ids.has(edge.source) && ids.has(edge.target)).map(edge => {
       const { selected, sourceNode, targetNode, sourceX, sourceY, targetX, targetY, events, ...saved } = edge as GraphEdge;

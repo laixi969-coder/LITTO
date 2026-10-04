@@ -8,6 +8,7 @@ import { authEnabled, tenantStore, type Tenant } from "@/utils/tenant";
  *   /cloud/*  → the cloud HTTP API (its own auth: OTP login, sessions, workspaces)
  *   /api/*    → Toonflow's engine, now behind the cloud session (tenant = the caller's workspace)
  */
+export type { GenRequest, GenResult } from "../../../../cloud/src/embed";
 type Embed = typeof import("../../../../cloud/src/embed");
 let embed: Embed | null = null;
 export const cloud = () => embed;
@@ -17,6 +18,8 @@ export async function mountCloud(app: Express) {
   // The cloud keeps its own data under data/cloud unless told otherwise.
   process.env.LITTO_DATA_DIR ??= join(process.env.TOONFLOW_DATA_DIR as string, "cloud");
   embed = await import("../../../../cloud/src/embed");
+  const { executeMediaJob } = await import("@/utils/media/jobs");
+  embed.configureWorkspaceMedia(executeMediaJob);
   embed.initCloud();
   // Hono handler expects a raw request stream: mount before any body parser.
   app.use("/cloud", (req, res) => void embed!.cloudRequestListener(req, res));

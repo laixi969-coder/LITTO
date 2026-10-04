@@ -91,6 +91,10 @@ CREATE TABLE usage_events(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, user_
 CREATE INDEX idx_usage_ws_time ON usage_events(workspace_id, created_at);
 `,
     },
+    {
+        id: "0006_workspaceProjects",
+        sql: `CREATE TABLE workspace_project_links(workspace_id TEXT NOT NULL, directory TEXT NOT NULL, project_id TEXT NOT NULL, PRIMARY KEY(workspace_id,directory));`,
+    },
 ];
 
 export const db = await openSqlite(config.dbFile);

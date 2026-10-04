@@ -40,7 +40,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   const bridge = canvas ? u.canvas.createCanvasContext(cwd, canvas as CanvasInfo, send) : undefined;
   const controller = new AbortController();
   const questions = u.question.createQuestionContext(cwd, send, () => controller.abort());
-  const close = () => { bridge?.dispose(); questions.dispose(); controller.abort(); };
+  const close = () => { bridge?.dispose(); questions.dispose(); controller.abort(Object.assign(new Error("观察连接已关闭"), { code: "observerDisconnected" })); };
   res.once("close", close);
   try {
     await u.agent.run({ ...options, cwd, canvas: bridge?.context, question: questions.context, signal: controller.signal, onCancel: close }, send);

@@ -4,18 +4,23 @@ import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-med
 import { validateFields } from "@/lib/middleware";
 import { success, error } from "@/lib/responseFormat";
 import u from "@/utils";
+import { authEnabled } from "@/utils/tenant";
 import { translateMessage, validationOptions } from "@/lib/i18n";
 
 export default Router().post("/", validateFields({
-  directory: z.string().min(1).max(4096), mediaType: z.enum(["image", "video"]),
+  requestId: z.string().uuid().optional(), directory: z.string().min(1).max(4096), mediaType: z.enum(["image", "video"]),
 }), async (req, res) => {
-  const { directory, mediaType, ...request } = req.body;
+  const { directory, mediaType, requestId, ...request } = req.body;
   const parsed = (mediaType === "image" ? imageGenerationSchema : videoGenerationSchema).safeParse(request, validationOptions());
   if (!parsed.success) {
     res.status(400).json(error("参数错误", parsed.error.issues.map(issue => ({ ...issue, message: translateMessage(issue.message) })), 400));
     return;
   }
   const cwd = await u.workspace.resolveWorkspace(req, directory);
+  if (authEnabled()) {
+    const job = await u.mediaJobs.enqueueMedia(cwd, mediaType, parsed.data, requestId ?? crypto.randomUUID());
+    return res.status(202).json(success({ jobId: job.id }));
+  }
   const controller = new AbortController();
   const close = () => controller.abort();
   res.once("close", close);

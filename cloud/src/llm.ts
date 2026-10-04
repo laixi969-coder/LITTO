@@ -20,7 +20,7 @@ export async function runText(o: { workspaceId: string; projectId: string | null
     const cred = credentialFor(prov.id, o.workspaceId, o.projectId);
     const inputs = [];
     for (const id of o.imageMediaIds ?? []) { const x = get("SELECT * FROM media WHERE id=? AND workspace_id=?", id, o.workspaceId); if (x) inputs.push({ role: "VISION", mime: x.mime, data: await storage.get(x.storage_key), weight: 1 }); }
-    const est = creditsFor(JSON.parse(m.price).perCall ?? 0.005);
+    const est = creditsFor(JSON.parse(m.price).perCall ?? null);
     const id = ulid();
     const s = scoped(o.workspaceId);
     hold(o.workspaceId, id, est);

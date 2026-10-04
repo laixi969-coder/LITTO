@@ -3,6 +3,8 @@ export type GenKind = "image" | "video" | "text";
 export type GenInput = { role: string; mime: string; data?: Buffer; text?: string; weight: number };
 
 export type GenRequest = {
+    signal?: AbortSignal;
+    context?: { jobId: string; workspaceId: string; projectId: string | null; userId: string };
     kind: GenKind;
     externalModelId: string;
     prompt: string;
@@ -15,8 +17,8 @@ export type GenRequest = {
     label?: string;
 };
 
-export type GenOutput = { data: Buffer; mime: string; duration?: number };
-export type GenResult = { outputs: GenOutput[]; costUsd: number };
+export type GenOutput = { data: Buffer; mime: string; duration?: number; workspacePath?: string };
+export type GenResult = { outputs: GenOutput[]; costUsd: number | null };
 
 export type PollResult = { status: "running" } | { status: "done"; result: GenResult } | { status: "failed"; error: string; retryable?: boolean };
 
@@ -25,7 +27,7 @@ export interface ProviderAdapter {
     readonly requiresKey: boolean;
     /** Returns a task id for async providers. Synchronous providers may return `done` immediately. */
     submit(req: GenRequest): Promise<{ taskId: string } | { done: GenResult }>;
-    poll(taskId: string, ctx: { apiKey?: string; baseUrl?: string }): Promise<PollResult>;
+    poll(taskId: string, ctx: { apiKey?: string; baseUrl?: string; signal?: AbortSignal }): Promise<PollResult>;
     testConnection(ctx: { apiKey?: string; baseUrl?: string }): Promise<{ ok: boolean; message: string; latencyMs: number }>;
 }
 

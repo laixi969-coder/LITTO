@@ -4,6 +4,33 @@ const MASK = "••••";
 export const isMasked = (v: unknown) => typeof v === "string" && v.startsWith(MASK);
 const mask = (v: string) => (v ? `${MASK}${v.slice(-4)}` : "");
 
+type SecretCipher = { cipher: string; iv: string; tag: string };
+
+export function encryptSecrets(value: unknown, encrypt: (value: string) => SecretCipher, key = ""): unknown {
+  if (SECRET_KEY.test(key) && typeof value === "string" && value) return { littoSecretVersion: 1, ...encrypt(value) };
+  if (Array.isArray(value)) return value.map(item => encryptSecrets(item, encrypt));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, encryptSecrets(item, encrypt, name)]));
+  return value;
+}
+
+export function decryptSecrets(value: unknown, decrypt: (value: SecretCipher) => string): unknown {
+  if (Array.isArray(value)) return value.map(item => decryptSecrets(item, decrypt));
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (record.littoSecretVersion === 1 && typeof record.cipher === "string" && typeof record.iv === "string" && typeof record.tag === "string") {
+      return decrypt({ cipher: record.cipher, iv: record.iv, tag: record.tag });
+    }
+    return Object.fromEntries(Object.entries(record).map(([name, item]) => [name, decryptSecrets(item, decrypt)]));
+  }
+  return value;
+}
+
+export function hasPlainSecrets(value: unknown, key = ""): boolean {
+  if (SECRET_KEY.test(key) && typeof value === "string" && !!value) return true;
+  if (Array.isArray(value)) return value.some(item => hasPlainSecrets(item));
+  return !!value && typeof value === "object" && Object.entries(value).some(([name, item]) => hasPlainSecrets(item, name));
+}
+
 /** Deep copy with every secret-looking field masked. */
 export function maskSecrets<T>(value: T): T {
   if (Array.isArray(value)) return value.map(maskSecrets) as T;

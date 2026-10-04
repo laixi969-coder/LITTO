@@ -57,7 +57,7 @@ platform.put("/workspaces/current/model-policy", async (c) => {
 
 // ---- /providers & /models (read-only for users; admin writes live under /admin) ----
 platform.get("/providers", (c) => (ctx(c), c.json(listProviders().filter((p) => p.status === "active").map(({ baseUrl, ...p }) => p))));
-platform.get("/models", (c) => (ctx(c), c.json(listModels(true))));
+platform.get("/models", (c) => { const { a } = ctx(c); return c.json(listModels(true).filter(m => !m.limits.workspaceExecution && (!m.limits.workspaceId || m.limits.workspaceId === a.workspaceId))); });
 platform.post("/models/route-preview", async (c) => {
     const { a } = ctx(c);
     const b = await body(c, z.object({ kind: z.enum(["image", "video"]), roles: z.array(z.string()).default([]), projectId: z.string().nullable().default(null), policy: z.any().optional() }));

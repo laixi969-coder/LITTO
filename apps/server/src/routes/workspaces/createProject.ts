@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { validateFields } from "@/lib/middleware";
 import { error, success } from "@/lib/responseFormat";
+import u from "@/utils";
 import { workspacesRoot } from "@/utils/tenant";
 
 const router = Router();
@@ -17,7 +18,8 @@ export default router.post("/", validateFields({ name: z.string().max(80).option
     const directory = join(root, n ? `${base} ${n + 1}` : base);
     try {
       await mkdir(directory, { recursive: false });
-      return res.json(success({ directory: await realpath(directory), name: n ? `${base} ${n + 1}` : base }));
+      const normalized = await realpath(directory);
+      return res.json(success({ directory: normalized, projectId: u.mediaJobs.workspaceProject(normalized), name: n ? `${base} ${n + 1}` : base }));
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     }

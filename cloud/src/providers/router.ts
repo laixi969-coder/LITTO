@@ -39,6 +39,7 @@ export function route(opts: { kind: "image" | "video" | "text"; need?: string[];
     const forced = opts.kind === "image" ? pol.imageModelId : opts.kind === "video" ? pol.videoModelId : pol.textModelId;
     const out: Candidate[] = [];
     for (const m of listModels(true)) {
+        if (m.limits.workspaceExecution || (m.limits.workspaceId && m.limits.workspaceId !== opts.workspaceId)) continue;
         if (m.type !== opts.kind || pol.disabledModelIds?.includes(m.id) || opts.exclude?.includes(m.id)) continue;
         const prov = get("SELECT * FROM providers WHERE id=?", m.providerId)!;
         const needsKey = ADAPTERS[prov.adapter].requiresKey;

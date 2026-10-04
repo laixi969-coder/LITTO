@@ -507,8 +507,14 @@ function stopSenderResize(event: PointerEvent) {
   if (senderResize?.pointerId === event.pointerId) senderResize = undefined;
 }
 
-function stopMessage() {
-  controller?.abort();
+async function stopMessage() {
+  const activeController = controller;
+  try {
+    if (directory && props.sessionFile) await axios.post("/api/agent/stop", { directory, sessionFile: props.sessionFile }, { headers: { "x-toonflow-workspace": "1" } });
+    activeController?.abort();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "停止任务失败");
+  }
 }
 
 async function uploadAttachments(attachments: AgentAttachment[], directory: string, signal: AbortSignal) {

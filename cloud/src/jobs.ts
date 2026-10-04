@@ -17,7 +17,8 @@ export type JobSpec = {
 
 export function estimate(modelId: string, kind: string, params: Record<string, any>) {
     const m = modelView(get("SELECT * FROM models WHERE id=?", modelId)!);
-    const usd = kind === "video" ? (m.price.perSecond ?? 0.05) * Number(params.duration ?? 4) : (m.price.perImage ?? 0.04) * Number(params.count ?? 1);
+    const rate = kind === "video" ? m.price.perSecond : m.price.perImage;
+    const usd = typeof rate === "number" && Number.isFinite(rate) && rate >= 0 ? rate * Number(kind === "video" ? params.duration ?? 4 : params.count ?? 1) : null;
     return { usd, credits: creditsFor(usd) };
 }
 
@@ -29,6 +30,9 @@ export function enqueue(spec: JobSpec) {
     }
     const model = get("SELECT * FROM models m WHERE id=?", spec.modelId);
     if (!model || model.status !== "active") throw bad("model unavailable");
+    const limits = JSON.parse(model.limits);
+    if (limits.workspaceId && limits.workspaceId !== spec.workspaceId) throw bad("model unavailable");
+    if (spec.projectId && !scoped(spec.workspaceId).get("projects", spec.projectId)) throw bad("project unavailable");
     const prov = get("SELECT * FROM providers WHERE id=?", model.provider_id)!;
     const est = estimate(spec.modelId, spec.kind, spec.parameters);
     const id = ulid();
@@ -53,6 +57,8 @@ export const jobView = (r: any) => r && {
     id: r.id, projectId: r.projectId, kind: r.kind, targetType: r.targetType, targetId: r.targetId, providerId: r.providerId, modelId: r.modelId, status: r.status, attempts: r.attempts,
     compiledPrompt: r.compiledPrompt, parameters: { ...r.parameters, negativePrompt: undefined }, seed: r.seed, estimatedCost: r.estimatedCost, actualCost: r.actualCost, userCharge: r.userCharge, durationMs: r.durationMs,
     error: r.error, parentJobId: r.parentJobId, fallbackChain: r.fallbackChain, createdAt: r.createdAt, finishedAt: r.finishedAt,
+    settled: !inflight.has(r.id),
+    files: all("SELECT meta FROM generation_outputs WHERE job_id=? ORDER BY idx", r.id).flatMap(o => { const m = JSON.parse(o.meta); return m.workspacePath ? [{ path: m.workspacePath, mimeType: m.mime, mediaType: r.kind }] : []; }),
     outputs: all("SELECT media_id, idx FROM generation_outputs WHERE job_id=? ORDER BY idx", r.id).map((o) => o.media_id),
 };
 
@@ -60,8 +66,16 @@ export const jobView = (r: any) => r && {
 let timer: NodeJS.Timeout | null = null;
 let ticking = false;
 const inflight = new Set<string>();
+const controllers = new Map<string, AbortController>();
 
 export function startWorker() {
+    // ACT: 无上游任务句柄的脚本不能安全重发，重启后保留失败记录，交由用户决定重试。
+    for (const job of all("SELECT * FROM generation_jobs WHERE status='RUNNING' AND provider_id='workspaceMedia'")) {
+        tx(() => {
+            run("UPDATE generation_jobs SET status='FAILED', finished_at=?, held=0, error=? WHERE id=?", now(), "服务重启，供应商结果待核查；未自动重发，请核查后重试", job.id);
+            release(job.workspace_id, job.id, job.held, "server interrupted");
+        });
+    }
     // Crash recovery: anything RUNNING at boot either resumes polling (has provider task) or re-queues.
     run("UPDATE generation_jobs SET status='QUEUED', run_after=? WHERE status='RUNNING'", now());
     if (!timer) timer = setInterval(() => void tick(), config.workerPollMs);
@@ -102,6 +116,8 @@ async function loadInputs(refs: any[]) {
 }
 
 async function execute(jobId: string) {
+    const controller = new AbortController();
+    controllers.set(jobId, controller);
     const raw = get("SELECT * FROM generation_jobs WHERE id=?", jobId)!;
     const s = scoped(raw.workspace_id);
     const job = s.get("generation_jobs", jobId, true)!;
@@ -115,7 +131,8 @@ async function execute(jobId: string) {
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
-        const req: GenRequest = { kind: job.kind, externalModelId: model.external_model_id, prompt: job.compiledPrompt, negativePrompt: p.negativePrompt, params: { ...p, seed: job.seed }, inputs: await loadInputs(job.inputRefs ?? []), apiKey, baseUrl: prov.base_url, attempt: job.attempts, label: p.label };
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(prov.timeout_ms)]);
+        const req: GenRequest = { signal, context: { jobId, workspaceId: job.workspaceId, projectId: job.projectId, userId: job.createdBy }, kind: job.kind, externalModelId: model.external_model_id, prompt: job.compiledPrompt, negativePrompt: p.negativePrompt, params: { ...p, seed: job.seed }, inputs: await loadInputs(job.inputRefs ?? []), apiKey, baseUrl: prov.base_url, attempt: job.attempts, label: p.label };
         let result: GenResult | null = null;
         let taskId: string | null = raw.provider_task_id; // resume after restart
         const deadline = started + prov.timeout_ms;
@@ -134,11 +151,11 @@ async function execute(jobId: string) {
                 if (hook.status === "failed") throw Object.assign(new Error(hook.error ?? "provider reported failure"), { retryable: false });
                 const outputs = [];
                 for (const o of hook.outputs ?? []) outputs.push(o.b64 ? { data: Buffer.from(o.b64, "base64"), mime: o.mime ?? "image/png", duration: o.duration } : await (async () => { const r = await fetch(o.url); if (!r.ok) throw new Error(`callback output HTTP ${r.status}`); return { data: Buffer.from(await r.arrayBuffer()), mime: o.mime ?? r.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream", duration: o.duration }; })());
-                result = { outputs, costUsd: Number(hook.costUsd ?? 0.04 * outputs.length) };
+                result = { outputs, costUsd: typeof hook.costUsd === "number" && Number.isFinite(hook.costUsd) && hook.costUsd >= 0 ? hook.costUsd : null };
                 break;
             }
             const t0 = Date.now();
-            const r = await adapter.poll(taskId!, { apiKey, baseUrl: prov.base_url });
+            const r = await adapter.poll(taskId!, { apiKey, baseUrl: prov.base_url, signal });
             observe(`provider_${prov.id}_poll_ms`, Date.now() - t0);
             if (r.status === "done") result = r.result;
             else if (r.status === "failed") throw Object.assign(new Error(r.error), { retryable: r.retryable });
@@ -150,7 +167,10 @@ async function execute(jobId: string) {
     } catch (e) {
         const err = e as Error & { retryable?: boolean; timeout?: boolean };
         if (cred) markCredential(cred.id, err.message);
+        if (err.name === "TimeoutError") err.timeout = true;
         await fail(job, err, Date.now() - started);
+    } finally {
+        controllers.delete(jobId);
     }
 }
 
@@ -162,7 +182,7 @@ async function finish(job: any, result: GenResult, durationMs: number) {
     for (const [i, o] of result.outputs.entries()) {
         const m = await saveMedia(job.workspaceId, job.projectId, o.data, { source: "generation", mime: o.mime, duration: o.duration, allowUnsniffed: false });
         mediaIds.push(m.id);
-        s.insert("generation_outputs", { job_id: job.id, media_id: m.id, idx: i, meta: { seed: job.seed, model: job.modelId } });
+        s.insert("generation_outputs", { job_id: job.id, media_id: m.id, idx: i, meta: { seed: job.seed, model: job.modelId, workspacePath: o.workspacePath, mime: o.mime } });
     }
     const userCharge = creditsFor(result.costUsd);
     tx(() => {
@@ -172,6 +192,7 @@ async function finish(job: any, result: GenResult, durationMs: number) {
         run("UPDATE generation_jobs SET status='SUCCEEDED', actual_cost=?, user_charge=?, duration_ms=?, finished_at=?, held=0, error=NULL WHERE id=?", result.costUsd, userCharge, durationMs, now(), job.id);
         charge(job.workspaceId, job.id, job.held, userCharge, result.costUsd);
     });
+    if (get("SELECT status FROM generation_jobs WHERE id=?", job.id)?.status !== "SUCCEEDED") return;
     try {
         onJobSucceeded(s, scoped(job.workspaceId).get("generation_jobs", job.id, true)!, mediaIds);
     } catch (e) {
@@ -228,6 +249,7 @@ export function cancelJob(workspaceId: string, id: string, actor: string) {
         run("UPDATE generation_jobs SET status='CANCELLED', finished_at=?, held=0 WHERE id=?", now(), id);
         release(workspaceId, id, j0.held, "cancelled: refund hold");
     });
+    controllers.get(id)?.abort();
     audit(actor, "job.cancel", id, null, workspaceId);
 }
 
@@ -237,6 +259,6 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     if (!o) throw bad("job not found");
     if (["QUEUED", "RUNNING"].includes(o.status)) throw conflict("job still active");
     const { negativePrompt, label, ...rest } = o.parameters ?? {};
-    return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, label });
+    return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label });
 }
 void setting; void conflict;

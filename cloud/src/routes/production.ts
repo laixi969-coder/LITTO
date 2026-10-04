@@ -183,7 +183,7 @@ production.post("/shots/:id/estimate", async (c) => {
     const roles = s.list("reference_bindings", { targetType: "shot", targetId: sh.id }).map((x: any) => x.role);
     const r = mustRoute({ kind: b.kind, workspaceId: a.workspaceId, projectId: sh.projectId, roles: b.kind === "video" ? ["START_FRAME", ...roles] : roles, policy: resolvePolicy(a.workspaceId, sh.projectId, sh.modelOverride) });
     const e = estimate(r.chosen!.modelId, b.kind, { count: b.kind === "image" ? b.count : 1, duration: sh.duration ?? 4 });
-    return c.json({ modelId: r.chosen!.modelId, degradations: r.chosen!.degradations, perJob: e, total: { usd: e.usd * (b.kind === "video" ? b.count : 1), credits: e.credits * (b.kind === "video" ? b.count : 1) }, candidates: r.candidates.map((x) => ({ modelId: x.modelId, usable: x.usable, degradations: x.degradations.length })) });
+    return c.json({ modelId: r.chosen!.modelId, degradations: r.chosen!.degradations, perJob: e, total: { usd: e.usd === null ? null : e.usd * (b.kind === "video" ? b.count : 1), credits: e.credits * (b.kind === "video" ? b.count : 1) }, candidates: r.candidates.map((x) => ({ modelId: x.modelId, usable: x.usable, degradations: x.degradations.length })) });
 });
 production.post("/shots/:id/skills/plan", (c) => {
     const { s } = ctx(c);

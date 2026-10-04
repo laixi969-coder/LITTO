@@ -4,6 +4,7 @@ import axios from "axios";
 import type { AgentAttachment } from "@/components/agent/types";
 
 export type Project = {
+  projectId?: string;
   directory: string;
   name: string;
   lastOpenedAt: number;
@@ -15,7 +16,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   const pendingAgentMessage = ref<{ directory: string; prompt: string; attachments?: AgentAttachment[]; model: string; reasoningEffort: string } | null>(null);
 
   async function openProject(path: string, previousDirectory = path, signal?: AbortSignal) {
-    const { data } = await axios.get<{ code: number; data?: { directory: string }; message?: string }>("/api/workspaces/check", {
+    const { data } = await axios.get<{ code: number; data?: { directory: string; projectId?: string }; message?: string }>("/api/workspaces/check", {
       params: { directory: path }, headers: { "x-toonflow-workspace": "1" }, signal,
     });
     signal?.throwIfAborted();
@@ -24,7 +25,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     pendingAgentMessage.value = null;
     const existing = projectList.value.find(project => project.directory === previousDirectory)
       ?? projectList.value.find(project => project.directory === checkedDirectory);
-    project.value = { directory: checkedDirectory, name: existing?.name || checkedDirectory.split(/[\\/]/).filter(Boolean).at(-1) || checkedDirectory, lastOpenedAt: Date.now() };
+    project.value = { projectId: data.data.projectId, directory: checkedDirectory, name: existing?.name || checkedDirectory.split(/[\\/]/).filter(Boolean).at(-1) || checkedDirectory, lastOpenedAt: Date.now() };
     projectList.value = [
       project.value,
       ...projectList.value.filter(item => item.directory !== previousDirectory && item.directory !== checkedDirectory),

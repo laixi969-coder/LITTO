@@ -34,7 +34,7 @@ const providers = (): Record<string, P> => {
             const t = await postForm(`${base}/login/oauth/access_token`, { client_id: env("LITTO_OAUTH_GITHUB_ID")!, client_secret: env("LITTO_OAUTH_GITHUB_SECRET")!, code, redirect_uri: redirect });
             const h = { authorization: `Bearer ${t.access_token}`, accept: "application/json", "user-agent": "litto" };
             const me: any = await (await fetch(`${api}/user`, { headers: h })).json();
-            const emails: any[] = await (await fetch(`${api}/user/emails`, { headers: h })).json().catch(() => []);
+            const emails: unknown = await (await fetch(`${api}/user/emails`, { headers: h })).json().catch(() => []);
             const primary = Array.isArray(emails) ? emails.find((e) => e.primary && e.verified) : null;
             const email = primary?.email ?? (me.email as string);
             return { email, subject: String(me.id), verified: !!primary || !!me.email };
