@@ -13,6 +13,7 @@ metadata:
 
 ## 与其他技能的分工
 
+- 消费者洞察靠 [insight](../insight/SKILL.md)。
 - 一致性靠 [continuity](../continuity/SKILL.md)：产品的形状、颜色、logo 与包装必须锁定；多镜头状态表照它做。
 - 画布操作与阶段确认靠 [canvas](../canvas/SKILL.md)；资产参考板、Seedance 分段与提示词靠 [workflow](../workflow/SKILL.md)。进入 workflow 的 Seedance 执行态后，**分段、时长、镜头格式一律以它为准**，本技能只负责广告内容层（策略、脚本、产品镜头、合规）。技能位置以 `available_skills` 中的 `location` 为准。
 
@@ -26,6 +27,8 @@ metadata:
 4. **必须出现的卖点与禁忌**：1–3 个卖点；不能出现的内容（竞品、特定词、颜色、人物）。
 
 缺项超过一项时，用 `askUser` 的 `fields` 一次问完（字段名如 `product`、`channel`、`duration`、`mustSay`），不要逐条追问；用户跳过或没回答，就用保守默认值继续并标明「待确认」。不要求用户先写策划案。
+
+简报里没有目标人群的真实依据、卖点不清，或用户要求做洞察时，先用 [insight](../insight/SKILL.md) 得到带证据状态的洞察（没有材料时只给明确标注的待验证假设），再写下面的策略；策略引用洞察，不把假设当事实。
 
 ## 2. 创意策略：三句话，用户确认后再写脚本
 

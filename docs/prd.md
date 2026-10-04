@@ -80,7 +80,7 @@ workspaceId。Project、Asset、Reference、Media、Shot、Take、GenerationJob�
 6. 面向拍摄的约束：Story Writer 须考虑角色数量、场景数量与当前模型可稳定生成的范围，不写拍不出来的戏；剧本质检用固定清单（情感锚点、欲望、困境、因果、情绪可拍摄等），不向用户展示模型自评分数。
 7. 数据：`story_drafts, script_versions, creative_briefs, scene_lists`，均带 workspaceId、projectId、schemaVersion。
 
-实现状态（V3.1）：四条通道已由技能落地，`packages/skills` 下 `story`（故事通道与已有素材整理）、`adfilm`（创意/广告）、`musicfilm`（MV）、`breakdown`（§4B），首页创作入口按通道调用。确认环节复用 `askUser`；SceneList 与拆解清单暂存画布文本节点，上述数据表为后续迁移目标。MV 通道在音频分析、歌词对齐与 Music Timeline 工具就绪前，只交付到段落场次表与镜头规划，结构与节拍须标注为推断。
+实现状态（V3.1）：四条通道已由技能落地，`packages/skills` 下 `story`（故事通道与已有素材整理）、`adfilm`（创意/广告，上游为 `insight` 消费者洞察）、`musicfilm`（MV）、`breakdown`（§4B），首页创作入口按通道调用。确认环节复用 `askUser`；SceneList 与拆解清单暂存画布文本节点，上述数据表为后续迁移目标。MV 通道在音频分析、歌词对齐与 Music Timeline 工具就绪前，只交付到段落场次表与镜头规划，结构与节拍须标注为推断。
 
 # 4B. Script Breakdown｜剧本拆解（V3.1 新增）
 
