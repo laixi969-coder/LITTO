@@ -10,13 +10,13 @@
 | --- | --- |
 | server `tsc`、`bun run build` | 通过 |
 | web `vite build` | 通过；浏览器实测首页四条创意通道、弹窗文案切换、375px 无横向溢出 |
-| web `vue-tsc` | 10 → 7。已修：首页通道死分支、语言模型对话框中不可达的 `tfRouter` 分支与无用资源、`fetch` 包装丢失静态成员的类型。剩余：form-create 库类型 4 处、vue-tsc 对模板中非 ref 绑定的 `.value` 误报 2 处、缺生成文件 `.hutch/devkit` 1 处 |
+| web `vue-tsc` | 10 → 1。已修：首页通道死分支、语言模型对话框中不可达的 `tfRouter` 分支、`fetch` 包装的类型、form-create 默认导出被声明为函数（运行时是组件，新增带 props 类型的 `formCreateForm` 别名，4 个设置对话框改用并实测渲染）、模板内联箭头函数的 `.value` 误报（改为具名函数）。剩余 1 处为缺生成目录 `.hutch/devkit` |
 | cloud `tsc` | 通过 |
 | cloud 测试 | 46 项中 37 通过、9 失败。失败根因均为 b835e73 有意加入的门禁（Hero 采用前须完成真实感检查、改动已采用镜头须 `confirm:true`），后续用例因前置失败级联。测试需按新门禁补上检查步骤；按仓库规范本轮不修改测试文件 |
 | desktop typecheck | 失败：`electrobun/main` 已迁移到 hutch 工具链，本地缺 `.hutch` 生成目录，属环境问题 |
 | 技能加载 | 9 个技能全部加载，无诊断 |
 
-环境说明：本地 `node_modules` 与 `bun.lock` 不同步（web 应使用 TypeScript 6.0.3，实际只有根目录的 7.0.2），导致 `bun run typecheck` 无法启动。重新安装需联网，本次以 lockfile 中的 6.0.3 运行 vue-tsc 完成检查，未改动 lockfile。
+环境说明：本地 `node_modules` 仍是旧的根目录集中布局，而 `bun.lock` 已是按包隔离的布局。由此导致：web 缺 TypeScript 6.0.3，`bun run typecheck` 无法启动；`modelIcons` 从包内 `node_modules` 读取图标，本地找不到，界面显示「?」。`.hutch` 需联网下载 Hutch（本机下载失败：ReleaseDownloadFailed）。重新安装需联网，本次以 lockfile 中的 6.0.3 运行 vue-tsc 完成检查，未改动 lockfile。
 
 ### 图片/视频领域链路落地（2026-10-04）
 

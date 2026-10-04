@@ -22,7 +22,7 @@
           </div>
           <messageMarkdown v-if="providerReadme" class="providerReadme" :content="providerReadme" />
           <el-divider v-if="providerReadme" contentPosition="left">连接配置</el-divider>
-          <form-create v-model="formValues" v-model:api="formApi" :rule="providerRules" :option="formOptions" />
+          <form-create-form v-model="formValues" v-model:api="formApi" :rule="providerRules" :option="formOptions" />
           <div class="modelHeader">
             <el-text tag="strong">模型列表 <el-text type="info">{{ models.length }}</el-text></el-text>
             <el-text v-if="fetching" type="info" size="small">正在获取…</el-text>
@@ -52,7 +52,7 @@
 import { computed, ref, shallowRef, watch } from "vue";
 import axios from "axios";
 import { IconRefresh } from "@tabler/icons-vue";
-import formCreate, { type Api, type Options } from "../../formCreate";
+import formCreate, { formCreateForm, type Api, type Options } from "../../formCreate";
 import { languageProviders } from "@toonflow/providers";
 import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";

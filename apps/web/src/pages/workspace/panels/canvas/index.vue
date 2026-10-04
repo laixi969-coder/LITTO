@@ -92,7 +92,7 @@
         :key="JSON.stringify([project?.directory, canvasId])"
         ref="selectionToolbarRef"
         :batchHistory="canvasHistory.batch"
-        :getSignal="() => canvasController.signal"
+        :getSignal="getCanvasSignal"
         :disabled="!canvasId || !project?.directory" />
       <nodeSearch ref="nodeSearchRef" :disabled="!active || settingsVisible || !canvasId || !project?.directory" />
     </vue-flow>
@@ -256,6 +256,8 @@ provide("selectionConnection", shallowRef<NodeConnectionFeedback>());
 provide("saveNodeToAssets", (label: string, outputs: { label: string; output: NodeOutput }[]) => assetLibraryRef.value?.openSave(label, outputs));
 let canvasController = new AbortController();
 let workspaceController = new AbortController();
+// 每次调用读取当前控制器；画布重载时 canvasController 会被替换。
+const getCanvasSignal = () => canvasController.signal;
 const createCanvasContext = useCanvasTools({
   availableNodes,
   flushSave: flushCanvasSave,

@@ -12,7 +12,7 @@
       <div v-if="provider" class="debugBody">
         <section class="parameters" aria-label="调试参数">
           <h3>{{ provider.label }}</h3>
-          <form-create v-model="config" v-model:api="formApi" :rule="formRules" :option="formOptions" />
+          <form-create-form v-model="config" v-model:api="formApi" :rule="formRules" :option="formOptions" />
           <el-form labelPosition="top" :disabled="busy">
             <el-form-item label="模型">
               <el-select v-model="modelId" placeholder="选择模型" aria-label="调试模型">
@@ -118,7 +118,7 @@
 import { locale, translate } from "@toonflow/i18n/vue";
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import axios from "axios";
-import formCreate, { type Api, type Options, type Rule } from "../../formCreate";
+import formCreate, { formCreateForm, type Api, type Options, type Rule } from "../../formCreate";
 import { ElMessage } from "element-plus";
 import { IconFolderOpen, IconRefresh, IconPlus, IconX, IconVolume, IconDownload, IconPlayerPlay, IconPlayerStop } from "@tabler/icons-vue";
 import type { Provider } from "@toonflow/providers";
