@@ -15,7 +15,7 @@ const dataOf = (i: ShotInput) => {
 export function createShot(s: Scope, projectId: string, input: ShotInput) {
     const seq = s.get("sequences", input.sequenceId);
     if (!seq || seq.projectId !== projectId) throw notFound("sequence");
-    for (const id of input.assetIds) if (!s.get("assets", id)) throw bad(`unknown asset ${id}`);
+    for (const id of input.assetIds) if (s.get("assets", id)?.projectId !== projectId) throw bad(`unknown project asset ${id}`);
     const ord = input.order ?? all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", input.sequenceId, s.workspaceId)[0].n;
     return tx(() => {
         if (input.order !== undefined) run("UPDATE shots SET ord=ord+1 WHERE sequence_id=? AND workspace_id=? AND ord>=? AND deleted_at IS NULL", input.sequenceId, s.workspaceId, ord);
@@ -26,13 +26,13 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["narrativeFunction", "action", "assetIds"] as const;
+const CORE = ["narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
     const changed = CORE.filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(shot[k]));
     if (changed.length && (shot.heroKeyframeId || shot.approvedTakeId) && !confirm) throw conflict(`changing ${changed.join(", ")} affects an approved Hero Frame/Take; resend with confirm:true`, "needs_confirmation", { fields: changed, heroKeyframeId: shot.heroKeyframeId, approvedTakeId: shot.approvedTakeId });
-    for (const aid of patch.assetIds ?? []) if (!s.get("assets", aid)) throw bad(`unknown asset ${aid}`);
+    for (const aid of patch.assetIds ?? []) if (s.get("assets", aid)?.projectId !== shot.projectId) throw bad(`unknown project asset ${aid}`);
     const { id: _i, workspaceId, projectId, sequenceId, sceneId, ord, schemaVersion, status, heroKeyframeId, approvedTakeId, createdAt, updatedAt, deletedAt, ...data } = shot;
     const { sequenceId: _s, sceneId: _c, order, ...rest } = patch;
     const upd = s.update("shots", id, { data: { ...data, ...rest }, ...(patch.sceneId !== undefined ? { scene_id: patch.sceneId } : {}) });
@@ -60,8 +60,8 @@ export function deleteShot(s: Scope, id: string) {
 }
 
 export function bindReference(s: Scope, projectId: string, target: { type: "shot" | "asset"; id: string }, b: { referenceId: string; role: string; weight?: number; lockLevel?: string; crop?: any; notes?: string }) {
-    if (!s.get(target.type === "shot" ? "shots" : "assets", target.id)) throw notFound(target.type);
-    if (!s.get("refs", b.referenceId)) throw notFound("reference");
+    if (s.get(target.type === "shot" ? "shots" : "assets", target.id)?.projectId !== projectId) throw notFound(target.type);
+    if (s.get("refs", b.referenceId)?.projectId !== projectId) throw notFound("reference");
     return s.insert("reference_bindings", { project_id: projectId, target_type: target.type, target_id: target.id, reference_id: b.referenceId, role: b.role, weight: b.weight ?? 1, lock_level: b.lockLevel ?? "CONTROL", crop: b.crop ?? null, notes: b.notes ?? null });
 }
 

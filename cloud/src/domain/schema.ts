@@ -66,5 +66,12 @@ export const shotInput = z.object({
     duration: z.number().default(4),
     subtitle: z.string().default(""),
     modelOverride: z.any().optional(),
+    realism: z.object({
+        surface: z.string().max(4000).default(""),
+        imaging: z.string().max(4000).default(""),
+        world: z.string().max(4000).default(""),
+        motion: z.string().max(4000).default(""),
+        cinematic: z.string().max(4000).default(""),
+    }).default({}),
 });
 export type ShotInput = z.infer<typeof shotInput>;

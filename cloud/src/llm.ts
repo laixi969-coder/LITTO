@@ -10,8 +10,8 @@ import { bad, now, ulid } from "./util.ts";
  * Provider → Router → Credential → Ledger path as media, and are recorded as generation jobs for cost/history.
  * Returns null when no usable text model exists, so callers fall back to the deterministic skills.
  */
-export async function runText(o: { workspaceId: string; projectId: string | null; actor: string; system: string; prompt: string; json?: boolean; imageMediaIds?: string[]; label: string; mockEcho?: string }) {
-    const need = o.imageMediaIds?.length ? ["vision"] : [];
+export async function runText(o: { workspaceId: string; projectId: string | null; actor: string; system: string; prompt: string; json?: boolean; imageMediaIds?: string[]; frames?: { data: Buffer; mime: string }[]; label: string; mockEcho?: string }) {
+    const need = o.imageMediaIds?.length || o.frames?.length ? ["vision"] : [];
     let routed;
     try { routed = mustRoute({ kind: "text", need, workspaceId: o.workspaceId, projectId: o.projectId, roles: [], policy: resolvePolicy(o.workspaceId, o.projectId) }); } catch { return null; }
     const m = get("SELECT * FROM models WHERE id=?", routed.chosen!.modelId)!;
@@ -19,6 +19,7 @@ export async function runText(o: { workspaceId: string; projectId: string | null
     const ad = ADAPTERS[prov.adapter];
     const cred = credentialFor(prov.id, o.workspaceId, o.projectId);
     const inputs = [];
+    for (const frame of o.frames ?? []) inputs.push({ role: "VISION", mime: frame.mime, data: frame.data, weight: 1 });
     for (const id of o.imageMediaIds ?? []) { const x = get("SELECT * FROM media WHERE id=? AND workspace_id=?", id, o.workspaceId); if (x) inputs.push({ role: "VISION", mime: x.mime, data: await storage.get(x.storage_key), weight: 1 }); }
     const est = creditsFor(JSON.parse(m.price).perCall ?? null);
     const id = ulid();

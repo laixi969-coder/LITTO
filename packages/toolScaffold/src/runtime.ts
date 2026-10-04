@@ -91,6 +91,8 @@ export interface MediaReference {
 }
 
 export interface MediaGenerationRequest {
+  shotId?: string;
+  productionFingerprint?: string;
   providerId: string;
   modelId: string;
   prompt: string;
@@ -121,6 +123,7 @@ export interface GeneratedMedia {
 }
 
 export interface MediaContext {
+  production?(operation: string, data: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>;
   listModels(): Promise<MediaModel[]>;
   generateImage(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
   generateVideo(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;

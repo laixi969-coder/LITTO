@@ -15,10 +15,12 @@ export { resolveSession } from "./auth.ts";
 export type { Auth, Role } from "./auth.ts";
 export { scoped, get as dbGet, all as dbAll, run as dbRun, audit, setting } from "./db.ts";
 export { recordUsage } from "./usage.ts";
-export { configureWorkspaceMedia, linkWorkspaceProject, enqueueWorkspaceMedia } from "./workspaceMedia.ts";
+export { configureWorkspaceMedia, linkWorkspaceProject, enqueueWorkspaceMedia, prepareWorkspaceShot } from "./workspaceMedia.ts";
 export { cancelJob, jobView } from "./jobs.ts";
 export type { GenRequest, GenResult } from "./providers/adapter.ts";
 export { encrypt, decrypt } from "./crypto.ts";
+export { workspaceProduction } from "./domain/workspaceProduction.ts";
+export { configureWorkspaceVision } from "./domain/qc-vision.ts";
 export { accountOf, adminAdjust, creditsFor, hold, charge, release } from "./credits.ts";
 export const cloudRequestListener = getRequestListener(app.fetch);
 

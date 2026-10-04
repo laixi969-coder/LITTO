@@ -7,6 +7,7 @@ import { recomputeStates } from "./state.ts";
 import { enqueue, estimate } from "../jobs.ts";
 import { mustRoute, resolvePolicy, type Policy } from "../providers/router.ts";
 import { mediaView } from "../storage.ts";
+import { requireReviewed } from "./realism.ts";
 
 /** Job success → materialise domain objects. Nothing is overwritten: every output is a new Keyframe variant or Take candidate. */
 export function onJobSucceeded(s: Scope, job: any, mediaIds: string[]) {
@@ -45,6 +46,7 @@ export function generateKeyframes(s: Scope, shotId: string, actor: string, o: Ge
 export function promoteHero(s: Scope, keyframeId: string, actor: string) {
     const kf = s.get("keyframes", keyframeId);
     if (!kf) throw notFound("keyframe");
+    requireReviewed(s, "keyframe", kf);
     return tx(() => {
         const shot = s.get("shots", kf.shotId)!;
         // Previous Hero is preserved (status superseded), never deleted.
@@ -71,7 +73,8 @@ export function generateTakes(s: Scope, shotId: string, actor: string, o: GenOpt
     if (!shot) throw notFound("shot");
     const kfId = o.keyframeId ?? shot.heroKeyframeId;
     const kf = kfId ? s.get("keyframes", kfId) : null;
-    if (!kf) throw conflict("promote a Hero Frame before generating Takes", "no_hero_frame");
+    if (!kf || kf.shotId !== shotId || kf.id !== shot.heroKeyframeId || kf.status !== "hero") throw conflict("promote a Hero Frame before generating Takes", "no_hero_frame");
+    requireReviewed(s, "keyframe", kf);
     const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId });
     const roles = ["START_FRAME", ...bindings.map((b: any) => b.role)];
     const policy = resolvePolicy(s.workspaceId, shot.projectId, { ...shot.modelOverride, ...o.policy });
@@ -89,6 +92,8 @@ export function generateTakes(s: Scope, shotId: string, actor: string, o: GenOpt
 export function approveTake(s: Scope, takeId: string, actor: string, override?: { reason: string }) {
     const take = s.get("takes", takeId);
     if (!take) throw notFound("take");
+    const evidence = requireReviewed(s, "take", take);
+    if (!evidence.observedStateDelta) throw conflict("请记录视频结束时实际观察到的资产状态", "result_state_required");
     const shot = s.get("shots", take.shotId)!;
     checkSequence(s, shot.sequenceId);
     const high = openHighIssues(s, shot.id);
@@ -99,8 +104,9 @@ export function approveTake(s: Scope, takeId: string, actor: string, override?: 
             event(s, take.projectId, "take", takeId, "override_continuity", actor, override!.reason, shot.id);
         }
         for (const t of s.list("takes", { shotId: shot.id, status: "approved" })) s.update("takes", t.id, { status: "superseded" });
-        s.update("takes", takeId, { status: "approved" });
+        s.update("takes", takeId, { status: "approved", meta: { ...take.meta, observedStateDelta: evidence.observedStateDelta } });
         s.update("shots", shot.id, { approved_take_id: takeId, status: "approved" });
+        recomputeStates(s, shot.sequenceId);
         event(s, take.projectId, "take", takeId, "approve", actor, undefined, shot.id);
         return s.get("takes", takeId)!;
     });

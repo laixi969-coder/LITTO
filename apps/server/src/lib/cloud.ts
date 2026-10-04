@@ -20,6 +20,8 @@ export async function mountCloud(app: Express) {
   embed = await import("../../../../cloud/src/embed");
   const { executeMediaJob } = await import("@/utils/media/jobs");
   embed.configureWorkspaceMedia(executeMediaJob);
+  const { inspectFrames } = await import("@/utils/media/vision");
+  embed.configureWorkspaceVision(inspectFrames);
   embed.initCloud();
   // Hono handler expects a raw request stream: mount before any body parser.
   app.use("/cloud", (req, res) => void embed!.cloudRequestListener(req, res));

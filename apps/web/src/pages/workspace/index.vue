@@ -43,6 +43,8 @@
     </el-tooltip>
     <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" />
     <settings v-model="settingsVisible" />
+    <el-button class="productionButton" @click="productionVisible = true">镜头制作</el-button>
+    <productionPanel v-if="workspaceStore.project" :key="workspaceStore.project.directory" ref="productionPanelRef" v-model="productionVisible" :projectId="workspaceStore.project.projectId" :directory="workspaceStore.project.directory" />
   </main>
 </template>
 
@@ -59,6 +61,10 @@ import anonymousData from "@/lib/anonymousData";
 import canvasPanel from "./panels/canvas/canvasHost.vue";
 import workspaceMenu from "./components/workspaceMenu.vue";
 import floatingAgent from "./components/floatingAgent.vue";
+import productionPanel from "./components/productionPanel.vue";
+const productionVisible = ref(false);
+const productionPanelRef = ref<InstanceType<typeof productionPanel>>();
+provide("openProductionShot", (id: string) => productionPanelRef.value?.openShot(id));
 
 const documentPanel = defineAsyncComponent(() => import("./panels/document/index.vue"));
 
@@ -125,6 +131,7 @@ registerWorkspaceControl({
 });
 
 async function flushSave() {
+  await productionPanelRef.value?.flushSave();
   await documentPanelRef.value?.flushSave();
   await canvasPanelRef.value?.flushSave();
 }
@@ -188,6 +195,7 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
 
 <style scoped lang="scss">
 .workspacePage {
+  .productionButton { position: absolute; left: calc(var(--railWidth) + 16px); top: 64px; z-index: 7; min-height: 44px; }
   --railWidth: 208px;
   position: relative;
   width: 100%;

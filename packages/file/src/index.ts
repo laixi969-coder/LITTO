@@ -89,12 +89,14 @@ export const opendir: typeof promises.opendir = async (path, options) => {
 };
 
 type PathStreamOptions<T> = Omit<T, "fd" | "fs"> & { fd?: never; fs?: never };
+type ReadStreamOptions = Exclude<Parameters<typeof native.createReadStream>[1], string | undefined>;
+type WriteStreamOptions = Exclude<Parameters<typeof native.createWriteStream>[1], string | undefined>;
 
 function createPathStream<T extends native.ReadStream | native.WriteStream>(
   path: native.PathLike,
-  options: BufferEncoding | PathStreamOptions<native.ReadStreamOptions & native.WriteStreamOptions> | undefined,
+  options: BufferEncoding | PathStreamOptions<ReadStreamOptions & WriteStreamOptions> | undefined,
   defaultFlags: string,
-  create: (path: native.PathLike, options: native.ReadStreamOptions & native.WriteStreamOptions) => T,
+  create: (path: native.PathLike, options: ReadStreamOptions & WriteStreamOptions) => T,
 ) {
   const settings = typeof options === "string" ? { encoding: options } : options;
   if (settings?.fd != null || settings?.fs != null) throw new TypeError("文件流不接受外部 fd/fs；请使用 open 返回的句柄创建流");
@@ -136,10 +138,10 @@ function createPathStream<T extends native.ReadStream | native.WriteStream>(
   return stream;
 }
 
-export function createReadStream(path: native.PathLike, options?: BufferEncoding | PathStreamOptions<native.ReadStreamOptions>) {
+export function createReadStream(path: native.PathLike, options?: BufferEncoding | PathStreamOptions<ReadStreamOptions>) {
   return createPathStream(path, options, "r", native.createReadStream);
 }
-export function createWriteStream(path: native.PathLike, options?: BufferEncoding | PathStreamOptions<native.WriteStreamOptions>) {
+export function createWriteStream(path: native.PathLike, options?: BufferEncoding | PathStreamOptions<WriteStreamOptions>) {
   return createPathStream(path, options, "w", native.createWriteStream);
 }
 

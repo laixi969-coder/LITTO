@@ -2,9 +2,15 @@ import { type Scope } from "../db.ts";
 import { notFound } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
 import { generateKeyframes, generateTakes } from "./lifecycle.ts";
+import { realismChecks, shotFingerprint } from "./realism.ts";
+import { bad } from "../util.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
 const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string; penalty: number; severity: "high" | "medium" | "low" }> = {
+    plastic_surface: { cause: "皮肤或材质呈塑料感、统一磨皮", action: "material_reference", detail: "核对材质与光照参考，修正表面粗糙度、局部纹理与高光响应；保留身份后另出关键帧，不靠叠加锐化补救", penalty: 25, severity: "high" },
+    imaging_failure: { cause: "曝光、焦平面或光学表现不可信", action: "imaging_revise", detail: "核对实景光源、曝光主体、高光滚降、暗部和景深，调整摄影规格后另出候选", penalty: 20, severity: "high" },
+    temporal_drift: { cause: "视频材质、身份或空间随时间漂移", action: "motion_regenerate", detail: "标记出错时间段，锁定 Hero 和身份/环境参考，简化该段动作后生成新 Take", penalty: 25, severity: "high" },
+    performance_failure: { cause: "表演或摄影机运动缺少动机", action: "performance_revise", detail: "重写可观察的反应、动作与收势节拍，明确走位和摄影机动机，再生成新 Take", penalty: 20, severity: "high" },
     hand_artifact: { cause: "Local anatomical failure (hands)", action: "inpaint_local", detail: "Mask the hands and inpaint / local edit; do not regenerate the whole frame", penalty: 15, severity: "medium" },
     face_artifact: { cause: "Local anatomical failure (face)", action: "inpaint_local", detail: "Mask the face region and inpaint with the IDENTITY reference", penalty: 15, severity: "medium" },
     identity_drift: { cause: "Identity drifted from approved asset", action: "reference_replace", detail: "Re-bind the IDENTITY reference at weight 1.0 (LOCK) and regenerate", penalty: 30, severity: "high" },
@@ -17,11 +23,14 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
 };
 export const OBSERVATION_KINDS = Object.keys(DIAGNOSIS);
 
-export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = []) {
+export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown> } = {}) {
     const shot = s.get("shots", shotId);
     if (!shot) throw notFound("shot");
     const obj = s.get(target.type === "take" ? "takes" : "keyframes", target.id);
-    if (!obj) throw notFound(target.type);
+    if (!obj || obj.shotId !== shotId) throw notFound(target.type);
+    if (observations.some(o => !DIAGNOSIS[o.kind])) throw bad("未知的质检问题类型");
+    const reviewed = [...new Set(review.reviewed ?? [])];
+    if (reviewed.length && (!review.actor || !review.note?.trim() || reviewed.some(key => !realismChecks.includes(key as any)))) throw bad("人工检查须记录检查项、检查者和观察说明");
     const findings: any[] = [];
     // 1. human / vision observations → diagnosis.
     for (const o of observations) {
@@ -35,10 +44,12 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     // 3. continuity issues on this shot.
     const issues = checkSequence(s, shot.sequenceId).filter((i) => i.shotId === shotId);
     for (const i of issues) findings.push({ kind: `continuity:${i.category}`, cause: i.message, action: i.repair.action, detail: i.repair.detail, penalty: i.severity === "high" ? 20 : i.severity === "medium" ? 8 : 3, severity: i.severity });
-    const score = Math.max(0, 100 - findings.reduce((a, f) => a + f.penalty, 0));
-    const report = s.insert("qc_reports", { project_id: shot.projectId, shot_id: shotId, target_type: target.type, target_id: target.id, score, findings });
+    const complete = realismChecks.filter(key => target.type === "take" || key !== "motion").every(key => reviewed.includes(key));
+    const score = complete ? Math.max(0, 100 - findings.reduce((a, f) => a + f.penalty, 0)) : null;
+    const evidence = { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint: shotFingerprint(s, shotId), vision: review.vision ?? null, observedStateDelta: review.observedStateDelta };
+    const report = s.insert("qc_reports", { project_id: shot.projectId, shot_id: shotId, target_type: target.type, target_id: target.id, score, findings, evidence });
     const actions = findings.map((f) => s.insert("repair_actions", { project_id: shot.projectId, qc_report_id: report.id, shot_id: shotId, action: f.action, cause: f.cause, detail: f.detail, status: "suggested" }));
-    return { report: { id: report.id, score, findings }, repairActions: actions.map((a) => ({ id: a.id, action: a.action, cause: a.cause, detail: a.detail, status: a.status })) };
+    return { report: { id: report.id, score, findings, evidence }, repairActions: actions.map((a) => ({ id: a.id, action: a.action, cause: a.cause, detail: a.detail, status: a.status })) };
 }
 
 /** Apply a repair: creates a NEW variant/take (old ones are kept) with the fix expressed in structured form. */

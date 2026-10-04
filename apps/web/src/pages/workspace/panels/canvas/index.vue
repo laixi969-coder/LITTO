@@ -96,7 +96,7 @@
         :disabled="!canvasId || !project?.directory" />
       <nodeSearch ref="nodeSearchRef" :disabled="!active || settingsVisible || !canvasId || !project?.directory" />
     </vue-flow>
-    <shotStrip v-if="shots.length" :shots="shots" :directory="project?.directory" @select="selectShot" @finalize="finalizeShot" />
+    <shotStrip v-if="shots.length || project?.projectId" :shots="shots" :projectId="project?.projectId" :directory="project?.directory" @select="selectShot" @finalize="finalizeShot" />
     <teleport to="body">
       <el-button
         v-if="edgeDisconnect && findEdge(edgeDisconnect.id)"

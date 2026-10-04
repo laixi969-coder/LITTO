@@ -43,18 +43,21 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     };
 
     const roleCap: Record<string, string> = { IDENTITY: "identityReference", GEOMETRY: "multiReference", WARDROBE: "multiReference", ENVIRONMENT: "multiReference", COMPOSITION: "compositionReference", LIGHTING: "multiReference", LOOK: "multiReference", DEPTH: "depthReference", PANORAMA: "panoramaReference", PERFORMANCE: "motionReference", CAMERA_MOTION: "cameraControl", START_FRAME: "image2video", END_FRAME: "startEndFrame", AUDIO: "nativeAudio" };
-    const maxInputs = Number(caps.maxInputs ?? 0);
+    const adapter = get("SELECT adapter FROM providers WHERE id=?", model.providerId)?.adapter;
+    const maxInputs = adapter === "openai-compatible" && kind === "video" ? 1 : Number(caps.maxInputs ?? 0);
     const degradations: Compiled["degradations"] = [];
     const inputs: Compiled["inputs"] = [];
-    let used = 0;
+    let used = kind === "video" && extra.startFrameMediaId ? 1 : 0;
     const sorted = [...bindings].sort((a, b) => b.weight - a.weight);
     const textFallback: string[] = [];
     for (const b of sorted) {
+        if (kind === "video" && extra.startFrameMediaId && b.role === "START_FRAME") continue;
         const ref = s.get("refs", b.referenceId);
-        const supported = !!caps[roleCap[b.role]] && used < maxInputs && ref?.mediaId;
-        if (supported || (kind === "video" && b.role === "START_FRAME")) { inputs.push({ referenceId: b.referenceId, mediaId: ref?.mediaId ?? null, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: true }); used++; }
+        const adapterSupports = !(adapter === "openai-compatible" && kind === "video" && b.role !== "START_FRAME");
+        const supported = !b.crop && adapterSupports && !!caps[roleCap[b.role]] && used < maxInputs && ref?.mediaId;
+        if (supported) { inputs.push({ referenceId: b.referenceId, mediaId: ref?.mediaId ?? null, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: true }); used++; }
         else {
-            const why = !caps[roleCap[b.role]] ? `model lacks ${roleCap[b.role]}` : used >= maxInputs ? "input limit reached" : "reference has no media";
+            const why = b.crop ? "crop/segment must be materialised before sending" : !adapterSupports ? "adapter cannot send this role" : !caps[roleCap[b.role]] ? `model lacks ${roleCap[b.role]}` : used >= maxInputs ? "input limit reached" : "reference has no media";
             degradations.push({ role: b.role, strategy: `${why}: ${b.role} expressed as text` });
             textFallback.push(`${b.role.toLowerCase()} reference "${ref?.name ?? ref?.text ?? b.referenceId}"${b.notes ? ` (${b.notes})` : ""}`);
             inputs.push({ referenceId: b.referenceId, mediaId: ref?.mediaId ?? null, text: ref?.text ?? ref?.name, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: false });
@@ -90,6 +93,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
 
     const sections: Record<string, string> = {
         subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
+        assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
+        narrative: shot.narrativeFunction,
         action: clean(shot.action || shot.title, "action"),
         performance: J([shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`, shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`, shot.performance?.gesture && `gesture ${shot.performance.gesture}`, shot.performance?.timing && `timing ${shot.performance.timing}`]),
         blocking: J([shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`, shot.blocking?.midground && `midground: ${shot.blocking.midground}`, shot.blocking?.background && `background: ${shot.blocking.background}`]),
@@ -99,14 +104,21 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         world: world ? J([world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
         look: look ? J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette?.length && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`]) : "",
         // Realism stack: concrete behaviours instead of adjectives.
-        realism: J([`imaging: exposed for skin, highlights roll off, natural depth of field per ${cam.lensMm}mm`, "surface: real skin pores, fabric weave and material response", "world: gravity, contact shadows, occlusion and correct scale", kind === "video" && "motion: anticipation, weight transfer, inertia and secondary motion"]),
+        realism: J(Object.entries(shot.realism ?? {}).filter(([key, value]) => value && (kind === "video" || key !== "motion")).map(([key, value]) => `${key}: ${clean(String(value), `realism.${key}`)}`)),
+        constraints: J(shot.constraints ?? []),
         state: J([...Object.entries<any>(start.props).filter(([, p]) => p.present).map(([id, p]) => `${p.name ?? id}${p.heldBy ? ` held by ${start.characters[p.heldBy]?.name ?? p.heldBy}` : ""}`), ...Object.entries<any>(start.characters).map(([id, c]) => c.wardrobeId ? `${c.name ?? id} wearing ${start.wardrobe[c.wardrobeId]?.name ?? c.wardrobeId}` : "")]),
+        observedState: J(Object.values(start).flatMap(group => Object.values<any>(group).filter(value => value && typeof value === "object" && value.note).map(value => `${value.name ?? "asset"}: ${value.note}`))),
+        opticalTexture: look ? J([look.shadowBehavior && `shadows: ${look.shadowBehavior}`, look.texture && `texture: ${look.texture}`, look.sharpnessPhilosophy && `sharpness: ${look.sharpnessPhilosophy}`, look.bloom && `bloom: ${look.bloom}`]) : "",
+        referenceIntent: J(bindings.filter(b => b.notes).map(b => `${b.role}: ${b.notes}`)),
         references: textFallback.join("; "),
         lock: freedom.LOCK.join("; "),
         repair: extra.repair?.note ?? "",
     };
     const prompt = Object.entries(sections).filter(([, v]) => v).map(([k, v]) => `${k.toUpperCase()}: ${v}`).join("\n");
     const negativePrompt = J(["extra fingers", "warped hands", "identity drift from references", "text artifacts / garbled logos", "floating objects", ...(freedom.LOCK.length ? ["changes to locked elements"] : [])]);
+    for (const key of ["surface", "imaging", "world", "cinematic", ...(kind === "video" ? ["motion"] : [])]) {
+        if (!shot.realism?.[key]?.trim()) warnings.push(`未填写真实感规格：${key}`);
+    }
     return { prompt, negativePrompt, inputs, degradations, warnings, freedomMap: freedom, sections };
 }
 void all; void route;

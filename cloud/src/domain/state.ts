@@ -1,5 +1,5 @@
 import { all, run, type Scope } from "../db.ts";
-import { j } from "../util.ts";
+import { bad, j } from "../util.ts";
 
 export type State = { characters: Record<string, any>; wardrobe: Record<string, any>; props: Record<string, any>; environment: Record<string, any>; lighting: Record<string, any>; motion: Record<string, any>; emotional: Record<string, any> };
 export const emptyState = (): State => ({ characters: {}, wardrobe: {}, props: {}, environment: {}, lighting: {}, motion: {}, emotional: {} });
@@ -9,6 +9,7 @@ export function applyDelta<T>(base: T, delta: any): T {
     if (delta === null || typeof delta !== "object" || Array.isArray(delta)) return delta;
     const out: any = { ...(base as any) };
     for (const [k, v] of Object.entries(delta)) {
+        if (["__proto__", "constructor", "prototype"].includes(k)) throw bad("invalid state key");
         if (v === null) delete out[k];
         else out[k] = v !== null && typeof v === "object" && !Array.isArray(v) ? applyDelta(out[k] ?? {}, v) : v;
     }
@@ -48,7 +49,8 @@ export function recomputeStates(s: Scope, sequenceId: string) {
         const start = seed(prev ?? emptyState(), shot, assets, shot.sceneId !== prevScene);
         prevScene = shot.sceneId;
         const delta = shot.intendedStateDelta ?? {};
-        const result = applyDelta(start, delta);
+        const approved = shot.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
+        const result = applyDelta(start, approved?.meta?.observedStateDelta ?? delta);
         const upsert = (kind: string, data: State) => {
             const ex = all("SELECT id FROM shot_states WHERE shot_id=? AND kind=? AND workspace_id=?", shot.id, kind, s.workspaceId)[0];
             if (ex) run("UPDATE shot_states SET data=?, updated_at=? WHERE id=?", j(data), new Date().toISOString(), ex.id);
@@ -60,12 +62,14 @@ export function recomputeStates(s: Scope, sequenceId: string) {
     }
 }
 
-export function statesOf(s: Scope, shotId: string): { start: State; result: State } {
+export function statesOf(s: Scope, shotId: string): { start: State; result: State; source: "observed" | "planned" } {
     const rows = s.list("shot_states", { shotId });
     const pick = (k: string) => (rows.find((r) => r.kind === k) as any) ?? emptyState();
     const strip = (r: any): State => {
         const { id, workspaceId, projectId, shotId, kind, createdAt, updatedAt, ...st } = r;
         return { ...emptyState(), ...st };
     };
-    return { start: strip(pick("start")), result: strip(pick("result")) };
+    const shot = s.get("shots", shotId);
+    const take = shot?.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
+    return { start: strip(pick("start")), result: strip(pick("result")), source: take?.meta?.observedStateDelta ? "observed" : "planned" };
 }

@@ -95,6 +95,10 @@ CREATE INDEX idx_usage_ws_time ON usage_events(workspace_id, created_at);
         id: "0006_workspaceProjects",
         sql: `CREATE TABLE workspace_project_links(workspace_id TEXT NOT NULL, directory TEXT NOT NULL, project_id TEXT NOT NULL, PRIMARY KEY(workspace_id,directory));`,
     },
+    {
+        id: "0007_realismReview",
+        sql: `ALTER TABLE qc_reports ADD COLUMN evidence TEXT NOT NULL DEFAULT '{}';`,
+    },
 ];
 
 export const db = await openSqlite(config.dbFile);
@@ -151,7 +155,7 @@ export function setSetting(key: string, value: unknown) {
 /** Tables that carry JSON in a column; repo flattens it into API objects. */
 const JSON_COLS: Record<string, string[]> = {
     worlds: ["data"], looks: ["data"], assets: ["data"], sequences: ["data"], scenes: ["data"], shots: ["data"],
-    shot_states: ["data"], state_deltas: ["data"], keyframes: ["meta"], takes: ["meta"], qc_reports: ["findings"],
+    shot_states: ["data"], state_deltas: ["data"], keyframes: ["meta"], takes: ["meta"], qc_reports: ["findings", "evidence"],
     projects: ["canvas"], asset_versions: ["snapshot"], reference_bindings: ["crop", "provider_compat"],
     generation_jobs: ["parameters", "input_refs", "fallback_chain"], renders: ["manifest"], timelines: ["data"], generation_outputs: ["meta"], continuity_issues: ["repair"],
 };

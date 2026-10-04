@@ -10,6 +10,8 @@ const imageReference = z.strictObject({ path: relativePath, mimeType: z.string()
 const videoReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^video\/[a-z0-9.+-]+$/i) });
 const audioReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^audio\/[a-z0-9.+-]+$/i) });
 const sharedFields = {
+  shotId: z.string().min(1).max(128).optional(),
+  productionFingerprint: z.string().length(64).optional(),
   providerId: z.string().regex(/^[a-z][a-zA-Z0-9]{0,95}$/),
   modelId: z.string().trim().min(1).max(256),
   prompt: z.string().trim().min(1).max(100000),

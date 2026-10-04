@@ -31,7 +31,19 @@ const plugin: ToolPlugin = {
         return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
       },
     };
-    return [listTool, ...generationTools.map<ToolDefinition>(operation => ({
+    const productionSchema = z.object({ operation: z.enum(["read", "world", "look", "asset", "sequence", "shot", "updateShot", "binding", "compile"]), data: z.record(z.string(), z.json()).default({}) });
+    const productionTools: ToolDefinition[] = media.production ? [{
+      name: "productionSpec", label: "制片规格", executionMode: "sequential",
+      description: "读写当前项目的真实领域规格。先 read。world/look 更新世界或影调；asset 创建含 type/name/description/invariants 的资产草稿；sequence 创建 name/script；shot 创建 sequenceId/title/narrativeFunction/assetIds/action/performance/blocking/camera/lighting/realism{surface,imaging,world,motion,cinematic}/duration/intendedStateDelta/freedomMap；updateShot 带 shotId 修改草稿；binding 带 shotId/referenceId/role/weight/lockLevel 绑定已有参考。不能替用户做视觉检查或批准资产/Hero/Take，需用户在镜头制作面板查看。",
+      promptSnippet: "电影制作必须先用 productionSpec 保存领域规格。compile 输入 shotId/kind/request（含实际 providerId/modelId/prompt 和模式规格），读取 warnings/degradations；生成时传 shotId 和返回的 fingerprint 作为 productionFingerprint，服务端会使用编译结果替代自由提示词。",
+      parameters: z.toJSONSchema(productionSchema, { io: "input", target: "draft-07" }),
+      async execute(_id, params, signal) {
+        const parsed = productionSchema.parse(params);
+        const result = await media.production!(parsed.operation, parsed.data, signal);
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      },
+    }] : [];
+    return [listTool, ...productionTools, ...generationTools.map<ToolDefinition>(operation => ({
       name: operation.name,
       label: operation.label,
       description: `${operation.description}providerId 和 modelId 必须来自 listMediaModels。引用素材的 path 及 outputDirectory 均为工作区相对路径；省略输出目录使用默认媒体目录。等待生成完成后返回已保存的文件路径，不返回 Base64。`,

@@ -12,6 +12,10 @@ import conf from "@/utils/conf";
 import { isWithin, resolveWorkspacePath, writeWorkspaceFile, renameWorkspaceFile, lockWorkspaceFiles, protectWorkspaceRoot } from "@/utils/workspace/files";
 import { listTools, loadTool, validateToolConfig } from "@/utils/plugins/tools";
 import { createSkillContext } from "@/agent/skills";
+import { cloud } from "@/lib/cloud";
+import { currentTenant } from "@/utils/tenant";
+import { workspaceProject, prepareShot } from "@/utils/media/jobs";
+import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
@@ -60,6 +64,18 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     cwd, config, files, resolvePath, writeFile: files.writeFile, canvas, question, skills: createSkillContext(cwd),
     ffmpeg: signal => createWorkspaceFfmpeg(cwd, signal),
     media: {
+      async production(operation, data, signal) {
+        signal?.throwIfAborted();
+        const api = cloud(), tenant = currentTenant();
+        if (!api || !tenant || tenant.role === "VIEWER") throw new Error("制片工具需要已登录且有编辑权限的工作区");
+        if (operation === "compile") {
+          if (data.kind !== "image" && data.kind !== "video" || typeof data.shotId !== "string") throw new Error("须提供 kind 和 shotId");
+          const schema = data.kind === "image" ? imageGenerationSchema : videoGenerationSchema;
+          const request = schema.parse(data.request);
+          return prepareShot(cwd, data.kind, data.shotId, request);
+        }
+        return api.workspaceProduction(api.scoped(tenant.workspaceId), workspaceProject(cwd)!, operation, data);
+      },
       listModels: listMediaModels,
       generateImage: (request, signal) => generateMedia(cwd, "image", request, mediaSignal(signal)),
       generateVideo: (request, signal) => generateMedia(cwd, "video", request, mediaSignal(signal)),
