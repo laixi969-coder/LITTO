@@ -84,7 +84,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
         }
       }
       const message = await stream.result();
-      if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(message.errorMessage || "模型请求失败");
+      if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(u.ai.describeModelError(message.errorMessage));
       recordTextUsage(message);
       send({ type: "done", message });
     } catch (error) {
