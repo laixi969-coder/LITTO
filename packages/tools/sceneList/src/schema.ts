@@ -14,9 +14,11 @@ export const sceneListSchema = z.object({
   locations: z.array(entity).min(1).max(40),
   props: z.array(entity).max(80).default([]),
   wardrobe: z.array(entity.extend({ characterId: entityId.optional() })).max(80).default([]),
-  scenes: z.array(z.object({
+  // 场次字段用 strictObject：模型写成 characters 之类的近义字段时直接指出，而不是被静默丢弃后误报"实体未出场"。
+  scenes: z.array(z.strictObject({
     sceneId,
-    order: z.number().int().min(1),
+    // 序号与数组位置重复，模型常从 0 开始编；保存时按位置重新编号，填不填都行。
+    order: z.unknown().optional().transform(() => 0),
     locationId: entityId,
     timeOfDay: text(40).min(1),
     characterIds: z.array(entityId).default([]),
@@ -43,12 +45,21 @@ const volumeLimits: Partial<Record<SceneList["volume"], { characters: number; lo
 // 只对本工具的校验使用中文提示；zod 由宿主共享，不改全局语言。
 const zhCN = z.locales.zhCN().localeError;
 
+// 模型调用工具时常把数组或对象整体写成一段 JSON 字符串；顶层字段先尝试解析，解析不了再交给校验报错。
+function unwrapJsonStrings(input: unknown) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  return Object.fromEntries(Object.entries(input).map(([key, value]) => {
+    if (typeof value !== "string" || !/^\s*[[{]/.test(value)) return [key, value];
+    try { return [key, JSON.parse(value)]; } catch { return [key, value]; }
+  }));
+}
+
 function zodIssues(error: z.ZodError) {
   return error.issues.map(issue => `${issue.path.join(".") || "参数"}：${issue.message}`);
 }
 
 export function validateSceneList(input: unknown): { value?: SceneList; issues: string[] } {
-  const parsed = sceneListSchema.safeParse(input, { error: zhCN });
+  const parsed = sceneListSchema.safeParse(unwrapJsonStrings(input), { error: zhCN });
   if (!parsed.success) return { issues: zodIssues(parsed.error) };
   const value = parsed.data;
   const issues: string[] = [];
@@ -67,7 +78,7 @@ export function validateSceneList(input: unknown): { value?: SceneList; issues: 
   value.scenes.forEach((scene, index) => {
     if (seenScenes.has(scene.sceneId)) issues.push(`场次 id ${scene.sceneId} 重复`);
     seenScenes.add(scene.sceneId);
-    if (scene.order !== index + 1) issues.push(`场次 ${scene.sceneId} 的 order 应为 ${index + 1}（按数组顺序从 1 连续编号）`);
+    scene.order = index + 1;
     const check = (list: string[], pool: Set<string>, label: string) => {
       for (const id of list) {
         if (!pool.has(id)) issues.push(`场次 ${scene.sceneId} 引用了不存在的${label} ${id}`);
@@ -87,6 +98,9 @@ export function validateSceneList(input: unknown): { value?: SceneList; issues: 
   return issues.length ? { issues } : { value, issues };
 }
 
+// 世界与影调是给人看的草案，模型常把关键词写成数组；合并成一句话，不当作错误。
+const noteValue = z.union([text(400), z.array(text(100)).max(20).transform(items => items.join("、"))]);
+
 const assetTypes = { characters: ["Character"], locations: ["Environment"], wardrobe: ["Wardrobe"], props: ["Prop", "Product", "Vehicle", "Creature"] } as const;
 
 export const breakdownSchema = z.object({
@@ -101,13 +115,13 @@ export const breakdownSchema = z.object({
     notes: text(400).default(""),
   })).min(1),
   skipped: z.array(z.object({ entityId, reason: text(300).min(1) })).default([]).describe("场次表里不单列为资产的实体及理由"),
-  world: z.record(z.string(), text(400)).default({}),
-  look: z.record(z.string(), text(400)).default({}),
+  world: z.record(z.string(), noteValue).default({}),
+  look: z.record(z.string(), noteValue).default({}),
   gaps: z.array(text(300)).max(40).default([]).describe("剧本没写但制作必须决定的事项"),
 });
 
 export function validateBreakdown(input: unknown, sceneList: SceneList & { version: number }) {
-  const parsed = breakdownSchema.safeParse(input, { error: zhCN });
+  const parsed = breakdownSchema.safeParse(unwrapJsonStrings(input), { error: zhCN });
   if (!parsed.success) return { issues: zodIssues(parsed.error) };
   const value = parsed.data;
   const issues: string[] = [];
@@ -126,6 +140,11 @@ export function validateBreakdown(input: unknown, sceneList: SceneList & { versi
     if (!category.has(item.entityId)) issues.push(`skipped 里的 ${item.entityId} 不在场次表里`);
     if (covered.has(item.entityId)) issues.push(`${item.entityId} 同时出现在 assets 和 skipped 里`);
     covered.add(item.entityId);
+  }
+  // 模型常自造 id；把场次表里真实的 id 列出来，让它照着改，而不是反复猜。
+  if (issues.some(issue => issue.includes("不在场次表里"))) {
+    const names = { characters: "人物", locations: "场景", wardrobe: "服装", props: "道具" } as const;
+    issues.push(`只能引用场次表里已有的实体 id：${[...category].map(([id, key]) => `${id} ${sceneList[key].find(item => item.id === id)!.name}（${names[key]}）`).join("、")}`);
   }
   const missing = [...category.keys()].filter(id => !covered.has(id));
   if (missing.length) issues.push(`场次表里这些实体既没拆成资产也没写不单列的理由：${missing.join("、")}`);
