@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { authOf, requireAdmin } from "../auth.ts";
-import { all, audit, get, run, setSetting, setting } from "../db.ts";
+import { all, audit, get, run, setSetting, setting, tx } from "../db.ts";
 import { body } from "../http.ts";
 import { accountOf, adminAdjust, grant } from "../credits.ts";
 import { addCredential, credentialView, listModels, listProviders, upsertModel, upsertProvider, testProvider, ADAPTERS, credentialFor, secretOf } from "../providers/registry.ts";
@@ -15,6 +15,7 @@ import { snapshot } from "../metrics.ts";
 export const admin = new Hono();
 admin.use("*", requireAdmin);
 const actor = (c: any) => authOf(c).user.id;
+const priceSchema = z.object({ perImage: z.number().finite().nonnegative().optional(), perSecond: z.number().finite().nonnegative().optional(), perCall: z.number().finite().nonnegative().optional() }).catchall(z.number().finite().nonnegative());
 
 admin.get("/dashboard", (c) => {
     const one = (sql: string, ...p: any[]) => get(sql, ...p)!;
@@ -100,14 +101,14 @@ admin.post("/providers/:id/sync-models", async (c) => {
 });
 admin.get("/models", (c) => c.json(listModels(false)));
 admin.post("/models", async (c) => {
-    const b = await body(c, z.object({ id: z.string().optional(), providerId: z.string(), externalModelId: z.string(), name: z.string(), type: z.string(), capabilities: z.record(z.any()).default({}), limits: z.any().optional(), resolutions: z.array(z.string()).optional(), aspectRatios: z.array(z.string()).optional(), durations: z.array(z.number()).optional(), price: z.any().optional(), status: z.enum(["active", "disabled"]).optional(), priority: z.number().optional(), fallbackModelId: z.string().nullable().optional() }));
+    const b = await body(c, z.object({ id: z.string().optional(), providerId: z.string(), externalModelId: z.string(), name: z.string(), type: z.string(), capabilities: z.record(z.any()).default({}), limits: z.any().optional(), resolutions: z.array(z.string()).optional(), aspectRatios: z.array(z.string()).optional(), durations: z.array(z.number()).optional(), price: priceSchema.optional(), status: z.enum(["active", "disabled"]).optional(), priority: z.number().optional(), fallbackModelId: z.string().nullable().optional() }));
     const m = upsertModel(null, b);
     audit(actor(c), "model.create", m.id);
     return c.json(m, 201);
 });
 admin.patch("/models/:id", async (c) => {
     if (!get("SELECT 1 FROM models WHERE id=?", c.req.param("id"))) throw notFound("model");
-    const b = await body(c, z.object({ name: z.string().optional(), capabilities: z.record(z.any()).optional(), limits: z.any().optional(), price: z.any().optional(), status: z.enum(["active", "disabled"]).optional(), priority: z.number().optional(), fallbackModelId: z.string().nullable().optional() }));
+    const b = await body(c, z.object({ name: z.string().optional(), capabilities: z.record(z.any()).optional(), limits: z.any().optional(), price: priceSchema.optional(), status: z.enum(["active", "disabled"]).optional(), priority: z.number().optional(), fallbackModelId: z.string().nullable().optional() }));
     const m = upsertModel(c.req.param("id"), b);
     audit(actor(c), "model.update", m.id, b);
     return c.json(m);
@@ -135,10 +136,14 @@ admin.post("/jobs/:id/retry", (c) => {
 // Credits
 admin.get("/credits/ledger", (c) => c.json(all("SELECT * FROM credit_ledger ORDER BY id DESC LIMIT 500")));
 admin.post("/credits/adjust", async (c) => {
-    const b = await body(c, z.object({ workspaceId: z.string(), amount: z.number(), type: z.enum(["CREDIT_GRANT", "ADMIN_ADJUSTMENT", "PURCHASE"]).default("ADMIN_ADJUSTMENT"), note: z.string().min(3) }));
-    if (!get("SELECT 1 FROM workspaces WHERE id=?", b.workspaceId)) throw notFound("workspace");
-    const r = b.type === "ADMIN_ADJUSTMENT" ? adminAdjust(b.workspaceId, b.amount, b.note) : grant(b.workspaceId, b.amount, b.type, b.note);
-    audit(actor(c), "credits.adjust", b.workspaceId, b);
+    const b = await body(c, z.object({ workspaceId: z.string().min(1), amount: z.number().finite().min(-1e9).max(1e9).refine(value => value !== 0), type: z.enum(["CREDIT_GRANT", "ADMIN_ADJUSTMENT", "PURCHASE"]).default("ADMIN_ADJUSTMENT"), note: z.string().trim().min(3).max(500) }));
+    if (!get("SELECT 1 FROM workspaces WHERE id=? AND deleted_at IS NULL", b.workspaceId)) throw notFound("workspace");
+    if (b.type !== "ADMIN_ADJUSTMENT" && b.amount < 0) throw bad("发放积分必须为正数");
+    const r = tx(() => {
+      const result = b.type === "ADMIN_ADJUSTMENT" ? adminAdjust(b.workspaceId, b.amount, b.note) : grant(b.workspaceId, b.amount, b.type, b.note);
+      audit(actor(c), "credits.adjust", b.workspaceId, b);
+      return result;
+    });
     return c.json({ ...r, account: accountOf(b.workspaceId) });
 });
 
@@ -153,12 +158,23 @@ admin.patch("/storage/quota/:workspaceId", async (c) => {
 });
 
 // System
-const SYSTEM_KEYS = { platformTrial: { enabled: false, creditsPer1kTokens: 1 }, registrationOpen: true, defaultCredits: 200, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: true, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true }, pricing: {} } as Record<string, any>;
-admin.get("/system", (c) => c.json(Object.fromEntries(Object.entries(SYSTEM_KEYS).map(([k, v]) => [k, setting(k, v)]))));
+const systemDefaults = { accountWhitelist: { enabled: false, emails: [] }, platformTrial: { enabled: false, creditsPer1kTokens: 1 }, registrationOpen: true, defaultCredits: 200, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: true, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true }, pricing: {} };
+const systemSchema = z.object({
+  accountWhitelist: z.object({ enabled: z.boolean(), emails: z.array(z.string().trim().toLowerCase().email().max(254)).max(5000).transform(emails => [...new Set(emails)]) }).strict(),
+  registrationOpen: z.boolean(), defaultCredits: z.number().finite().nonnegative().max(1e9),
+  billingEnabled: z.boolean(), creditsPerUsd: z.number().finite().positive().max(1e9), markup: z.number().finite().nonnegative().max(1e6),
+  platformTrial: z.object({ enabled: z.boolean(), creditsPer1kTokens: z.number().finite().positive().max(1e9) }).strict(),
+  pricing: z.record(priceSchema), maxConcurrency: z.number().int().min(1), maxUploadMb: z.number().finite().positive(),
+  defaultImageModel: z.string(), defaultVideoModel: z.string(), announcement: z.string(), maintenanceMode: z.boolean(),
+  modelPolicy: z.object({ optimize: z.enum(["quality", "cost", "latency", "balanced"]), allowFallback: z.boolean() }).strict(),
+}).partial().strict();
+admin.get("/system", (c) => c.json(Object.fromEntries(Object.entries(systemDefaults).map(([k, v]) => [k, setting(k, v)]))));
 admin.put("/system", async (c) => {
-    const b = await body(c, z.record(z.any()));
-    for (const [k, v] of Object.entries(b)) { if (!(k in SYSTEM_KEYS)) throw bad(`unknown setting ${k}`); setSetting(k, v); }
-    audit(actor(c), "system.update", undefined, b);
+    const b = await body(c, systemSchema);
+    tx(() => {
+      for (const [key, value] of Object.entries(b)) setSetting(key, value);
+      audit(actor(c), "system.update", undefined, b);
+    });
     return c.json({ ok: true });
 });
 

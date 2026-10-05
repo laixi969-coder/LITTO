@@ -16,6 +16,16 @@ export type Auth = { user: { id: string; email: string; isAdmin: boolean }; work
 const CODE_TTL_MS = 10 * 60_000;
 const SESSION_TTL_MS = 30 * 24 * 3600_000;
 
+function accountAllowed(email: string, isAdmin: boolean) {
+  const whitelist = setting("accountWhitelist", { enabled: false, emails: [] as string[] });
+  return isAdmin || !whitelist.enabled || whitelist.emails.includes(email);
+}
+
+function requireAccountAccess(email: string) {
+  const user = get("SELECT is_admin FROM users WHERE email=? AND deleted_at IS NULL", email);
+  if (!accountAllowed(email, !!user?.is_admin)) throw forbidden("此邮箱未在账户白名单中，请联系管理员");
+}
+
 // 每次发码都会重置错误次数，不限制发码频率就等于可无限次猜码，也能被用来对任意邮箱轰炸发信。
 // ACT: 进程内计数，单实例部署足够；多实例需改为数据库或共享缓存。
 const codeRequests = new Map<string, number[]>();
@@ -58,6 +68,7 @@ const passwordAttempts = new Map<string, { count: number; expiresAt: number }>()
 export async function verifyPassword(email: string, password: string) {
   email = email.trim().toLowerCase();
   assertNotSsoEnforced(email);
+  requireAccountAccess(email);
   const at = Date.now();
   for (const [key, attempt] of passwordAttempts) if (attempt.expiresAt <= at) passwordAttempts.delete(key);
   const attempt = passwordAttempts.get(email) ?? { count: 0, expiresAt: at + 15 * 60_000 };
@@ -95,6 +106,7 @@ export function requestCode(email: string): { devCode?: string } {
     email = email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw bad("邮箱格式不正确，请检查后重试");
     assertNotSsoEnforced(email);
+    requireAccountAccess(email);
     requireCodeLogin(email);
     const existing = get("SELECT id FROM users WHERE email=? AND deleted_at IS NULL", email);
     if (!existing && !setting("registrationOpen", true)) throw forbidden("暂未开放新用户注册");
@@ -109,6 +121,7 @@ export function requestCode(email: string): { devCode?: string } {
 export function verifyCode(email: string, code: string) {
     email = email.trim().toLowerCase();
     assertNotSsoEnforced(email);
+    requireAccountAccess(email);
     requireCodeLogin(email);
     const rec = get("SELECT * FROM login_codes WHERE email=?", email);
     if (!rec || rec.expires_at < now() || rec.attempts >= 5) throw new HttpError(401, "验证码已过期或错误次数过多，请重新获取", "bad_code");
@@ -123,6 +136,7 @@ export function verifyCode(email: string, code: string) {
 /** Shared by OTP and OAuth: find-or-create the user (+ Personal Workspace), apply pending invites, open a session. */
 export function loginUser(email: string, identity?: { provider: string; subject: string }) {
     email = email.trim().toLowerCase();
+    requireAccountAccess(email);
     const user = tx(() => {
         let u = get("SELECT * FROM users WHERE email=?", email);
         if (u?.deleted_at) throw forbidden("这个账号已注销");
@@ -178,6 +192,7 @@ export function resolveSession(token: string | null | undefined, wantedWorkspace
     if (!token) return null;
     const s = get("SELECT s.user_id, s.expires_at, u.email, u.is_admin, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?", sha256(token));
     if (!s || s.expires_at < now() || s.deleted_at || s.status !== "active") return null;
+    if (!accountAllowed(s.email, !!s.is_admin)) return null;
     const m = wantedWorkspace
         ? get("SELECT m.workspace_id, m.role FROM workspace_members m JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND w.deleted_at IS NULL", wantedWorkspace, s.user_id)
         : get("SELECT m.workspace_id, m.role FROM workspace_members m JOIN workspaces w ON w.id=m.workspace_id WHERE m.user_id=? AND w.deleted_at IS NULL ORDER BY w.created_at LIMIT 1", s.user_id);

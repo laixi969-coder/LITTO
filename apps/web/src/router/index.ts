@@ -22,6 +22,10 @@ const router = createRouter({
       component: () => import("@/pages/home/index.vue"),
     },
     {
+      path: "/admin",
+      component: () => import("@/pages/admin/index.vue"),
+    },
+    {
       path: "/canvas",
       redirect: "/workspace",
     },
@@ -34,8 +38,9 @@ const router = createRouter({
 // Accounts: everything except /login needs a session (unless the server runs in single-user mode).
 router.beforeEach(async (to) => {
   const me = getMe() ?? await loadMe();
-  if (isAuthDisabled()) return to.path === "/login" ? "/home" : true;
+  if (isAuthDisabled()) return ["/login", "/admin"].includes(to.path) ? "/home" : true;
   if (to.path === "/login") return me ? "/home" : true;
+  if (me && to.path === "/admin" && !me.user.isAdmin) return "/home";
   return me ? true : "/login";
 });
 export default router;

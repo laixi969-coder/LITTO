@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
 import { authOf, requireAdmin } from "../auth.ts";
-import { all, audit, get, run, setting } from "../db.ts";
+import { all, audit, get, run, setting, setSetting, tx } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { checkout, fulfil, packs, paymentsOf, plans, setPlan, subscriptionOf, verifyStripe, paymentProvider } from "../billing.ts";
 import { buildTimeline, exportPackage, startRender, toEdl, toSrt } from "../domain/assembly.ts";
@@ -166,6 +166,24 @@ adminExtra.post("/providers/:id/webhook-secret", (c) => {
 });
 adminExtra.get("/usage", (c) => c.json(summary(null, Math.min(365, Number(c.req.query("days") ?? 30) || 30))));
 adminExtra.get("/plans", (c) => c.json({ plans: plans(), packs: packs() }));
+adminExtra.put("/plans", async (c) => {
+  const itemSchema = z.object({ id: z.string().min(1).max(80), name: z.string().trim().min(1).max(100), priceUsd: z.number().finite().nonnegative().max(1e9), credits: z.number().finite().nonnegative().max(1e9) });
+  const b = await body(c, z.object({
+    plans: z.array(itemSchema.extend({ period: z.enum(["free", "monthly", "quarterly", "annual", "custom"]), storageGb: z.number().finite().nonnegative().max(1e6) }).strict()).min(1).max(100),
+    packs: z.array(itemSchema.strict()).max(100),
+  }).strict());
+  if (new Set(b.plans.map(plan => plan.id)).size !== b.plans.length || new Set(b.packs.map(pack => pack.id)).size !== b.packs.length) throw bad("套餐和积分包 ID 不能重复");
+  if (!b.plans.some(plan => plan.id === "free" && plan.period === "free" && plan.priceUsd === 0)) throw bad("必须保留免费的 free 套餐");
+  const currentPlans = plans();
+  const currentPacks = packs();
+  if (b.plans.length !== currentPlans.length || b.packs.length !== currentPacks.length || currentPlans.some(plan => !b.plans.some(item => item.id === plan.id)) || currentPacks.some(pack => !b.packs.some(item => item.id === pack.id))) throw bad("请保留现有套餐和积分包，仅编辑价格与积分");
+  tx(() => {
+    setSetting("plans", currentPlans.map(plan => { const item = b.plans.find(item => item.id === plan.id)!; return { ...plan, priceUsd: item.priceUsd, credits: item.credits }; }));
+    setSetting("packs", currentPacks.map(pack => { const item = b.packs.find(item => item.id === pack.id)!; return { ...pack, priceUsd: item.priceUsd, credits: item.credits }; }));
+    audit(authOf(c).user.id, "pricing.catalogue.update", undefined, b);
+  });
+  return c.json({ plans: plans(), packs: packs() });
+});
 adminExtra.put("/workspaces/:id/subscription", async (c) => {
     const b = await body(c, z.object({ planId: z.string(), grantCredits: z.boolean().default(false), custom: z.object({ credits: z.number().optional(), storageGb: z.number().optional(), months: z.number().optional() }).optional() }));
     const plan = plans().find((p) => p.id === b.planId);

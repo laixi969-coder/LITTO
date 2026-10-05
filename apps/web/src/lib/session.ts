@@ -18,12 +18,16 @@ export async function loadMe(force = false): Promise<Me | null> {
 export const getMe = () => me;
 export const isAuthDisabled = () => authDisabled;
 
-async function post(path: string, body: unknown) {
-  const response = await fetch(`/cloud${path}`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "x-litto-csrf": "1" }, body: JSON.stringify(body) });
+export async function cloudRequest<T = unknown>(path: string, method = "GET", body?: unknown): Promise<T> {
+  const response = await fetch(`/cloud${path}`, { method, credentials: "same-origin", headers: { "Content-Type": "application/json", "x-litto-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `请求失败（${response.status}）`);
+  if (!response.ok) {
+    const details = Array.isArray(data.details) ? data.details.map((item: { path: string; message: string }) => `${item.path}：${item.message}`).join("；") : "";
+    throw new Error(details || data.error || `请求失败（${response.status}）`);
+  }
   return data;
 }
+const post = (path: string, body: unknown) => cloudRequest(path, "POST", body);
 export const requestCode = (email: string) => post("/auth/request-code", { email }) as Promise<{ devCode?: string }>;
 export async function verifyCode(email: string, code: string) { await post("/auth/verify", { email, code, client: "web" }); await loadMe(true); }
 export async function verifyPassword(email: string, password: string) { await post("/auth/password/login", { email, password, client: "web" }); await loadMe(true); }

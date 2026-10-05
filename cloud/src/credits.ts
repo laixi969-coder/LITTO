@@ -1,5 +1,5 @@
 import { get, run, setting, tx } from "./db.ts";
-import { conflict, now, ulid } from "./util.ts";
+import { bad, conflict, now, ulid } from "./util.ts";
 
 export type LedgerType = "CREDIT_GRANT" | "PURCHASE" | "GENERATION_HOLD" | "GENERATION_CHARGE" | "REFUND" | "ADMIN_ADJUSTMENT";
 
@@ -43,7 +43,13 @@ export function release(ws: string, jobId: string, held: number, why: string) {
 }
 /** 按实际用量直接扣费：平台试用的文本 token 在回复结束后才知道，无法预扣。 */
 export const chargeUsage = (ws: string, amount: number, note: string) => post(ws, "GENERATION_CHARGE", -amount, 0, { note });
-export const adminAdjust = (ws: string, amount: number, note: string) => post(ws, "ADMIN_ADJUSTMENT", amount, 0, { note });
+export function adminAdjust(ws: string, amount: number, note: string) {
+  if (!Number.isFinite(amount) || amount === 0) throw bad("积分调整须为非零有限数值");
+  return tx(() => {
+    if (amount < 0 && available(ws) + amount < 0) throw conflict("扣减不能超过可用积分，冻结积分不可扣减", "insufficient_credits");
+    return post(ws, "ADMIN_ADJUSTMENT", amount, 0, { note });
+  });
+}
 export const accountOf = (ws: string) => {
     const a = account(ws);
     return { balance: a.balance, held: a.held, available: a.balance - a.held };

@@ -30,6 +30,7 @@
         <div class="accountBar">
           <usageSummary v-if="accounts" />
           <el-text v-if="accounts" class="accountEmail" :title="me?.user.email">{{ me?.user.email }}</el-text>
+          <el-button v-if="accounts && me?.user.isAdmin" text @click="router.push('/admin')">管理后台</el-button>
           <el-button v-if="accounts" text @click="logout()">退出登录</el-button>
         </div>
       </header>

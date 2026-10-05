@@ -84,7 +84,8 @@ export function fulfil(paymentId: string) {
     tx(() => {
         run("UPDATE payments SET status='paid', updated_at=? WHERE id=? AND status!='paid'", now(), paymentId);
         if (p.kind === "pack") grant(p.workspace_id, p.credits, "PURCHASE", `credit pack ${p.item_id}`);
-        else { const plan = plans().find((x) => x.id === p.item_id); if (plan) setPlan(p.workspace_id, plan, true, "purchase"); }
+        // 积分与已下单金额一起固定，后台改价不能改变待支付订单的权益。
+        else { const plan = plans().find((x) => x.id === p.item_id); if (plan) setPlan(p.workspace_id, { ...plan, credits: p.credits }, true, "purchase"); }
     });
     audit(null, "payment.paid", paymentId, { kind: p.kind, item: p.item_id }, p.workspace_id);
     return true;
