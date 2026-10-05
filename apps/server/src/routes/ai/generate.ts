@@ -85,7 +85,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
       }
       const message = await stream.result();
       if (message.stopReason === "error" || message.stopReason === "aborted") throw new Error(u.ai.describeModelError(message.errorMessage));
-      recordTextUsage(message);
+      recordTextUsage({ ...message, provider: configured.providerId });
       send({ type: "done", message });
     } catch (error) {
       send({ type: "error", message: error instanceof Error ? translateError(error) : translateMessage("模型请求失败") });

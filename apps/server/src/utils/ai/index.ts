@@ -63,6 +63,7 @@ function trialConfiguredModel(modelId: string) {
   const baseUrl = new URL(access.baseUrl);
   if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
   return {
+    providerId: embed.trialProviderId,
     provider: { apiUrl: access.baseUrl, apiKey: access.apiKey, protocol: "openai-completions" as const, models: [model] },
     model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens },
     baseUrl: baseUrl.href.replace(/\/+$/, ""),
@@ -93,7 +94,7 @@ export function getConfiguredModel(providerId: string, modelId: string) {
   const baseUrl = new URL(provider.apiUrl);
   if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
   const limits = getModelLimits(providerId, model);
-  return { provider, model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens }, baseUrl: baseUrl.href.replace(/\/+$/, "") };
+  return { providerId, provider, model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens }, baseUrl: baseUrl.href.replace(/\/+$/, "") };
 }
 
 /** Full check including DNS resolution, for the async call sites right before a request is made. */
@@ -178,6 +179,7 @@ export function streamAi(
 ) {
   const { provider, model: configuredModel, baseUrl } = configured;
   const model: Model<typeof provider.protocol> = {
+    // 回复里的 provider 恒为 "toonflow"；记录用量和平台试用扣费须用 configured.providerId。
     id: configuredModel.id, name: configuredModel.label, provider: "toonflow", api: provider.protocol, baseUrl,
     reasoning: false, input: ["text", "image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

@@ -23,7 +23,7 @@ export async function inspectFrames(input: { workspaceId: string; projectId: str
       const stream = streamAi(configured, context, AbortSignal.timeout(180000));
       for await (const _event of stream) { /* consume the existing SDK stream */ }
       const result = await stream.result();
-      recordTextUsage(result);
+      recordTextUsage({ ...result, provider: configured.providerId });
       if (scope.get("generation_jobs", job.id)?.status !== "RUNNING") throw new Error("视觉检查已停止，结果未采用");
       if (result.stopReason === "error" || result.stopReason === "aborted") throw new Error(result.errorMessage || "视觉检查失败");
       scope.update("generation_jobs", job.id, { status: "SUCCEEDED", actual_cost: null, duration_ms: Date.now() - started, finished_at: new Date().toISOString() });
