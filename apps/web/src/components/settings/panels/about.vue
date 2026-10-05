@@ -14,10 +14,6 @@
       <p class="slogan">好戏，都在里头。</p>
       <p class="note">LITTO 是面向影视与短剧创作的 AI 工作台：把剧本、角色、场景、分镜和生成放在同一个画布里。</p>
     </el-card>
-
-    <el-card class="infoCard" shadow="never">
-      <p class="note">LITTO 基于开源项目 Toonflow（MIT 许可，版权归 HBAI-Ltd 所有）构建，并保留其许可声明。</p>
-    </el-card>
   </div>
 </template>
 

@@ -36,6 +36,10 @@ function describeError(error: unknown) {
   const status = /HTTP (\d{3})/.exec(text)?.[1];
   if (status) return explain(Number(status));
   if (/timed? ?out|TimeoutError|aborted/i.test(text)) return "连接超时，请检查地址是否正确、网络是否通畅";
+  const proxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy || process.env.ALL_PROXY || process.env.all_proxy;
+  if (proxy && /unable to connect|connectionrefused|econnrefused/i.test(text)) {
+    return `本机代理 ${proxy} 连不上，请先启动代理软件，或清空 HTTP_PROXY/HTTPS_PROXY 等代理环境变量后重启服务再试`;
+  }
   return "连不上这个地址，请检查网址和网络";
 }
 

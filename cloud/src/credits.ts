@@ -29,6 +29,8 @@ export const available = (ws: string) => {
 export const creditsFor = (providerCostUsd: number | null) => (providerCostUsd !== null && setting("billingEnabled", true) ? Math.round(providerCostUsd * setting("creditsPerUsd", 100) * setting("markup", 1.0) * 100) / 100 : 0);
 
 export function hold(ws: string, jobId: string, est: number) {
+    // 自带 Key 或未定价的调用冻结额为 0，平台没有风险敞口，负余额（试用透支）不应拦住它。
+    if (est <= 0) return;
     tx(() => {
         if (available(ws) < est) throw conflict(`insufficient credits: need ${est}, have ${available(ws)}`, "insufficient_credits");
         post(ws, "GENERATION_HOLD", 0, est, { jobId });

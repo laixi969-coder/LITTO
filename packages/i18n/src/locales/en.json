@@ -1962,7 +1962,6 @@
   "GHFast 加速": "GHFast acceleration",
   "GHProxy.net 加速": "GHProxy.net acceleration",
   "GitHub 仓库": "GitHub repository",
-  "GitHub 仓库：HBAI-Ltd/Toonflow-app": "GitHub repository: HBAI-Ltd/Toonflow-app",
   "GitHub 上游": "GitHub upstream",
   "HTTP 配置包含访问凭证，请仅提供给可信的客户端。": "The HTTP configuration contains access credentials, please only provide them to trusted clients.",
   "JasonZeng 加速": "JasonZeng Acceleration",
@@ -2040,6 +2039,5 @@
   "数据与隐私": "Data & privacy",
   "LITTO 不收集匿名使用统计，也不会向第三方上报你的提示词、对话、文件内容、项目名称、路径、账号或密钥。": "LITTO does not collect anonymous usage statistics and never reports your prompts, conversations, file contents, project names, paths, accounts or keys to third parties.",
   "生成内容时，素材与提示词只会发送到你自己配置的模型服务。": "When generating, assets and prompts are sent only to the model services you configured.",
-  "LITTO 是面向影视与短剧创作的 AI 工作台：把剧本、角色、场景、分镜和生成放在同一个画布里。": "LITTO is an AI workbench for film and short-drama creation: scripts, characters, scenes, storyboards and generation in one canvas.",
-  "LITTO 基于开源项目 Toonflow（MIT 许可，版权归 HBAI-Ltd 所有）构建，并保留其许可声明。": "LITTO is built on the open-source project Toonflow (MIT license, copyright HBAI-Ltd) and keeps its license notice."
+  "LITTO 是面向影视与短剧创作的 AI 工作台：把剧本、角色、场景、分镜和生成放在同一个画布里。": "LITTO is an AI workbench for film and short-drama creation: scripts, characters, scenes, storyboards and generation in one canvas."
 }
