@@ -44,33 +44,7 @@ MV 不是「上传歌曲后随机配画面」。起点是音乐的结构与情�
 
 ## 3. 段落场次表
 
-确认方向后，输出与 [story](../story/SKILL.md) 同一结构的 SceneList，多一个 `musicRange` 字段，用段落名与大致占比（有时间码才写时间）：
-
-```json
-{
-  "schemaVersion": 1,
-  "title": "",
-  "kind": "musicFilm",
-  "scenes": [
-    {
-      "sceneId": "m01",
-      "order": 1,
-      "musicRange": "intro",
-      "location": "",
-      "timeOfDay": "",
-      "characters": [],
-      "props": [],
-      "wardrobe": [],
-      "emotionBeat": "",
-      "narrativeFunction": "",
-      "durationHint": "",
-      "syncMode": "free|beat|phrase|lyric|energy",
-      "lyricLines": [],
-      "risk": ""
-    }
-  ]
-}
-```
+确认方向后，按 [story](../story/SKILL.md) 的场次表规则用 `saveSceneList` 保存，**不在回复里写 JSON**。`kind` 填 `musicFilm`，场次 id 同样写作 `s01`、`s02`。每场另填三项：`musicRange` 写段落名或大致占比（有时间码才写时间），`syncMode` 写 `free`、`beat`、`phrase`、`lyric` 或 `energy`，`lyricLines` 写对应的歌词行。给用户看的是可读的段落表格。
 
 - 镜头长度服从音乐与表演，不默认固定 5 秒切镜；可故意不同步，不把卡点率当唯一标准。
 - 人物与场景数量要克制，复用同一批资产；长歌曲按段落拆成多个场次，不依赖单个模型一次生成整片。
@@ -80,4 +54,4 @@ MV 不是「上传歌曲后随机配画面」。起点是音乐的结构与情�
 
 场次表确认后交给 [breakdown](../breakdown/SKILL.md)：它提取角色、场景、道具与世界、影调草案，用户确认后进入 [cinema](../cinema/SKILL.md) 的镜头规划。音乐时间轴、逐拍同步和整曲组装需要后续的专用工具，现在不假称已具备；缺少时说明实际只交付到场次表与镜头规划。
 
-保存按 [workflow](../workflow/SKILL.md) 的画布执行规则放入文本节点；用户只要对话文字或没有对应工具时，直接回复并说明未保存。
+场次表由 `saveSceneList` 写入工作区；音乐理解、影像方向按 [workflow](../workflow/SKILL.md) 的画布执行规则放入文本节点。用户只要对话文字或本轮没有对应工具时，直接回复并说明未保存，不改为手写 JSON。
