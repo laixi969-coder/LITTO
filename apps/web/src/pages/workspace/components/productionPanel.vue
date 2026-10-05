@@ -82,6 +82,9 @@
           </template>
           <template v-if="detail && section === 'review'">
             <h3>实际输出与版本</h3>
+            <p v-if="!versions.length" class="reviewHint">这个镜头还没有生成结果，先到「生成」页生成关键帧。</p>
+            <p v-else-if="detail.approvedTakeId && !target" class="statusMessage">这个镜头的 Take 已批准。</p>
+            <button v-if="detail.approvedTakeId && nextPendingShot" type="button" @click="run(() => selectShot(nextPendingShot!.id))">下一个待处理镜头：{{ nextPendingShot.ord + 1 }} · {{ nextPendingShot.title }}</button>
             <div class="versionList"><button v-for="item in versions" :key="item.id" type="button" :aria-pressed="targetId === item.id" @click="selectVersion(item)">{{ item.type === 'keyframe' ? '关键帧' : 'Take' }} · {{ item.status }} · {{ item.id.slice(-5) }}</button></div>
             <template v-if="target">
               <img v-if="target.media?.mime.startsWith('image/')" class="outputPreview" :src="mediaUrl(target.media.url)" alt="当前关键帧候选" />
@@ -117,7 +120,7 @@ const projectId = props.projectId;
 const section = ref("world"), busy = ref(false), error = ref(""), message = ref("");
 const controller = new AbortController();
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
-onScopeDispose(() => { controller.abort(); clearTimeout(pollTimer); });
+onScopeDispose(() => { controller.abort(); clearTimeout(pollTimer); clearInterval(watchTimer); });
 const tabs = [{ id: "world", label: "世界与资产" }, { id: "shot", label: "镜头规格" }, { id: "generate", label: "生成" }, { id: "review", label: "检查与采用" }];
 const worldFields = [["era", "年代"], ["locationLogic", "地点与空间逻辑"], ["architecture", "建筑"], ["weather", "天气"], ["time", "时间"], ["material", "环境材质"], ["physics", "物理规则"]];
 const lookFields = [["contrast", "对比"], ["saturation", "饱和度"], ["skinTone", "肤色"], ["highlightRolloff", "高光滚降"], ["shadowBehavior", "暗部表现"], ["lensCharacter", "镜头特性"], ["texture", "纹理"], ["sharpnessPhilosophy", "锐度策略"]];
@@ -189,7 +192,15 @@ async function load() {
   await refreshJobs();
 }
 let loaded = false;
-watch(visible, open => { if (open && !loaded) void run(async () => { await load(); loaded = true; }); }, { immediate: true });
+// 面板开着时每 10 秒检查一次别处发起的任务；打开时立即检查一次。
+let watchTimer: ReturnType<typeof setInterval> | undefined;
+watch(visible, open => {
+  clearInterval(watchTimer);
+  if (!open) return;
+  if (!loaded) void run(async () => { await load(); loaded = true; });
+  else void refreshJobs().catch(() => {});
+  watchTimer = setInterval(() => { if (loaded && !busy.value) void refreshJobs().catch(() => {}); }, 10000);
+}, { immediate: true });
 async function saveWorld() {
   await request(`/projects/${projectId}/world`, "PUT", world.value);
   await request(`/projects/${projectId}/looks/project`, "PUT", look.value);
@@ -234,6 +245,8 @@ async function selectShot(id: string) {
   draft.value = structuredClone(toRaw(detail.value));
   draft.value.realism ??= Object.fromEntries(realismFields.map(field => [field[0], ""]));
   duration.value = draft.value.duration;
+  selectPendingVersion();
+  void refreshJobs().catch(() => {});
 }
 async function createShot() {
   await saveShot();
@@ -268,13 +281,43 @@ async function production(requestId?: string) {
 }
 async function compile() { if (kind.value === "video" && draft.value.duration !== duration.value) { draft.value.duration = duration.value; dirty.value = true; } await saveShot(); if (worldDirty.value) await saveWorld(); preview.value = await production(); pendingRequestId = ""; }
 async function generate() { pendingRequestId ||= crypto.randomUUID(); await production(pendingRequestId); pendingRequestId = ""; preview.value = null; message.value = "生成任务已提交"; await refreshJobs(); }
+// 助手或画布在别处发起的任务也要跟上：任务出现或状态变化时刷新当前镜头，几秒内跑完的任务也不会漏。
+let jobSignature = "";
 async function refreshJobs() {
   const result = await request(`/generations?projectId=${encodeURIComponent(projectId!)}`);
   jobs.value = (Array.isArray(result) ? result : result.items ?? []).filter((job: any) => job.targetType === "shot");
+  const signature = jobs.value.map(job => `${job.id}:${job.status}`).join(",");
+  const changed = jobSignature !== "" && signature !== jobSignature;
+  jobSignature = signature;
   clearTimeout(pollTimer);
-  if (jobs.value.some(job => ["QUEUED", "RUNNING"].includes(job.status))) pollTimer = setTimeout(() => void refreshJobs().then(refreshResults).catch(cause => { if (!controller.signal.aborted) error.value = cause.message; }), 1800);
+  if (jobs.value.some(job => ["QUEUED", "RUNNING"].includes(job.status))) pollTimer = setTimeout(() => void refreshJobs().catch(cause => { if (!controller.signal.aborted) error.value = cause.message; }), 1800);
+  if (changed) await refreshResults();
 }
-async function refreshResults() { if (shotId.value) detail.value = await request(`/shots/${shotId.value}`); window.dispatchEvent(new Event("littoProductionUpdated")); }
+async function refreshResults() {
+  if (shotId.value) {
+    detail.value = await request(`/shots/${shotId.value}`);
+    const { id, heroKeyframeId, approvedTakeId } = detail.value;
+    shots.value = shots.value.map(shot => shot.id === id ? { ...shot, heroKeyframeId, approvedTakeId } : shot);
+    if (!targetId.value) selectPendingVersion();
+  }
+  window.dispatchEvent(new Event("littoProductionUpdated"));
+}
+// 直接选中待处理的版本：没有主关键帧选最新关键帧，有了选最新未批准的 Take；当前选中的仍待处理就保留。
+function selectPendingVersion() {
+  const current = target.value;
+  if (current && ["variant", "candidate"].includes(current.status)) return;
+  const newest = (type: string, status: string) => versions.value.filter(item => item.type === type && item.status === status)
+    .sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt))).at(-1);
+  const pending = !detail.value?.heroKeyframeId ? newest("keyframe", "variant") : !detail.value?.approvedTakeId ? newest("take", "candidate") : undefined;
+  if (pending) selectVersion(pending);
+  else targetId.value = "";
+}
+// 按镜头顺序找下一个还没批准 Take 的镜头，连续检查时不用回到镜头条。
+const nextPendingShot = computed(() => {
+  const ordered = [...shots.value].sort((left, right) => left.ord - right.ord);
+  const index = ordered.findIndex(shot => shot.id === shotId.value);
+  return [...ordered.slice(index + 1), ...ordered.slice(0, Math.max(index, 0))].find(shot => !shot.approvedTakeId && shot.id !== shotId.value);
+});
 async function cancelJob(id: string) { await request(`/generations/${id}/cancel`, "POST", {}); await refreshJobs(); }
 // 结束状态按镜头规格推算的计划结果预填，用户只改与画面不符的地方。
 const stateKinds: Record<string, string> = { Character: "characters", Wardrobe: "wardrobe", Environment: "environment" };
@@ -325,7 +368,8 @@ async function confirmVersion() {
   const item = target.value;
   await request(`/shots/${shotId.value}/qc`, "POST", reviewPayload(item));
   await request(`/${item.type === "keyframe" ? "keyframes" : "takes"}/${item.id}/${item.type === "keyframe" ? "promote" : "approve"}`, "POST", {});
-  await refreshResults(); message.value = item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准，结束状态已记录";
+  await refreshResults(); selectPendingVersion();
+  message.value = item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准，结束状态已记录";
 }
 async function flushSave() { if (JSON.stringify(asset.value) !== savedAsset) throw new Error("资产修改尚未保存，请先建立或保存资产版本"); if (worldDirty.value) await saveWorld(); await saveShot(); }
 async function closePanel(done: () => void) { try { await flushSave(); done(); } catch (cause) { error.value = cause instanceof Error ? cause.message : "未保存，面板保持打开"; } }
