@@ -17,6 +17,8 @@ if (process.env.LITTO_TRIAL_DISABLE === "1") {
 
 const key = process.env.LITTO_TRIAL_KEY?.trim();
 if (!key) throw new Error("请通过环境变量 LITTO_TRIAL_KEY 提供平台 Key");
+// 在写入任何记录之前校验，避免 Key 不合格时供应商和模型已被改写一半。
+if (key.length < 8) throw new Error(`Key 只有 ${key.length} 位，明显不完整；请确认剪贴板里是完整的 Key 后重试`);
 const baseUrl = process.env.LITTO_TRIAL_BASE_URL ?? "https://api.deepseek.com";
 const externalModelId = process.env.LITTO_TRIAL_MODEL ?? "deepseek-chat";
 const creditsPer1kTokens = Number(process.env.LITTO_TRIAL_CREDITS_PER_1K ?? 1);
