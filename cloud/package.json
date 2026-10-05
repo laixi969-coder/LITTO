@@ -9,7 +9,8 @@
         "typecheck": "tsc --noEmit",
         "lint": "tsc --noEmit",
         "test": "node --import tsx --test tests/*.test.ts",
-        "seed": "tsx src/seed.ts"
+        "seed": "tsx src/seed.ts",
+        "trial:setup": "tsx src/trialSetup.ts"
     },
     "dependencies": {
         "@hono/node-server": "^1.13.7",
