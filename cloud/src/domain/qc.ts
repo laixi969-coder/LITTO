@@ -30,7 +30,8 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (!obj || obj.shotId !== shotId) throw notFound(target.type);
     if (observations.some(o => !DIAGNOSIS[o.kind])) throw bad("未知的质检问题类型");
     const reviewed = [...new Set(review.reviewed ?? [])];
-    if (reviewed.length && (!review.actor || !review.note?.trim() || reviewed.some(key => !realismChecks.includes(key as any)))) throw bad("人工检查须记录检查项、检查者和观察说明");
+    // 观察说明只在标了问题时必填（由检查接口校验）；"看过、没问题"的确认不要求逐条写字。
+    if (reviewed.length && (!review.actor || reviewed.some(key => !realismChecks.includes(key as any)))) throw bad("人工检查须记录检查项和检查者");
     const findings: any[] = [];
     // 1. human / vision observations → diagnosis.
     for (const o of observations) {

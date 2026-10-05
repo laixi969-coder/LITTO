@@ -88,16 +88,16 @@
               <video v-else-if="target.media?.mime.startsWith('video/')" class="outputPreview" :src="mediaUrl(target.media.url)" controls preload="metadata" />
               <label>检查模型<select v-model="visionModelKey"><option value="">选择支持图片输入的模型</option><option v-for="item in visualModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label><button type="button" :disabled="!visionModelKey" @click="run(autoReview)">视觉模型辅助检查</button>
               <p>辅助检查可能产生模型费用。视频按时间抽帧，只覆盖采样画面；请完整播放后记录运动和表演检查。</p>
-              <div class="checkList"><label v-for="field in reviewFields" :key="field[0]"><input v-model="reviewed" type="checkbox" :value="field[0]" />已查看：{{ field[1] }}</label></div>
-              <label class="fullField">实际观察说明<textarea v-model="reviewNote" rows="3" /></label>
-              <div class="fieldGrid"><label>发现的问题<select v-model="observation"><option value="">本次未观察到下列缺陷</option><option v-for="item in observationKinds" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label></div>
+              <p class="reviewHint">确认前请对照画面看：{{ reviewFields.map(field => field[1]).join("、") }}{{ target.type === "take" ? "；视频请完整播放一遍" : "" }}。</p>
+              <div class="fieldGrid"><label>发现的问题<select v-model="observation"><option value="">没有发现问题</option><option v-for="item in observationKinds" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label></div>
+              <label class="fullField">{{ observation ? "看到的具体情况（必填）" : "补充说明（选填）" }}<textarea v-model="reviewNote" rows="2" /></label>
               <template v-if="target.type === 'take'">
                 <h3>片段结束时的实际状态</h3>
-                <div class="fieldGrid"><label v-for="item in shotAssets" :key="item.id">{{ item.name }} · 实际位置、持物或服装状态<textarea v-model="stateNotes[item.id]" rows="2" /></label></div>
-                <label class="checkList"><input v-model="stateConfirmed" type="checkbox" />已核对结束状态，下一镜继承这些实际记录</label>
+                <p class="reviewHint">已按镜头规格预填，只改与画面不符的地方；批准后下一镜继承这些记录。</p>
+                <div class="fieldGrid"><label v-for="item in shotAssets" :key="item.id">{{ item.name }}<textarea v-model="stateNotes[item.id]" rows="2" /></label></div>
               </template>
-              <button type="button" :disabled="!reviewNote.trim()" @click="run(saveReview)">保存人工检查记录</button>
-              <button type="button" @click="run(approveVersion)">{{ target.type === 'keyframe' ? '选为主关键帧' : '批准此 Take' }}</button>
+              <button v-if="observation" type="button" :disabled="!reviewNote.trim()" @click="run(saveReview)">记录问题</button>
+              <button v-else type="button" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "完整看过，批准此 Take" }}</button>
               <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="finding in report.findings" :key="finding.kind">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
             </template>
           </template>
@@ -142,9 +142,9 @@ const shotId = ref(""), draft = ref<any>(null), detail = ref<any>(null), dirty =
 const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref(""), ratio = ref("16:9");
 const visualModels = ref<any[]>([]), visionModelKey = ref("");
 const models = ref<MediaModel[]>([]), preview = ref<any>(null), jobs = ref<any[]>([]);
-const stateNotes = ref<Record<string, string>>({}), stateConfirmed = ref(false);
+const stateNotes = ref<Record<string, string>>({});
 const shotAssets = computed(() => assets.value.filter(item => detail.value?.assetIds?.includes(item.id)));
-const targetId = ref(""), reviewed = ref<string[]>([]), reviewNote = ref(""), observation = ref("");
+const targetId = ref(""), reviewNote = ref(""), observation = ref("");
 const keyOf = (model: MediaModel) => JSON.stringify([model.providerId, model.modelId]);
 const availableModels = computed(() => models.value.filter(model => model.type === kind.value));
 const selectedModel = computed(() => availableModels.value.find(model => keyOf(model) === modelKey.value));
@@ -276,22 +276,57 @@ async function refreshJobs() {
 }
 async function refreshResults() { if (shotId.value) detail.value = await request(`/shots/${shotId.value}`); window.dispatchEvent(new Event("littoProductionUpdated")); }
 async function cancelJob(id: string) { await request(`/generations/${id}/cancel`, "POST", {}); await refreshJobs(); }
-function selectVersion(item: any) { targetId.value = item.id; reviewed.value = []; reviewNote.value = ""; observation.value = ""; stateNotes.value = {}; stateConfirmed.value = false; }
-async function autoReview() { const item = target.value; await request(`/shots/${shotId.value}/qc`, "POST", { targetType: item.type, targetId: item.id, auto: true, visionModel: { providerId: JSON.parse(visionModelKey.value)[0], modelId: JSON.parse(visionModelKey.value)[1] } }); await refreshResults(); }
-async function saveReview() {
-  const item = target.value;
-  const observedStateDelta: Record<string, Record<string, unknown>> = {};
-  if (item.type === "take" && stateConfirmed.value) {
-    for (const asset of shotAssets.value) {
-      if (!stateNotes.value[asset.id]?.trim()) throw new Error(`请填写 ${asset.name} 的实际结束状态`);
-      const key = ({ Character: "characters", Wardrobe: "wardrobe", Environment: "environment" } as Record<string, string>)[asset.type] ?? "props";
-      (observedStateDelta[key] ??= {})[asset.id] = { note: stateNotes.value[asset.id] };
-    }
+// 结束状态按镜头规格推算的计划结果预填，用户只改与画面不符的地方。
+const stateKinds: Record<string, string> = { Character: "characters", Wardrobe: "wardrobe", Environment: "environment" };
+const kindOf = (type: string) => stateKinds[type] ?? "props";
+function plannedNote(value: unknown) {
+  if (!value || typeof value !== "object") return "与开始时一致";
+  const state = value as Record<string, unknown>;
+  if (typeof state.note === "string" && state.note.trim()) return state.note;
+  const parts: string[] = [];
+  if (state.present === true) parts.push("在场");
+  if (state.present === false) parts.push("不在画面中");
+  if (typeof state.heldBy === "string" && state.heldBy !== "unknown") parts.push(`由 ${assets.value.find(item => item.id === state.heldBy)?.name ?? state.heldBy} 拿着`);
+  for (const [key, item] of Object.entries(state)) {
+    if (["name", "present", "heldBy", "note"].includes(key) || item === null || item === "") continue;
+    parts.push(`${key}：${typeof item === "object" ? JSON.stringify(item) : item}`);
   }
-  await request(`/shots/${shotId.value}/qc`, "POST", { targetType: item.type, targetId: item.id, reviewed: reviewed.value, note: reviewNote.value, ...(stateConfirmed.value ? { observedStateDelta } : {}), observations: observation.value ? [{ kind: observation.value, note: reviewNote.value }] : [] });
-  await refreshResults(); message.value = "检查记录已保存";
+  return parts.join("，") || "与开始时一致";
 }
-async function approveVersion() { const item = target.value; await request(`/${item.type === 'keyframe' ? 'keyframes' : 'takes'}/${item.id}/${item.type === 'keyframe' ? 'promote' : 'approve'}`, "POST", {}); await refreshResults(); message.value = item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准"; }
+// 预填时记下计划状态：用户没改的资产连同结构化字段（如 heldBy）一起提交，连续性检查才能继续按字段比对。
+let plannedStates: Record<string, { state: Record<string, unknown> | undefined; note: string }> = {};
+function selectVersion(item: any) {
+  targetId.value = item.id; reviewNote.value = ""; observation.value = "";
+  const planned = detail.value?.state?.result ?? {};
+  plannedStates = Object.fromEntries(shotAssets.value.map(asset => {
+    const state = planned[kindOf(asset.type)]?.[asset.id];
+    return [asset.id, { state, note: plannedNote(state) }];
+  }));
+  stateNotes.value = Object.fromEntries(Object.entries(plannedStates).map(([id, item]) => [id, item.note]));
+}
+async function autoReview() { const item = target.value; await request(`/shots/${shotId.value}/qc`, "POST", { targetType: item.type, targetId: item.id, auto: true, visionModel: { providerId: JSON.parse(visionModelKey.value)[0], modelId: JSON.parse(visionModelKey.value)[1] } }); await refreshResults(); }
+// 检查项随确认一并记录：看过画面并点确认即视为完成本版本的人工检查。
+function reviewPayload(item: any) {
+  const observedStateDelta: Record<string, Record<string, unknown>> = {};
+  if (item.type === "take") for (const asset of shotAssets.value) {
+    const note = stateNotes.value[asset.id]?.trim() || "与开始时一致";
+    const planned = plannedStates[asset.id];
+    // 改过的说明以用户为准，规格里的结构化字段可能已不成立，只记文字。
+    (observedStateDelta[kindOf(asset.type)] ??= {})[asset.id] = planned && note === planned.note && planned.state ? { ...planned.state, note } : { note };
+  }
+  return { targetType: item.type, targetId: item.id, reviewed: reviewFields.value.map(field => field[0]), note: reviewNote.value,
+    ...(item.type === "take" ? { observedStateDelta } : {}), observations: observation.value ? [{ kind: observation.value, note: reviewNote.value }] : [] };
+}
+async function saveReview() {
+  await request(`/shots/${shotId.value}/qc`, "POST", reviewPayload(target.value));
+  await refreshResults(); message.value = "问题已记录，可按修复建议重新生成";
+}
+async function confirmVersion() {
+  const item = target.value;
+  await request(`/shots/${shotId.value}/qc`, "POST", reviewPayload(item));
+  await request(`/${item.type === "keyframe" ? "keyframes" : "takes"}/${item.id}/${item.type === "keyframe" ? "promote" : "approve"}`, "POST", {});
+  await refreshResults(); message.value = item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准，结束状态已记录";
+}
 async function flushSave() { if (JSON.stringify(asset.value) !== savedAsset) throw new Error("资产修改尚未保存，请先建立或保存资产版本"); if (worldDirty.value) await saveWorld(); await saveShot(); }
 async function closePanel(done: () => void) { try { await flushSave(); done(); } catch (cause) { error.value = cause instanceof Error ? cause.message : "未保存，面板保持打开"; } }
 async function openShot(id: string) {
@@ -322,6 +357,7 @@ defineExpose({ flushSave, openShot });
   .errorMessage, .attention { color: var(--studioAttention); }
   .statusMessage { color: var(--studioDone); }
   .fullField { margin: 16px 0; }
+  .reviewHint { margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: var(--studioMuted); }
   pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
   small { color: var(--studioMuted); }
   @media (max-width: 640px) { .fieldGrid { grid-template-columns: 1fr; } }

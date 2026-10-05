@@ -235,6 +235,7 @@ production.get("/qc/observation-kinds", (c) => c.json(OBSERVATION_KINDS));
 production.post("/shots/:id/qc", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
     const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), auto: z.boolean().default(false), visionModel: z.object({ providerId: z.string().min(1), modelId: z.string().min(1) }).optional(), reviewed: z.array(z.enum(["surface", "imaging", "world", "motion", "cinematic"])).default([]), note: z.string().max(4000).optional(), observedStateDelta: z.record(z.any()).optional(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
+    if (b.reviewed.length && b.observations.length && !b.note?.trim()) throw bad("标了问题时，请写明看到的具体情况");
     const obs = [...b.observations];
     let vision: any = null;
     if (b.auto) vision = await autoObserve(s, c.req.param("id"), b.targetType, b.targetId, a.user.id, b.visionModel);
