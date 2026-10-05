@@ -7,6 +7,7 @@ import { accountOf, adminAdjust, grant } from "../credits.ts";
 import { addCredential, credentialView, listModels, listProviders, upsertModel, upsertProvider, testProvider, ADAPTERS, credentialFor, secretOf } from "../providers/registry.ts";
 import { cancelJob, jobView, retryJob } from "../jobs.ts";
 import { cleanupMedia } from "../storage.ts";
+import { trialReport } from "../trial.ts";
 import { scoped } from "../db.ts";
 import { bad, notFound, now } from "../util.ts";
 import { snapshot } from "../metrics.ts";
@@ -152,13 +153,21 @@ admin.patch("/storage/quota/:workspaceId", async (c) => {
 });
 
 // System
-const SYSTEM_KEYS = { registrationOpen: true, defaultCredits: 200, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: true, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true }, pricing: {} } as Record<string, any>;
+const SYSTEM_KEYS = { platformTrial: { enabled: false, creditsPer1kTokens: 1 }, registrationOpen: true, defaultCredits: 200, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: true, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true }, pricing: {} } as Record<string, any>;
 admin.get("/system", (c) => c.json(Object.fromEntries(Object.entries(SYSTEM_KEYS).map(([k, v]) => [k, setting(k, v)]))));
 admin.put("/system", async (c) => {
     const b = await body(c, z.record(z.any()));
     for (const [k, v] of Object.entries(b)) { if (!(k in SYSTEM_KEYS)) throw bad(`unknown setting ${k}`); setSetting(k, v); }
     audit(actor(c), "system.update", undefined, b);
     return c.json({ ok: true });
+});
+
+// 实验 1 读数：时间段内新注册用户多快拿到首个文本回复，默认最近 7 天。
+admin.get("/experiments/trial", (c) => {
+    const until = c.req.query("until") ?? new Date().toISOString();
+    const since = c.req.query("since") ?? new Date(Date.parse(until) - 7 * 864e5).toISOString();
+    if (Number.isNaN(Date.parse(since)) || Number.isNaN(Date.parse(until))) throw bad("since/until 须为 ISO 时间");
+    return c.json(trialReport(new Date(since).toISOString(), new Date(until).toISOString()));
 });
 
 // Audit

@@ -4,6 +4,21 @@
 
 ## 本轮实施进展
 
+### 实验 1：新用户平台免费额度（2026-10-05）
+
+假设：首次使用必须自带 API Key 是最大的流失点。给新用户平台文本模型的试用额度后，"10 分钟内拿到第一个故事"的比例应明显上升。
+
+- 实现：复用 cloud 的平台供应商、平台凭据和积分账本。开启后，账号模式下的新用户在模型列表里看到「平台试用」，写故事、剧本和画布文本节点都能直接用，按实际 token 从注册赠送的积分里扣（`defaultCredits`，默认 200；`creditsPer1kTokens` 默认 1）。Key 只在服务端使用。积分用完返回 402，提示接入自己的模型。图片和视频仍需自带 Key。
+- 开启（管理员）：
+  1. `POST /cloud/admin/providers`，`{"name":"平台 DeepSeek","adapter":"openai-compatible","baseUrl":"https://api.deepseek.com"}`
+  2. `POST /cloud/admin/models`，`{"providerId":"<上一步 id>","externalModelId":"deepseek-chat","name":"DeepSeek V3","type":"text"}`
+  3. `POST /cloud/admin/providers/<id>/credentials`，`{"secret":"<平台 Key>"}`
+  4. `PUT /cloud/admin/system`，`{"platformTrial":{"enabled":true,"creditsPer1kTokens":1}}`
+- 读数：`GET /cloud/admin/experiments/trial?since=&until=`（默认最近 7 天，不含管理员账号）。返回注册数，10 分钟和 24 小时内拿到首个回复的人数与比例，到首个回复的中位分钟数，以及首个回复走平台试用还是自带 Key。对照组是开启前同等时长的时间段。
+- 判定：`rateWithin10Min` 比对照期高出 2 倍以上，且 `firstReplyVia.trial` 占多数，即证实假设，应转为正式的平台模型方案；否则说明门槛不在 Key 上，需要回头看创意入口的流程本身。
+- 已知限制：以"首个成功的文本回复"近似"拿到第一个故事"；扣费在回复结束后进行，单条超长回复可能透支，下一次调用会被拦下；中位数在样本为偶数时取较大的一个；试用模型不显示上下文用量。
+- 验证：隔离数据库下验证了开关、凭据缺失、取用、扣费、透支后拦截、未知模型和读数分组；隔离服务实例下以真实 HTTP 验证了管理员配置、模型列表、调用走平台凭据到达上游、额度耗尽返回 402、服务日志不含 Key。没有用真实平台 Key 跑出完整回复，首页试用提示条未在浏览器中实测。
+
 ### 首次使用走查与安全加固（2026-10-04，基线 578dd91）
 
 以新用户身份在浏览器中实际走完注册登录、开始创作、修改设置三条流程，修复后完整重走确认无回归。

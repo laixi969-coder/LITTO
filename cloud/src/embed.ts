@@ -22,6 +22,7 @@ export { encrypt, decrypt } from "./crypto.ts";
 export { workspaceProduction } from "./domain/workspaceProduction.ts";
 export { configureWorkspaceVision } from "./domain/qc-vision.ts";
 export { accountOf, adminAdjust, creditsFor, hold, charge, release } from "./credits.ts";
+export { trialProviderId, trialStatus, trialModelAccess, chargeTrialTokens } from "./trial.ts";
 export const cloudRequestListener = getRequestListener(app.fetch);
 
 let started = false;

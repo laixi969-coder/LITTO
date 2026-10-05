@@ -91,7 +91,23 @@ export const customProviders = computed<CustomProvider[]>(() => Array.isArray(se
     && item.models.every((model: CustomProviderModel) => !!model && typeof model.id === "string" && typeof model.label === "string"))
   : []);
 
-export const modelChoices = computed(() => customProviders.value.flatMap(provider => provider.models.map(model => ({
+// 平台试用：账号模式下平台提供的文本模型与剩余积分（服务端扣费，Key 不下发）；不写入用户设置。
+export const platformTrial = ref<{ credits: number; models: CustomProviderModel[] }>({ credits: 0, models: [] });
+export async function loadPlatformTrial() {
+  try {
+    const { data } = await axios.get("/api/ai/trial");
+    if (data.code === 200 && data.data && Array.isArray(data.data.models)) platformTrial.value = data.data;
+  } catch {
+    // 试用不可用时只是少了平台模型，用户仍可接入自己的模型。
+  }
+}
+export const platformTrialProvider = computed<CustomProvider | undefined>(() => platformTrial.value.models.length
+  ? { id: "littoPlatform", label: "平台试用", apiUrl: "", apiKey: "", protocol: "openai-completions", models: platformTrial.value.models }
+  : undefined);
+// 可选文本模型：用户自己的供应商在前，平台试用在后。
+export const languageProviders = computed(() => platformTrialProvider.value ? [...customProviders.value, platformTrialProvider.value] : customProviders.value);
+
+export const modelChoices = computed(() => languageProviders.value.flatMap(provider => provider.models.map(model => ({
   value: JSON.stringify([provider.id, model.id]), providerId: provider.id, modelId: model.id, label: model.label, contextWindow: model.contextWindow,
 }))));
 
@@ -106,6 +122,7 @@ export async function loadSettings() {
   // 等初始化引发的监听执行完，再允许自动保存。
   await nextTick();
   settingsReady = true;
+  await loadPlatformTrial();
 }
 
 export function saveSettings(update?: (current: Record<string, unknown>) => Record<string, unknown> | undefined) {

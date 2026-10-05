@@ -34,8 +34,15 @@
         </div>
       </header>
       <div class="pageContent">
-        <el-alert v-if="needsModels && !bannerDismissed" class="connectBanner" type="warning" showIcon @close="dismissBanner">
-          <template #title>接入模型，准备开拍</template>
+        <el-alert v-if="usingTrial" class="connectBanner" type="success" showIcon :closable="false">
+          <template #title>平台送你 {{ platformTrial.credits }} 积分，现在就能开始写故事</template>
+          <div class="connectBannerBody">
+            <span>写故事和剧本先用平台试用额度；生成图片和视频需要接入自己的模型。</span>
+            <el-button size="small" @click="openConnectModel('text')">接入自己的模型</el-button>
+          </div>
+        </el-alert>
+        <el-alert v-else-if="needsModels && !bannerDismissed" class="connectBanner" type="warning" showIcon @close="dismissBanner">
+          <template #title>{{ trialExhausted ? "试用额度已用完，接入模型继续创作" : "接入模型，准备开拍" }}</template>
           <div class="connectBannerBody">
             <span>
               {{
@@ -253,7 +260,7 @@ import { getCanvasShots, type CanvasShot } from "@/lib/canvasShots";
 import { isCanvasFile } from "@/pages/workspace/canvasFile";
 import { getMe, isAuthDisabled, logout } from "@/lib/session";
 import { openConnectModel } from "@/components/connectModel/state";
-import { customProviders, settings as settingsStore } from "@/stores/settings";
+import { customProviders, loadPlatformTrial, platformTrial, settings as settingsStore } from "@/stores/settings";
 import workspacePicker from "./workspacePicker.vue";
 
 const settingsVisible = ref(false);
@@ -261,7 +268,14 @@ const me = getMe();
 const accounts = !isAuthDisabled();
 const canSend = computed(() => accounts || !!workspaceDirectory.value);
 // "Ready" = at least one text model with models, and a media provider with a key (masked values count: they mean a key is stored).
-const hasTextModel = computed(() => customProviders.value.some((item) => item.models.length > 0));
+// 自己的文本模型优先；没有时，平台试用还有积分也能直接开始写故事。
+const hasOwnTextModel = computed(() => customProviders.value.some((item) => item.models.length > 0));
+const trialReady = computed(() => platformTrial.value.models.length > 0 && platformTrial.value.credits > 0);
+const usingTrial = computed(() => !hasOwnTextModel.value && trialReady.value);
+const trialExhausted = computed(() => !hasOwnTextModel.value && platformTrial.value.models.length > 0 && platformTrial.value.credits <= 0);
+const hasTextModel = computed(() => hasOwnTextModel.value || trialReady.value);
+// 每次回到首页刷新一次剩余积分。
+void loadPlatformTrial();
 const hasMediaModel = computed(() => {
   const configs = settingsStore.value.mediaProviderConfigs;
   return (

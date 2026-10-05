@@ -41,6 +41,8 @@ export function release(ws: string, jobId: string, held: number, why: string) {
     if (held <= 0) return;
     tx(() => post(ws, "REFUND", 0, -held, { jobId, note: why }));
 }
+/** 按实际用量直接扣费：平台试用的文本 token 在回复结束后才知道，无法预扣。 */
+export const chargeUsage = (ws: string, amount: number, note: string) => post(ws, "GENERATION_CHARGE", -amount, 0, { note });
 export const adminAdjust = (ws: string, amount: number, note: string) => post(ws, "ADMIN_ADJUSTMENT", amount, 0, { note });
 export const accountOf = (ws: string) => {
     const a = account(ws);

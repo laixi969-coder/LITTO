@@ -8,6 +8,8 @@ import conf from "@/utils/conf";
 import { assertPublicHttpUrl, assertPublicUrlLiteral } from "@/utils/ssrf";
 import { readReference } from "@/utils/media/generation";
 import modelContextLimits from "@/utils/ai/modelContextLimits";
+import { cloud } from "@/lib/cloud";
+import { currentTenant } from "@/utils/tenant";
 
 export { fetchProviderModels } from "@/utils/ai/models";
 
@@ -43,7 +45,32 @@ export function getModelLimits(providerId: string, model: z.infer<typeof provide
   };
 }
 
+// 平台试用：账号模式下由 cloud 提供平台凭据的文本模型，按 token 扣注册赠送的积分（见 cloud/src/trial.ts）。
+function trialModels() {
+  const embed = cloud();
+  const tenant = currentTenant();
+  return embed && tenant ? embed.trialStatus(tenant.workspaceId) : { credits: 0, models: [] };
+}
+export const trialStatus = trialModels;
+
+function trialConfiguredModel(modelId: string) {
+  const embed = cloud();
+  const tenant = currentTenant();
+  if (!embed || !tenant) throw Object.assign(new Error("平台试用仅在账号模式下可用"), { status: 400 });
+  const access = embed.trialModelAccess(tenant.workspaceId, modelId);
+  const model = { id: modelId, label: access.label, contextWindow: access.contextWindow, maxOutputTokens: access.maxOutputTokens };
+  const limits = getModelLimits(embed.trialProviderId, model);
+  const baseUrl = new URL(access.baseUrl);
+  if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
+  return {
+    provider: { apiUrl: access.baseUrl, apiKey: access.apiKey, protocol: "openai-completions" as const, models: [model] },
+    model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens },
+    baseUrl: baseUrl.href.replace(/\/+$/, ""),
+  };
+}
+
 export function getConfiguredModel(providerId: string, modelId: string) {
+  if (providerId === cloud()?.trialProviderId) return trialConfiguredModel(modelId);
   const providers = conf.get("settings", {}).customProviders;
   const parsed = providerSchema.safeParse(Array.isArray(providers) ? providers.find(item => item?.id === providerId) : undefined);
   if (!parsed.success) throw Object.assign(new Error("请先在设置中配置模型供应商"), { status: 400 });
@@ -64,8 +91,13 @@ export async function assertConfiguredUpstream(configured: ReturnType<typeof get
 
 export function listAiModels() {
   const providers = conf.get("settings", {}).customProviders;
-  if (!Array.isArray(providers)) return [];
-  return providers.flatMap(item => {
+  const trial = trialModels().models.map(model => {
+    const limits = getModelLimits(cloud()!.trialProviderId, model);
+    return { providerId: cloud()!.trialProviderId, providerLabel: "平台试用", protocol: "openai-completions" as const, modelId: model.id, label: model.label,
+      contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens };
+  });
+  if (!Array.isArray(providers)) return trial;
+  return [...providers.flatMap(item => {
     const parsed = providerSchema.extend({ id: z.string().min(1), label: z.string() }).safeParse(item);
     if (!parsed.success) return [];
     const provider = parsed.data;
@@ -76,7 +108,7 @@ export function listAiModels() {
         contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens,
       };
     });
-  });
+  }), ...trial];
 }
 
 const aiApis = {
