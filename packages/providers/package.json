@@ -11,8 +11,16 @@
     "./types": "./types.d.ts",
     "./language/tfRouter": "./src/language/tfRouter.ts",
     "./language/deepSeek": "./src/language/deepSeek.ts",
+    "./language/atlasCloud": "./src/language/atlasCloud.ts",
+    "./language/easyRouter": "./src/language/easyRouter.ts",
     "./media/tfRouter": "./src/media/tfRouter.ts",
     "./media/apiMart": "./src/media/apiMart.ts",
-    "./media/meta": "./src/media/meta.ts"
+    "./media/meta": "./src/media/meta.ts",
+    "./media/agnes": "./src/media/agnes.ts",
+    "./media/volcengine": "./src/media/volcengine.ts",
+    "./media/bailian": "./src/media/bailian.ts",
+    "./media/kling": "./src/media/kling.ts",
+    "./media/atlasCloud": "./src/media/atlasCloud.ts",
+    "./media/easyRouter": "./src/media/easyRouter.ts"
   }
 }

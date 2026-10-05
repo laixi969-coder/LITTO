@@ -36,6 +36,7 @@ type ProviderConfig<TRules extends readonly ProviderFormRule[]> = {
 
 interface ProviderContext<TConfig = Record<string, unknown>> {
   config: TConfig;
+  models?: ProviderModel[];
   signal?: AbortSignal;
   /** 宿主直接注入工具，供应商无需 import；FFmpeg 为按需安装的插件能力。 */
   tool: ProviderTools;
@@ -183,6 +184,8 @@ interface ProviderDefinition<TRules extends readonly ProviderFormRule[] = readon
   readme?: string;
   rules: TRules;
   models: ProviderModel[];
+  /** 获取可调用的媒体目录；指定 ID 时补全所选模型的生成参数，不修改配置。 */
+  fetchModels?: (this: ProviderContext<ProviderConfig<TRules>>, modelIds?: string[]) => Promise<ProviderModel[]>;
   /** 检查供应商适配文件是否有更新。 */
   checkForUpdates?: (this: ProviderContext<ProviderConfig<TRules>>) => Promise<ProviderUpdateInfo>;
   /** 获取更新文件的完整源码；写入与应用由宿主负责。 */

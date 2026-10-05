@@ -24,10 +24,10 @@
             <el-text size="small" type="info">{{ item.models.length }} 个模型</el-text>
           </div>
           <el-space class="itemActions" wrap>
-            <el-button v-if="item.modelsUrl" text :icon="IconDownload" :loading="fetchingFile === item.fileName" :disabled="!!fetchingFile || !!deletingFile || !!item.loadError || !item.revision" @click="fetchModels(item)">获取模型</el-button>
-            <el-button text :icon="IconEdit" :disabled="!!fetchingFile || !!deletingFile || !!item.loadError" @click="editProvider(item)">编辑模型</el-button>
+            <el-button v-if="item.canSyncModels || item.modelsUrl" text :icon="IconDownload" :disabled="!!deletingFile || !!item.loadError || !item.revision" @click="editProvider(item, true)">同步并选择模型</el-button>
+            <el-button text :icon="IconEdit" :disabled="!!deletingFile || !!item.loadError" @click="editProvider(item)">编辑模型</el-button>
             <el-popconfirm title="确定删除此供应商及其模型？" confirmButtonText="删除" cancelButtonText="取消" @confirm="deleteProvider(item)">
-              <template #reference><el-button text type="danger" :icon="IconTrash" :loading="deletingFile === item.fileName" :disabled="!!fetchingFile || !!deletingFile || !item.revision">删除</el-button></template>
+              <template #reference><el-button text type="danger" :icon="IconTrash" :loading="deletingFile === item.fileName" :disabled="!!deletingFile || !item.revision">删除</el-button></template>
             </el-popconfirm>
           </el-space>
         </div>
@@ -38,7 +38,7 @@
       <el-button class="addButton" :icon="IconSettings" @click="openAdd('custom')">添加自定义供应商</el-button>
     </div>
     <component :is="mediaProviderDialog" v-model="providerDialogVisible" :mode="addMode" @added="saveProviderItem" />
-    <component :is="editProviderDialog" v-model="editorVisible" :provider="editingProvider" @saved="saveProviderItem" />
+    <component :is="editProviderDialog" v-model="editorVisible" :provider="editingProvider" :syncOnOpen="syncOnOpen" @saved="saveProviderItem" />
   </div>
 </template>
 
@@ -50,7 +50,7 @@ import { ElMessage } from "element-plus";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconDownload } from "@tabler/icons-vue";
 import logoUrl from "@toonflow/assets/logo.svg";
 import type { MediaProvider } from "./types";
-import { settings, saveSettings } from "@/stores/settings";
+import { saveSettings } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();
@@ -64,24 +64,8 @@ const editorVisible = ref(false);
 const addMode = ref<"builtin" | "custom">("builtin");
 const editingProvider = ref<MediaProvider>();
 const deletingFile = ref("");
-const fetchingFile = ref("");
+const syncOnOpen = ref(false);
 let loadRequest = 0;
-
-function getProviderApiKey(id: string) {
-  const configs = settings.value.mediaProviderConfigs as Record<string, { apiKey?: unknown }> | undefined;
-  const apiKey = configs?.[id]?.apiKey;
-  return typeof apiKey === "string" ? apiKey : "";
-}
-
-async function saveProviderApiKey(id: string, key: string) {
-  await saveSettings(settings => {
-    const configs = settings.mediaProviderConfigs;
-    const current = configs && typeof configs === "object" && !Array.isArray(configs) ? configs as Record<string, unknown> : {};
-    const existing = current[id];
-    const config = existing && typeof existing === "object" && !Array.isArray(existing) ? existing as Record<string, unknown> : {};
-    return { mediaProviderConfigs: { ...current, [id]: { ...config, apiKey: key } } };
-  });
-}
 
 function refreshInstalled(event: WindowEventMap["toonflow:plugin-installed"]) {
   if (event.detail.type === "provider") void loadProviders();
@@ -113,31 +97,16 @@ function openAdd(mode: "builtin" | "custom") {
   providerDialogVisible.value = true;
 }
 
-function editProvider(provider: MediaProvider) {
-  if (fetchingFile.value || deletingFile.value || provider.loadError) return;
+function editProvider(provider: MediaProvider, sync = false) {
+  if (deletingFile.value || provider.loadError) return;
   editProviderDialog.value ??= defineAsyncComponent(() => import("./editProviderDialog.vue"));
   editingProvider.value = provider;
+  syncOnOpen.value = sync;
   editorVisible.value = true;
 }
 
-async function fetchModels(provider: MediaProvider) {
-  if (fetchingFile.value || deletingFile.value || !provider.modelsUrl || !provider.revision || provider.loadError) return;
-  fetchingFile.value = provider.fileName;
-  try {
-    const { data } = await axios.post<{ code: number; data: MediaProvider; message: string }>("/api/providers/media/models", {
-      fileName: provider.fileName, revision: provider.revision,
-    }, { timeout: 35000 });
-    if (data.code !== 200 || !data.data) throw new Error(data.message || "获取模型失败");
-    saveProviderItem(data.data);
-    invalidateNodeModels("media");
-    ElMessage.success("模型列表已更新");
-  } catch (error) {
-    ElMessage.error(axios.isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "获取模型失败，请重试");
-  } finally { fetchingFile.value = ""; }
-}
-
 async function deleteProvider(provider: MediaProvider) {
-  if (fetchingFile.value || deletingFile.value || !provider.revision) return;
+  if (deletingFile.value || !provider.revision) return;
   deletingFile.value = provider.fileName;
   let deleted = false;
   try {

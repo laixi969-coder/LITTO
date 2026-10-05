@@ -9,6 +9,7 @@ import { parse, parseExpression } from "@babel/parser";
 import { z } from "zod";
 import conf from "@/utils/conf";
 import { guardedFetch } from "@/utils/ssrf";
+import { restoreSecrets, isMasked } from "@/utils/secrets";
 import { convertAudio } from "@/utils/media/audioProcessor";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, writeWorkspaceFile } from "@/utils/workspace/files";
@@ -174,14 +175,14 @@ function parseProvider(source: string) {
   }).safeParse(modelsUrl).success) invalid("模型列表地址须为不含凭据或片段的 HTTP URL");
   const models = mediaModelsSchema.safeParse(value("models") ?? [], validationOptions());
   if (!models.success) invalid(models.error.issues.map(issue => translateMessage(issue.message)).join("; "));
-  return { object, modelProperty: entries.get("models"), id: id as string, label, version: version?.trim(), readme, modelsUrl: modelsUrl as string | undefined, models: models.data };
+  return { object, modelProperty: entries.get("models"), canSyncModels: entries.has("fetchModels"), id: id as string, label, version: version?.trim(), readme, modelsUrl: modelsUrl as string | undefined, models: models.data };
 }
 
 function metadata(fileName: string, source: string) {
-  const { id, label, version, readme, modelsUrl, models } = parseProvider(source);
+  const { id, label, version, readme, modelsUrl, models, canSyncModels } = parseProvider(source);
   if (fileName !== `${id}.ts`) invalid("供应商 ID 与文件名不一致");
   // ACT: 旧 TF-Router 文件不会随应用覆盖，缺少列表地址时使用内置定义。
-  return { fileName, id, label, version, readme, modelsUrl: modelsUrl ?? (id === tfRouter.id ? tfRouter.modelsUrl : undefined), models,
+  return { fileName, id, label, version, readme, canSyncModels: canSyncModels || !!modelsUrl || id === tfRouter.id, modelsUrl: modelsUrl ?? (id === tfRouter.id ? tfRouter.modelsUrl : undefined), models,
     revision: createHash("sha256").update(source).digest("hex"), loadError: "" };
 }
 
@@ -280,14 +281,28 @@ export function getMediaProviderApiKey(id: string) {
   return typeof value === "string" ? value.trim().replace(/^Bearer(?:\s+|$)/i, "").trim() : "";
 }
 
-export async function refreshMediaProviderModels(fileName: string, revision?: string) {
+export async function refreshMediaProviderModels(fileName: string, revision?: string, options: { apply?: boolean; modelIds?: string[]; config?: Record<string, unknown> } = {}) {
   if (!mediaProviderFileSchema.safeParse(fileName).success) invalid("供应商文件名无效");
   const provider = await getMediaProvider(fileName.slice(0, -3));
   if (revision !== undefined && revision !== provider.revision) invalid("供应商文件已被修改，请刷新页面后再获取", 409);
-  if (!provider.modelsUrl) invalid("供应商未配置 modelsUrl");
   const apiKey = getMediaProviderApiKey(provider.id);
-  const response = await fetch(provider.modelsUrl, {
-    headers: { Accept: "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+  const storedConfig = conf.get(`settings.mediaProviderConfigs.${provider.id}`) as Record<string, unknown> | undefined;
+  if (options.config && isMasked(options.config.apiKey) && options.config.baseUrl !== storedConfig?.baseUrl) invalid("API 地址已变化，请重新填写 API Key");
+  const config = restoreSecrets(options.config ?? storedConfig ?? {}, storedConfig);
+  const runtime = await loadMediaProviderSource(provider.source, config, AbortSignal.timeout(60000));
+  if (runtime.fetchModels) {
+    const models = mediaModelsSchema.parse(await runtime.fetchModels(options.modelIds ?? (options.apply === false ? undefined : provider.models.map(model => model.id))));
+    if (!models.length) invalid("未获取到已适配的媒体模型，保留原有列表");
+    if (options.apply === false) return { ...provider, source: undefined, models };
+    // ACT: 目录获取不会删掉用户手工模型，只有明确保存选择时才替换列表。
+    const merged = new Map(provider.models.map(model => [model.id, model]));
+    for (const model of models) merged.set(model.id, model);
+    return saveMediaProvider(fileName, [...merged.values()], provider.revision, apiKey);
+  }
+  if (!provider.modelsUrl) invalid("此供应商未提供模型目录接口，请手动指定模型 ID");
+  const requestApiKey = typeof config.apiKey === "string" ? config.apiKey.trim().replace(/^Bearer\s+/i, "") : "";
+  const response = await guardedFetch(provider.modelsUrl, {
+    headers: { Accept: "application/json", ...(requestApiKey ? { Authorization: `Bearer ${requestApiKey}` } : {}) },
     signal: AbortSignal.timeout(30000), redirect: "error",
   });
   if (!response.ok) throw new Error(t`获取媒体模型列表失败（HTTP ${response.status}）`);
@@ -305,6 +320,7 @@ export async function refreshMediaProviderModels(fileName: string, revision?: st
       ?? (typeof model.display_name === "string" ? model.display_name : typeof model.displayName === "string" ? model.displayName : id), type };
   });
   const types = new Set(models.map(model => model.type));
+  if (options.apply === false) return { ...provider, source: undefined, models: options.modelIds ? models.filter(model => options.modelIds!.includes(model.id)) : models };
   return saveMediaProvider(fileName, [...provider.models.filter(model => !types.has(model.type)), ...models], provider.revision, apiKey);
 }
 
@@ -327,7 +343,7 @@ export async function loadMediaProviderSource(source: string, config: Record<str
   const { id } = parseProvider(source);
   // ACT: VM 只隔离可信供应商的全局上下文；不可信代码需要独立进程等更强隔离。
   const context = createContext({
-    Buffer, URL, URLSearchParams, TextEncoder, TextDecoder, Blob,
+    Buffer, URL, URLSearchParams, TextEncoder, TextDecoder, Blob, FormData, crypto: globalThis.crypto,
     AbortController, AbortSignal, setTimeout, clearTimeout,
   }, { codeGeneration: { strings: false, wasm: false } });
   const rejectImport = () => { throw new Error("供应商不能导入模块，请使用 this.tool 中的宿主工具"); };

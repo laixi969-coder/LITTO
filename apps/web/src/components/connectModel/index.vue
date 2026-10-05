@@ -39,9 +39,9 @@
               <el-form-item label="API 地址（一般不用改）"><el-input v-model="textUrl" dir="ltr" :placeholder="textPreset.apiUrl" aria-label="API 地址" /></el-form-item>
             </el-collapse-item>
           </el-collapse>
-          <el-alert v-if="textResult" class="result" :title="textResult.message" :type="textResult.ok ? 'success' : 'error'" :closable="false" showIcon />
           <el-button type="primary" :loading="textBusy" :disabled="!canSaveText" @click="saveText">测试并保存</el-button>
         </el-form>
+        <el-alert v-if="textResult" class="result" :title="textResult.message" :type="textResult.ok ? (textResult.verified === false ? 'warning' : 'success') : 'error'" :closable="false" showIcon />
       </section>
 
       <!-- ② media -->
@@ -64,7 +64,7 @@
             <div><strong>{{ mediaPreset.label }}</strong> 已连接</div>
             <el-text type="info" size="small">密钥 {{ mediaConnectedKey }}</el-text>
             <el-space>
-              <el-button @click="mediaReplacing = true">更换 Key</el-button>
+              <el-button @click="mediaReplacing = true">修改连接</el-button>
               <el-popconfirm title="断开后将删除这个服务商的 Key。" confirmButtonText="断开" cancelButtonText="取消" @confirm="disconnectMedia"><template #reference><el-button text type="danger">断开</el-button></template></el-popconfirm>
             </el-space>
           </div>
@@ -76,10 +76,16 @@
           <el-form-item label="Key">
             <el-input v-model="mediaKey" type="password" showPassword autocomplete="off" dir="ltr" placeholder="粘贴你的 Key" aria-label="Key" @keyup.enter="saveMedia" />
           </el-form-item>
+          <el-form-item v-if="mediaPreset.secret" label="Secret Key（旧 AK/SK 认证填写，新 API Key 认证留空）">
+            <el-input v-model="mediaSecret" type="password" showPassword autocomplete="off" dir="ltr" aria-label="Secret Key" />
+          </el-form-item>
+          <el-form-item v-if="mediaPreset.baseUrl !== undefined" label="API 地址（可填同协议中转地址）" :required="mediaPreset.urlRequired">
+            <el-input v-model="mediaUrl" dir="ltr" :placeholder="mediaPreset.urlRequired ? 'https://你的工作空间.cn-beijing.maas.aliyuncs.com/api/v1' : mediaPreset.baseUrl || '留空使用所选地区的默认地址'" aria-label="媒体 API 地址" />
+          </el-form-item>
           <el-text class="help" type="info" size="small">在哪里获取 Key？{{ mediaPreset.keyHelp }}</el-text>
-          <el-alert v-if="mediaResult" class="result" :title="mediaResult.message" :type="mediaResult.ok ? (mediaResult.verified ? 'success' : 'warning') : 'error'" :closable="false" showIcon />
-          <el-button type="primary" :loading="mediaBusy" :disabled="mediaKey.trim().length < 8" @click="saveMedia">测试并保存</el-button>
+          <el-button type="primary" :loading="mediaBusy" :disabled="!canSaveMedia" @click="saveMedia">检查并保存</el-button>
         </el-form>
+        <el-alert v-if="mediaResult" class="result" :title="mediaResult.message" :type="mediaResult.ok ? (mediaResult.verified ? 'success' : 'warning') : 'error'" :closable="false" showIcon />
       </section>
     </div>
     <template #footer>
@@ -110,6 +116,8 @@ const textResult = ref<TestResult>();
 
 const mediaPresetId = ref(mediaPresets[0]!.id);
 const mediaKey = ref("");
+const mediaSecret = ref("");
+const mediaUrl = ref("");
 const mediaRegion = ref<"1" | "2">("1");
 const mediaBusy = ref(false);
 const mediaReplacing = ref(false);
@@ -131,9 +139,15 @@ const connectedMediaIds = computed(() => new Set(mediaPresets.filter(item => med
 const mediaConnectedKey = computed(() => mediaKeyOf(mediaPresetId.value));
 
 const canSaveText = computed(() => (textPreset.value.custom ? textUrl.value.trim() && textKey.value.trim() : textKey.value.trim().length > 0));
+const canSaveMedia = computed(() => mediaKey.value.trim().length >= 8 && (!mediaPreset.value.urlRequired || !!mediaUrl.value.trim()));
 
 function pickText(id: string) { textPresetId.value = id; textKey.value = ""; textUrl.value = ""; textResult.value = undefined; textReplacing.value = false; textAdvanced.value = []; }
-function pickMedia(id: string) { mediaPresetId.value = id; mediaKey.value = ""; mediaResult.value = undefined; mediaReplacing.value = false; }
+function pickMedia(id: string) {
+  mediaPresetId.value = id; mediaKey.value = mediaSecret.value = ""; mediaResult.value = undefined; mediaReplacing.value = false;
+  const config = mediaConfigs()[id];
+  mediaUrl.value = typeof config?.baseUrl === "string" ? config.baseUrl : mediaPreset.value.baseUrl ?? "";
+  mediaRegion.value = config?.isOverseas === "2" ? "2" : "1";
+}
 watch(connectModelVisible, visible => {
   if (!visible) return;
   textKey.value = ""; mediaKey.value = ""; textResult.value = mediaResult.value = undefined; textReplacing.value = mediaReplacing.value = false;
@@ -141,7 +155,7 @@ watch(connectModelVisible, visible => {
   const open = textPresets.find(item => !connectedTextIds.value.has(item.id));
   if (!textConnected.value && open) textPresetId.value = textPresetId.value || open.id;
   const connected = mediaPresets.find(item => connectedMediaIds.value.has(item.id));
-  if (connected) mediaPresetId.value = connected.id;
+  pickMedia(connected?.id ?? mediaPresetId.value);
 });
 
 const maskKey = (key: string) => (key ? `••••${key.slice(-4)}` : "");
@@ -188,21 +202,23 @@ async function disconnectText() {
 }
 
 async function saveMedia() {
-  if (mediaKey.value.trim().length < 8 || mediaBusy.value) return;
+  if (!canSaveMedia.value || mediaBusy.value) return;
   mediaBusy.value = true; mediaResult.value = undefined;
   const preset = mediaPreset.value;
   const apiKey = mediaKey.value.trim();
+  const secret = mediaSecret.value.trim();
+  const baseUrl = mediaUrl.value.trim() || preset.baseUrl;
   try {
-    const { data } = await axios.post<{ data: TestResult }>("/api/providers/test", { kind: "media", providerId: preset.id, apiKey, region: preset.regions ? mediaRegion.value : undefined }, { timeout: 60000 });
+    const { data } = await axios.post<{ data: TestResult }>("/api/providers/test", { kind: "media", providerId: preset.id, apiKey, secret: preset.secret ? secret : undefined, baseUrl, region: preset.regions ? mediaRegion.value : undefined }, { timeout: 60000 });
     mediaResult.value = data.data;
     if (!data.data.ok) return;
     await saveSettings(current => {
       const configs = mediaConfigs();
-      return { mediaProviderConfigs: { ...configs, [preset.id]: { ...(configs[preset.id] ?? {}), apiKey, ...(preset.regions ? { isOverseas: mediaRegion.value } : {}) } } };
+      return { mediaProviderConfigs: { ...configs, [preset.id]: { ...(configs[preset.id] ?? {}), apiKey, ...(preset.secret ? { secret } : {}), ...(baseUrl !== undefined ? { baseUrl } : {}), ...(preset.regions ? { isOverseas: mediaRegion.value } : {}) } } };
     });
-    await saveSettings(() => ({ mediaProviderConfigs: { ...mediaConfigs(), [preset.id]: { ...(mediaConfigs()[preset.id] ?? {}), apiKey: maskKey(apiKey) } } }));
+    await saveSettings(() => ({ mediaProviderConfigs: { ...mediaConfigs(), [preset.id]: { ...(mediaConfigs()[preset.id] ?? {}), apiKey: maskKey(apiKey), ...(preset.secret ? { secret: maskKey(secret) } : {}) } } }));
     invalidateNodeModels("media");
-    mediaKey.value = ""; mediaReplacing.value = false;
+    mediaKey.value = mediaSecret.value = ""; mediaReplacing.value = false;
     ElMessage.success(`${preset.label} 已连接`);
   } catch (error) {
     mediaResult.value = { ok: false, message: errorText(error) };
@@ -212,7 +228,7 @@ async function saveMedia() {
 async function disconnectMedia() {
   const id = mediaPresetId.value;
   try {
-    await saveSettings(() => ({ mediaProviderConfigs: { ...mediaConfigs(), [id]: { ...(mediaConfigs()[id] ?? {}), apiKey: "" } } }));
+    await saveSettings(() => ({ mediaProviderConfigs: { ...mediaConfigs(), [id]: { ...(mediaConfigs()[id] ?? {}), apiKey: "", ...(mediaPreset.value.secret ? { secret: "" } : {}) } } }));
     invalidateNodeModels("media");
     mediaResult.value = undefined;
   } catch (error) { ElMessage.error(errorText(error)); }

@@ -14,7 +14,7 @@ import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 
-const autoInstallProviders = ["apiMart.ts", "meta.ts"];
+const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "bailian.ts", "kling.ts", "atlasCloud.ts", "easyRouter.ts"];
 
 export async function createApp({
   webRoot,

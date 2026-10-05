@@ -125,10 +125,21 @@ let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
 const sizeOptions = computed(() => (selectedModel.value?.imageSizes?.length ? selectedModel.value.imageSizes : ["2K"]));
-const ratioOptions = computed(() => (selectedModel.value?.imageRatios?.length ? selectedModel.value.imageRatios : ["16:9"]));
+function pixelRatio(size: string) {
+  const pixels = /^([1-9]\d*)[x*]([1-9]\d*)$/.exec(size);
+  if (!pixels) return;
+  let divisor = Number(pixels[1]);
+  let remainder = Number(pixels[2]);
+  while (remainder) [divisor, remainder] = [remainder, divisor % remainder];
+  return `${Number(pixels[1]) / divisor}:${Number(pixels[2]) / divisor}`;
+}
+const ratioOptions = computed(() => {
+  const ratio = pixelRatio(data.value.size);
+  return ratio ? [ratio] : selectedModel.value?.imageRatios?.length ? selectedModel.value.imageRatios : ["16:9"];
+});
 watch(
-  selectedModel,
-  (choice) => {
+  [selectedModel, () => data.value.size],
+  ([choice]) => {
     if (!choice) return;
     // ACT: 现有分辨率使用 K 单位；出现其他单位时再统一换算，未知名称排在数值选项之后。
     if (!sizeOptions.value.includes(data.value.size)) data.value.size = sizeOptions.value.toSorted((left, right) =>
@@ -306,7 +317,7 @@ function getConfig() {
       size: data.value.size,
       ratio: data.value.ratio,
     },
-    models: models.value,
+    models: models.value.map(model => ({ ...model, ...(model.imageSizes?.some(size => pixelRatio(size)) ? { imageRatios: [...new Set(model.imageSizes.map(size => pixelRatio(size)).filter((ratio): ratio is string => !!ratio))] } : {}) })),
   };
 }
 
@@ -341,12 +352,14 @@ nodeTools.register({
       : models.value.find((item) => item.providerId === args.providerId && item.modelId === args.modelId);
     if (!choice) throw new Error("请选择 getConfig 返回的有效图片模型");
     const sizes = choice.imageSizes?.length ? choice.imageSizes : ["2K"];
-    const ratios = choice.imageRatios?.length ? choice.imageRatios : ["16:9"];
+    const pixel = pixelRatio(args.size ?? (sizes.includes(data.value.size) ? data.value.size : sizes[0]!));
+    const ratios = pixel ? [pixel] : choice.imageRatios?.length ? choice.imageRatios : ["16:9"];
     if (args.size !== undefined && !sizes.includes(args.size)) throw new Error(`当前模型不支持分辨率 ${args.size}，可选：${sizes.join("、")}`);
     if (args.ratio !== undefined && !ratios.includes(args.ratio)) throw new Error(`当前模型不支持比例 ${args.ratio}，可选：${ratios.join("、")}`);
     data.value.model = JSON.stringify([choice.providerId, choice.modelId]);
     if (args.size !== undefined) data.value.size = args.size;
     if (args.ratio !== undefined) data.value.ratio = args.ratio;
+    if (pixel) data.value.ratio = pixel;
     return getConfig();
   },
 });

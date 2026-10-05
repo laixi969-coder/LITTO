@@ -27,7 +27,7 @@
         </el-form-item>
         <div class="modelHeader">
           <el-text tag="strong">模型列表</el-text>
-          <el-button :icon="IconDownload" :loading="fetching || modelRefreshPending" @click="fetchModels()">获取模型列表</el-button>
+          <el-button :icon="IconDownload" :loading="fetching || modelRefreshPending" @click="fetchModels()">同步并选择模型</el-button>
         </div>
         <div class="modelList">
           <div v-for="item in models" :key="item.key" class="modelItem">
@@ -82,7 +82,7 @@
       </el-button>
     </template>
   </el-dialog>
-  <el-dialog v-model="resultsVisible" title="选择要添加的模型" width="min(680px, 92vw)" alignCenter appendToBody destroyOnClose>
+  <el-dialog v-model="resultsVisible" title="选择要启用的模型" width="min(680px, 92vw)" alignCenter appendToBody destroyOnClose>
     <el-input v-model="modelSearch" clearable :prefixIcon="IconSearch" placeholder="搜索模型 ID 或显示名称" aria-label="搜索模型" />
     <div class="modelResults">
       <el-auto-resizer>
@@ -102,13 +102,13 @@
     <el-text type="info">{{ filteredModels.length }} 个结果，已勾选 {{ selectedIds.size }} 个</el-text>
     <template #footer>
       <el-button @click="resultsVisible = false">取消</el-button>
-      <el-button type="primary" :disabled="!selectedIds.size" @click="addSelectedModels">添加勾选的模型（{{ selectedIds.size }}）</el-button>
+      <el-button type="primary" @click="addSelectedModels">应用选择（{{ selectedIds.size }}）</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, h, onBeforeUnmount, reactive, ref, shallowRef, watch } from "vue";
+import { computed, h, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from "vue";
 import axios from "axios";
 import { ElCheckbox, type FormInstance, type FormRules, type Column } from "element-plus";
 import {
@@ -123,7 +123,7 @@ import { saveSettings, type CustomProvider, type CustomProviderModel } from "@/s
 import { languageProviders } from "@toonflow/providers";
 import { isTfRouterProvider } from "@/lib/tf";
 
-const props = defineProps<{ provider?: CustomProvider }>();
+const props = defineProps<{ provider?: CustomProvider; syncOnOpen?: boolean }>();
 const visible = defineModel<boolean>({ default: false });
 const providerForm = ref<FormInstance>();
 const form = reactive({ id: "", label: "", apiUrl: "", protocol: "openai-completions", apiKey: "" });
@@ -146,7 +146,6 @@ const resultColumns = computed<Column[]>(() => [
     cellRenderer: ({ rowData }) =>
       h(ElCheckbox, {
         modelValue: selectedIds.value.has(rowData.id),
-        disabled: addedIds.value.has(rowData.id),
         ariaLabel: `选择 ${rowData.id}`,
         onChange: (value: boolean | string | number) => {
           if (value) selectedIds.value.add(rowData.id);
@@ -185,13 +184,17 @@ const rules: FormRules = {
   ],
 };
 
-watch(visible, (value) => {
+watch(visible, async (value) => {
   if (value) {
     resetForm();
     if (props.provider) {
       const { models: providerModels, ...config } = props.provider;
       Object.assign(form, config);
       models.value = providerModels.map((item) => ({ ...item, key: crypto.randomUUID() }));
+    }
+    if (props.syncOnOpen && !isTfRouterProvider(form)) {
+      await nextTick();
+      if (visible.value) void fetchModels();
     }
   } else {
     request?.abort();
@@ -240,7 +243,7 @@ async function fetchModels(autoApply = false) {
   try {
     const { data } = await axios.post(
       "/api/providers/models",
-      { apiUrl: form.apiUrl.trim(), protocol: form.protocol, apiKey: form.apiKey.trim() },
+      { apiUrl: form.apiUrl.trim(), protocol: form.protocol, apiKey: form.apiKey.trim(), providerId: props.provider?.id },
       { signal: controller.signal, timeout: 35000 }
     );
     if (controller.signal.aborted) return;
@@ -250,8 +253,10 @@ async function fetchModels(autoApply = false) {
       models.value = data.data.map((item: CustomProviderModel) => ({ ...item, key: crypto.randomUUID() }));
       return;
     }
-    fetchedModels.value = data.data;
-    selectedIds.value = new Set();
+    if (!data.data.length) throw new Error("未获取到可用模型，已保留原有列表");
+    const remoteIds = new Set(data.data.map((item: CustomProviderModel) => item.id));
+    fetchedModels.value = [...data.data, ...models.value.filter(item => !remoteIds.has(item.id))];
+    selectedIds.value = new Set(addedIds.value);
     modelSearch.value = "";
     resultsVisible.value = true;
   } catch (error) {
@@ -269,13 +274,9 @@ async function fetchModels(autoApply = false) {
 }
 
 function addSelectedModels() {
-  const added = new Set(addedIds.value);
-  for (const item of fetchedModels.value) {
-    if (selectedIds.value.has(item.id) && !added.has(item.id)) {
-      models.value.push({ ...item, key: crypto.randomUUID() });
-      added.add(item.id);
-    }
-  }
+  models.value = fetchedModels.value.filter(item => selectedIds.value.has(item.id)).map(item => ({
+    ...models.value.find(model => model.id === item.id), ...item, key: crypto.randomUUID(),
+  }));
   resultsVisible.value = false;
 }
 
@@ -305,6 +306,7 @@ async function addProvider() {
   saving.value = true;
   try {
     const updatedProvider = {
+      ...props.provider,
       ...form,
       label: form.label.trim(),
       apiUrl: form.apiUrl.trim(),

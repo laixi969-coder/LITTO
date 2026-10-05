@@ -7,10 +7,24 @@ const modelSchema = z.object({
   display_name: z.string().optional(), displayName: z.string().optional(),
   inputTokenLimit: z.number().int().positive().optional(),
   outputTokenLimit: z.number().int().positive().optional(),
+  output_modalities: z.array(z.string()).optional(),
 });
 
 export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl: string; protocol: string; apiKey: string }) {
   const url = new URL(await assertPublicHttpUrl(apiUrl));
+  if (url.hostname === "api.atlascloud.ai" && ["/", "/v1", "/v1/"].includes(url.pathname)) {
+    url.pathname = "/api/v1/models";
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000), redirect: "error" });
+    if (!response.ok) throw new Error(`获取 Atlas Cloud 模型目录失败（HTTP ${response.status}）`);
+    const result = z.object({ data: z.array(z.object({
+      model: z.string().min(1), displayName: z.string().optional(), type: z.string(), display_console: z.boolean(),
+      contextLength: z.number().int().positive().optional(), maxCompletionTokens: z.number().int().positive().optional(),
+      supported_protocols: z.array(z.string()).optional(),
+    })) }).parse(await response.json());
+    return result.data.filter(item => item.display_console && item.type === "Text"
+      && (!item.supported_protocols || item.supported_protocols.includes("openai.chat.completions")))
+      .map(item => ({ id: item.model, label: item.displayName || item.model, contextWindow: item.contextLength, maxOutputTokens: item.maxCompletionTokens }));
+  }
   if (url.pathname === "/") url.pathname = "/v1";
   url.pathname = `${url.pathname.replace(/\/+$/, "")}/models`;
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -34,6 +48,8 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
     for (const item of items) {
       const id = item.id?.trim();
       if (!id) throw new Error("模型列表包含无效的模型 ID");
+      if (url.hostname === "api.atlascloud.ai" && item.output_modalities && !item.output_modalities.includes("text")) continue;
+      if (["api.atlascloud.ai", "easyrouter.io"].includes(url.hostname) && /embed|whisper|tts|dall-e|image|moderation|audio|realtime|transcribe|rerank|speech|video|sora|seedance|seedream|pixverse|veo|kling|wan\d|wan-|minimax-h3|happyhorse|nano.?banana/i.test(id)) continue;
       models.set(id, { id, label: item.display_name || item.displayName || id, contextWindow: item.inputTokenLimit, maxOutputTokens: item.outputTokenLimit });
     }
     const cursor = protocol === "anthropic-messages" && result.has_more ? result.last_id : undefined;

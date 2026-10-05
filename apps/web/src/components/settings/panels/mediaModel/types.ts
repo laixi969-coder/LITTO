@@ -12,6 +12,7 @@ export type MediaProvider = {
   version?: string;
   readme?: string;
   modelsUrl?: string;
+  canSyncModels?: boolean;
   models: MediaProviderModel[];
   revision: string;
   loadError?: string;

@@ -9,10 +9,16 @@ import { assertPublicHttpUrl, guardedFetch, UnsafeUpstreamError } from "@/utils/
  * Connection test for the "connect your models" wizard. Makes the cheapest real, non-generating call it can and answers in plain Chinese.
  * The key is only ever used for that one request: it is never logged, stored or echoed back.
  */
-const mediaProviders: Record<string, { label: string; verifyUrl?: (region: string) => string }> = {
+const mediaProviders: Record<string, { label: string; customUrl?: boolean; verifyUrl?: (region: string, baseUrl?: string) => string }> = {
   // APIMart is OpenAI-compatible; listing models is an authenticated, free request.
   apiMart: { label: "APIMart", verifyUrl: region => `${region === "2" ? "https://api.apimart.ai/v1" : "https://api.apib.ai/v1"}/models` },
   meta: { label: "秘塔 MiniMax" },
+  agnes: { label: "Agnes AI", verifyUrl: () => "https://apihub.agnes-ai.com/v1/models" },
+  volcengine: { label: "火山方舟" },
+  bailian: { label: "阿里百炼" },
+  kling: { label: "可灵" },
+  atlasCloud: { label: "Atlas Cloud" },
+  easyRouter: { label: "EasyRouter", customUrl: true, verifyUrl: (_region, baseUrl) => `${(baseUrl?.trim() || "https://easyrouter.io/v1").replace(/\/+$/, "")}/models` },
 };
 
 function explain(status: number) {
@@ -35,7 +41,10 @@ function describeError(error: unknown) {
 
 async function textTest({ apiUrl, apiKey, protocol, probeModel }: { apiUrl: string; apiKey: string; protocol: string; probeModel?: string }) {
   try {
+    const publicCatalog = new URL(apiUrl).hostname === "api.atlascloud.ai";
+    if (publicCatalog && apiKey.trim().length < 8) return failure("Key 看起来太短了，请确认复制完整");
     const models = await u.ai.fetchProviderModels({ apiUrl, protocol, apiKey });
+    if (publicCatalog && models.length) return { ok: true, verified: false, message: `已获取 ${models.length} 个文字模型；目录为公开列表，密钥和调用权限在首次生成时确认。`, models };
     if (models.length) return { ok: true, verified: true, message: `连接成功，找到 ${models.length} 个模型`, models };
     if (!probeModel) return failure("连上了，但服务商没有返回任何模型。");
   } catch (error) {
@@ -60,13 +69,17 @@ async function textTest({ apiUrl, apiKey, protocol, probeModel }: { apiUrl: stri
   }
 }
 
-async function mediaTest({ providerId, apiKey, region }: { providerId: string; apiKey: string; region: string }) {
+async function mediaTest({ providerId, apiKey, region, baseUrl, secret }: { providerId: string; apiKey: string; region: string; baseUrl?: string; secret?: string }) {
   const provider = mediaProviders[providerId];
   if (!provider) return failure("不支持这个图片/视频服务商");
   if (apiKey.trim().length < 8) return failure("Key 看起来太短了，请确认复制完整");
-  if (!provider.verifyUrl) return { ok: true, verified: false, message: `格式检查通过。${provider.label} 无法在不产生费用的情况下验证 Key，生成第一张图时才会真正确认。` };
+  if (providerId === "bailian" && !baseUrl?.trim()) return failure("请填写百炼工作空间 API 地址");
+  if (secret && providerId !== "kling") return failure("此服务商不使用 Secret Key");
   try {
-    const response = await guardedFetch(provider.verifyUrl(region), { headers: { Accept: "application/json", Authorization: `Bearer ${apiKey.trim().replace(/^Bearer\s+/i, "")}` }, signal: AbortSignal.timeout(20000) });
+    if (baseUrl?.trim()) await assertPublicHttpUrl(baseUrl.trim(), { strictDns: false });
+    if (!provider.verifyUrl) return { ok: true, verified: false, message: `配置格式检查通过，尚未验证 ${provider.label} 的密钥和模型权限；首次生成时确认。` };
+    if (baseUrl?.trim() && !provider.customUrl) return failure("此服务商暂不支持自定义地址");
+    const response = await guardedFetch(provider.verifyUrl(region, baseUrl), { headers: { Accept: "application/json", Authorization: `Bearer ${apiKey.trim().replace(/^Bearer\s+/i, "")}` }, signal: AbortSignal.timeout(20000) });
     await response.body?.cancel();
     if (response.ok) return { ok: true, verified: true, message: `${provider.label} 连接成功` };
     if (response.status === 401 || response.status === 403) return failure(explain(response.status));
@@ -81,13 +94,15 @@ export default Router().post("/", validateFields({
   kind: z.enum(["text", "media"]),
   apiUrl: z.string().max(2048).optional(),
   apiKey: z.string().max(8192),
+  secret: z.string().max(8192).optional(),
+  baseUrl: z.string().max(2048).optional(),
   protocol: z.enum(["openai-completions", "openai-responses", "anthropic-messages"]).optional(),
   providerId: z.string().max(64).optional(),
   region: z.enum(["1", "2"]).optional(),
   probeModel: z.string().max(200).optional(),
 }), async (req, res) => {
-  const body = req.body as { kind: "text" | "media"; apiUrl?: string; apiKey: string; protocol?: string; providerId?: string; region?: "1" | "2"; probeModel?: string };
-  if (body.kind === "media") return void res.json(success(await mediaTest({ providerId: body.providerId ?? "", apiKey: body.apiKey, region: body.region ?? "1" })));
+  const body = req.body as { kind: "text" | "media"; apiUrl?: string; apiKey: string; secret?: string; baseUrl?: string; protocol?: string; providerId?: string; region?: "1" | "2"; probeModel?: string };
+  if (body.kind === "media") return void res.json(success(await mediaTest({ providerId: body.providerId ?? "", apiKey: body.apiKey, region: body.region ?? "1", baseUrl: body.baseUrl, secret: body.secret })));
   if (!body.apiUrl) return void res.json(success(failure("请先选择服务商或填写 API 地址")));
   res.json(success(await textTest({ apiUrl: body.apiUrl, apiKey: body.apiKey, protocol: body.protocol ?? "openai-completions", probeModel: body.probeModel })));
 });
