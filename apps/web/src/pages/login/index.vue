@@ -37,7 +37,20 @@
           autocomplete="email"
           :disabled="sent || busy"
           aria-label="邮箱" />
-        <template v-if="sent">
+        <template v-if="loginMethod === 'password'">
+          <label for="loginPassword">密码</label>
+          <el-input
+            id="loginPassword"
+            v-model="password"
+            type="password"
+            showPassword
+            size="large"
+            autocomplete="current-password"
+            maxlength="256"
+            :disabled="busy"
+            aria-label="密码" />
+        </template>
+        <template v-else-if="sent">
           <label for="loginCode">验证码</label>
           <el-input
             id="loginCode"
@@ -51,7 +64,8 @@
             aria-label="验证码"
             autofocus />
         </template>
-        <el-button v-if="!sent" type="primary" size="large" nativeType="submit" :loading="busy" :disabled="!email.includes('@')">获取验证码</el-button>
+        <el-button v-if="loginMethod === 'password'" type="primary" size="large" nativeType="submit" :loading="busy" :disabled="!email.includes('@') || !password">登录</el-button>
+        <el-button v-else-if="!sent" type="primary" size="large" nativeType="submit" :loading="busy" :disabled="!email.includes('@')">获取验证码</el-button>
         <template v-else>
           <el-button type="primary" size="large" nativeType="submit" :loading="busy" :disabled="code.length < 6">登录</el-button>
           <div class="codeActions">
@@ -67,8 +81,9 @@
             </el-button>
           </div>
         </template>
+        <el-button link :disabled="busy" @click="switchLoginMethod">{{ loginMethod === "password" ? "使用验证码登录" : "使用密码登录" }}</el-button>
       </el-form>
-      <p class="hint">输入邮箱即可登录，首次使用会自动创建你的个人工作区。</p>
+      <p class="hint">{{ loginMethod === "password" ? "已设置密码的账号使用密码登录。" : "未设置密码的账号可使用验证码登录，首次使用会自动创建个人工作区。" }}</p>
     </section>
   </main>
 </template>
@@ -76,10 +91,12 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from "vue";
 import { ElMessage } from "element-plus";
-import { requestCode, verifyCode } from "@/lib/session";
+import { requestCode, verifyCode, verifyPassword } from "@/lib/session";
 import logoUrl from "@toonflow/assets/logo.svg";
 
 const email = ref("");
+const loginMethod = ref<"password" | "code">("password");
+const password = ref("");
 const code = ref("");
 const sent = ref(false);
 const busy = ref(false);
@@ -87,6 +104,13 @@ const busy = ref(false);
 const cooldown = ref(0);
 let cooldownTimer: ReturnType<typeof setInterval> | undefined;
 onBeforeUnmount(() => clearInterval(cooldownTimer));
+
+function switchLoginMethod() {
+  loginMethod.value = loginMethod.value === "password" ? "code" : "password";
+  sent.value = false;
+  code.value = "";
+  password.value = "";
+}
 
 function startCooldown() {
   cooldown.value = 60;
@@ -114,11 +138,13 @@ async function send() {
   busy.value = false;
 }
 async function submit() {
-  if (!sent.value) return send();
-  if (busy.value || code.value.trim().length !== 6) return;
+  if (loginMethod.value === "code" && !sent.value) return send();
+  if (busy.value || !email.value.includes("@")) return;
+  if (loginMethod.value === "code" ? code.value.trim().length !== 6 : !password.value) return;
   busy.value = true;
   try {
-    await verifyCode(email.value.trim(), code.value.trim());
+    if (loginMethod.value === "password") await verifyPassword(email.value.trim(), password.value);
+    else await verifyCode(email.value.trim(), code.value.trim());
     location.hash = "#/home";
     location.reload(); // reload so settings and workspaces load under the new session
   } catch (error) {

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { authOf, deleteAccount, logout, requestCode, requireRole, setSessionCookie, verifyCode } from "../auth.ts";
+import { authOf, deleteAccount, logout, requestCode, requireRole, setSessionCookie, verifyCode, verifyPassword } from "../auth.ts";
 import { all, audit, get, run, scoped } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { accountOf, grant } from "../credits.ts";
@@ -21,6 +21,12 @@ authPublic.post("/verify", async (c) => {
     const r = verifyCode(b.email, b.code);
     if (b.client === "web") setSessionCookie(c, r.token);
     return c.json({ user: r.user, ...(b.client === "api" ? { token: r.token } : {}) });
+});
+authPublic.post("/password/login", async (c) => {
+  const b = await body(c, z.object({ email: z.string().trim().email().max(254), password: z.string().min(1).max(256), client: z.enum(["web", "api"]).default("web") }));
+  const r = await verifyPassword(b.email, b.password);
+  if (b.client === "web") setSessionCookie(c, r.token);
+  return c.json({ user: r.user, ...(b.client === "api" ? { token: r.token } : {}) });
 });
 
 platform.get("/auth/me", (c) => {

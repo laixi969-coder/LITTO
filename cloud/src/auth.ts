@@ -1,4 +1,4 @@
-import { randomBytes, randomInt } from "node:crypto";
+import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { all, audit, get, run, setting, tx } from "./db.ts";
@@ -29,10 +29,73 @@ function throttleCodeRequest(email: string) {
     codeRequests.set(email, [...recent, at]);
 }
 
+function derivePassword(password: string, salt: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }, (error, key) => {
+      if (error) reject(error);
+      else resolve(key);
+    });
+  });
+}
+
+/** 本机初始化或重置密码；不提供未认证的远程设置入口。 */
+export async function setUserPassword(userId: string, password: string) {
+  if (password.length < 12 || password.length > 256) throw bad("密码长度须为 12–256 个字符");
+  const salt = randomBytes(16).toString("hex");
+  const key = await derivePassword(password, salt);
+  tx(() => {
+    const user = get("SELECT email FROM users WHERE id=? AND status='active' AND deleted_at IS NULL", userId);
+    if (!user) throw bad("账号不存在或已停用");
+    run("INSERT INTO user_passwords VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash=excluded.password_hash, updated_at=excluded.updated_at", userId, `scrypt:${salt}:${key.toString("hex")}`, now());
+    run("DELETE FROM login_codes WHERE email=?", user.email);
+    run("DELETE FROM sessions WHERE user_id=?", userId);
+    audit(null, "auth.password.setLocal", userId);
+  });
+}
+
+// ACT: 单进程按邮箱限制每 15 分钟 10 次尝试；多实例须改为共享存储。
+const passwordAttempts = new Map<string, { count: number; expiresAt: number }>();
+export async function verifyPassword(email: string, password: string) {
+  email = email.trim().toLowerCase();
+  assertNotSsoEnforced(email);
+  const at = Date.now();
+  for (const [key, attempt] of passwordAttempts) if (attempt.expiresAt <= at) passwordAttempts.delete(key);
+  const attempt = passwordAttempts.get(email) ?? { count: 0, expiresAt: at + 15 * 60_000 };
+  if (attempt.count >= 10 || passwordAttempts.size >= 10_000 && !passwordAttempts.has(email)) {
+    throw new HttpError(429, "登录尝试过多，请 15 分钟后重试", "rate_limited");
+  }
+  attempt.count++;
+  passwordAttempts.set(email, attempt);
+  const user = get("SELECT u.id, u.status, u.deleted_at, p.password_hash FROM users u LEFT JOIN user_passwords p ON p.user_id=u.id WHERE u.email=?", email);
+  const hash = String(user?.password_hash ?? "");
+  const validHash = /^scrypt:[0-9a-f]{32}:[0-9a-f]{128}$/.test(hash);
+  const [, salt, expected] = validHash ? hash.split(":") : ["scrypt", "0".repeat(32), "0".repeat(128)];
+  // 未设置密码的账号也执行同样的哈希计算，不暴露账号是否存在。
+  const key = await derivePassword(password, salt);
+  if (!timingSafeEqual(key, Buffer.from(expected, "hex")) || !validHash || user?.status !== "active" || user?.deleted_at) {
+    throw new HttpError(401, "邮箱或密码不正确", "bad_credentials");
+  }
+  // 异步计算期间密码或账号状态可能改变，不能使用旧凭据新建会话。
+  if (get("SELECT p.password_hash FROM user_passwords p JOIN users u ON u.id=p.user_id WHERE p.user_id=? AND u.email=? AND u.status='active' AND u.deleted_at IS NULL", user.id, email)?.password_hash !== hash) {
+    throw new HttpError(401, "邮箱或密码不正确", "bad_credentials");
+  }
+  const result = loginUser(email);
+  passwordAttempts.delete(email);
+  return result;
+}
+
+function requireCodeLogin(email: string) {
+  // 当前尚未接入邮件投递，不能让开发模式返回的验证码绕过密码。
+  if (get("SELECT p.user_id FROM user_passwords p JOIN users u ON u.id=p.user_id WHERE u.email=?", email)) {
+    throw forbidden("此账号已设置密码，请使用密码登录");
+  }
+}
+
 export function requestCode(email: string): { devCode?: string } {
     email = email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw bad("邮箱格式不正确，请检查后重试");
     assertNotSsoEnforced(email);
+    requireCodeLogin(email);
     const existing = get("SELECT id FROM users WHERE email=? AND deleted_at IS NULL", email);
     if (!existing && !setting("registrationOpen", true)) throw forbidden("暂未开放新用户注册");
     throttleCodeRequest(email);
@@ -46,6 +109,7 @@ export function requestCode(email: string): { devCode?: string } {
 export function verifyCode(email: string, code: string) {
     email = email.trim().toLowerCase();
     assertNotSsoEnforced(email);
+    requireCodeLogin(email);
     const rec = get("SELECT * FROM login_codes WHERE email=?", email);
     if (!rec || rec.expires_at < now() || rec.attempts >= 5) throw new HttpError(401, "验证码已过期或错误次数过多，请重新获取", "bad_code");
     if (rec.code_hash !== sha256(email + code)) {

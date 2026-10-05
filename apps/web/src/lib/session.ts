@@ -26,6 +26,7 @@ async function post(path: string, body: unknown) {
 }
 export const requestCode = (email: string) => post("/auth/request-code", { email }) as Promise<{ devCode?: string }>;
 export async function verifyCode(email: string, code: string) { await post("/auth/verify", { email, code, client: "web" }); await loadMe(true); }
+export async function verifyPassword(email: string, password: string) { await post("/auth/password/login", { email, password, client: "web" }); await loadMe(true); }
 export async function logout() { await post("/auth/logout", {}).catch(() => {}); me = null; location.hash = "#/login"; location.reload(); }
 
 /** Any 401 from the engine API means the session ended: go back to the login page. */

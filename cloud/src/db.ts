@@ -99,6 +99,10 @@ CREATE INDEX idx_usage_ws_time ON usage_events(workspace_id, created_at);
         id: "0007_realismReview",
         sql: `ALTER TABLE qc_reports ADD COLUMN evidence TEXT NOT NULL DEFAULT '{}';`,
     },
+    {
+        id: "0008_passwordLogin",
+        sql: `CREATE TABLE user_passwords(user_id TEXT PRIMARY KEY, password_hash TEXT NOT NULL, updated_at TEXT NOT NULL);`,
+    },
 ];
 
 export const db = await openSqlite(config.dbFile);
