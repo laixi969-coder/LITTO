@@ -69,15 +69,16 @@ function trialConfiguredModel(modelId: string) {
   };
 }
 
-// 上游 SDK 的错误是英文且不说明原因，转成用户能据此行动的说明；无法识别的保持原文。
+// 上游 SDK 的错误是英文且不说明原因，转成用户能据此行动的说明，并附上原文便于管理员排查；无法识别的保持原文。
 export function describeModelError(message: string | undefined) {
   if (!message) return "模型请求失败";
-  if (/^Connection error|ECONNREFUSED|ECONNRESET|ENOTFOUND|fetch failed|socket hang up/i.test(message)) return "无法连接模型服务，请检查网络或代理设置后重试";
-  if (/timed? ?out|ETIMEDOUT/i.test(message)) return "模型服务响应超时，请稍后重试";
-  if (/\b401\b|invalid api key|incorrect api key|unauthorized/i.test(message)) return "模型 Key 无效或已过期，请检查后重新填写";
-  if (/\b402\b|insufficient (balance|quota)|余额不足/i.test(message)) return "模型服务账户余额不足，请充值后重试";
-  if (/\b429\b|rate limit/i.test(message)) return "模型服务请求过于频繁，请稍后重试";
-  return message;
+  const hint = /^Connection error|ECONNREFUSED|ECONNRESET|ENOTFOUND|fetch failed|socket hang up/i.test(message) ? "无法连接模型服务，请检查网络或代理设置后重试"
+    : /timed? ?out|ETIMEDOUT/i.test(message) ? "模型服务响应超时，请稍后重试"
+      : /\b401\b|invalid api key|incorrect api key|unauthorized/i.test(message) ? "模型 Key 无效或已过期，请检查后重新填写"
+        : /\b402\b|insufficient (balance|quota)|余额不足/i.test(message) ? "模型服务账户余额不足，请充值后重试"
+          : /\b429\b|rate limit/i.test(message) ? "模型服务请求过于频繁，请稍后重试"
+            : undefined;
+  return hint ? `${hint}（${message.slice(0, 200)}）` : message;
 }
 
 export function getConfiguredModel(providerId: string, modelId: string) {

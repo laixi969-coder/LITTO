@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 
 // 与内嵌在主服务里时使用同一个数据目录，否则写入的凭据无法被服务解密。
 process.env.LITTO_DATA_DIR ??= resolve(import.meta.dirname, "../../data/cloud");
-const { get, setSetting } = await import("./db.ts");
+const { all, get, setSetting } = await import("./db.ts");
 const { addCredential, upsertModel, upsertProvider } = await import("./providers/registry.ts");
 
 if (process.env.LITTO_TRIAL_DISABLE === "1") {
@@ -23,9 +23,16 @@ const creditsPer1kTokens = Number(process.env.LITTO_TRIAL_CREDITS_PER_1K ?? 1);
 if (!(creditsPer1kTokens > 0)) throw new Error("LITTO_TRIAL_CREDITS_PER_1K 必须大于 0");
 
 // 重复执行时复用同一个平台供应商与模型，只追加新凭据（取用时用最新的一条）。
-const provider = upsertProvider(get("SELECT id FROM providers WHERE name='平台试用'")?.id ?? null, { name: "平台试用", adapter: "openai-compatible", baseUrl, status: "active" });
+const previous = get("SELECT id, base_url FROM providers WHERE name='平台试用'");
+const provider = upsertProvider(previous?.id ?? null, { name: "平台试用", adapter: "openai-compatible", baseUrl, status: "active" });
+// 换了服务地址，原来登记的模型名在新服务上不一定存在，全部停用；同一地址下可以叠加多个模型做对比。
+if (previous && previous.base_url !== baseUrl) {
+    for (const row of all("SELECT id FROM models WHERE provider_id=? AND external_model_id<>?", provider.id, externalModelId)) upsertModel(row.id, { status: "disabled" });
+}
 const existingModel = get("SELECT id FROM models WHERE provider_id=? AND external_model_id=?", provider.id, externalModelId);
 upsertModel(existingModel?.id ?? null, { providerId: provider.id, type: "text", externalModelId, name: process.env.LITTO_TRIAL_MODEL_NAME ?? externalModelId, status: "active" });
 addCredential("platform", null, { providerId: provider.id, secret: key, label: "platform trial" });
 setSetting("platformTrial", { enabled: true, creditsPer1kTokens });
 console.log(`平台试用已开启：${baseUrl} · ${externalModelId} · 每 1000 token 扣 ${creditsPer1kTokens} 积分`);
+// 终端隐藏输入时粘贴偶尔会吞掉开头几个字符，打印长度与末 4 位供当场核对。
+console.log(`已保存的 Key：${key.length} 位，开头 ${key.slice(0, 3)}…，末 4 位 ${key.slice(-4)}`);
