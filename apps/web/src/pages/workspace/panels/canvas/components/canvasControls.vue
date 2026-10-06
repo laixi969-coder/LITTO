@@ -5,10 +5,10 @@
     :style="{ bottom: '64px' }"
     :pannable="true"
     :zoomable="true"
-    node-color="var(--el-fill-color-dark)"
-    mask-color="var(--el-mask-color-extra-light)" />
+    nodeColor="var(--el-fill-color-dark)"
+    maskColor="var(--el-mask-color-extra-light)" />
   <panel position="bottom-left">
-    <elCard shadow="never" :body-style="{ padding: '4px' }">
+    <el-card shadow="never" :bodyStyle="{ padding: '4px' }">
       <div class="canvasControls">
         <el-tooltip :showArrow="false" :content="assetsVisible ? '关闭素材库' : '打开素材库'" placement="top" :hideAfter="0" :enterable="false" :triggerKeys="[]">
           <el-button
@@ -74,8 +74,11 @@
             <icon-focus-centered :size="17" />
           </el-button>
         </el-tooltip>
+        <el-button class="toolButton" text :disabled="zoomPercent <= 20" aria-label="缩小画布" title="缩小画布" @click="zoomOut()">
+          <icon-minus :size="17" />
+        </el-button>
         <el-tooltip :showArrow="false"
-          content="缩放菜单（滚轮调整缩放）"
+          content="滚轮缩放 · Shift＋滚轮平移 · 空格＋拖动平移"
           placement="top"
           :hideAfter="0"
           :enterable="false"
@@ -95,7 +98,7 @@
               <div class="zoomMenu">
                 <el-input-number
                   class="zoomInput"
-                  :model-value="zoomPercent"
+                  :modelValue="zoomPercent"
                   :min="20"
                   :max="800"
                   :controls="false"
@@ -110,8 +113,11 @@
             </el-popover>
           </span>
         </el-tooltip>
+        <el-button class="toolButton" text :disabled="zoomPercent >= 800" aria-label="放大画布" title="放大画布" @click="zoomIn()">
+          <icon-plus :size="17" />
+        </el-button>
       </div>
-    </elCard>
+    </el-card>
   </panel>
 </template>
 
@@ -119,9 +125,8 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Panel, useVueFlow, type XYPosition } from "@vue-flow/core";
 import { MiniMap } from "@vue-flow/minimap";
-import { IconMap, IconMagnet, IconFocusCentered } from "@tabler/icons-vue";
+import { IconMap, IconMagnet, IconFocusCentered, IconMinus, IconPlus } from "@tabler/icons-vue";
 import { ElMessage } from "element-plus";
-import { QRCode } from "tdesign-vue-next";
 import { arrangeCanvas } from "../arrangeCanvas";
 
 const props = defineProps<{

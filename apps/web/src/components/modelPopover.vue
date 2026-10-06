@@ -10,7 +10,8 @@
       popperClass="agentModelPopover"
       :popperStyle="{ padding: '20px', maxWidth: 'calc(100vw - 24px)' }">
       <template #reference>
-        <el-button class="modelButton" text :disabled="disabled" aria-label="模型与推理设置">
+        <el-button class="modelButton" text :disabled="disabled" :aria-label="`选择对话模型，当前：${selectedModelChoice?.label ?? '未选择'}`" title="选择对话模型与推理等级">
+          <span class="modelLabel">模型</span>
           <modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="14" />
           <span class="modelName">{{ selectedModelChoice?.label ?? "选择模型" }}</span>
           ·
@@ -86,6 +87,11 @@ watch(() => !props.active || props.disabled, close => { if (close) visible.value
     }
     svg {
       flex-shrink: 0;
+    }
+
+    .modelLabel {
+      flex-shrink: 0;
+      font-size: 12px;
     }
 
     .reasoningLabel {

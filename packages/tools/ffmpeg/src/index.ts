@@ -47,6 +47,9 @@ const plugin: ToolPlugin = {
         if (event.event === "error") {
           const failure = event.args[0] as { message?: string };
           error = Object.assign(new Error(failure.message ?? "FFmpeg 执行失败"), failure);
+          // ACT: 保留末尾 8 KB 原生诊断，避免完整媒体日志撑满对话上下文。
+          const stderr = typeof event.args[2] === "string" ? event.args[2].trim().slice(-8000) : "";
+          if (stderr) error.message += `\nFFmpeg 诊断：\n${stderr}`;
         } else if (event.event === "result") details = event.args[0];
         else if (event.event === "filenames") filenames = event.args[0];
         else if (event.event === "end") details = { stdout: event.args[0], stderr: event.args[1], ...(filenames ? { filenames } : {}) };
@@ -74,6 +77,7 @@ const plugin: ToolPlugin = {
         '截帧示例：{"steps":[{"method":"input","args":["assets/input.mp4"]},{"method":"seekInput","args":[1]},{"method":"frames","args":[1]},{"method":"output","args":["assets/frame.png"]}]}。',
         'inputOptions/outputOptions 按 fluent 原生语法传参，不额外拆分空格。含空格的元数据使用 args:["-metadata","title=a b"]，不要再嵌套数组。先用 operation={"method":"availableEncoders","args":[]} 等查询实际能力，不猜测本机编码器。',
         "除非用户要求覆盖，否则使用新文件名；所有显式路径及参数、滤镜和媒体清单中引用的文件都应位于当前工作区。",
+        '文字叠加、字幕烧录前先用 operation={"method":"availableFilters","args":[]} 确认 drawtext、subtitles 或 ass 是否可用。缺少滤镜时说明需要安装包含对应滤镜的 FFmpeg，不要反复试运行或用不存在的字幕文件探测。input 只接受工作区文件，不接受 color 等 lavfi 虚拟输入；滤镜验证复用已有素材。',
       ],
       parameters: z.toJSONSchema(processSchema, { io: "input", target: "draft-07" }),
       executionMode: "sequential",

@@ -37,9 +37,10 @@
             @change="setShortcut(field.id, $event)" />
         </div>
       </el-form-item>
+      <div class="gestureRow"><span>鼠标缩放</span><span class="gestureValue"><icon-mouse :size="16" />直接滚动滚轮</span></div>
       <div class="gestureRow"><span>触摸板缩放</span><span class="gestureValue"><icon-hand-two-fingers :size="16" />双指捏合</span></div>
-      <div class="gestureRow"><span>触摸板平移</span><span class="gestureValue"><icon-hand-two-fingers :size="16" />双指滑动</span></div>
-      <div class="gestureRow"><span>鼠标平移</span><span class="gestureValue"><icon-mouse :size="16" />滚轮 / 中键拖动</span></div>
+      <div class="gestureRow"><span>触摸板平移</span><span class="gestureValue"><icon-hand-two-fingers :size="16" />Shift＋双指滑动</span></div>
+      <div class="gestureRow"><span>鼠标平移</span><span class="gestureValue"><icon-mouse :size="16" />Shift＋滚轮 / 中键拖动</span></div>
     </el-form>
   </section>
 </template>

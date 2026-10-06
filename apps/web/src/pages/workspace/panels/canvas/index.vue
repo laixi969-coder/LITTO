@@ -17,43 +17,43 @@
       class="flowViewport"
       :class="{ withShots: shots.length }"
       :id="runtimeKey"
-      :only-render-visible-elements="false"
-      :nodes-draggable="true"
-      :node-types="nodeTypes"
-      :snap-to-grid="snapEnabled"
-      :snap-grid="[16, 16]"
-      :min-zoom="0.2"
-      :max-zoom="8"
-      :nodes-connectable="true"
-      :connection-mode="ConnectionMode.Strict"
-      :nodes-focusable="false"
-      :edges-focusable="false"
-      :edges-updatable="false"
-      :elevate-nodes-on-select="true"
-      :elevate-edges-on-select="false"
-      :disable-keyboard-a11y="true"
+      :onlyRenderVisibleElements="false"
+      :nodesDraggable="true"
+      :nodeTypes="nodeTypes"
+      :snapToGrid="snapEnabled"
+      :snapGrid="[16, 16]"
+      :minZoom="0.2"
+      :maxZoom="8"
+      :nodesConnectable="true"
+      :connectionMode="ConnectionMode.Strict"
+      :nodesFocusable="false"
+      :edgesFocusable="false"
+      :edgesUpdatable="false"
+      :elevateNodesOnSelect="true"
+      :elevateEdgesOnSelect="false"
+      :disableKeyboardA11y="true"
       :selectNodesOnDrag="false"
-      :auto-pan-on-node-drag="false"
-      :auto-pan-on-connect="false"
-      :zoom-on-double-click="false"
+      :autoPanOnNodeDrag="false"
+      :autoPanOnConnect="false"
+      :zoomOnDoubleClick="false"
       :zoomOnScroll="false"
       :zoomOnPinch="active && !settingsVisible"
       :panOnScroll="active && !settingsVisible"
       :panOnScrollSpeed="1"
       :panOnDrag="handMode ? true : [1]"
       :panOnScrollMode="PanOnScrollMode.Free"
-      :delete-key-code="null"
+      :deleteKeyCode="null"
       :selectionKeyCode="!handMode"
       :selectionMode="SelectionMode.Partial"
-      :multi-selection-key-code="null"
+      :multiSelectionKeyCode="null"
       :zoomActivationKeyCode="zoomKeyPressed ? true : null"
-      :pan-activation-key-code="null"
+      :panActivationKeyCode="null"
       v-model="flowData"
       @connect="addEdges"
       @edgeClick="showEdgeDisconnect"
       @paneClick="edgeDisconnect = undefined"
       @moveStart="edgeDisconnect = undefined"
-      :default-edge-options="defaultEdgeOptions">
+      :defaultEdgeOptions="defaultEdgeOptions">
       <template v-for="type in remoteNodeTypes" :key="type" #[`node-${type}`]="nodeProps">
         <remoteNode
           v-bind="nodeProps"
@@ -61,7 +61,7 @@
           :error="nodeErrors[type]"
           :loading="nodeLoads.has(type) || (nodeListLoading && !nodeTypes[type] && !nodeErrors[type])" />
       </template>
-      <background :gap="16" pattern-color="var(--el-border-color)" />
+      <background :gap="16" patternColor="var(--el-border-color)" />
       <canvasMenu ref="canvasMenuRef" v-model:canvasId="canvasId" :directory="project?.directory" :initialCanvasId="initialCanvasId" :activateCanvas="activateCanvas" :flushSave="flushCanvases ?? flushCanvasSave">
         <assetLibrary ref="assetLibraryRef" v-model="assetsVisible" :directory="project?.directory" />
       </canvasMenu>
@@ -743,9 +743,12 @@ function zoomCanvas(event: WheelEvent | (Event & { scale: number })) {
     factor = event.type === "gesturechange" && gestureScale !== undefined ? event.scale / gestureScale : 1;
     gestureScale = event.type === "gestureend" ? undefined : event.scale;
   } else {
+    if (event.target.closest(".nowheel, input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
     // ACT: Chromium 捏合发送 Ctrl+wheel，但不发送 Control 按键；WebKit 使用上方原生 gesture 事件。
     const pinching = event.ctrlKey && !pressedCodes.has("ControlLeft") && !pressedCodes.has("ControlRight");
-    if (!pinching && !shortcutPressed(event, generalSettings.value.canvasShortcuts.zoom, pressedCodes)) {
+    const shortcutZoom = shortcutPressed(event, generalSettings.value.canvasShortcuts.zoom, pressedCodes);
+    const plainWheel = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (!pinching && !shortcutZoom && !plainWheel) {
       if (!event.ctrlKey) return;
       // 实体 Ctrl 未绑定缩放时，阻止 Vue Flow 和节点骨架将它误判为捏合。
       factor = 1;

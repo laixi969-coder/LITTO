@@ -24,6 +24,8 @@
 
 也可使用 `operation: { "method": "save", "args": ["assets/output.mp4"] }`，或者原生的 `screenshots`、`concat` 等操作。查询可用编码器、编解码器、格式、滤镜时，省略 `steps`，将 `operation.method` 设为 `availableEncoders`、`availableCodecs`、`availableFormats` 或 `availableFilters`。
 
+文字叠加、字幕烧录前先查询 `availableFilters`，确认 `drawtext`、`subtitles` 或 `ass` 可用；部分系统安装的精简版本不包含这些滤镜。`input` 仅接受工作区文件，不接受 `color` 等 lavfi 虚拟输入。执行失败时返回原生错误及末尾最多 8 KB 的诊断输出，供定位具体原因。
+
 `options` 对应宿主支持的 fluent 构造选项：`source`、`cwd`、`niceness`、`priority`、`stdoutLines`、`timeout`。`steps` 支持宿主已有的全部配置方法和别名；`args` 中的 JSON 值保持原样，`undefinedArgs` 可指定要传入 `undefined` 的位置。
 
 ## 原生能力与执行
