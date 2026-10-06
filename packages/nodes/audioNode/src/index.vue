@@ -33,14 +33,15 @@
       <input ref="fileInput" class="fileInput" type="file" accept="audio/*" aria-label="选择音频" :disabled="uploading" @change="uploadAudio" />
       <el-button
         v-if="!outputs.audio"
-        class="uploadButton"
+        class="uploadButton nodrag nopan"
         text
         :loading="uploading"
         title="上传音频"
         aria-label="上传音频"
         @dblclick.stop
         @click="fileInput?.click()">
-        <icon-upload v-if="!uploading" :size="48" stroke="1.5" />
+        <icon-upload v-if="!uploading" :size="28" stroke="1.5" />
+        <span>{{ uploading ? "正在上传…" : "上传音频" }}</span>
       </el-button>
     </div>
   </nodeSkeleton>
@@ -166,7 +167,8 @@ function showError(error: unknown, fallback: string) {
     width: 100%;
     height: 144px;
     padding: 0;
-    color: var(--el-text-color-placeholder);
+    color: var(--el-text-color-regular);
+    :deep(span) { display: inline-flex; align-items: center; gap: 10px; }
 
     &:hover {
       color: var(--el-color-primary);

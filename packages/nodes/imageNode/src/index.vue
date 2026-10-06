@@ -28,14 +28,15 @@
       <input ref="fileInput" class="fileInput" type="file" accept="image/*" aria-label="选择图片" :disabled="uploading" @change="uploadImage" />
       <el-button
         v-if="!outputFile"
-        class="uploadButton"
+        class="uploadButton nodrag nopan"
         text
         :loading="uploading"
         title="上传图片"
         aria-label="上传图片"
         @dblclick.stop
         @click="fileInput?.click()">
-        <icon-upload v-if="!uploading" :size="48" stroke="1.5" />
+        <icon-upload v-if="!uploading" :size="28" stroke="1.5" />
+        <span>{{ uploading ? "正在上传…" : "上传图片" }}</span>
       </el-button>
     </div>
   </nodeSkeleton>
@@ -108,7 +109,7 @@ nodeTools.register({
 async function resizeImage(event: Event) {
   const image = event.currentTarget as HTMLImageElement;
   if (!image.naturalWidth || !image.naturalHeight) return;
-  imageWidth.value = 240 * image.naturalWidth / image.naturalHeight;
+  imageWidth.value = Math.min(480, Math.max(220, 240 * image.naturalWidth / image.naturalHeight));
   await nextTick();
   updateNodeInternals();
 }
@@ -158,7 +159,8 @@ function showError(error: unknown, fallback: string) {
     width: 100%;
     height: 144px;
     padding: 0;
-    color: var(--el-text-color-placeholder);
+    color: var(--el-text-color-regular);
+    :deep(span) { display: inline-flex; align-items: center; gap: 10px; }
 
     &:hover {
       color: var(--el-color-primary);

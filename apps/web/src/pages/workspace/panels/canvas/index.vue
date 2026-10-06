@@ -147,6 +147,7 @@ import {
 } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { getCanvasShots } from "@/lib/canvasShots";
+import messageMarkdown from "@/components/messageMarkdown.vue";
 import shotStrip from "./components/shotStrip.vue";
 import { useCanvasTools } from "./useCanvasTools";
 import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
@@ -252,6 +253,7 @@ const getNodeTools = useNodeToolsContext();
 const { addNodes, addEdges, removeEdges, findEdge, findNode, toObject, viewport, screenToFlowCoordinate } = flow;
 provide("copyNodeToClipboard", (node: Parameters<typeof copyNodeToClipboard>[0]) => copyNodeToClipboard(node, project.value?.directory ?? ""));
 provide("retainNodeFiles", true);
+provide("nodeMarkdown", markRaw(messageMarkdown));
 provide("selectionConnection", shallowRef<NodeConnectionFeedback>());
 provide("saveNodeToAssets", (label: string, outputs: { label: string; output: NodeOutput }[]) => assetLibraryRef.value?.openSave(label, outputs));
 let canvasController = new AbortController();
@@ -968,7 +970,7 @@ async function loadRemoteNodes(reloadName?: string) {
           // 保存拒绝时旧组件仍可用，不从节点菜单中移除；脚本加载错误仍排除。
           if (nodeTypes.value[nodeType] && !nodeErrors.value[nodeType]) {
             if (reloadNames.has(node.name) && !signal.aborted) ElMessage.warning({
-              message: `${node.displayName}已安装，但当前节点无法刷新。请等待任务结束后，点击节点右上角的刷新按钮。`,
+              message: `${node.displayName}已安装，但当前节点无法刷新。请等待任务结束后，在节点右上角的操作菜单中选择“刷新节点”。`,
               grouping: true,
             });
           }

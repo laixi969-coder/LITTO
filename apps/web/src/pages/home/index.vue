@@ -196,11 +196,28 @@
     <el-dialog
       v-model="briefVisible"
       :title="currentLane.title"
-      width="min(560px, calc(100vw - 32px))"
+      :class="{ musicBrief: briefKind === 'musicFilm' }"
+      :width="briefKind === 'musicFilm' ? 'min(720px, calc(100vw - 24px))' : 'min(560px, calc(100vw - 32px))'"
       alignCenter
-      :closeOnClickModal="!creating">
+      :closeOnClickModal="!creating && !musicBusy && !readingMusicFiles"
+      :closeOnPressEscape="!creating && !musicBusy && !readingMusicFiles"
+      :showClose="!creating && !musicBusy && !readingMusicFiles"
+      @close="musicAnalysisRef?.stopPreview()">
       <el-form class="briefForm" labelPosition="top" @submit.prevent="startBrief">
-        <el-form-item :label="currentLane.label" required>
+        <template v-if="briefKind === 'musicFilm'">
+          <el-form-item label="歌曲与歌词文件">
+            <label class="musicUpload" :class="{ uploadDisabled: creating || readingMusicFiles || musicBusy }">
+              <input type="file" accept=".mp3,.txt,.lrc,.srt" multiple :disabled="creating || readingMusicFiles || musicBusy" aria-label="上传 MP3 或歌词文件" @change="addMusicFiles" />
+              <strong>{{ readingMusicFiles ? '正在读取文件…' : musicAttachments.length ? '继续添加文件' : '选择歌曲或歌词' }}</strong>
+              <span>MP3 · TXT · LRC · SRT，可一次选择多个文件</span>
+            </label>
+          </el-form-item>
+          <p v-if="musicFileError" class="musicFileError" role="alert">{{ musicFileError }}</p>
+          <attachmentList v-if="musicAttachments.length" class="musicAttachments" :attachments="musicAttachments" removable :disabled="creating || readingMusicFiles || musicBusy" @remove="musicAttachments.splice($event, 1); musicFileError = ''" />
+          <p class="briefHint">支持一首 MP3（最多 100 MB）和 UTF-8 歌词 TXT / LRC / SRT（最多 400 KB）。</p>
+          <musicAnalysis ref="musicAnalysisRef" :attachments="musicAttachments" :disabled="creating || readingMusicFiles" @busy="musicBusy = $event" @ready="musicHasLyrics = $event" />
+        </template>
+        <el-form-item :label="currentLane.label" :required="briefKind !== 'musicFilm'">
           <el-input
             v-model="brief.subject"
             type="textarea"
@@ -209,11 +226,14 @@
             :placeholder="currentLane.placeholder" />
         </el-form-item>
         <p class="briefHint">受众、时长和画面风格不用现在想好，助手会在需要时再问你。</p>
-        <div class="briefActions">
-          <el-button :disabled="creating" @click="briefVisible = false">取消</el-button>
-          <el-button type="primary" :loading="creating" :disabled="!brief.subject.trim()" @click="startBrief">开始创作</el-button>
-        </div>
       </el-form>
+      <template #footer>
+        <div class="briefActions" :class="{ musicFooter: briefKind === 'musicFilm' }">
+          <span v-if="briefKind === 'musicFilm'" class="footerHint">{{ musicBusy ? '处理完成或停止后，即可继续创作' : '歌曲、歌词、想法，任选一项即可开始' }}</span>
+          <el-button :disabled="creating || readingMusicFiles || musicBusy" @click="briefVisible = false">取消</el-button>
+          <el-button type="primary" :loading="creating" :disabled="readingMusicFiles || musicBusy || (!brief.subject.trim() && !(briefKind === 'musicFilm' && (musicAttachments.length || musicHasLyrics)))" @click="startBrief">开始创作</el-button>
+        </div>
+      </template>
     </el-dialog>
     <settings v-model="settingsVisible" />
     <workspacePicker ref="relocationPicker" hideTrigger />
@@ -263,6 +283,7 @@ import { getMe, isAuthDisabled, logout } from "@/lib/session";
 import { openConnectModel } from "@/components/connectModel/state";
 import { customProviders, loadPlatformTrial, platformTrial, settings as settingsStore } from "@/stores/settings";
 import workspacePicker from "./workspacePicker.vue";
+import musicAnalysis from "./musicAnalysis.vue";
 
 const settingsVisible = ref(false);
 const me = getMe();
@@ -426,7 +447,7 @@ async function renameProject(project: Project) {
 }
 
 // message 默认取首页输入框；通道弹窗传入带技能指令的消息，不能写回输入框，否则用户会看到内部指令。
-async function createProject(fromPrompt = true, message = prompt.value) {
+async function createProject(fromPrompt = true, message = prompt.value, attachments = promptAttachments.value) {
   if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
   // Sending an idea without a text model would just fail: take the person to the one-minute wizard instead.
   if (fromPrompt && message.trim() && !hasTextModel.value) {
@@ -467,11 +488,11 @@ async function createProject(fromPrompt = true, message = prompt.value) {
       true,
     );
     await workspaceStore.openProject(directory);
-    if (fromPrompt && (message.trim() || promptAttachments.value.length)) {
+    if (fromPrompt && (message.trim() || attachments.length)) {
       workspaceStore.pendingAgentMessage = {
         directory: workspaceStore.project!.directory,
         prompt: message,
-        attachments: [...promptAttachments.value],
+        attachments: [...attachments],
         model: selectedModel.value,
         reasoningEffort: reasoningEffort.value,
       };
@@ -497,13 +518,47 @@ const briefVisible = ref(false);
 const creationLanes = [
   { kind: "story", skill: "story", icon: IconMovie, title: "写一个故事", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
   { kind: "creative", skill: "adfilm", icon: IconSpeakerphone, title: "做一支广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
-  { kind: "musicFilm", skill: "musicfilm", icon: IconMusic, title: "拍一支 MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法", placeholder: "哪首歌？想要什么感觉？歌词可以稍后上传。" },
+  { kind: "musicFilm", skill: "musicfilm", icon: IconMusic, title: "拍一支 MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法（选填）", placeholder: "上传歌曲或歌词，补充你想要的情绪与画面感觉。也可以直接粘贴歌词。" },
   { kind: "existing", skill: "story", icon: IconFileImport, title: "已有剧本或素材", desc: "导入剧本、参考片或参考图，整理后继续。", label: "手上有什么", placeholder: "粘贴剧本，或说明你的参考素材。" },
 ] as const;
 type LaneKind = (typeof creationLanes)[number]["kind"];
 const briefKind = ref<LaneKind>("story");
 const currentLane = computed(() => creationLanes.find((lane) => lane.kind === briefKind.value)!);
 const brief = reactive({ subject: "" });
+const musicAttachments = ref<AgentAttachment[]>([]);
+const musicAnalysisRef = ref<InstanceType<typeof musicAnalysis>>();
+const musicBusy = ref(false);
+const musicHasLyrics = ref(false);
+const readingMusicFiles = ref(false);
+const musicFileError = ref("");
+async function addMusicFiles(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+  if (creating.value || readingMusicFiles.value || musicBusy.value) return;
+  readingMusicFiles.value = true;
+  musicFileError.value = "";
+  try {
+    for (const file of files) {
+      if (musicAttachments.value.length >= 18) throw new Error("最多添加 18 个素材文件，另预留两个分析报告附件");
+      const isAudio = /\.mp3$/i.test(file.name);
+      if (isAudio && musicAttachments.value.some(item => item.mimeType === "audio/mpeg")) throw new Error("每次分析一首歌曲，更换歌曲请先移除原 MP3");
+      if (!isAudio && !/\.(txt|lrc|srt)$/i.test(file.name)) throw new Error("请选择 MP3、TXT、LRC 或 SRT 文件");
+      if (!file.size || file.size > (isAudio ? 100 * 1024 * 1024 : 400000)) throw new Error(`${file.name} 为空或超出大小限制`);
+      if (!isAudio) {
+        let text: string;
+        try { text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer()); }
+        catch { throw new Error(`${file.name} 必须使用 UTF-8 编码`); }
+        if (text.length > 100000) throw new Error("歌词不能超过 100000 个字符");
+      }
+      musicAttachments.value.push({ name: file.name, path: "", mimeType: isAudio ? "audio/mpeg" : "text/plain", file });
+    }
+  } catch (error) {
+    musicFileError.value = error instanceof Error ? error.message : "添加文件失败，请重试";
+  } finally {
+    readingMusicFiles.value = false;
+  }
+}
 function showProjects() {
   document.getElementById("projectListTitle")?.scrollIntoView();
 }
@@ -513,14 +568,25 @@ function openBrief(kind: LaneKind) {
   briefVisible.value = true;
 }
 async function startBrief() {
-  if (!brief.subject.trim() || creating.value) return;
+  const isMusic = briefKind.value === "musicFilm";
+  if (creating.value || musicBusy.value || readingMusicFiles.value || (!brief.subject.trim() && !(isMusic && (musicAttachments.value.length || musicHasLyrics.value)))) return;
   // 受众、时长、风格等由技能按需追问，弹窗只收核心想法。
-  const message = `/skill:${currentLane.value.skill} ${brief.subject.trim()}\n开始前只追问必要的缺失信息，最多 4 个问题。`;
-  if (!accounts && !workspaceDirectory.value) {
-    workspaceDirectory.value = (await relocationPicker.value?.chooseDirectory()) ?? "";
-    if (!workspaceDirectory.value) return;
+  const subject = brief.subject.trim() || "根据上传的歌曲与歌词创作 MV";
+  const message = `/skill:${currentLane.value.skill} ${subject}${isMusic && musicAttachments.value.length ? "\n以附件为创作依据。若附有 littoMusicAnalysis 报告，使用其中真实计算的时长、节拍、旋律候选和 cutPlan 帧剪点；musicLyrics 包含原歌词、转写时间戳和人工校正。以校正后的 cues 为逐句依据，未校准结果标为自动识别待复核。场次与镜头规划明确对应歌曲秒数和剪点帧号。没有分析报告才用可用的 ffprobe 读取时长。无法读取的信息明确说明，不编造听感、歌词或节拍。" : ""}\n开始前只追问必要的缺失信息，最多 4 个问题。`;
+  readingMusicFiles.value = true;
+  try {
+    const reports = isMusic ? await musicAnalysisRef.value?.buildAttachments() ?? [] : [];
+    const attachments = isMusic ? [...musicAttachments.value, ...reports] : [...promptAttachments.value];
+    if (!accounts && !workspaceDirectory.value) {
+      workspaceDirectory.value = (await relocationPicker.value?.chooseDirectory()) ?? "";
+      if (!workspaceDirectory.value) return;
+    }
+    await createProject(true, message, attachments);
+  } catch (cause) {
+    ElMessage.error(cause instanceof Error ? cause.message : "音乐创作准备失败");
+  } finally {
+    readingMusicFiles.value = false;
   }
-  await createProject(true, message);
 }
 const projectSummaries = ref<Record<string, { count: number; generated: number; preview?: CanvasShot; error?: string }>>({});
 watch(
@@ -991,15 +1057,59 @@ watch(
   }
 }
 .briefForm {
+  .musicUpload {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    padding: 20px;
+    border: 1px dashed var(--el-color-primary);
+    border-radius: var(--ui-radius);
+    background: var(--studioSurface);
+    color: var(--studioInk);
+    text-align: center;
+    cursor: pointer;
+    strong { font-size: 15px; font-weight: 600; }
+    span { font-size: 12px; line-height: 1.6; color: var(--studioMuted); }
+    input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    &:hover { background: var(--el-fill-color-light); }
+    &:focus-within { outline: 2px solid var(--el-color-primary); outline-offset: 3px; }
+    &.uploadDisabled { opacity: 0.6; cursor: not-allowed; input { cursor: not-allowed; } }
+  }
+  .musicFileError { color: var(--studioAttention); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+  .musicAttachments {
+    margin-bottom: 16px;
+    :deep(.thumbnailItem.textAttachment) { width: 100%; padding: 0 48px 0 12px; min-height: 44px; }
+    :deep(.textAttachmentButton) { min-height: 44px; font-size: 13px; }
+    :deep(.removeAttachment) { opacity: 1; pointer-events: auto; width: 44px; height: 44px; top: 0; right: 0; border: none; background: transparent; svg { width: 16px; height: 16px; } }
+  }
   .briefHint {
     margin: -4px 0 16px;
     font-size: 12px;
     line-height: 1.6;
     color: var(--studioMuted);
   }
-  .briefActions {
-    display: flex;
-    justify-content: flex-end;
+}
+.briefActions { display: flex; justify-content: flex-end; }
+</style>
+
+<style lang="scss">
+.el-dialog.musicBrief {
+  .el-dialog__body { max-height: calc(100dvh - 188px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 4px; }
+  .el-dialog__header { padding-bottom: 16px; }
+  .el-dialog__footer { border-top: 1px solid var(--studioBorder); padding-top: 16px; }
+  .el-dialog__headerbtn { width: 44px; height: 44px; }
+  .musicFooter {
+    align-items: center;
+    gap: 8px;
+    .footerHint { margin-right: auto; text-align: left; font-size: 12px; color: var(--studioMuted); }
+    .el-button { min-height: 44px; margin-left: 0; }
+    @media (max-width: 540px) {
+      flex-wrap: wrap;
+      .footerHint { flex-basis: 100%; }
+      .el-button { flex: 1; }
+    }
   }
 }
 </style>

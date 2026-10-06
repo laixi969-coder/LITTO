@@ -14,7 +14,7 @@ export const agentAttachmentsSchema = z
     z.strictObject({
       name: z.string().min(1).max(255),
       path: z.string().min(1).max(4096),
-      mimeType: z.string().regex(/^(?:(image|video)\/[a-zA-Z0-9.+-]+|text\/plain)$/),
+      mimeType: z.string().regex(/^(?:(image|video)\/[a-zA-Z0-9.+-]+|audio\/mpeg|text\/plain)$/),
     })
   )
   .max(20);

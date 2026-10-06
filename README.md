@@ -40,6 +40,8 @@ cd apps/web && npx vite
 
 数据（设置、插件、工作区）默认保存在仓库的 `data/`，可用环境变量 `TOONFLOW_DATA_DIR` 指定其他位置。
 
+MV 听歌识词可使用自托管 Speaches，无需用户提供商业 API Key。CPU/GPU 容器配置、环境变量与部署验收见 [MV 开源转写部署](docs/musicDeployment.md)。
+
 默认启用邮箱验证码、Session 与租户隔离；`LITTO_AUTH=off` 为本地单用户模式。当前工作台的 BYOK 设置尚未接入云端加密凭据系统，部署状态与其他未满足项见 V3 核查表。
 
 ## 目录

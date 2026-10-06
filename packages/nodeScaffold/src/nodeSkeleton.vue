@@ -12,6 +12,8 @@
       @command="handleCommand">
       <template #dropdown>
         <el-dropdown-menu>
+          <el-dropdown-item command="rename" :icon="IconEdit">重命名</el-dropdown-item>
+          <el-dropdown-item command="refresh" :icon="IconRefresh" :disabled="loading || reloading || !reloadRemoteNode">刷新节点</el-dropdown-item>
           <el-dropdown-item v-if="assetOutputs.length && saveNodeToAssets" command="saveAsset" :icon="IconFolderPlus">保存到素材库</el-dropdown-item>
           <el-dropdown-item :divided="!!(assetOutputs.length && saveNodeToAssets)" command="copy" :icon="IconCopy">复制节点</el-dropdown-item>
           <el-dropdown-item command="duplicate" :icon="IconCopyPlus">创建副本</el-dropdown-item>
@@ -96,19 +98,13 @@
         tabindex="0"
         :title="`${label}（双击编辑名称）`"
         @dblclick.stop="editLabel"
-        @keydown.enter.stop.prevent="editLabel">
+        @keydown.enter.stop.prevent="editLabel"
+        @keydown.f2.stop.prevent="editLabel">
         {{ label }}
       </span>
       <div class="nodeActions nodrag nopan" @pointerdown.stop @mousedown.stop @dblclick.stop>
-        <el-button
-          :icon="IconRefresh"
-          :loading="loading || reloading"
-          :disabled="loading || !reloadRemoteNode"
-          text
-          title="刷新节点"
-          aria-label="刷新节点"
-          @click.stop="reloadNode" />
-        <el-button :icon="IconX" text title="移除节点" aria-label="移除节点" @click.stop="deleteNode" :loading="deleting" />
+        <el-button :icon="IconDots" text title="节点操作" aria-label="节点操作" aria-haspopup="menu"
+          :loading="deleting || reloading" @click.stop="openActionMenu" @keydown.stop />
       </div>
     </div>
     <div class="cardContainer">
@@ -157,7 +153,8 @@ import { computed, inject, nextTick, ref, shallowRef, watch, watchEffect, type C
 import { Handle, Position, getTransformForBounds, pointToRendererPoint, useNode, useVueFlow, wheelDelta } from "@vue-flow/core";
 import {
   IconRefresh,
-  IconX,
+  IconDots,
+  IconEdit,
   IconTrash,
   IconCopy,
   IconCopyPlus,
@@ -334,6 +331,15 @@ async function reloadNode() {
   }
 }
 
+async function openActionMenu(event: MouseEvent) {
+  const target = event.currentTarget as HTMLElement;
+  const rect = target.getBoundingClientRect();
+  menu.value?.handleClose();
+  menuAnchor.value = { getBoundingClientRect: () => new DOMRect(rect.left, rect.bottom, rect.width, 0) };
+  await nextTick();
+  menu.value?.handleOpen();
+}
+
 async function openMenu(event: MouseEvent | TouchEvent) {
   event.preventDefault();
   menu.value?.handleClose();
@@ -373,6 +379,8 @@ const assetOutputs = computed(() =>
 );
 
 async function handleCommand(command: string) {
+  if (command === "rename") editLabel();
+  if (command === "refresh") await reloadNode();
   if (command === "saveAsset") saveNodeToAssets?.(props.label, assetOutputs.value);
   if (command === "clipboard" && copyNodeToClipboard && !copyingToClipboard.value) {
     copyingToClipboard.value = true;
@@ -506,19 +514,29 @@ watch(
 );
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .nodeSkeleton {
   position: relative;
   width: 220px;
   color: var(--el-text-color-primary);
   text-align: left;
 
-  &:hover .cardContainer .nodeHandle .handleIcon {
-    opacity: 1;
+  :deep(button:focus-visible), .labelText:focus-visible {
+    outline: 2px solid var(--el-color-primary);
+    outline-offset: 3px;
+    border-radius: 4px;
   }
 
-  &:hover .titleBar .nodeActions {
-    visibility: visible;
+  @media (pointer: coarse) {
+    .titleBar .nodeActions .el-button, .floatingSlot .mediaToolbar :deep(.el-button) {
+      width: 44px;
+      height: 44px;
+    }
+    .cardContainer .nodeHandle .handleIcon { opacity: 1; }
+  }
+
+  &:hover .cardContainer .nodeHandle .handleIcon {
+    opacity: 1;
   }
 
   .floatingSlot {
@@ -536,8 +554,8 @@ watch(
 
     .mediaToolbar {
       :deep(.el-button) {
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
         margin: 0;
         padding: 0;
       }
@@ -585,14 +603,13 @@ watch(
     }
 
     .nodeActions {
-      visibility: hidden;
       display: flex;
       flex-shrink: 0;
       gap: 2px;
 
       .el-button {
-        width: 24px;
-        height: 24px;
+        width: 36px;
+        height: 36px;
         margin: 0;
         padding: 0;
       }
@@ -603,7 +620,8 @@ watch(
     position: relative;
 
     .contentCard.selected {
-      border-color: color-mix(in srgb, var(--el-color-primary) 50%, var(--el-border-color-light));
+      border-color: var(--el-color-primary);
+      box-shadow: 0 0 0 2px var(--el-color-primary-light-8);
     }
 
     .contentCard .loadingContent {

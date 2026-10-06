@@ -1,5 +1,5 @@
 <template>
-  <div class="thumbnailItem" :class="{ textAttachment: isText }">
+  <div class="thumbnailItem" :class="{ textAttachment: isText || isAudio }">
     <template v-if="isText">
       <button class="textAttachmentButton" type="button" :title="attachment.name" :aria-label="`预览 ${attachment.name}`" @click="textPreviewVisible = true">
         <icon-file-text :size="18" />
@@ -7,6 +7,10 @@
       </button>
       <el-button v-if="restorable" class="restoreAttachment" text size="small" :disabled="disabled" @click="emit('restore')">还原到输入框</el-button>
     </template>
+    <button v-else-if="isAudio" class="textAttachmentButton" type="button" :title="attachment.name" :aria-label="`试听 ${attachment.name}`" :disabled="!thumbnailUrl" @click="videoPreviewVisible = true">
+      <icon-music :size="18" />
+      <span>{{ attachment.name }}</span>
+    </button>
     <el-image
       v-else-if="attachment.mimeType.startsWith('image/')"
       ref="imageRef"
@@ -30,7 +34,8 @@
     </button>
     <el-button v-if="removable" class="removeAttachment" circle :disabled="disabled" :aria-label="`移除 ${attachment.name}`" title="移除附件" @click="emit('remove')"><icon-x :size="10" /></el-button>
     <el-dialog v-model="videoPreviewVisible" :title="attachment.name" width="min(800px, 90vw)" alignCenter appendToBody destroyOnClose>
-      <video v-if="videoPreviewVisible" class="videoPreview" :src="thumbnailUrl" controls playsinline preload="metadata" />
+      <audio v-if="videoPreviewVisible && isAudio" class="videoPreview" :src="thumbnailUrl" controls preload="metadata" />
+      <video v-else-if="videoPreviewVisible" class="videoPreview" :src="thumbnailUrl" controls playsinline preload="metadata" />
     </el-dialog>
     <el-dialog v-model="textPreviewVisible" :title="attachment.name" width="min(720px, 90vw)" alignCenter appendToBody destroyOnClose>
       <p v-if="textLoading || textError" :role="textError ? 'alert' : 'status'">{{ textLoading ? '正在读取…' : textError }}</p>
@@ -42,7 +47,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { ImageInstance } from "element-plus";
-import { IconFileText, IconPhoto, IconVideo, IconX } from "@tabler/icons-vue";
+import { IconFileText, IconMusic, IconPhoto, IconVideo, IconX } from "@tabler/icons-vue";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import type { AgentAttachment } from "./types";
 import { readTextAttachment } from "./textAttachments";
@@ -50,6 +55,7 @@ import { readTextAttachment } from "./textAttachments";
 const props = defineProps<{ attachment: AgentAttachment; directory?: string; removable?: boolean; restorable?: boolean; disabled?: boolean }>();
 const emit = defineEmits<{ remove: []; restore: [] }>();
 const isText = computed(() => props.attachment.mimeType === "text/plain");
+const isAudio = computed(() => props.attachment.mimeType.startsWith("audio/"));
 const textPreviewVisible = ref(false);
 const textContent = ref("");
 const textLoading = ref(false);

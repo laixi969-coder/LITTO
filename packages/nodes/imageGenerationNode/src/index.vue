@@ -304,7 +304,7 @@ nodeEvent.on("delete", async () => {
 async function resizeImage(event: Event) {
   const image = event.currentTarget as HTMLImageElement;
   if (!image.naturalWidth || !image.naturalHeight) return;
-  imageWidth.value = (240 * image.naturalWidth) / image.naturalHeight;
+  imageWidth.value = Math.min(480, Math.max(220, (240 * image.naturalWidth) / image.naturalHeight));
   await nextTick();
   updateNodeInternals();
 }

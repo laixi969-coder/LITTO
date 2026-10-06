@@ -1,0 +1,37 @@
+# 与 compose.yaml 一起使用：docker compose -f compose.yaml -f composeSpeech.yaml up -d --build
+services:
+  toonflow:
+    environment:
+      LITTO_SPEECH_URL: http://speaches:8000/v1
+      LITTO_SPEECH_MODEL: ${LITTO_SPEECH_MODEL:-Systran/faster-whisper-small}
+      LITTO_SPEECH_TIMEOUT_MS: ${LITTO_SPEECH_TIMEOUT_MS:-900000}
+      LITTO_SPEECH_CONCURRENCY: ${LITTO_SPEECH_CONCURRENCY:-1}
+    depends_on:
+      speaches:
+        condition: service_healthy
+  speaches:
+    # 固定镜像摘要，避免后续 latest 更新改变接口行为。
+    image: ghcr.io/speaches-ai/speaches@sha256:21e3df06d842fb7802ab470dd77c25f0e8c0d22950e8d8c6ae886e851af53ef8
+    init: true
+    restart: unless-stopped
+    environment:
+      WHISPER__INFERENCE_DEVICE: cpu
+      WHISPER__COMPUTE_TYPE: int8
+      WHISPER__CPU_THREADS: "4"
+      PRELOAD_MODELS: '["${LITTO_SPEECH_MODEL:-Systran/faster-whisper-small}"]'
+      LOG_LEVEL: info
+      ENABLE_UI: "false"
+    volumes:
+      - speechModels:/home/ubuntu/.cache/huggingface/hub
+    # 只供 LITTO 容器访问，不向宿主机或公网发布端口。
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15m
+
+volumes:
+  speechModels:

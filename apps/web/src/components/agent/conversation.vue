@@ -727,15 +727,16 @@ function pasteAttachments(event: ClipboardEvent) {
   event.stopImmediatePropagation();
   if (locked.value) return;
   for (const file of files) {
-    if (!/^(image|video)\//.test(file.type) && file.type !== "text/plain") {
-      ElMessage.warning("只支持图片、视频和纯文本文件");
+    const mimeType = /\.mp3$/i.test(file.name) ? "audio/mpeg" : /\.(txt|lrc|srt)$/i.test(file.name) ? "text/plain" : file.type;
+    if (!/^(image|video)\//.test(mimeType) && mimeType !== "audio/mpeg" && mimeType !== "text/plain") {
+      ElMessage.warning("只支持图片、视频、MP3 和纯文本歌词文件");
       continue;
     }
     if (!file.size || file.size > 100 * 1024 * 1024) {
       ElMessage.warning("附件不能为空且不能超过 100 MB");
       continue;
     }
-    if (file.type === "text/plain" && file.size > 400000) {
+    if (mimeType === "text/plain" && file.size > 400000) {
       ElMessage.warning("文本附件不能超过 400000 字节");
       continue;
     }
@@ -743,7 +744,7 @@ function pasteAttachments(event: ClipboardEvent) {
       ElMessage.warning("每条消息最多添加 20 个附件");
       break;
     }
-    draftAttachments.value.push({ name: file.name, path: "", mimeType: file.type, file });
+    draftAttachments.value.push({ name: file.name, path: "", mimeType, file });
   }
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="videoPlayer">
+  <div class="videoPlayer" :class="{ paused: !playing }">
     <video
       ref="video"
       class="videoPreview"
@@ -273,7 +273,7 @@ async function captureFrame(command: "current" | "first" | "last") {
     left: 0;
     right: 0;
     display: grid;
-    grid-template-columns: 28px auto minmax(0, 1fr) 28px 28px;
+    grid-template-columns: 36px auto minmax(0, 1fr) 36px 36px;
     grid-template-areas: "progress progress progress progress progress" "play current duration volume capture";
     align-items: center;
     gap: 2px 3px;
@@ -287,8 +287,8 @@ async function captureFrame(command: "current" | "first" | "last") {
     transition: opacity 120ms ease;
 
     .playerButton {
-      width: 28px;
-      height: 28px;
+      width: 36px;
+      height: 36px;
       margin: 0;
       padding: 0;
       font-size: 15px;
@@ -333,7 +333,7 @@ async function captureFrame(command: "current" | "first" | "last") {
     }
 
     @container (min-width: 320px) {
-      grid-template-columns: 28px auto minmax(32px, 1fr) auto 28px 28px;
+      grid-template-columns: 36px auto minmax(32px, 1fr) auto 36px 36px;
       grid-template-areas: "play current progress duration volume capture";
       gap: 6px;
       padding: 8px 8px 4px;
@@ -342,7 +342,10 @@ async function captureFrame(command: "current" | "first" | "last") {
     }
     @media (prefers-reduced-motion: reduce) { transition: none; }
   }
-  &:hover .playerControls, .playerControls:has(:focus-visible) {
+  @media (hover: none) {
+    .playerControls { opacity: 1; pointer-events: auto; }
+  }
+  &.paused .playerControls, &:hover .playerControls, &:focus-within .playerControls {
     opacity: 1;
     pointer-events: auto;
   }

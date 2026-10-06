@@ -373,7 +373,7 @@ export async function run(
       send({ type: "session", file: basename(history.getSessionFile()!) });
       // ACT: 文本附件完整内容进入模型上下文，界面仍保存工作区引用；视频在请求时加载，图片由 read 按需读取。
       const content = attachments.length
-        ? `${mentionPrompt(prompt, mentions)}\n\n附件已保存到工作区，path 为相对路径，可用于节点选择素材。以下 JSON 包含文件信息，文本附件的 content 为完整正文：\n${JSON.stringify(
+        ? `${mentionPrompt(prompt, mentions)}\n\n附件已保存到工作区，path 为相对路径，可用于节点选择素材。音频仅提供文件引用，需用可用的 ffprobe / ffmpeg 读取或处理，不代表已经听过音频。以下 JSON 包含文件信息，文本附件的 content 为完整正文：\n${JSON.stringify(
             attachmentContents
           )}`.trim()
         : mentionPrompt(prompt, mentions);

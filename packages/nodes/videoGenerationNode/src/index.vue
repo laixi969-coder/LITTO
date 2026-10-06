@@ -343,7 +343,7 @@ nodeEvent.on("delete", async () => {
 async function resizeVideo(event: Event) {
   const video = event.currentTarget as HTMLVideoElement;
   if (!video.videoWidth || !video.videoHeight) return;
-  videoWidth.value = Math.max(180, (240 * video.videoWidth) / video.videoHeight);
+  videoWidth.value = Math.min(480, Math.max(220, (240 * video.videoWidth) / video.videoHeight));
   await nextTick();
   updateNodeInternals();
 }

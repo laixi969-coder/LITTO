@@ -1,16 +1,20 @@
 <template>
   <nodeSkeleton
     v-bind="nodeProps"
+    style="width: 320px"
     v-model:bottomVisible="node.selected"
     :topVisible="node.selected"
     topWidth="max-content"
     :downloadUrl="downloadUrl"
     :downloadName="`${nodeProps.label || '文本'}.txt`"
     :bottomWidth="660"
-    @fullscreen="fullscreen = true; editing = true">
+    @fullscreen="expanded = true; editing = true">
     <div class="textContent" :class="{ empty: !outputs.text.value.trim() }">
-      <div v-if="outputs.text.value.trim()" class="textPreview nopan nowheel" aria-label="文本内容">{{ outputs.text.value }}</div>
-      <el-button class="editButton nodrag nopan" :icon="IconEdit" :disabled="generating || !textReady" text @dblclick.stop @click.stop="editing = true">编辑</el-button>
+      <div v-if="outputs.text.value.trim()" class="textPreview nodrag nopan nowheel" tabindex="0" aria-label="文本内容，可选中复制" @pointerdown.stop @mousedown.stop @dblclick.stop @keydown.stop>
+        <component v-if="markdownRenderer" :is="markdownRenderer" :content="outputs.text.value" :streaming="generating" :directory="textDirectory" />
+        <span v-else class="plainText">{{ outputs.text.value }}</span>
+      </div>
+      <el-button class="editButton nodrag nopan" :icon="IconEdit" :disabled="generating || !textReady" text @dblclick.stop @click.stop="editing = true">{{ outputs.text.value.trim() ? "编辑文本" : "写入文本" }}</el-button>
     </div>
     <template #bottom>
       <el-card class="promptCard" shadow="never" :bodyStyle="{ padding: '14px 16px 12px' }">
@@ -35,14 +39,27 @@
       </el-card>
     </template>
   </nodeSkeleton>
-  <el-dialog v-model="editing" title="编辑文本" width="min(860px, calc(100vw - 32px))" :fullscreen="fullscreen" alignCenter appendToBody @closed="fullscreen = false">
-    <el-input class="textEditor" :class="{ fullscreen }" v-model="outputs.text.value" type="textarea" :rows="1" :disabled="generating" resize="none" aria-label="编辑文本内容" />
-  </el-dialog>
+  <el-drawer v-model="editing" :title="nodeProps.label || '编辑文本'" :size="expanded ? 'min(900px, 100vw)' : 'min(560px, 100vw)'"
+    :modal="false" :lockScroll="false" :closeOnClickModal="false" appendToBody @closed="expanded = false">
+    <div class="editorPanel" @keydown.stop>
+      <div class="editorToolbar">
+        <span class="saveStatus" :class="{ failed: saveState === 'error' }" role="status" aria-live="polite">{{ generating ? '生成中…' : saveState === 'saving' ? '保存中…' : saveState === 'error' ? '保存失败，输入仍保留' : '已保存' }}</span>
+        <el-button v-if="saveState === 'error'" size="small" @click="retrySave">重试保存</el-button>
+        <el-button size="small" :aria-pressed="previewing" @click="previewing = !previewing">{{ previewing ? '继续编辑' : '预览排版' }}</el-button>
+        <el-button size="small" @click="expanded = !expanded">{{ expanded ? '收窄' : '加宽' }}</el-button>
+      </div>
+      <div v-if="previewing && markdownRenderer" class="documentPreview" tabindex="0" aria-label="文本排版预览">
+        <component :is="markdownRenderer" :content="outputs.text.value" :streaming="generating" :directory="textDirectory" />
+      </div>
+      <el-input v-else class="textEditor" v-model="outputs.text.value" type="textarea" :rows="1" :disabled="generating || !textReady" resize="none" aria-label="编辑文本内容" />
+      <div class="editorFooter">支持 Markdown 标题、列表和表格；修改自动保存。</div>
+    </div>
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { ElButton, ElCard, ElInput, ElSelect, ElDialog, ElOption, ElOptionGroup, ElMessage } from "element-plus";
+import { computed, inject, onMounted, ref, watch, type Component } from "vue";
+import { ElButton, ElCard, ElInput, ElSelect, ElDrawer, ElOption, ElOptionGroup, ElMessage } from "element-plus";
 import { IconEdit, IconFileText, IconSparkles, IconArrowUp } from "@tabler/icons-vue";
 import { groupNodeModels, nodeSkeleton, nodeTools, useNode, useNodeReferences, z, type NodeAiModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
@@ -64,7 +81,11 @@ const { node, nodeProps, outputs, ai, files, nodeEvent } = useNode({
 });
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
 const editing = ref(false);
-const fullscreen = ref(false);
+const expanded = ref(false);
+const previewing = ref(false);
+const markdownRenderer = inject<Component | undefined>("nodeMarkdown", undefined);
+const textDirectory = ref("");
+const saveState = ref<"saved" | "saving" | "error">("saved");
 const downloadUrl = ref("");
 watch([() => outputs.value.text.value, () => node.selected], ([text, selected], _previous, onCleanup) => {
   downloadUrl.value = "";
@@ -87,8 +108,19 @@ let textFiles: ReturnType<typeof files.getWorkspaceFiles>;
 let textLoading: Promise<void> | undefined;
 let textSaving = Promise.resolve();
 function saveText(value: string) {
-  textSaving = textSaving.catch(() => {}).then(() => textFiles.write(textPath, value));
-  return textSaving;
+  saveState.value = "saving";
+  const pending = textSaving.catch(() => {}).then(() => textFiles.write(textPath, value));
+  textSaving = pending;
+  void pending.then(() => {
+    if (textSaving === pending) saveState.value = "saved";
+  }, () => {
+    if (textSaving === pending) saveState.value = "error";
+  });
+  return pending;
+}
+async function retrySave() {
+  try { await saveText(outputs.value.text.value); }
+  catch (error) { ElMessage.error(error instanceof Error ? error.message : "文本保存失败"); }
 }
 nodeEvent.on("save", async (reason) => {
   await textLoading;
@@ -110,6 +142,7 @@ async function loadText() {
     if (!node.id || /[\\/]/.test(node.id) || node.id === "." || node.id === "..") throw new Error("节点 ID 不能作为文件夹名称");
     if (data.value.textPath !== undefined && data.value.textPath !== textPath) throw new Error("文本文件路径无效");
     textFiles = files.getWorkspaceFiles();
+    textDirectory.value = (await textFiles.list()).directory;
     const value = data.value.textSnapshot !== undefined ? data.value.textSnapshot : data.value.textPath ? await textFiles.readText(textPath) : outputs.value.text.value;
     if (typeof value !== "string") throw new Error("文本内容无效");
     if (!data.value.textPath) {
@@ -205,19 +238,27 @@ nodeTools.register({
 </script>
 
 <style lang="scss" scoped>
-.textEditor {
-  &.fullscreen :deep(.el-textarea__inner) {
-    height: calc(100dvh - 112px);
+.editorPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 16px;
+  .editorToolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    .saveStatus { margin-right: auto; font-size: 12px; color: var(--el-text-color-secondary); }
+    .saveStatus.failed { color: var(--el-color-danger); }
+    .el-button { margin: 0; min-height: 36px; }
   }
-
-  :deep(.el-textarea__inner) {
-    height: min(560px, calc(100dvh - 144px));
-    padding: 16px 20px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    font-size: 14px;
-    line-height: 1.8;
+  .textEditor {
+    flex: 1;
+    min-height: 0;
+    :deep(.el-textarea__inner) { height: 100%; padding: 16px; font-size: 14px; line-height: 1.8; overscroll-behavior: contain; }
   }
+  .documentPreview { flex: 1; min-height: 0; overflow: auto; padding: 8px; overflow-wrap: anywhere; }
+  .editorFooter { font-size: 12px; color: var(--el-text-color-secondary); }
 }
 
 .textContent {
@@ -237,14 +278,21 @@ nodeTools.register({
     min-height: 110px;
     max-height: 240px;
     overflow: auto;
-    white-space: pre-wrap;
+    .plainText { white-space: pre-wrap; }
     overflow-wrap: anywhere;
-    user-select: none;
+    user-select: text;
+    cursor: text;
+    padding: 8px;
+    font-size: 14px;
+    line-height: 1.8;
+    overscroll-behavior: contain;
+    &:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: -2px; }
   }
 
   .editButton {
     display: flex;
     margin-left: auto;
+    min-height: 36px;
   }
 }
 

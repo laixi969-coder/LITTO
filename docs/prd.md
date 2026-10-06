@@ -80,7 +80,7 @@ workspaceId。Project、Asset、Reference、Media、Shot、Take、GenerationJob�
 6. 面向拍摄的约束：Story Writer 须考虑角色数量、场景数量与当前模型可稳定生成的范围，不写拍不出来的戏；剧本质检用固定清单（情感锚点、欲望、困境、因果、情绪可拍摄等），不向用户展示模型自评分数。
 7. 数据：`story_drafts, script_versions, creative_briefs, scene_lists`，均带 workspaceId、projectId、schemaVersion。
 
-实现状态（V3.1）：四条通道已由技能落地，`packages/skills` 下 `story`（故事通道与已有素材整理）、`adfilm`（创意/广告，上游为 `insight` 消费者洞察）、`musicfilm`（MV）、`breakdown`（§4B），首页创作入口按通道调用。确认环节复用 `askUser`；SceneList 与拆解清单暂存画布文本节点，上述数据表为后续迁移目标。MV 通道在音频分析、歌词对齐与 Music Timeline 工具就绪前，只交付到段落场次表与镜头规划，结构与节拍须标注为推断。
+实现状态（V3.1）：四条通道已由技能落地，`packages/skills` 下 `story`（故事通道与已有素材整理）、`adfilm`（创意/广告，上游为 `insight` 消费者洞察）、`musicfilm`（MV）、`breakdown`（§4B），首页创作入口按通道调用。确认环节复用 `askUser`；SceneList 与拆解清单暂存画布文本节点，上述数据表为后续迁移目标。MV 入口支持 MP3、TXT/LRC/SRT，本地 Basic Pitch 旋律候选与 Beatroot 节拍分析（最长 10 分钟），OpenAI 兼容转写接口的句级/词级时间戳，以及歌词编辑、帧对齐卡点、同一音频时钟试听校准和 CSV 导出。转写复用用户配置的供应商 Key，需支持 verbose_json 和时间戳（如 whisper-1），不使用平台文本试用额度。分析与歌词报告随附件进入项目创作；节拍、旋律及识词均可能出错，未经试听校准须标为自动识别待复核。纯文本歌词不假称已强制对齐，自动成片组装与最终声画同步验收不由此入口代替。
 
 # 4B. Script Breakdown｜剧本拆解（V3.1 新增）
 
