@@ -1,5 +1,5 @@
 <template>
-  <div class="nodeSkeleton" @wheel.capture="zoomCanvas" @dblclick.stop="focusNode">
+  <div ref="cardRoot" class="nodeSkeleton" :class="{ customSize: hasCustomSize }" @wheel.capture="zoomCanvas" @dblclick.stop="focusNode">
     <el-dropdown
       ref="menu"
       trigger="contextmenu"
@@ -107,6 +107,11 @@
           :loading="deleting || reloading" @click.stop="openActionMenu" @keydown.stop />
       </div>
     </div>
+    <button v-if="node.selected && !loading" class="resizeGrip nodrag nopan" type="button"
+      aria-label="调整卡片大小" title="拖动调整宽高；方向键微调，Shift 加速"
+      @pointerdown.stop.prevent="startResize" @pointermove.stop="moveResize" @pointerup.stop="finishResize"
+      @pointercancel="finishResize" @lostpointercapture="finishResize"
+      @mousedown.stop @click.stop @dblclick.stop @keydown.stop="resizeWithKey">↘</button>
     <div class="cardContainer">
       <el-card
         class="contentCard"
@@ -149,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, ref, shallowRef, watch, watchEffect, type Component, type ShallowRef } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref, shallowRef, watch, watchEffect, type Component, type ShallowRef } from "vue";
 import { Handle, Position, getTransformForBounds, pointToRendererPoint, useNode, useVueFlow, wheelDelta } from "@vue-flow/core";
 import {
   IconRefresh,
@@ -228,6 +233,7 @@ const {
   removeNodes,
   removeEdges,
   updateNodeInternals,
+  updateNode,
   connectionLookup,
   connectionStartHandle,
   connectionEndHandle,
@@ -242,6 +248,55 @@ const {
   onNodeClick,
   onSelectionStart,
 } = useVueFlow();
+const cardRoot = ref<HTMLElement>();
+const batchHistory = inject<((action: () => Promise<void>) => Promise<void>) | undefined>("batchCanvasHistory", undefined);
+const hasCustomSize = computed(() => typeof node.style === "object" && !!node.style?.["--cardWidth"]);
+const resizeState = shallowRef<{ element: HTMLElement; pointerId: number; x: number; y: number; width: number; height: number; zoom: number; resolve: () => void }>();
+function setCardSize(width: number, height: number) {
+  const titleHeight = cardRoot.value?.querySelector<HTMLElement>(".titleBar")?.offsetHeight ?? 44;
+  updateNode(nodeId, { style: { ...(typeof node.style === "object" ? node.style : {}),
+    "--cardWidth": `${Math.max(220, width)}px`, "--cardHeight": `${Math.max(cardHeight.value + titleHeight, height)}px` } });
+  void nextTick(() => updateNodeInternals([nodeId]));
+}
+function startResize(event: PointerEvent) {
+  if (event.button !== 0 || resizeState.value || !cardRoot.value) return;
+  const element = event.currentTarget as HTMLElement;
+  const root = cardRoot.value;
+  const action = () => new Promise<void>(resolve => {
+    resizeState.value = { element, pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+      width: root.offsetWidth, height: root.offsetHeight, zoom: viewport.value.zoom, resolve };
+    node.resizing = true;
+    element.setPointerCapture(event.pointerId);
+  });
+  void (batchHistory ? batchHistory(action) : action()).catch(error => {
+    finishResize();
+    ElMessage.error(error instanceof Error ? error.message : "卡片缩放失败");
+  });
+}
+function moveResize(event: PointerEvent) {
+  const state = resizeState.value;
+  if (!state || state.pointerId !== event.pointerId) return;
+  if (findNode(nodeId) !== node) return finishResize();
+  setCardSize(state.width + (event.clientX - state.x) / state.zoom, state.height + (event.clientY - state.y) / state.zoom);
+}
+function finishResize(event?: PointerEvent) {
+  const state = resizeState.value;
+  if (!state || (event && state.pointerId !== event.pointerId)) return;
+  resizeState.value = undefined;
+  node.resizing = false;
+  if (state.element.hasPointerCapture(state.pointerId)) state.element.releasePointerCapture(state.pointerId);
+  state.resolve();
+}
+function resizeWithKey(event: KeyboardEvent) {
+  if (!cardRoot.value || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+  event.preventDefault();
+  const step = event.shiftKey ? 40 : 10;
+  const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+  const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+  setCardSize(cardRoot.value.offsetWidth + dx, cardRoot.value.offsetHeight + dy);
+}
+onBeforeUnmount(() => finishResize());
+
 const localStartHandle = computed(() => (connectionStartHandle.value?.nodeId === nodeId ? connectionStartHandle.value : undefined));
 const localEndHandle = computed(() => (connectionEndHandle.value?.nodeId === nodeId ? connectionEndHandle.value : undefined));
 const localSelectionConnection = computed(() => (selectionConnection?.value?.nodeId === nodeId ? selectionConnection.value : undefined));
@@ -425,6 +480,7 @@ async function handleCommand(command: string) {
     addNodes({
       id,
       zIndex: node.zIndex,
+      style: typeof node.style === "object" ? { ...node.style } : node.style,
       type: node.type,
       position: copyPosition,
       data: { ...data, label: `${props.label} - 副本` },
@@ -520,6 +576,40 @@ watch(
   width: 220px;
   color: var(--el-text-color-primary);
   text-align: left;
+  &.customSize {
+    width: var(--cardWidth) !important;
+    height: var(--cardHeight) !important;
+    display: flex;
+    flex-direction: column;
+    .titleBar { flex-shrink: 0; }
+    .cardContainer {
+      flex: 1;
+      min-height: 0;
+      .contentCard {
+        height: 100%;
+        box-sizing: border-box;
+        :deep(.el-card__body) { height: 100%; box-sizing: border-box; overflow: auto; }
+      }
+    }
+  }
+  .resizeGrip {
+    position: absolute;
+    right: -10px;
+    bottom: -10px;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--el-color-primary);
+    border-radius: 6px;
+    background: var(--el-bg-color);
+    color: var(--el-color-primary);
+    cursor: nwse-resize;
+    touch-action: none;
+    @media (pointer: coarse) { width: 44px; height: 44px; }
+  }
 
   :deep(button:focus-visible), .labelText:focus-visible {
     outline: 2px solid var(--el-color-primary);

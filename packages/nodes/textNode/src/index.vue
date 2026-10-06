@@ -263,6 +263,14 @@ nodeTools.register({
 
 .textContent {
   min-height: 110px;
+  .customSize & {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    .textPreview { flex: 1; min-height: 0; max-height: none; }
+    .editButton { flex-shrink: 0; }
+  }
 
   &.empty {
     display: flex;
