@@ -23,6 +23,8 @@ interface ProviderModel {
   imageRatios?: string[];
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   voices?: { title: string; voice: string }[];
+  speechInstructions?: boolean;
+  lipSync?: boolean;
 }
 
 interface ProviderFormRule {
@@ -139,6 +141,8 @@ interface VideoRequest extends MediaRequest {
 
 interface AudioRequest extends MediaRequest {
   text: string;
+  /** 表演语气说明，不作为台词朗读。 */
+  instructions?: string;
   audios?: MediaInput[];
   /** 音色标识，由供应商映射到平台的音色参数。 */
   voice?: string;

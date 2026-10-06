@@ -29,6 +29,7 @@ export type NodeImageRequest = {
 };
 export type NodeImageResult = { path: string; mimeType: string; mediaType: "image" };
 export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { directory: string; outputDirectory: string };
+export type NodeAudioRequest = MediaGenerationRequest & { directory: string };
 export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video" };
 export type NodeAiRequest = {
   providerId: string;
@@ -207,7 +208,7 @@ export function useNodeAi() {
     while (!(await readMediaJob(jobId, signal)).settled) await delayMediaPoll(signal);
   }
 
-  async function generateMedia<T extends "image" | "video">(mediaType: T, input: NodeImageRequest | NodeVideoRequest, signal?: AbortSignal, onJob?: (id: string) => void, requestId?: string) {
+  async function generateMedia<T extends "image" | "video" | "audio">(mediaType: T, input: NodeImageRequest | NodeVideoRequest | NodeAudioRequest, signal?: AbortSignal, onJob?: (id: string) => void, requestId?: string) {
     const result = await readResult<{ jobId: string } | { path: string; mimeType: string; mediaType: T }[]>(await fetch("/api/ai/media/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
@@ -225,6 +226,10 @@ export function useNodeAi() {
 
   function generateVideo(input: NodeVideoRequest, signal?: AbortSignal, onJob?: (id: string) => void, requestId?: string) {
     return generateMedia("video", input, signal, onJob, requestId);
+  }
+
+  function generateAudio(input: NodeAudioRequest, signal?: AbortSignal) {
+    return generateMedia("audio", input, signal);
   }
 
   async function generate(input: NodeAiRequest): Promise<NodeAiResult> {
@@ -277,5 +282,5 @@ export function useNodeAi() {
     return { text, ...(reasoning ? { reasoning } : {}) };
   }
 
-  return { getModels, getMediaModels, generateImage, generateVideo, waitMediaJob, cancelMediaJob, cancelMediaRequest, generate };
+  return { getModels, getMediaModels, generateImage, generateVideo, generateAudio, waitMediaJob, cancelMediaJob, cancelMediaRequest, generate };
 }

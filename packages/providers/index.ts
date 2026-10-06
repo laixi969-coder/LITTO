@@ -11,6 +11,8 @@ import bailian from "./src/media/bailian";
 import kling from "./src/media/kling";
 import atlasCloud from "./src/media/atlasCloud";
 import easyRouter from "./src/media/easyRouter";
+import qwenSpeech from "./src/media/qwenSpeech";
+import museTalk from "./src/media/museTalk";
 
 export type Provider = ProviderDefinition;
 export type ProviderTools = ProviderContext["tool"];
@@ -19,4 +21,4 @@ export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
 // LITTO does not offer the Toonflow TF-Router relay (its adapters stay in src/ but are not listed or auto-installed).
 export const languageProviders = [deepSeek, atlasCloudText, easyRouterText] as const;
-export const mediaProviders = [apiMart, meta, agnes, volcengine, bailian, kling, atlasCloud, easyRouter] as const;
+export const mediaProviders = [apiMart, meta, agnes, volcengine, bailian, kling, atlasCloud, easyRouter, qwenSpeech, museTalk] as const;

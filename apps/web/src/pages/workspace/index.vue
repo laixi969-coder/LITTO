@@ -43,7 +43,8 @@
     </el-tooltip>
     <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" />
     <settings v-model="settingsVisible" />
-    <el-button class="productionButton" @click="productionVisible = true">镜头制作</el-button>
+    <div class="productionActions"><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <voicePanel v-if="workspaceStore.project" :key="`voice${workspaceStore.project.directory}`" ref="voicePanelRef" v-model="voiceVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" />
     <productionPanel v-if="workspaceStore.project" :key="workspaceStore.project.directory" ref="productionPanelRef" v-model="productionVisible" :projectId="workspaceStore.project.projectId" :directory="workspaceStore.project.directory" />
   </main>
 </template>
@@ -62,6 +63,9 @@ import canvasPanel from "./panels/canvas/canvasHost.vue";
 import workspaceMenu from "./components/workspaceMenu.vue";
 import floatingAgent from "./components/floatingAgent.vue";
 import productionPanel from "./components/productionPanel.vue";
+const voicePanel = defineAsyncComponent(() => import("./components/voicePanel.vue"));
+const voiceVisible = ref(false);
+const voicePanelRef = ref<InstanceType<typeof voicePanel>>();
 const productionVisible = ref(false);
 const productionPanelRef = ref<InstanceType<typeof productionPanel>>();
 provide("openProductionShot", (id: string) => productionPanelRef.value?.openShot(id));
@@ -131,6 +135,7 @@ registerWorkspaceControl({
 });
 
 async function flushSave() {
+  await voicePanelRef.value?.flushSave();
   await productionPanelRef.value?.flushSave();
   await documentPanelRef.value?.flushSave();
   await canvasPanelRef.value?.flushSave();
@@ -195,7 +200,7 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
 
 <style scoped lang="scss">
 .workspacePage {
-  .productionButton { position: absolute; left: calc(var(--railWidth) + 16px); top: 64px; z-index: 7; min-height: 44px; }
+  .productionActions { position: absolute; left: calc(var(--railWidth) + 16px); top: 64px; z-index: 7; display: flex; gap: 8px; .el-button { min-height: 44px; margin-left: 0; } }
   --railWidth: 208px;
   position: relative;
   width: 100%;

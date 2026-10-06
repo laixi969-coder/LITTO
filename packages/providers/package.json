@@ -21,6 +21,8 @@
     "./media/bailian": "./src/media/bailian.ts",
     "./media/kling": "./src/media/kling.ts",
     "./media/atlasCloud": "./src/media/atlasCloud.ts",
-    "./media/easyRouter": "./src/media/easyRouter.ts"
+    "./media/easyRouter": "./src/media/easyRouter.ts",
+    "./media/qwenSpeech": "./src/media/qwenSpeech.ts",
+    "./media/museTalk": "./src/media/museTalk.ts"
   }
 }

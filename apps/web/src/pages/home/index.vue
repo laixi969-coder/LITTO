@@ -192,12 +192,12 @@
     <el-dialog
       v-model="briefVisible"
       :title="currentLane.title"
-      :class="{ musicBrief: briefKind === 'musicFilm' }"
+      :class="{ musicBrief: briefKind === 'musicFilm', sourceBrief: briefKind !== 'musicFilm' }"
       :width="briefKind === 'musicFilm' ? 'min(720px, calc(100vw - 24px))' : 'min(560px, calc(100vw - 32px))'"
       alignCenter
-      :closeOnClickModal="!creating && !musicBusy && !readingMusicFiles"
-      :closeOnPressEscape="!creating && !musicBusy && !readingMusicFiles"
-      :showClose="!creating && !musicBusy && !readingMusicFiles"
+      :closeOnClickModal="!creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
+      :closeOnPressEscape="!creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
+      :showClose="!creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
       @close="musicAnalysisRef?.stopPreview()">
       <el-form class="briefForm" labelPosition="top" @submit.prevent="startBrief">
         <template v-if="briefKind === 'musicFilm'">
@@ -213,7 +213,19 @@
           <p class="briefHint">支持一首 MP3（最多 100 MB）和 UTF-8 歌词 TXT / LRC / SRT（最多 400 KB）。</p>
           <musicAnalysis ref="musicAnalysisRef" :attachments="musicAttachments" :disabled="creating || readingMusicFiles" @busy="musicBusy = $event" @ready="musicHasLyrics = $event" />
         </template>
-        <el-form-item :label="currentLane.label" :required="briefKind !== 'musicFilm'">
+        <template v-if="briefKind !== 'musicFilm'">
+          <el-form-item :label="briefKind === 'creative' ? '产品、品牌与广告参考资料' : briefKind === 'story' ? '故事资料与参考素材' : '剧本与参考素材'">
+            <label class="musicUpload" :class="{ uploadDisabled: creating || readingSourceFiles }">
+              <input type="file" accept=".txt,.md,.docx,.pdf,.srt,.lrc,image/*,video/*" multiple :disabled="creating || readingSourceFiles" aria-label="上传文档、PDF、图片或参考片" @change="addSourceFiles" />
+              <strong>{{ readingSourceFiles ? '正在读取文档…' : sourceFiles.length ? '继续添加素材' : '选择文档、图片或参考片' }}</strong>
+              <span>TXT · MD · DOCX · PDF · 图片 · 视频，可多选</span>
+            </label>
+          </el-form-item>
+          <p v-if="sourceFileError" class="musicFileError" role="alert">{{ sourceFileError }}</p>
+          <attachmentList v-if="sourceFiles.length" class="musicAttachments" :attachments="sourceFiles.map(items => items[0]!)" removable :disabled="creating || readingSourceFiles" @remove="sourceFiles.splice($event, 1); sourceFileError = ''" />
+          <p class="briefHint">文档最多 20 MB，正文最多 10 万字；UTF-8 文本最多 400 KB，图片或参考片最多 100 MB。PDF / DOCX 保留原件与提取正文，各占两个附件名额，总计最多 20 个。扫描 PDF 请先 OCR 或上传图片。</p>
+        </template>
+        <el-form-item :label="currentLane.label" :required="briefKind !== 'musicFilm' && briefKind !== 'existing' && !sourceFiles.length">
           <el-input
             v-model="brief.subject"
             type="textarea"
@@ -226,8 +238,8 @@
       <template #footer>
         <div class="briefActions" :class="{ musicFooter: briefKind === 'musicFilm' }">
           <span v-if="briefKind === 'musicFilm'" class="footerHint">{{ musicBusy ? '处理完成或停止后，即可继续创作' : '歌曲、歌词、想法，任选一项即可开始' }}</span>
-          <el-button :disabled="creating || readingMusicFiles || musicBusy" @click="briefVisible = false">取消</el-button>
-          <el-button type="primary" :loading="creating" :disabled="readingMusicFiles || musicBusy || (!brief.subject.trim() && !(briefKind === 'musicFilm' && (musicAttachments.length || musicHasLyrics)))" @click="startBrief">开始创作</el-button>
+          <el-button :disabled="creating || readingMusicFiles || musicBusy || readingSourceFiles" @click="briefVisible = false">取消</el-button>
+          <el-button type="primary" :loading="creating" :disabled="readingSourceFiles || readingMusicFiles || musicBusy || !canStartBrief" @click="startBrief">开始创作</el-button>
         </div>
       </template>
     </el-dialog>
@@ -265,6 +277,7 @@ import {
 import modelPopover from "@/components/modelPopover.vue";
 import attachmentList from "@/components/agent/attachmentList.vue";
 import { createPastedTextFile, readTextAttachment } from "@/components/agent/textAttachments";
+import { createSourceAttachments } from "@/components/agent/sourceAttachments";
 import type { AgentAttachment } from "@/components/agent/types";
 import brandLogo from "@/components/brandLogo.vue";
 import { useWorkspaceStore, type Project } from "@/stores/workspace";
@@ -515,12 +528,41 @@ const creationLanes = [
   { kind: "story", skill: "story", icon: IconMovie, title: "写一个故事", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
   { kind: "creative", skill: "adfilm", icon: IconSpeakerphone, title: "做一支广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
   { kind: "musicFilm", skill: "musicfilm", icon: IconMusic, title: "拍一支 MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法（选填）", placeholder: "上传歌曲或歌词，补充你想要的情绪与画面感觉。也可以直接粘贴歌词。" },
-  { kind: "existing", skill: "story", icon: IconFileImport, title: "已有剧本或素材", desc: "导入剧本、参考片或参考图，整理后继续。", label: "手上有什么", placeholder: "粘贴剧本，或说明你的参考素材。" },
+  { kind: "existing", skill: "story", icon: IconFileImport, title: "已有剧本或素材", desc: "导入剧本、参考片或参考图，整理后继续。", label: "补充说明（选填）", placeholder: "粘贴剧本，或说明参考素材的用途。" },
 ] as const;
 type LaneKind = (typeof creationLanes)[number]["kind"];
 const briefKind = ref<LaneKind>("story");
 const currentLane = computed(() => creationLanes.find((lane) => lane.kind === briefKind.value)!);
 const brief = reactive({ subject: "" });
+const sourceFiles = ref<AgentAttachment[][]>([]);
+const readingSourceFiles = ref(false);
+const sourceFileError = ref("");
+const canStartBrief = computed(() => !!brief.subject.trim()
+  || (briefKind.value !== "musicFilm" && sourceFiles.value.length > 0)
+  || (briefKind.value === "musicFilm" && (musicAttachments.value.length > 0 || musicHasLyrics.value)));
+async function addSourceFiles(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+  if (creating.value || readingSourceFiles.value) return;
+  readingSourceFiles.value = true;
+  const errors: string[] = [];
+  sourceFileError.value = "";
+  try {
+    for (const file of files) {
+      try {
+        const attachments = await createSourceAttachments(file);
+        if (sourceFiles.value.flat().length + attachments.length > 20) throw new Error("每条消息最多添加 20 个附件（含文档提取正文）");
+        sourceFiles.value.push(attachments);
+      } catch (cause) {
+        errors.push(`${file.name}：${cause instanceof Error ? cause.message : "读取失败，请重试"}`);
+      }
+    }
+    sourceFileError.value = errors.join("；");
+  } finally {
+    readingSourceFiles.value = false;
+  }
+}
 const musicAttachments = ref<AgentAttachment[]>([]);
 const musicAnalysisRef = ref<InstanceType<typeof musicAnalysis>>();
 const musicBusy = ref(false);
@@ -561,25 +603,32 @@ function showProjects() {
 function openBrief(kind: LaneKind) {
   briefKind.value = kind;
   brief.subject = prompt.value;
+  if (kind !== "musicFilm" && !sourceFiles.value.length) sourceFiles.value = promptAttachments.value.map(item => [item]);
   briefVisible.value = true;
 }
 async function startBrief() {
   const isMusic = briefKind.value === "musicFilm";
-  if (creating.value || musicBusy.value || readingMusicFiles.value || (!brief.subject.trim() && !(isMusic && (musicAttachments.value.length || musicHasLyrics.value)))) return;
+  if (creating.value || musicBusy.value || readingMusicFiles.value || readingSourceFiles.value || !canStartBrief.value) return;
   // 受众、时长、风格等由技能按需追问，弹窗只收核心想法。
-  const subject = brief.subject.trim() || "根据上传的歌曲与歌词创作 MV";
+  const defaultSubjects: Record<LaneKind, string> = {
+    story: "根据上传的故事资料与参考素材创作故事",
+    creative: "根据上传的产品、品牌与参考资料创作广告",
+    musicFilm: "根据上传的歌曲与歌词创作 MV",
+    existing: "整理上传的剧本与参考素材，在保留原有内容的基础上继续创作",
+  };
+  const subject = brief.subject.trim() || defaultSubjects[briefKind.value];
   const message = `/skill:${currentLane.value.skill} ${subject}${isMusic && musicAttachments.value.length ? "\n以附件为创作依据。若附有 littoMusicAnalysis 报告，使用其中真实计算的时长、节拍、旋律候选和 cutPlan 帧剪点；musicLyrics 包含原歌词、转写时间戳和人工校正。以校正后的 cues 为逐句依据，未校准结果标为自动识别待复核。场次与镜头规划明确对应歌曲秒数和剪点帧号。没有分析报告才用可用的 ffprobe 读取时长。无法读取的信息明确说明，不编造听感、歌词或节拍。" : ""}\n开始前只追问必要的缺失信息，最多 4 个问题。`;
   readingMusicFiles.value = true;
   try {
     const reports = isMusic ? await musicAnalysisRef.value?.buildAttachments() ?? [] : [];
-    const attachments = isMusic ? [...musicAttachments.value, ...reports] : [...promptAttachments.value];
+    const attachments = isMusic ? [...musicAttachments.value, ...reports] : sourceFiles.value.flat();
     if (!accounts && !workspaceDirectory.value) {
       workspaceDirectory.value = (await relocationPicker.value?.chooseDirectory()) ?? "";
       if (!workspaceDirectory.value) return;
     }
     await createProject(true, message, attachments);
   } catch (cause) {
-    ElMessage.error(cause instanceof Error ? cause.message : "音乐创作准备失败");
+    ElMessage.error(cause instanceof Error ? cause.message : "创作准备失败");
   } finally {
     readingMusicFiles.value = false;
   }
@@ -1080,7 +1129,8 @@ watch(
 </style>
 
 <style lang="scss">
-.el-dialog.musicBrief {
+.el-dialog.musicBrief,
+.el-dialog.sourceBrief {
   .el-dialog__body { max-height: calc(100dvh - 188px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 4px; }
   .el-dialog__header { padding-bottom: 16px; }
   .el-dialog__footer { border-top: 1px solid var(--studioBorder); padding-top: 16px; }

@@ -1,5 +1,5 @@
 <template>
-  <div class="thumbnailItem" :class="{ textAttachment: isText || isAudio }">
+  <div class="thumbnailItem" :class="{ textAttachment: isText || isAudio || isDocument }">
     <template v-if="isText">
       <button class="textAttachmentButton" type="button" :title="attachment.name" :aria-label="`预览 ${attachment.name}`" @click="textPreviewVisible = true">
         <icon-file-text :size="18" />
@@ -7,6 +7,10 @@
       </button>
       <el-button v-if="restorable" class="restoreAttachment" text size="small" :disabled="disabled" @click="emit('restore')">还原到输入框</el-button>
     </template>
+    <a v-else-if="isDocument" class="textAttachmentButton" :href="thumbnailUrl || undefined" :download="attachment.name" :title="`下载 ${attachment.name}`">
+      <icon-file-text :size="18" />
+      <span>{{ attachment.name }}</span>
+    </a>
     <button v-else-if="isAudio" class="textAttachmentButton" type="button" :title="attachment.name" :aria-label="`试听 ${attachment.name}`" :disabled="!thumbnailUrl" @click="videoPreviewVisible = true">
       <icon-music :size="18" />
       <span>{{ attachment.name }}</span>
@@ -55,6 +59,7 @@ import { readTextAttachment } from "./textAttachments";
 const props = defineProps<{ attachment: AgentAttachment; directory?: string; removable?: boolean; restorable?: boolean; disabled?: boolean }>();
 const emit = defineEmits<{ remove: []; restore: [] }>();
 const isText = computed(() => props.attachment.mimeType === "text/plain");
+const isDocument = computed(() => props.attachment.mimeType === "application/pdf" || props.attachment.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 const isAudio = computed(() => props.attachment.mimeType.startsWith("audio/"));
 const textPreviewVisible = ref(false);
 const textContent = ref("");
@@ -136,6 +141,7 @@ watch([textPreviewVisible, () => props.attachment, () => props.directory], async
       color: var(--el-text-color-primary);
       font: inherit;
       font-size: 12px;
+      text-decoration: none;
       cursor: pointer;
 
       svg { flex-shrink: 0; color: var(--el-color-primary); }

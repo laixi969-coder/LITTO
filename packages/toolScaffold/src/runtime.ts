@@ -83,6 +83,8 @@ export interface MediaModel {
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   audio?: boolean | "optional";
   voices?: { title: string; voice: string }[];
+  speechInstructions?: boolean;
+  lipSync?: boolean;
 }
 
 export interface MediaReference {
@@ -108,6 +110,7 @@ export interface MediaGenerationRequest {
   duration?: number;
   generateAudio?: boolean;
   voice?: string;
+  instructions?: string;
   speed?: number;
   volume?: number;
   format?: string;

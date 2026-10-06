@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
+import { audioGenerationSchema, imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
 import { validateFields } from "@/lib/middleware";
 import { success, error } from "@/lib/responseFormat";
 import u from "@/utils";
@@ -8,16 +8,16 @@ import { authEnabled } from "@/utils/tenant";
 import { translateMessage, validationOptions } from "@/lib/i18n";
 
 export default Router().post("/", validateFields({
-  requestId: z.string().uuid().optional(), directory: z.string().min(1).max(4096), mediaType: z.enum(["image", "video"]),
+  requestId: z.string().uuid().optional(), directory: z.string().min(1).max(4096), mediaType: z.enum(["image", "video", "audio"]),
 }), async (req, res) => {
   const { directory, mediaType, requestId, ...request } = req.body;
-  const parsed = (mediaType === "image" ? imageGenerationSchema : videoGenerationSchema).safeParse(request, validationOptions());
+  const parsed = (mediaType === "image" ? imageGenerationSchema : mediaType === "audio" ? audioGenerationSchema : videoGenerationSchema).safeParse(request, validationOptions());
   if (!parsed.success) {
     res.status(400).json(error("参数错误", parsed.error.issues.map(issue => ({ ...issue, message: translateMessage(issue.message) })), 400));
     return;
   }
   const cwd = await u.workspace.resolveWorkspace(req, directory);
-  if (authEnabled()) {
+  if (authEnabled() && mediaType !== "audio") {
     const job = await u.mediaJobs.enqueueMedia(cwd, mediaType, parsed.data, requestId ?? crypto.randomUUID());
     return res.status(202).json(success({ jobId: job.id }));
   }

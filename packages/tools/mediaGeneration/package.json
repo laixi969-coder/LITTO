@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./runtime": "./src/runtime.ts"
+    "./runtime": "./src/runtime.ts",
+    "./voiceProject": "./src/voiceProject.ts"
   },
   "scripts": {
     "build": "bun build.ts",
