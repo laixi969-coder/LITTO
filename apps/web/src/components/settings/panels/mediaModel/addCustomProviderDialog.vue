@@ -19,7 +19,7 @@
           :disabled="saving"
           :aria-pressed="selectedProvider === item.id"
           @click="selectedProvider = item.id">
-          <img v-if="item.id === 'tfRouter'" class="providerLogo" :src="logoUrl" alt="" />
+          <brandLogo v-if="item.id === 'tfRouter'" class="providerLogo" />
           <modelIcon v-else :model="item.id" :size="18" />
           <span>{{ item.label }}</span>
         </button>
@@ -95,7 +95,7 @@ import { IconFileCode, IconCode, IconFolderOpen, IconCopy } from "@tabler/icons-
 import { ElMessage } from "element-plus";
 import { mediaProviders } from "@toonflow/providers";
 import { modelIcon } from "@toonflow/model-icons";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 import tfRouterSource from "@toonflow/providers/media/tfRouter?raw";
@@ -260,11 +260,10 @@ async function copyPrompt() {
       &:focus-visible { outline: 2px solid var(--el-color-primary); }
 
       .providerLogo {
-        width: 18px;
-        height: 18px;
+        width: 80px;
+        height: 67px;
         object-fit: contain;
 
-        .dark & { filter: invert(1); }
       }
     }
   }

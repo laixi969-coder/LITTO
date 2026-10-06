@@ -7,7 +7,7 @@
       <el-card v-for="item in sortedProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">
           <div v-if="item.id.toLowerCase() === 'tfrouter'" class="providerMark" aria-hidden="true">
-            <img class="providerLogo" :src="logoUrl" alt="" />
+            <brandLogo class="providerLogo" />
           </div>
           <div class="providerInfo">
             <div class="providerHeading">
@@ -48,7 +48,7 @@ import axios from "axios";
 import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, shallowRef, type Component } from "vue";
 import { ElMessage } from "element-plus";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconDownload } from "@tabler/icons-vue";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 import type { MediaProvider } from "./types";
 import { saveSettings } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";

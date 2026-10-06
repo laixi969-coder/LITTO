@@ -1,9 +1,8 @@
 <template>
   <div class="about">
     <div class="brand">
-      <div class="brandMark"><img class="brandLogo" :src="logoUrl" alt="LITTO Logo" /></div>
+      <div class="brandMark"><brandLogo class="brandLogo" /></div>
       <div class="brandInfo">
-        <h3>LITTO 里头</h3>
         <div class="brandMeta">
           <span>v{{ currentVersion }}</span>
         </div>
@@ -19,7 +18,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 
 const currentVersion = computed(() => import.meta.env.appVersion);
 </script>
@@ -39,21 +38,14 @@ const currentVersion = computed(() => import.meta.env.appVersion);
     .brandMark {
       display: grid;
       place-items: center;
-      width: 72px;
-      height: 72px;
-      border-radius: 16px;
-      background: var(--el-fill-color-light);
+      width: 160px;
+      height: 134px;
     }
 
     .brandLogo {
-      width: 52px;
-      height: 52px;
+      width: 160px;
+      height: 134px;
       object-fit: contain;
-    }
-
-    h3 {
-      margin: 0;
-      font-size: 20px;
     }
 
     .brandMeta {

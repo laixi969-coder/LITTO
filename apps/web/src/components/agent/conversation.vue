@@ -7,7 +7,7 @@
           <template #content>
             <section class="welcomeMessage" aria-label="开始新对话">
               <div class="welcomeHeader">
-                <span class="welcomeIcon" aria-hidden="true"><span class="welcomeLogo" :style="{ maskImage: `url(${logoUrl})` }" /></span>
+                <span class="welcomeIcon" aria-hidden="true"><brandLogo class="welcomeLogo" /></span>
                 <div>
                   <p class="welcomeLabel">你好，我是 LITTO 助手</p>
                   <h3>从一个想法开始</h3>
@@ -162,7 +162,7 @@ import {
   IconTrash, IconLayoutGrid, IconMovie, IconPhoto, IconArrowUpRight, IconUsersGroup,
 } from "@tabler/icons-vue";
 import { ElMessage } from "element-plus";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 import modelPopover from "@/components/modelPopover.vue";
 import skillMenu from "./skillMenu.vue";
 import mentionMenu from "./mentionMenu.vue";
@@ -869,19 +869,12 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
           display: grid;
           place-items: center;
           flex-shrink: 0;
-          width: 42px;
-          height: 42px;
-          border-radius: var(--ui-radius-large);
-          background: var(--el-color-primary-light-9);
-          color: var(--el-color-primary);
+          width: 96px;
+          height: 80px;
 
           .welcomeLogo {
-            width: 28px;
-            height: 28px;
-            background: currentColor;
-            mask-size: contain;
-            mask-position: center;
-            mask-repeat: no-repeat;
+            width: 96px;
+            height: 80px;
           }
         }
 

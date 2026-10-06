@@ -7,7 +7,7 @@
       <el-card v-for="item in sortedProviders" :key="item.id" class="providerItem" shadow="never">
         <div class="providerHeader">
           <div v-if="isTfRouterProvider(item)" class="providerMark" aria-hidden="true">
-            <img class="providerLogo" :src="logoUrl" alt="" />
+            <brandLogo class="providerLogo" />
           </div>
           <div class="providerInfo">
             <div class="providerHeading">
@@ -48,7 +48,7 @@ import { ElMessage } from "element-plus";
 import { customProviders, saveSettings, type CustomProvider } from "@/stores/settings";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 import { isTfRouterProvider } from "@/lib/tf";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();

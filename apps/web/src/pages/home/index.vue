@@ -2,11 +2,7 @@
   <main class="home">
     <aside class="homeRail" aria-label="工作台导航">
       <div class="railBrand">
-        <el-image :src="logoUrl" fit="contain" alt="LITTO" />
-        <strong>
-          LITTO
-          <small>里头</small>
-        </strong>
+        <brandLogo class="railLogo" theme="dark" />
       </div>
       <nav>
         <a class="railLink selected" href="#/home" aria-current="page">
@@ -270,7 +266,7 @@ import modelPopover from "@/components/modelPopover.vue";
 import attachmentList from "@/components/agent/attachmentList.vue";
 import { createPastedTextFile, readTextAttachment } from "@/components/agent/textAttachments";
 import type { AgentAttachment } from "@/components/agent/types";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 import { useWorkspaceStore, type Project } from "@/stores/workspace";
 import { hasDesktopUpdate } from "@/stores/desktopUpdate";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
@@ -646,22 +642,11 @@ watch(
       display: flex;
       align-items: center;
       gap: 10px;
-      margin: 0 8px 48px;
-      .el-image {
-        width: 28px;
-        height: 28px;
-        filter: invert(1);
-      }
-      strong {
-        font-size: 22px;
-        letter-spacing: -0.04em;
-        white-space: nowrap;
-      }
-      small {
-        font-size: 12px;
-        font-weight: 400;
-        margin-left: 4px;
-        color: var(--studioRailMuted);
+      justify-content: center;
+      margin: 0 8px 28px;
+      .railLogo {
+        width: 144px;
+        height: 120px;
       }
     }
     nav {

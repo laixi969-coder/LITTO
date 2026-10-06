@@ -2,8 +2,7 @@
   <main class="hello">
     <bg class="pageBackground" />
     <div class="welcome">
-      <img class="logo" :src="logoUrl" alt="LITTO" />
-      <h1>LITTO <small>里头</small></h1>
+      <h1><brandLogo class="logo" /></h1>
       <p class="slogan">好戏，都在里头</p>
       <p class="description">把剧本、角色、场景、分镜和生成，放进同一个画布。</p>
       <el-button type="primary" size="large" round :loading="saving" @click="enter">进入 LITTO</el-button>
@@ -18,7 +17,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 import { useHelloStore } from "@/stores/hello";
 import bg from "./bg.vue";
 import languageSelect from "@/components/languageSelect.vue";
@@ -63,22 +62,14 @@ async function enter() {
     padding: 24px;
     text-align: center;
 
-    .logo {
-      width: 96px;
-      height: 96px;
-      object-fit: contain;
-    }
-
     h1 {
-      margin: 0;
-      font-size: 40px;
-      letter-spacing: 2px;
+      margin: 0 0 8px;
+      line-height: 0;
 
-      small {
-        font-size: 20px;
-        font-weight: 400;
-        letter-spacing: 6px;
-        color: var(--el-text-color-secondary);
+      .logo {
+        width: min(280px, 70vw);
+        height: auto;
+        aspect-ratio: 1.2;
       }
     }
 

@@ -11,19 +11,16 @@
         .providerMark {
           display: grid;
           place-items: center;
-          flex: 0 0 40px;
-          height: 40px;
+          flex: 0 0 96px;
+          height: 80px;
           background: var(--el-fill-color-light);
           border-radius: var(--el-border-radius-base);
 
           .providerLogo {
-            width: 24px;
-            height: 24px;
+            width: 96px;
+            height: 80px;
             object-fit: contain;
 
-            .dark & {
-              filter: invert(1);
-            }
           }
         }
 

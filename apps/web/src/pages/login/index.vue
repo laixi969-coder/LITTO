@@ -2,11 +2,7 @@
   <main class="login">
     <aside class="brandPanel">
       <div class="brandMark">
-        <el-image class="logo" :src="logoUrl" fit="contain" alt="LITTO" />
-        <span>
-          LITTO
-          <small>里头</small>
-        </span>
+        <brandLogo class="logo" theme="dark" />
       </div>
       <div class="brandStatement">
         <p>好戏，都在里头。</p>
@@ -92,7 +88,7 @@
 import { onBeforeUnmount, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { requestCode, verifyCode, verifyPassword } from "@/lib/session";
-import logoUrl from "@toonflow/assets/logo.svg";
+import brandLogo from "@/components/brandLogo.vue";
 
 const email = ref("");
 const loginMethod = ref<"password" | "code">("password");
@@ -176,15 +172,8 @@ async function submit() {
       font-weight: 650;
       letter-spacing: -0.04em;
       .logo {
-        width: 36px;
-        height: 36px;
-        filter: invert(1);
-      }
-      small {
-        margin-left: 6px;
-        font-size: 14px;
-        color: var(--studioRailMuted);
-        font-weight: 400;
+        width: 180px;
+        height: 150px;
       }
     }
     .brandStatement {
