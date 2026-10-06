@@ -4,6 +4,7 @@ import { useNodeEvent, useNodeToolsContext, validateConnection } from "@toonflow
 import { canvasSchemas, type CanvasContext, type CanvasToolCall } from "@toonflow/tool-canvas/runtime";
 import { arrangeCanvas } from "./arrangeCanvas";
 import { canvasEdgeSummary, canvasNodeSummary, createCanvasQueries, isCanvasRead } from "./canvasQueries";
+import useWorkspaceFiles from "@/lib/workspaceFiles";
 
 export function useCanvasTools(options: {
   availableNodes: Ref<{ type: string; label: string }[]>;
@@ -19,6 +20,7 @@ export function useCanvasTools(options: {
 }) {
   const flow = useVueFlow();
   const getNodeTools = useNodeToolsContext();
+  const files = useWorkspaceFiles();
   let nodeRevision = 0;
   let edgeRevision = 0;
   // 只跟踪列表结构，不深读节点 data；批量更新合并到同一 tick。
@@ -118,6 +120,25 @@ export function useCanvasTools(options: {
       return readCanvas(request, canvasId, signal);
     }
     switch (request.name) {
+      case "publishVideo": {
+        const args = canvasSchemas.publishVideo.parse(request.args);
+        if (args.canvasId && args.canvasId !== canvasId) throw new Error("目标画布已切换，请回到原画布后重试展示成片");
+        const path = args.path.replaceAll("\\", "/");
+        const mimeTypes: Record<string, string> = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", m4v: "video/mp4", mkv: "video/x-matroska" };
+        const mimeType = mimeTypes[path.split(".").at(-1)?.toLowerCase() ?? ""];
+        if (!mimeType) throw new Error("成片必须是支持的视频文件");
+        if (!await files.readText(path, 16)) throw new Error("成片文件为空");
+        signal.throwIfAborted();
+        const existing = flow.nodes.value.find(node => node.type === "remote-videoNode" && node.data.outputs?.video?.value?.url === path);
+        if (existing) return nodeInfo(existing.id);
+        if (!options.availableNodes.value.some(node => node.type === "remote-videoNode")) throw new Error("请先启用视频素材节点");
+        const id = crypto.randomUUID();
+        const right = Math.max(0, ...flow.nodes.value.filter(node => !node.parentNode).map(node => node.position.x + (node.dimensions.width || 400)));
+        flow.addNodes({ id, type: "remote-videoNode", position: { x: right + 80, y: 0 }, data: { label: args.label ?? `成片 · ${path.split("/").at(-1)}`, outputs: { video: { dataType: "VIDEO", value: { url: path, mimeType } } } } });
+        await nextTick();
+        signal.throwIfAborted();
+        return nodeInfo(id);
+      }
       case "addCanvas": {
         const { name } = canvasSchemas.addCanvas.parse(request.args);
         return options.menu().addCanvas(name, signal);

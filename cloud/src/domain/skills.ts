@@ -124,14 +124,14 @@ export function storyboardDirector(script: string, assets: AssetLite[], opts: { 
 }
 
 export function assetDirector(type: string, name: string, description = "") {
-    const common = { forbiddenChanges: ["identity / defining silhouette", "approved colours"], allowedVariations: ["natural lighting response", "minor wrinkles / wear consistent with the world"] };
+    const common = { forbiddenChanges: ["identity / defining silhouette", "approved colours"], allowedVariations: ["natural lighting response", "material response consistent with the specified condition"] };
     const t: Record<string, any> = {
-        Character: { views: ["front", "3/4", "profile", "back", "expression sheet (neutral, joy, anger, fear)"], invariants: [`${name}: face geometry and proportions`, "hairline and hair style", "skin tone and age cues", "hands and distinctive marks"], allowedVariations: ["micro-expressions", "natural hair strands"], forbiddenChanges: ["face geometry", "body proportions", "age", "distinctive marks"] },
+        Character: { views: ["single front full-body identity reference; portrait framing with head and feet visible"], invariants: [`${name}: face geometry and proportions`, "hairline and hair style", "skin tone and age cues", "hands and distinctive marks", "natural age-appropriate torso and leg proportions; no limb compression to fit the frame"], allowedVariations: ["micro-expressions", "natural hair strands"], forbiddenChanges: ["face geometry", "body proportions", "age", "distinctive marks"] },
         Wardrobe: { views: ["front", "back", "fabric macro"], invariants: ["cut / silhouette", "fabric and weave", "colour", "closure details and trim"], allowedVariations: ["natural creasing", "movement of cloth"], forbiddenChanges: ["colour", "silhouette", "logos / trim"] },
-        Environment: { views: ["master wide", "reverse wide", "detail of key set dressing"], invariants: ["spatial topology (door/window positions)", "furniture relationships", "materials", "practical light positions"], allowedVariations: ["dust motes", "background extras"], forbiddenChanges: ["room layout", "window / door placement"] },
-        Prop: { views: ["front", "side", "top", "scale reference in hand"], invariants: ["geometry and real-world size", "material", "distinctive details / wear"], allowedVariations: ["reflections", "light falloff"], forbiddenChanges: ["shape", "size", "markings"] },
+        Environment: { views: ["master wide", "reverse wide", "detail of key set dressing"], invariants: ["spatial topology (door/window positions)", "furniture relationships", "materials", "practical light positions"], allowedVariations: ["source-motivated light response"], forbiddenChanges: ["room layout", "window / door placement"] },
+        Prop: { views: ["front", "side", "top", "scale reference in hand"], invariants: ["geometry and real-world size", "material", "distinctive details and specified condition"], allowedVariations: ["reflections", "light falloff"], forbiddenChanges: ["shape", "size", "markings"] },
         Product: { views: ["front", "side", "top", "label macro"], invariants: ["geometry and real-world size", "logo and label", "material / finish"], allowedVariations: ["reflections"], forbiddenChanges: ["logo", "proportions", "colourway"] },
-        Vehicle: { views: ["front 3/4", "side", "rear 3/4", "interior"], invariants: ["body geometry", "colour / livery", "wear and damage"], allowedVariations: ["reflections", "dust"], forbiddenChanges: ["body shape", "livery"] },
+        Vehicle: { views: ["front 3/4", "side", "rear 3/4", "interior"], invariants: ["body geometry", "colour / livery", "specified surface condition"], allowedVariations: ["reflections"], forbiddenChanges: ["body shape", "livery"] },
     };
     const x = t[type] ?? { views: ["front"], invariants: [`${name}: defining traits`], ...common };
     return { requiredViews: x.views, invariants: x.invariants, allowedVariations: x.allowedVariations ?? common.allowedVariations, forbiddenChanges: x.forbiddenChanges ?? common.forbiddenChanges, note: description ? `Based on: ${description}` : undefined };
@@ -148,7 +148,7 @@ export function visualDirector(notes: string) {
             grain: has("16mm", "film", "grain") ? "visible 16mm-like" : "fine", halation: has("film", "halation") ? "subtle red halation on highlights" : "",
             highlightRolloff: has("film") ? "long, filmic" : "gentle", blackLevel: has("lifted", "faded") ? "lifted" : "rich but not crushed",
         },
-        materialLanguage: has("wood") ? "worn wood, matte" : has("metal", "steel") ? "brushed metal, controlled speculars" : "mixed natural materials",
+        materialLanguage: has("wood") ? "wood grain with the finish and condition specified by the story" : has("metal", "steel") ? "brushed metal, controlled speculars" : "mixed natural materials",
         motifs: [] as string[],
     };
 }

@@ -9,6 +9,7 @@ import { statesOf, recomputeStates } from "../domain/state.ts";
 import { checkSequence } from "../domain/continuity.ts";
 import { applyRepair, OBSERVATION_KINDS, runQc } from "../domain/qc.ts";
 import { approveTake, generateKeyframes, generateTakes, keyframeView, promoteHero, rollbackHero, rollbackTake, takeView } from "../domain/lifecycle.ts";
+import { assembleApprovedSequence } from "../domain/assembly.ts";
 import { directorRun } from "../domain/director.ts";
 import { assetDirector, cinematographer, motionDirector, visualDirector, storyboardDirector } from "../domain/skills.ts";
 import { compileShot } from "../domain/compiler.ts";
@@ -208,7 +209,14 @@ production.post("/shots/:id/takes", async (c) => {
 production.post("/takes/:id/approve", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
     const b = await body(c, z.object({ overrideReason: z.string().min(3).optional() }));
-    return c.json(takeView(approveTake(s, c.req.param("id"), a.user.id, b.overrideReason ? { reason: b.overrideReason } : undefined)));
+    const take = approveTake(s, c.req.param("id"), a.user.id, b.overrideReason ? { reason: b.overrideReason } : undefined);
+    const shot = s.get("shots", take.shotId)!;
+    try {
+        const render = assembleApprovedSequence(s, shot.sequenceId, a.user.id);
+        return c.json({ ...takeView(take), autoRender: render ? { id: render.id, status: render.status } : null });
+    } catch (cause) {
+        return c.json({ ...takeView(take), autoRenderError: `镜头已采用，自动合成未启动：${cause instanceof Error ? cause.message : String(cause)}` });
+    }
 });
 production.post("/shots/:id/take/rollback", async (c) => { const { s, a } = ctx(c, "EDITOR"); const b = await body(c, z.object({ takeId: z.string() })); return c.json(takeView(rollbackTake(s, c.req.param("id"), b.takeId, a.user.id))); });
 production.get("/shots/:id/history", (c) => {

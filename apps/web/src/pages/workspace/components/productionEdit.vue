@@ -89,11 +89,15 @@
         <article v-for="item in renders" :key="item.id" class="finalReview">
           <p>{{ item.status === 'SUCCEEDED' ? '文件已生成' : item.status }} · {{ qualityLabels[item.quality?.status] || '未验收' }} <span v-if="item.error">{{ item.error }}</span></p>
           <template v-if="item.media">
-            <a :href="url(item.media.url)" target="_blank" rel="noopener">查看导出文件</a>
+            <video class="seamPreview" :src="url(item.media.url)" controls preload="metadata" />
+            <div class="editFields">
+              <button type="button" @click="run(() => download(item))">下载 / 另存成片</button>
+              <button type="button" @click="run(() => publish(item))">{{ published.has(item.id) ? '定位画布成片' : '放到画布' }}</button>
+            </div>
+            <p v-if="publishErrors[item.id]" role="alert">{{ publishErrors[item.id] }}（文件已导出，可直接下载或重试放到画布）</p>
             <button type="button" @click="run(() => analyzeQuality(item.id))">检测最终文件与声音接缝</button>
             <details v-if="qualityDrafts[item.id] && item.quality?.analysisId">
               <summary>最终声画验收</summary>
-              <video class="seamPreview" :src="url(item.media.url)" controls preload="metadata" />
               <p>每项记录实际观察；有意静默或声音进入需解释告警，未解决则选返修。剪辑或素材改变后须重新导出。</p>
               <label v-for="field in qualityFields" :key="field[0]">{{ field[1] }}<select v-model="qualityDrafts[item.id].checks[field[0]]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
               <label><input v-model="qualityDrafts[item.id].fullPlayback" type="checkbox" />已完整播放并试听此导出文件</label>
@@ -112,9 +116,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, watch } from "vue";
+import { computed, inject, onScopeDispose, ref, watch } from "vue";
+import axios from "axios";
+import saveFile from "@/lib/saveFile";
+import useWorkspaceFiles from "@/lib/workspaceFiles";
+import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 import { ElMessageBox } from "element-plus";
-const props = defineProps<{ sequences: any[]; shots: any[]; references: any[]; request: (path: string, method?: string, body?: unknown) => Promise<any> }>();
+const props = defineProps<{ directory: string; sequences: any[]; shots: any[]; references: any[]; request: (path: string, method?: string, body?: unknown) => Promise<any> }>();
 const sequenceId = ref(""), edit = ref<any>(null), busy = ref(false), error = ref(""), message = ref("");
 const ranges = ref<Record<string, { in: number; out: number }>>({});
 const rightId = ref(""), candidates = ref<any[]>([]), suggestionNote = ref(""), preview = ref<any>(null);
@@ -126,7 +134,14 @@ const qualityFields = [["surface", "皮肤、头发与商品材质"], ["motion",
 const qualityLabels: Record<string, string> = { unverified: "未验收", fail: "需要返修", pass: "人工验收通过", stale: "版本已改变，须重新导出验收" };
 const qualityDrafts = ref<Record<string, { analysisId: string; checks: Record<string, string>; fullPlayback: boolean; note: string; reasons: Record<string, string> }>>({});
 let disposed = false;
-onScopeDispose(() => { disposed = true; });
+let renderTimer: ReturnType<typeof setTimeout> | undefined;
+let renderLoading = false;
+const lifetime = new AbortController();
+const getCanvas = inject<() => CanvasContext | undefined>("canvas");
+const published = ref(new Set<string>());
+const publishErrors = ref<Record<string, string>>({});
+const renderCanvases = new Map<string, { context: CanvasContext; id: string }>();
+onScopeDispose(() => { disposed = true; lifetime.abort(); clearTimeout(renderTimer); });
 const videoClips = computed<any[]>(() => {
   const track = edit.value?.tracks.find((item: any) => item.kind === "video");
   return (edit.value?.clips ?? []).filter((clip: any) => clip.trackId === track?.id).sort((a: any, b: any) => a.start - b.start);
@@ -151,11 +166,18 @@ function accept(value: any) {
   ranges.value = Object.fromEntries(value.clips.map((clip: any) => [clip.id, { in: clip.in, out: clip.out }]));
   if (!value.clips.some((clip: any) => clip.id === rightId.value)) rightId.value = "";
 }
-async function load() { if (!sequenceId.value) return; accept(await props.request(path())); }
+async function load() {
+  const id = sequenceId.value;
+  if (!id) return;
+  const value = await props.request(`/sequences/${id}/edit`);
+  if (!disposed && id === sequenceId.value) accept(value);
+  await loadRenders();
+}
 async function ops(operations: any[]) { accept(await props.request(`${path()}/ops`, "POST", { expectedVersion: edit.value.version, ops: operations })); }
 async function history(direction: string) { accept(await props.request(`${path()}/${direction}`, "POST", {})); }
 watch(() => props.sequences, values => { if (!sequenceId.value && values.length) sequenceId.value = values[0].id; }, { immediate: true });
-watch(sequenceId, () => { edit.value = null; renders.value = []; void run(load); }, { immediate: true });
+watch(sequenceId, () => { edit.value = null; renders.value = []; clearTimeout(renderTimer); void load().catch(cause => { if (!disposed) error.value = String(cause); }); }, { immediate: true });
+watch(() => props.shots.map(shot => shot.approvedTakeId).join(","), () => { void loadRenders().catch(cause => { if (!disposed) error.value = String(cause); }); });
 watch(rightId, () => { candidates.value = []; suggestionNote.value = ""; preview.value = null; transition.value = pair.value?.right.transition.type ?? "cut"; });
 async function trim(clip: any) {
   if (clip.transition.type !== "cut") throw new Error("请先将该片段设为硬切，再修剪区间");
@@ -176,10 +198,53 @@ async function mapSegments() {
   await ElMessageBox.confirm("将用所列区间替换当前主轨及其关联声音，独立音乐保留；可通过撤销恢复。", "替换主轨", { confirmButtonText: "替换", cancelButtonText: "取消" });
   await ops([{ type: "map_segments", mediaId: segmentMediaId.value, segments: segments.value }]);
 }
+async function download(item: any) {
+  await saveFile(() => axios.get<Blob>(url(item.media.url), { responseType: "blob", signal: lifetime.signal }).then(result => result.data), `成片${item.id}.mp4`);
+}
+async function publish(item: any, focus = true) {
+  const directory = props.directory;
+  const context = renderCanvases.get(item.id)?.context ?? getCanvas?.();
+  if (!context) throw new Error("请先打开目标画布");
+  const canvasId = renderCanvases.get(item.id)?.id ?? context.id;
+  renderCanvases.set(item.id, { context, id: canvasId });
+  const files = useWorkspaceFiles(directory);
+  const path = `render${item.id}.mp4`;
+  const { entries } = await files.list();
+  lifetime.signal.throwIfAborted();
+  if (!entries.some(entry => entry.path === path && entry.type === "file")) {
+    const { data } = await axios.get<Blob>(url(item.media.url), { responseType: "blob", signal: lifetime.signal });
+    lifetime.signal.throwIfAborted();
+    if (!data.size) throw new Error("导出视频为空");
+    await files.write(path, data, true, lifetime.signal);
+  }
+  lifetime.signal.throwIfAborted();
+  const result = await context.call({ name: "publishVideo", args: { path, canvasId, label: `成片 · ${props.sequences.find(sequence => sequence.id === sequenceId.value)?.name ?? "影片"}` } }, lifetime.signal) as { node: { id: string } };
+  published.value.add(item.id);
+  delete publishErrors.value[item.id];
+  if (focus) await context.call({ name: "fitCanvas", args: { nodeIds: [result.node.id] } }, lifetime.signal);
+}
 async function loadRenders() {
-  renders.value = await props.request(`/sequences/${sequenceId.value}/renders`);
-  for (const item of renders.value) if (item.quality?.analysisId && qualityDrafts.value[item.id]?.analysisId !== item.quality.analysisId) {
-    qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(qualityFields.map(field => [field[0], "unverified"])), fullPlayback: false, note: "", reasons: {} };
+  const id = sequenceId.value;
+  if (!id || renderLoading || disposed) return;
+  renderLoading = true;
+  clearTimeout(renderTimer);
+  try {
+    const values = await props.request(`/sequences/${id}/renders`);
+    if (disposed || id !== sequenceId.value) return;
+    renders.value = values;
+    for (const item of values) if (item.quality?.analysisId && qualityDrafts.value[item.id]?.analysisId !== item.quality.analysisId) {
+      qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(qualityFields.map(field => [field[0], "unverified"])), fullPlayback: false, note: "", reasons: {} };
+    }
+    const latest = values.find((item: any) => item.status === "SUCCEEDED" && item.media);
+    if (latest && !published.value.has(latest.id) && !publishErrors.value[latest.id]) {
+      try { await publish(latest, false); }
+      catch (cause) { if (!disposed) publishErrors.value[latest.id] = cause instanceof Error ? cause.message : String(cause); }
+    }
+  } finally {
+    renderLoading = false;
+    if (!disposed && (id !== sequenceId.value || renders.value.some(item => item.status === "RUNNING" || item.status === "QUEUED"))) {
+      renderTimer = setTimeout(() => { void loadRenders().catch(cause => { if (!disposed) error.value = String(cause); }); }, 3000);
+    }
   }
 }
 async function analyzeQuality(id: string) { await props.request(`/renders/${id}/quality/analyze`, "POST", {}); await loadRenders(); }
@@ -188,10 +253,19 @@ async function saveQuality(item: any) {
   await props.request(`/renders/${item.id}/quality/review`, "POST", { analysisId: draft.analysisId, checks: draft.checks, fullPlayback: draft.fullPlayback, note: draft.note, acknowledgements: Object.entries(draft.reasons).filter(([, reason]) => reason.trim()).map(([id, reason]) => ({ id, reason })) });
   await loadRenders();
 }
+async function trackRender(id: string, targetSequence: string, binding?: { context: CanvasContext; id: string }) {
+  if (binding) renderCanvases.set(id, binding);
+  if (sequenceId.value !== targetSequence) sequenceId.value = targetSequence;
+  else await loadRenders();
+}
+defineExpose({ trackRender });
 async function render() {
   const [width, height] = exportSize.value.split("x").map(Number);
-  await props.request(`/sequences/${sequenceId.value}/render`, "POST", exportSize.value === "source" ? {} : { width, height });
-  message.value = "导出已提交，刷新状态查看结果"; await loadRenders();
+  const context = getCanvas?.();
+  const canvasId = context?.id;
+  const item = await props.request(`/sequences/${sequenceId.value}/render`, "POST", exportSize.value === "source" ? {} : { width, height });
+  if (context && canvasId) renderCanvases.set(item.id, { context, id: canvasId });
+  message.value = "正在导出，完成后自动展示到画布，可直接播放和下载"; await loadRenders();
 }
 </script>
 

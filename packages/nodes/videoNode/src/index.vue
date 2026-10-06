@@ -41,6 +41,7 @@
         <span>{{ uploading ? "正在上传…" : "上传视频" }}</span>
       </el-button>
     </div>
+    <a v-if="previewUrl && !exporting" class="videoDownload nodrag nopan" :href="previewUrl" :download="outputFile?.url.split(/[\\/]/).at(-1) || '成片.mp4'" @click.stop @dblclick.stop>下载 / 另存视频</a>
   </nodeSkeleton>
 </template>
 
@@ -141,6 +142,15 @@ function showError(error: unknown, fallback: string) {
 </script>
 
 <style scoped lang="scss">
+.videoDownload {
+  display: block;
+  padding: 10px 12px;
+  color: var(--el-color-primary);
+  text-align: center;
+  text-decoration: none;
+  &:hover { background: var(--el-fill-color-light); }
+  &:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: -2px; }
+}
 .videoContent {
   position: relative;
   display: grid;

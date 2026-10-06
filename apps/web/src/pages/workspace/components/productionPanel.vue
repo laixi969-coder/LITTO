@@ -24,8 +24,7 @@
           <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
           <ul class="assetList"><li v-for="item in assets" :key="item.id"><button type="button" @click="run(() => editAsset(item))">编辑与历史</button><span>{{ item.name }} · v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</span><button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button></li></ul><ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
         </template>
-        <productionEdit v-else-if="section === 'edit'" :sequences="sequences" :shots="shots" :references="references" :request="request" />
-        <template v-else>
+        <template v-else-if="section !== 'edit'">
           <div class="shotNavigation">
             <label>当前镜头<select :value="shotId" @change="run(() => selectShot(($event.target as HTMLSelectElement).value))"><option value="">选择镜头</option><option v-for="item in shots" :key="item.id" :value="item.id">{{ item.ord + 1 }} · {{ item.title }}</option></select></label>
             <button type="button" @click="run(createShot)">新建镜头</button>
@@ -115,14 +114,18 @@
             </template>
           </template>
         </template>
+        <productionEdit ref="editPanel" v-show="section === 'edit'" :directory="directory" :sequences="sequences" :shots="shots" :references="references" :request="request" />
       </fieldset>
     </div>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, toRaw, watch } from "vue";
+import { computed, inject, onScopeDispose, ref, toRaw, watch } from "vue";
 import productionEdit from "./productionEdit.vue";
+import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
+const editPanel = ref<InstanceType<typeof productionEdit>>();
+const getCanvas = inject<() => CanvasContext | undefined>("canvas");
 import { ElMessageBox } from "element-plus";
 import type { MediaModel } from "@toonflow/tools-scaffold/runtime";
 const visible = defineModel<boolean>({ default: false });
@@ -382,10 +385,17 @@ async function saveReview() {
 }
 async function confirmVersion() {
   const item = target.value;
+  const sequenceId = detail.value.sequenceId;
+  const context = getCanvas?.();
+  const canvasId = context?.id;
   await request(`/shots/${shotId.value}/qc`, "POST", reviewPayload(item));
-  await request(`/${item.type === "keyframe" ? "keyframes" : "takes"}/${item.id}/${item.type === "keyframe" ? "promote" : "approve"}`, "POST", {});
+  const result = await request(`/${item.type === "keyframe" ? "keyframes" : "takes"}/${item.id}/${item.type === "keyframe" ? "promote" : "approve"}`, "POST", {});
   await refreshResults(); selectPendingVersion();
-  message.value = item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准，结束状态已记录";
+  message.value = result.autoRenderError || (result.autoRender ? "全部镜头已采用，正在合成成片；完成后自动展示到画布" : item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准，结束状态已记录");
+  if (result.autoRender) {
+    section.value = "edit";
+    await editPanel.value?.trackRender(result.autoRender.id, sequenceId, context && canvasId ? { context, id: canvasId } : undefined);
+  }
 }
 async function flushSave() { if (JSON.stringify(asset.value) !== savedAsset) throw new Error("资产修改尚未保存，请先建立或保存资产版本"); if (worldDirty.value) await saveWorld(); await saveShot(); }
 async function closePanel(done: () => void) { try { await flushSave(); done(); } catch (cause) { error.value = cause instanceof Error ? cause.message : "未保存，面板保持打开"; } }

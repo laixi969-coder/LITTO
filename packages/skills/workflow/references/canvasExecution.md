@@ -21,6 +21,7 @@
 | `getCanvasNodes` | `{nodeIds:[...],fields?:["label","type","position","ports","data","outputs"],dataKeys?,path?,valueOffset?,valueLimit?,textOffset?,textLimit?,cursor?,canvasId?}` |
 | `getCanvasEdges` | `{nodeIds?:[...],direction?:"incoming"/"outgoing"/"both",cursor?,limit?,canvasId?}` |
 | `getNodeTools` | `{nodeIds:[...],names?,cursor?,limit?,canvasId?}` |
+| `publishVideo` | `{path, label?, canvasId?}`；真实工作区视频，自动放置独立节点，同路径复用，可播放与下载 |
 | `addNode` | `{type, position:{x,y}, label?}` |
 | `nodeTools` | `{nodeId, name:"node:函数名", args:{...}}` |
 | `connectNodes` | `{connections:[{source,sourceHandle,target,targetHandle}]}` |

@@ -23,7 +23,13 @@ const refined = z.object({ shots: z.array(z.object({ title: z.string(), narrativ
  * but never the shot count, order, scene assignment or asset ids (those carry continuity). Anything invalid → keep the rule-based draft.
  */
 async function refineWithLlm(s: Scope, projectId: string, actor: string, script: string, drafts: ShotDraft[], world: any) {
-    const system = "You are a film storyboard director and cinematographer. Refine the draft shot list. Return ONLY JSON {\"shots\":[...]} with exactly the same number of shots in the same order; keep each shot's fields (title, narrativeFunction, action, performance{emotion,intensity,eyeline,gesture,timing}, camera{shotSize,position,height,angle,lensMm,focus,depth,motion,motivation,side,screenDirection}, lighting{motivatedLight,key,fill,negativeFill,practicals,exposure,keyDirection,timeOfDay,colorTemp}, duration, subtitle). Respect: cut by narrative function, stay on one side of the 180-degree axis within a scene, motivate every camera move, keep lighting consistent within a scene. No filler words like 8K or cinematic.";
+  const system = [
+    "You are a film storyboard director and cinematographer. Refine the draft shot list. Return ONLY JSON {\"shots\":[...]} with exactly the same number of shots in the same order; keep each shot's fields (title, narrativeFunction, action, performance{emotion,intensity,eyeline,gesture,timing}, camera{shotSize,position,height,angle,lensMm,focus,depth,motion,motivation,side,screenDirection}, lighting{motivatedLight,key,fill,negativeFill,practicals,exposure,keyDirection,timeOfDay,colorTemp}, duration, subtitle).",
+    "Respect: cut by narrative function, stay on one side of the 180-degree axis within a scene, motivate every camera move, keep lighting consistent within a scene. Describe performer paths separately from camera paths. Preserve story facts, exact dialogue and approved identity; no filler words like 8K or cinematic.",
+    // 方法来源与适配边界见 cinema/references/performanceDirectionLicense.md。
+    "For shots with performers, put each character's immediate objective, tactic and observable behavior in action/performance.gesture, their attention target in eyeline, and the trigger, response order, dialogue delivery and ending residue in timing. Name the performer for each behavior. Emotion labels and intensity alone are not performance direction.",
+    "Listening can start during a partner's line only after the relevant cue is available. Preserve emotional carryover across adjacent shots. Keep established voice identity while varying delivery for the scene. Give ensemble members distinct attention and responses when appropriate; do not force synchronized gestures, repetitive blinking, crying, damage, new props or new backstory. Match behavior scale to framing and leave room for the existing dialogue and pauses. Empty environment or object shots need no human acting notes.",
+  ].join(" ");
     const slim = drafts.map((d) => ({ title: d.title, narrativeFunction: d.narrativeFunction, action: d.action, performance: d.performance, camera: d.camera, lighting: d.lighting, duration: d.duration, subtitle: d.subtitle ?? "" }));
     const r = await runText({ workspaceId: s.workspaceId, projectId, actor, system, prompt: `WORLD: ${JSON.stringify(world ?? {})}\nSCRIPT:\n${script}\nDRAFT:\n${JSON.stringify({ shots: slim })}`, json: true, label: "director.refine", mockEcho: JSON.stringify({ shots: slim }) });
     if (!r) return { used: false, reason: "no usable text model" };
@@ -72,7 +78,7 @@ export async function directorRun(s: Scope, projectId: string, actor: string, in
 
     const bindings = s.list("reference_bindings", { targetType: "shot" });
     steps.push({ step: "reference_plan", status: "done", detail: { perShot: shots.map((x: any) => ({ shotId: x.id, assets: x.assetIds.length, bound: bindings.filter((b: any) => b.targetId === x.id).map((b: any) => b.role) })) } });
-    steps.push({ step: "freedom_map", status: "done", detail: { default: { LOCK: "approved asset invariants", CONTROL: "composition, lens, action, camera, lighting", ALLOW: "creases, micro-expression", RANDOM: "dust, background" } } });
+    steps.push({ step: "freedom_map", status: "done", detail: { default: { LOCK: "approved asset invariants", CONTROL: "composition, lens, action, camera, lighting", ALLOW: "creases, micro-expression", RANDOM: "none unless specified by the story" } } });
 
     const policy = resolvePolicy(s.workspaceId, projectId);
     const routed = shots.map((x: any) => ({ shotId: x.id, image: mustRoute({ kind: "image", workspaceId: s.workspaceId, projectId, roles: bindings.filter((b: any) => b.targetId === x.id).map((b: any) => b.role), policy }).chosen }));
