@@ -4,7 +4,9 @@ import { get, scoped, type Scope } from "../db.ts";
 import { saveMedia, storage } from "../storage.ts";
 import { bad, notFound, now } from "../util.ts";
 import { end as clipEnd, getEdit, hasEdit, resolveClip } from "./nle.ts";
-import { startNleRender } from "./nle-render.ts";
+import { startNleRender, renderOptionsSchema } from "./nle-render.ts";
+import type { RenderOpts } from "./nle-render.ts";
+import { sequenceFingerprint } from "./finalQuality.ts";
 
 /** Basic assembly timeline (PRD Phase 5 / P2 "基础 Timeline"): approved Take per shot, in shot order, with subtitles and audio references. */
 export type Clip = { shotId: string; order: number; title: string; kind: "take" | "hero" | "missing"; mediaId: string | null; mime: string | null; start: number; duration: number; subtitle: string; clipId?: string; srcIn?: number; srcOut?: number; speed?: number; transition?: { type: string; duration: number } };
@@ -139,10 +141,12 @@ export async function exportPackage(s: Scope, sequenceId: string) {
 // ---- optional ffmpeg render (see nle-render.ts) ----
 export const ffmpegAvailable = () => new Promise<boolean>((r) => { const p = spawn("ffmpeg", ["-version"]); p.on("error", () => r(false)); p.on("exit", (c) => r(c === 0)); });
 
-export function startRender(workspaceId: string, projectId: string, sequenceId: string, actor: string, opts: { normalizeAudio?: boolean; targetLufs?: number; burnSubtitles?: boolean } = {}) {
+export function startRender(workspaceId: string, projectId: string, sequenceId: string, actor: string, opts: RenderOpts = {}) {
     const s = scoped(workspaceId);
+    getEdit(s, sequenceId, true);
     const tl = buildTimeline(s, sequenceId);
-    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts }, created_by: actor, updated_at: now() });
+    opts = renderOptionsSchema.parse(opts);
+    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts, sourceFingerprint: sequenceFingerprint(s, sequenceId) }, created_by: actor, updated_at: now() });
     void startNleRender(workspaceId, projectId, sequenceId, r.id, opts);
     return r;
 }

@@ -32,7 +32,7 @@ function seed(state: State, shot: any, assets: Map<string, any>, newScene: boole
             if (!c.wardrobeId) c.wardrobeId = id;
         }
     }
-    if ((newScene || !Object.keys(s.lighting).length) && shot.lighting) s.lighting = { keyDirection: shot.lighting.keyDirection, timeOfDay: shot.lighting.timeOfDay, colorTemp: shot.lighting.colorTemp };
+    if ((newScene || !Object.keys(s.lighting).length) && shot.lighting) s.lighting = { worldSource: shot.lighting.worldSource, directionSpace: shot.lighting.directionSpace ?? "screen", keyDirection: shot.lighting.keyDirection, timeOfDay: shot.lighting.timeOfDay, colorTemp: shot.lighting.colorTemp };
     return s;
 }
 

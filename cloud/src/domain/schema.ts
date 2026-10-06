@@ -30,20 +30,30 @@ export const assetInput = z.object({
     forbiddenChanges: z.array(z.string()).default([]),
 });
 
+export const referenceCropSchema = z.object({
+    x: z.number().finite().nonnegative(), y: z.number().finite().nonnegative(),
+    width: z.number().finite().positive(), height: z.number().finite().positive(),
+    unit: z.enum(["normalized", "pixels"]).default("normalized"),
+}).strict().refine(crop => crop.unit === "pixels"
+    ? [crop.x, crop.y, crop.width, crop.height].every(Number.isInteger)
+    : crop.x + crop.width <= 1 && crop.y + crop.height <= 1, "裁切区域须在图内，像素坐标须为整数");
+
 export const bindingInput = z.object({
     referenceId: z.string(), role: z.enum(ROLES), weight: z.number().min(0).max(1).default(1),
-    lockLevel: z.enum(LOCK_LEVELS).default("CONTROL"), crop: z.any().optional(), notes: z.string().optional(),
+    lockLevel: z.enum(LOCK_LEVELS).default("CONTROL"), crop: referenceCropSchema.nullable().optional(), notes: z.string().optional(),
 });
 
 export const cameraSchema = z.object({
     shotSize: z.string().default("MS"), position: z.string().default(""), height: z.string().default("eye level"), angle: z.string().default("neutral"),
     lensMm: z.number().default(35), focus: z.string().default(""), depth: z.string().default(""), motion: z.string().default("static"), motivation: z.string().default(""),
+    axisCrossing: z.string().default(""),
     side: z.enum(["A", "B", "none"]).default("none"), // which side of the 180° axis
     screenDirection: z.enum(["left", "right", "none"]).default("none"),
     // 360° view into the Environment panorama (optional so existing shots stay valid)
     viewYaw: z.number().min(-180).max(180).optional(), viewPitch: z.number().min(-90).max(90).optional(), viewFov: z.number().min(10).max(140).optional(),
 });
 export const lightingSchema = z.object({
+    worldSource: z.string().default(""), directionSpace: z.enum(["screen", "world"]).default("screen"),
     motivatedLight: z.string().default(""), key: z.string().default(""), fill: z.string().default(""), negativeFill: z.string().default(""),
     practicals: z.array(z.string()).default([]), exposure: z.string().default(""), keyDirection: z.enum(["left", "right", "front", "back", "top", "none"]).default("none"),
     timeOfDay: z.string().default(""), colorTemp: z.string().default(""),
@@ -58,12 +68,14 @@ export const shotInput = z.object({
     title: z.string().default(""),
     narrativeFunction: z.enum(NARRATIVE_FUNCTIONS).default("Establish"),
     assetIds: z.array(z.string()).default([]),
-    action: z.string().default(""), performance: z.object({ emotion: z.string().default(""), intensity: z.number().default(0.5), eyeline: z.string().default(""), gesture: z.string().default(""), timing: z.string().default("") }).default({}),
+    action: z.string().default(""), performance: z.object({ emotion: z.string().default(""), intensity: z.number().default(0.5), eyeline: z.string().default(""), lookTarget: z.string().default(""), gesture: z.string().default(""), timing: z.string().default("") }).default({}),
     blocking: z.object({ foreground: z.string().default(""), midground: z.string().default(""), background: z.string().default("") }).default({}),
     camera: cameraSchema.default({}), lighting: lightingSchema.default({}),
     intendedStateDelta: z.record(z.any()).default({}),
     freedomMap: freedomMapSchema.optional(), constraints: z.array(z.string()).default([]),
-    duration: z.number().default(4),
+    duration: z.number().finite().positive().max(3600).default(4),
+    generationDuration: z.number().finite().positive().max(3600).optional(),
+    inspectionRegion: referenceCropSchema.nullable().optional(),
     subtitle: z.string().default(""),
     modelOverride: z.any().optional(),
     realism: z.object({

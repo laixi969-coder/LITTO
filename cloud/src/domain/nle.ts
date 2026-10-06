@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { all, get, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, forbidden, j, notFound, now, ulid } from "../util.ts";
+import { mediaView } from "../storage.ts";
 import { parseGrade, type Grade } from "./grade.ts";
 
 /**
@@ -10,7 +11,7 @@ import { parseGrade, type Grade } from "./grade.ts";
  */
 export type Transition = { type: "cut" | "dissolve" | "fade_black"; duration: number };
 export type Track = { id: string; kind: "video" | "audio"; name: string; role?: "dialogue" | "music" | "sfx"; muted: boolean; locked: boolean; gainDb: number };
-export type EClip = { id: string; trackId: string; type: "shot" | "media"; shotId?: string; mediaId?: string; refId?: string; start: number; duration: number; in: number; speed: number; transition: Transition; gainDb: number; fadeIn: number; fadeOut: number; label: string; auto?: boolean };
+export type EClip = { id: string; trackId: string; type: "shot" | "media"; shotId?: string; mediaId?: string; refId?: string; start: number; duration: number; in: number; speed: number; transition: Transition; gainDb: number; fadeIn: number; fadeOut: number; label: string; auto?: boolean; linkedClipId?: string; audioDetached?: boolean };
 export type Marker = { id: string; t: number; label: string };
 export type Duck = { underRole: "dialogue" | "music" | "sfx"; amountDb: number };
 export type Body = { fps: number; tracks: Track[]; clips: EClip[]; markers: Marker[]; grade: Grade | null; duck: Duck | null };
@@ -33,7 +34,7 @@ export function resolveClip(s: Scope, c: EClip): Resolved {
     const hero = !take && sh?.heroKeyframeId ? s.get("keyframes", sh.heroKeyframeId) : null;
     const mid = c.mediaId ?? take?.mediaId ?? hero?.mediaId ?? null;
     const m = mid ? s.get("media", mid) : null;
-    return { kind: take ? "take" : hero ? "hero" : "missing", mediaId: mid, mime: m?.mime ?? null, srcDuration: take && m?.duration ? m.duration : null };
+    return { kind: c.mediaId && m ? "media" : take ? "take" : hero ? "hero" : "missing", mediaId: mid, mime: m?.mime ?? null, srcDuration: m?.duration ?? null };
 }
 
 // ---------------------------------------------------------------- conform
@@ -50,7 +51,7 @@ export function conformBody(s: Scope, sequenceId: string, prev: Body | null, res
     const shots = s.list("shots", { sequenceId }, "ord");
     const bindings = s.list("reference_bindings", { targetType: "shot" }).filter((b: any) => b.role === "AUDIO");
     const base: Body = !prev || reset ? { fps: 24, tracks: defaultTracks(), clips: [], markers: [], grade: prev && !reset ? prev.grade : null, duck: null } : structuredClone(prev);
-    const have = new Set(base.clips.filter((c) => c.type === "shot").map((c) => c.shotId));
+    const have = new Set(base.clips.filter((c) => c.shotId).map((c) => c.shotId));
     const live = new Set(shots.map((x) => x.id));
     // drop clips of deleted shots; drop auto audio whose binding disappeared
     base.clips = base.clips.filter((c) => (c.type === "shot" ? live.has(c.shotId!) : !(c.auto && c.refId && !bindings.some((b: any) => `${b.targetId}:${b.referenceId}` === c.refId))));
@@ -115,6 +116,9 @@ const num = z.number().finite();
 const tr = z.object({ type: z.enum(["cut", "dissolve", "fade_black"]), duration: num.min(0).max(10) });
 const clipIn = z.object({ trackId: z.string(), type: z.enum(["shot", "media"]), shotId: z.string().optional(), mediaId: z.string().optional(), start: num.min(0), duration: num.optional(), in: num.min(0).default(0), speed: num.min(0.25).max(4).default(1), transition: tr.optional(), gainDb: num.min(-60).max(24).default(0), fadeIn: num.min(0).default(0), fadeOut: num.min(0).default(0), label: z.string().default("") });
 export const opSchema = z.discriminatedUnion("type", [
+    z.object({ type: z.literal("set_cut"), leftId: z.string(), rightId: z.string(), sourceOut: num.nonnegative(), sourceIn: num.nonnegative(), leftMediaId: z.string().optional(), rightMediaId: z.string().optional() }),
+    z.object({ type: z.literal("bridge_audio"), leftId: z.string(), rightId: z.string(), mode: z.enum(["jCut", "lCut", "crossfade", "none"]), duration: num.min(0).max(3) }),
+    z.object({ type: z.literal("map_segments"), mediaId: z.string(), segments: z.array(z.object({ shotId: z.string(), in: num.nonnegative(), out: num.positive() })).min(1).max(100) }),
     z.object({ type: z.literal("add_clip"), clip: clipIn }),
     z.object({ type: z.literal("move_clip"), id: z.string(), start: num.min(0).optional(), trackId: z.string().optional() }),
     z.object({ type: z.literal("trim_clip"), id: z.string(), in: num.min(0).optional(), out: num.optional(), start: num.min(0).optional(), duration: num.optional(), ripple: z.boolean().default(false) }),
@@ -158,6 +162,7 @@ function validate(s: Scope, t: Body) {
         const tk = t.tracks.find((x) => x.id === c.trackId);
         if (!tk) throw bad(`clip ${c.id} is on a missing track`);
         if (c.duration < MIN_DUR - EPS) throw bad(`clip duration must be ≥ ${MIN_DUR}s`);
+        if (!Number.isFinite(c.in) || c.in < 0) throw bad("素材入点不能小于零");
         if (c.start < -EPS) throw bad("clip cannot start before 0");
         const src = resolveClip(s, c);
         if (tk.kind === "video" && c.type === "media" && src.mime && !src.mime.startsWith("video/") && !src.mime.startsWith("image/")) throw bad(`clip ${c.id}: ${src.mime} cannot go on a video track`);
@@ -178,8 +183,81 @@ function validate(s: Scope, t: Body) {
     }
 }
 
+export function adjacentClips(t: Body, leftId: string, rightId: string) {
+    const left = findClip(t, leftId), right = findClip(t, rightId);
+    const track = findTrack(t, left.trackId);
+    if (track.kind !== "video" || right.trackId !== left.trackId) throw bad("请选择同一视频轨的相邻片段");
+    const list = t.clips.filter(c => c.trackId === left.trackId).sort((a, b) => a.start - b.start);
+    if (list[list.indexOf(left) + 1]?.id !== right.id) throw bad("片段不相邻，请刷新时间线");
+    return { left, right };
+}
+
+function detachAudio(s: Scope, t: Body, clip: EClip) {
+    const source = resolveClip(s, clip);
+    if (!source.mediaId || !source.mime?.startsWith("video/")) throw bad("片段没有可用的视频音轨");
+    let track = t.tracks.find(item => item.kind === "audio" && item.role === "dialogue" && !item.locked);
+    if (!track) { track = { id: ulid(), kind: "audio", name: "对白与现场声", role: "dialogue", muted: false, locked: false, gainDb: 0 }; t.tracks.push(track); }
+    const existing = t.clips.find(item => item.linkedClipId === clip.id);
+    if (existing) { unlocked(t, existing.trackId); t.clips = t.clips.filter(item => item.id !== existing.id); }
+    const audio = newClip({ trackId: track.id, type: "media", mediaId: source.mediaId, linkedClipId: clip.id, start: clip.start, duration: clip.duration, in: clip.in, speed: clip.speed, label: clip.label, gainDb: clip.gainDb, auto: false });
+    clip.mediaId = source.mediaId; clip.audioDetached = true; clip.auto = false; t.clips.push(audio);
+    return audio;
+}
+
 function apply(s: Scope, t: Body, op: Op) {
     switch (op.type) {
+        case "set_cut": {
+            const { left, right } = adjacentClips(t, op.leftId, op.rightId);
+            unlocked(t, left.trackId);
+            if (right.transition.type !== "cut" || Math.abs(end(left) - right.start) > EPS) throw bad("先将相邻片段设为连续硬切，再调整剪点");
+            if ((op.leftMediaId && resolveClip(s, left).mediaId !== op.leftMediaId) || (op.rightMediaId && resolveClip(s, right).mediaId !== op.rightMediaId)) throw conflict("源素材已更换，请刷新剪点候选", "stale");
+            const oldEnd = end(right);
+            const rightOut = right.in + right.duration * right.speed;
+            left.duration = r3((op.sourceOut - left.in) / left.speed);
+            right.in = r3(op.sourceIn); right.duration = r3((rightOut - right.in) / right.speed);
+            right.start = r3(end(left)); left.auto = false; right.auto = false;
+            shiftLater(t, right, r3(end(right) - oldEnd), oldEnd - EPS);
+            return;
+        }
+        case "bridge_audio": {
+            const { left, right } = adjacentClips(t, op.leftId, op.rightId);
+            unlocked(t, left.trackId);
+            if (right.transition.type !== "cut" || Math.abs(end(left) - right.start) > EPS) throw bad("声音桥要求连续硬切；溶解可在独立音轨手动淡化");
+            const a = detachAudio(s, t, left), b = detachAudio(s, t, right);
+            const d = op.mode === "none" ? 0 : op.duration;
+            if (d >= Math.min(a.duration, b.duration) - MIN_DUR) throw bad("声音桥超过相邻片段可用时长");
+            if (op.mode === "jCut" || op.mode === "crossfade") {
+                b.start = r3(b.start - d); b.in = r3(b.in - d * b.speed); b.duration = r3(b.duration + d);
+                if (op.mode === "jCut") a.duration = r3(a.duration - d);
+            }
+            if (op.mode === "lCut") {
+                a.duration = r3(a.duration + d); b.start = r3(b.start + d); b.in = r3(b.in + d * b.speed); b.duration = r3(b.duration - d);
+            }
+            a.fadeOut = op.mode === "crossfade" ? d : Math.min(0.01, a.duration / 2);
+            b.fadeIn = op.mode === "crossfade" ? d : Math.min(0.01, b.duration / 2);
+            return;
+        }
+        case "map_segments": {
+            const media = s.get("media", op.mediaId);
+            if (!media?.mime.startsWith("video/") || !media.duration) throw bad("请选择有真实时长的视频素材");
+            const track = t.tracks.find(item => item.kind === "video");
+            if (!track) throw bad("缺少视频轨");
+            unlocked(t, track.id);
+            const replaced = new Set(t.clips.filter(c => c.trackId === track.id).map(c => c.id));
+            const removed = t.clips.filter(c => replaced.has(c.id) || (c.linkedClipId && replaced.has(c.linkedClipId)) || (c.auto && c.refId));
+            for (const c of removed) unlocked(t, c.trackId);
+            t.clips = t.clips.filter(c => !removed.includes(c));
+            let start = 0;
+            for (const segment of op.segments) {
+                if (segment.out <= segment.in || segment.out > media.duration + EPS) throw bad("分段区间无效或超出素材");
+                const shot = s.get("shots", segment.shotId);
+                if (!shot) throw notFound("shot");
+                const duration = r3(segment.out - segment.in);
+                t.clips.push(newClip({ trackId: track.id, type: "media", mediaId: media.id, shotId: shot.id, start: r3(start), duration, in: segment.in, label: shot.title, auto: false }));
+                start += duration;
+            }
+            return;
+        }
         case "add_clip": {
             const k = op.clip;
             unlocked(t, k.trackId);
@@ -216,6 +294,8 @@ function apply(s: Scope, t: Body, op: Op) {
         case "split_clip": {
             const c = findClip(t, op.id);
             unlocked(t, c.trackId);
+            // ACT: 独立声桥保留自己的入出点；分割前需移除关联声音，避免复制出错误的关联关系。
+            if (c.linkedClipId || t.clips.some((x) => x.linkedClipId === c.id)) throw bad("请先移除关联声音片段，再分割画面");
             if (op.at < c.start + MIN_DUR - EPS || op.at > end(c) - MIN_DUR + EPS) throw bad(`split point must be inside the clip with ≥ ${MIN_DUR}s on each side`);
             const first = op.at - c.start;
             const b = newClip({ ...c, id: ulid(), start: r3(op.at), duration: r3(c.duration - first), in: r3(c.in + first * c.speed), transition: { type: "cut", duration: 0 }, fadeIn: 0, auto: false });
@@ -249,6 +329,7 @@ function apply(s: Scope, t: Body, op: Op) {
         case "set_speed": {
             const c = findClip(t, op.id);
             unlocked(t, c.trackId);
+            if (c.linkedClipId || t.clips.some((x) => x.linkedClipId === c.id)) throw bad("请先移除关联声音片段，再调整速度");
             const span = c.duration * c.speed; // source span stays, timeline length changes
             c.speed = op.speed; c.duration = r3(span / op.speed); c.auto = false;
             return;
@@ -276,11 +357,9 @@ function apply(s: Scope, t: Body, op: Op) {
             const ia = list.indexOf(a), ib = list.indexOf(b);
             [list[ia], list[ib]] = [list[ib], list[ia]];
             // re-pack V1 contiguously (dissolves keep their overlap); audio that was tied to a swapped shot follows it
-            const oldStart = new Map(list.map((c) => [c.id, c.start]));
             let pos = 0;
             for (const c of list) { const ov = c.transition.type === "dissolve" ? c.transition.duration : 0; c.start = r3(Math.max(0, pos - ov)); pos = end(c); c.auto = false; }
-            for (const au of t.clips.filter((c) => c.refId)) { const sid = au.refId!.split(":")[0]; const sc = list.find((c) => c.shotId === sid); if (sc) au.start = sc.start; }
-            void oldStart;
+
             return;
         }
         case "set_duck": t.duck = op.duck; return;
@@ -297,7 +376,26 @@ export function applyOps(s: Scope, sequenceId: string, ops: unknown[], expectedV
     const cur: EditRow = ex ?? { ...conformBody(s, sequenceId, null, true), version: 0, history: [], future: [] };
     if (expectedVersion !== undefined && expectedVersion !== cur.version) throw conflict(`timeline changed (version ${cur.version}, you had ${expectedVersion})`, "stale", { version: cur.version });
     const work: Body = structuredClone(body(cur));
-    parsed.forEach((op, i) => { try { apply(s, work, op); } catch (e: any) { e.message = `op #${i + 1} (${op.type}): ${e.message}`; throw e; } });
+    parsed.forEach((op, i) => {
+        try {
+            const before = new Map(work.clips.map(c => [c.id, { ...c }]));
+            apply(s, work, op);
+            if (op.type === "bridge_audio" || op.type === "map_segments") return;
+            for (const audio of work.clips.filter(c => c.linkedClipId || c.refId)) {
+                const parent = audio.linkedClipId ? work.clips.find(c => c.id === audio.linkedClipId) : work.clips.find(c => c.type === "shot" && c.shotId === audio.refId?.split(":")[0]);
+                const old = parent && before.get(parent.id);
+                if (!parent && audio.linkedClipId) { unlocked(work, audio.trackId); work.clips = work.clips.filter(c => c.id !== audio.id); continue; }
+                if (!parent || !old || !before.has(audio.id)) continue;
+                const delta = parent.start - parent.in / parent.speed - (old.start - old.in / old.speed);
+                if (Math.abs(delta) > EPS) { unlocked(work, audio.trackId); audio.start = r3(audio.start + delta); }
+            }
+        } catch (e: any) { e.message = `op #${i + 1} (${op.type}): ${e.message}`; throw e; }
+    });
+    for (const clip of work.clips) {
+        const mediaId = resolveClip(s, clip).mediaId;
+        if (mediaId && s.get("media", mediaId)?.projectId !== seq.projectId) throw bad("素材不属于当前项目");
+        if (clip.shotId && s.get("shots", clip.shotId)?.sequenceId !== sequenceId) throw bad("镜头不属于当前序列");
+    }
     validate(s, work);
     const next: EditRow = { ...work, version: cur.version + 1, history: [...cur.history, JSON.stringify(body(cur))].slice(-50), future: [] };
     // a never-persisted timeline is created at version 1 with the pre-edit state as its first undo step
@@ -319,6 +417,6 @@ export function undoRedo(s: Scope, sequenceId: string, dir: "undo" | "redo") {
 /** API view: resolved sources next to each clip, history stripped to depths. */
 export function editView(s: Scope, row: EditRow) {
     return { version: row.version, fps: row.fps, tracks: row.tracks, markers: row.markers, grade: row.grade ? { ...row.grade, lutCube: row.grade.lutCube ? "(cube)" : undefined } : null, duck: row.duck, historyDepth: row.history.length, futureDepth: row.future.length, duration: Math.max(0, ...row.clips.map(end)),
-        clips: row.clips.map((c) => { const r = resolveClip(s, c); const sh = c.shotId ? s.get("shots", c.shotId) : null; return { ...c, out: r3(c.in + c.duration * c.speed), source: { kind: r.kind, mediaId: r.mediaId, mime: r.mime, srcDuration: r.srcDuration }, shotOrder: sh?.ord ?? null, subtitle: sh?.subtitle ?? "", grade: sh?.grade ?? null }; }) };
+        clips: row.clips.map((c) => { const r = resolveClip(s, c); const sh = c.shotId ? s.get("shots", c.shotId) : null; return { ...c, out: r3(c.in + c.duration * c.speed), source: { kind: r.kind, mediaId: r.mediaId, mime: r.mime, srcDuration: r.srcDuration, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null }, shotOrder: sh?.ord ?? null, subtitle: sh?.subtitle ?? "", grade: sh?.grade ?? null }; }) };
 }
 void all; void get; void forbidden;

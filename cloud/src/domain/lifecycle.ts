@@ -1,6 +1,6 @@
 import { all, get, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
-import { compileShot } from "./compiler.ts";
+import { compileShot, requireCompiledInputs } from "./compiler.ts";
 import { event } from "./assets.ts";
 import { checkSequence, openHighIssues } from "./continuity.ts";
 import { recomputeStates } from "./state.ts";
@@ -39,6 +39,7 @@ export function generateKeyframes(s: Scope, shotId: string, actor: string, o: Ge
     const policy = resolvePolicy(s.workspaceId, shot.projectId, { ...shot.modelOverride, ...o.policy });
     const { chosen } = mustRoute({ kind: "image", workspaceId: s.workspaceId, projectId: shot.projectId, roles: bindings.map((b: any) => b.role), policy });
     const c = compileShot(s, shotId, "image", chosen!.modelId, { repair: o.repair });
+    requireCompiledInputs(c);
     const job = enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "image", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "image"), count: o.count ?? 3 }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey, label: `KEYFRAME · shot ${shot.ord + 1}`, seed: o.seed });
     return { job, degradations: [...chosen!.degradations, ...c.degradations], warnings: c.warnings, compiled: { prompt: c.prompt, freedomMap: c.freedomMap, inputs: c.inputs.map((i) => ({ role: i.role, sent: i.sent, weight: i.weight })) } };
 }
@@ -80,9 +81,11 @@ export function generateTakes(s: Scope, shotId: string, actor: string, o: GenOpt
     const policy = resolvePolicy(s.workspaceId, shot.projectId, { ...shot.modelOverride, ...o.policy });
     const { chosen } = mustRoute({ kind: "video", workspaceId: s.workspaceId, projectId: shot.projectId, roles, policy });
     const c = compileShot(s, shotId, "video", chosen!.modelId, { startFrameMediaId: kf.mediaId, repair: o.repair });
+    requireCompiledInputs(c);
+    if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
     const jobs = [];
     const n = o.count ?? 2;
-    for (let i = 0; i < n; i++) jobs.push(enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "video", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "video"), duration: shot.duration ?? 4, keyframeId: kf.id, count: 1 }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey ? `${o.idempotencyKey}:${i}` : undefined, label: `TAKE ${i + 1} · shot ${shot.ord + 1}`, seed: o.seed ? o.seed + i : undefined }));
+    for (let i = 0; i < n; i++) jobs.push(enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "video", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "video"), duration: shot.generationDuration ?? shot.duration ?? 4, keyframeId: kf.id, count: 1 }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey ? `${o.idempotencyKey}:${i}` : undefined, label: `TAKE ${i + 1} · shot ${shot.ord + 1}`, seed: o.seed ? o.seed + i : undefined }));
     return { jobs, degradations: [...chosen!.degradations, ...c.degradations], warnings: c.warnings };
 }
 

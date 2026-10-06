@@ -26,7 +26,7 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta"] as const;
+const CORE = ["narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "generationDuration", "inspectionRegion"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");

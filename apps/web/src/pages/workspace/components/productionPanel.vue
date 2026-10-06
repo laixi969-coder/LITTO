@@ -24,6 +24,7 @@
           <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
           <ul class="assetList"><li v-for="item in assets" :key="item.id"><button type="button" @click="run(() => editAsset(item))">编辑与历史</button><span>{{ item.name }} · v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</span><button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button></li></ul><ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
         </template>
+        <productionEdit v-else-if="section === 'edit'" :sequences="sequences" :shots="shots" :references="references" :request="request" />
         <template v-else>
           <div class="shotNavigation">
             <label>当前镜头<select :value="shotId" @change="run(() => selectShot(($event.target as HTMLSelectElement).value))"><option value="">选择镜头</option><option v-for="item in shots" :key="item.id" :value="item.id">{{ item.ord + 1 }} · {{ item.title }}</option></select></label>
@@ -34,7 +35,7 @@
               <label>镜头名称<input v-model="draft.title" /></label>
               <label>镜头职责<select v-model="draft.narrativeFunction"><option v-for="item in functions" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
               <label>动作与起止<textarea v-model="draft.action" /></label>
-              <label>时长（秒）<input v-model.number="draft.duration" type="number" min="1" max="3600" /></label>
+              <label>计划使用时长（秒）<input v-model.number="draft.duration" type="number" min="1" max="3600" /></label>
               <label v-for="field in cameraFields" :key="field[0]">{{ field[1] }}<input v-model="draft.camera[field[0]]" /></label>
               <label>焦段（mm）<input v-model.number="draft.camera.lensMm" type="number" min="1" max="2000" /></label>
               <label v-for="field in lightingFields" :key="field[0]">{{ field[1] }}<textarea v-model="draft.lighting[field[0]]" rows="2" /></label>
@@ -43,9 +44,12 @@
             </div>
             <h3>真实感规格</h3>
             <div class="fieldGrid"><label v-for="field in realismFields" :key="field[0]">{{ field[1] }}<textarea v-model="draft.realism[field[0]]" rows="3" @input="dirty = true" /><small>{{ field[2] }}</small></label></div>
+            <h3>原尺寸材质检查区域</h3>
+            <label><input :checked="!!draft.inspectionRegion" type="checkbox" @change="draft.inspectionRegion = ($event.target as HTMLInputElement).checked ? { x: 0.25, y: 0.25, width: 0.5, height: 0.5, unit: 'normalized' } : null; dirty = true" />指定脸部或材质区域（0–1），辅助检查会附加原尺寸局部图</label>
+            <div v-if="draft.inspectionRegion" class="fieldGrid"><label v-for="field in ['x', 'y', 'width', 'height']" :key="field">{{ field }}<input v-model.number="draft.inspectionRegion[field]" type="number" min="0" max="1" step="0.01" @input="dirty = true" /></label></div>
             <h3>出场资产</h3>
             <div class="checkList"><label v-for="item in assets" :key="item.id"><input v-model="draft.assetIds" type="checkbox" :value="item.id" @change="dirty = true" />{{ item.name }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</label></div>
-            <div class="fieldGrid" @change="dirty = true"><label>轴线侧<select v-model="draft.camera.side"><option value="none">未指定</option><option value="A">A 侧</option><option value="B">B 侧</option></select></label><label>画面运动方向<select v-model="draft.camera.screenDirection"><option value="none">无</option><option value="left">向左</option><option value="right">向右</option></select></label><label>主光方向<select v-model="draft.lighting.keyDirection"><option v-for="value in ['none', 'left', 'right', 'front', 'back', 'top']" :key="value">{{ value }}</option></select></label></div>
+            <div class="fieldGrid" @change="dirty = true"><label>轴线侧<select v-model="draft.camera.side"><option value="none">未指定</option><option value="A">A 侧</option><option value="B">B 侧</option></select></label><label>画面运动方向<select v-model="draft.camera.screenDirection"><option value="none">无</option><option value="left">向左</option><option value="right">向右</option></select></label><label>光向坐标<select v-model="draft.lighting.directionSpace"><option value="screen">画面坐标</option><option value="world">场景固定坐标</option></select></label><label>主光方向<select v-model="draft.lighting.keyDirection"><option v-for="value in ['none', 'left', 'right', 'front', 'back', 'top']" :key="value">{{ value }}</option></select></label></div>
             <button type="button" @click="run(saveShot)">{{ dirty ? '保存镜头规格' : '镜头规格已保存' }}</button>
             <h3>参考用途</h3>
             <div class="fieldGrid">
@@ -55,6 +59,8 @@
               <label>约束级别<select v-model="binding.lockLevel"><option value="LOCK">锁定</option><option value="CONTROL">受控</option><option value="ALLOW">允许变化</option><option value="RANDOM">随机</option></select></label>
               <label>意图权重<input v-model.number="binding.weight" type="number" min="0" max="1" step="0.1" /></label>
             </div>
+            <label><input v-model="cropEnabled" type="checkbox" />裁切图像参考（原图归一化坐标 0–1）</label>
+            <div v-if="cropEnabled" class="fieldGrid"><label v-for="field in ['x', 'y', 'width', 'height'] as const" :key="field">{{ field }}<input v-model.number="referenceCrop[field]" type="number" min="0" max="1" step="0.01" /></label></div>
             <button type="button" :disabled="!binding.referenceId" @click="run(bindReference)">绑定到镜头</button>
             <ul><li v-for="item in detail?.bindings" :key="item.id">{{ references.find(ref => ref.id === item.referenceId)?.name }} · {{ item.role }} · {{ item.lockLevel }} <button type="button" @click="run(() => removeBinding(item))">解除绑定</button></li></ul>
           </template>
@@ -66,7 +72,7 @@
               <label>模型<select v-model="modelKey"><option value="">选择已接入的模型</option><option v-for="item in availableModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label>
               <label v-if="kind === 'video'">模式<select v-model="modeKey"><option value="">选择模式</option><option v-for="mode in modes" :key="JSON.stringify(mode)" :value="JSON.stringify(mode)">{{ modeLabel(mode) }}</option></select></label>
               <label v-if="kind === 'video'">分辨率<select v-model="resolution"><option value="">选择分辨率</option><option v-for="value in resolutions" :key="value">{{ value }}</option></select></label>
-              <label v-if="kind === 'video'">时长<select v-model.number="duration"><option v-for="value in durations" :key="value" :value="value">{{ value }} 秒</option></select></label>
+              <label v-if="kind === 'video'">生成时长（含剪辑余量）<select v-model.number="duration"><option v-for="value in durations" :key="value" :value="value">{{ value }} 秒</option></select></label>
               <label v-if="kind === 'image' && selectedModel?.imageSizes?.length">尺寸<select v-model="size"><option v-for="value in selectedModel.imageSizes" :key="value">{{ value }}</option></select></label>
               <label>画幅<select v-model="ratio"><option v-for="value in selectedModel?.imageRatios?.length ? selectedModel.imageRatios : ['16:9', '9:16', '1:1']" :key="value">{{ value }}</option></select></label>
             </div>
@@ -74,6 +80,7 @@
             <div v-if="preview" class="generationPreview">
               <p v-for="warning in preview.compiled.warnings" :key="warning" class="attention">{{ warning }}</p>
               <p v-for="item in preview.compiled.degradations" :key="item.role" class="attention">{{ item.role }}：{{ item.strategy }}</p>
+              <div class="sentReferences"><figure v-for="item in compiledMedia" :key="item.id"><img v-if="item.mime.startsWith('image/')" :src="mediaUrl(item.url)" :alt="item.role + ' 实际发送参考'" /><video v-else-if="item.mime.startsWith('video/')" :src="mediaUrl(item.url)" controls preload="metadata" /><audio v-else :src="mediaUrl(item.url)" controls /><figcaption>{{ item.role }} · {{ item.id }}</figcaption></figure></div>
               <details><summary>查看实际发送的镜头规格与参考</summary><pre>{{ preview.compiled.prompt }}</pre></details>
               <p>供应商费用未知，按你接入的模型实际计费。提交后可在下方停止。</p>
               <button type="button" @click="run(generate)">提交一次生成</button>
@@ -90,8 +97,11 @@
               <img v-if="target.media?.mime.startsWith('image/')" class="outputPreview" :src="mediaUrl(target.media.url)" alt="当前关键帧候选" />
               <video v-else-if="target.media?.mime.startsWith('video/')" class="outputPreview" :src="mediaUrl(target.media.url)" controls preload="metadata" />
               <label>检查模型<select v-model="visionModelKey"><option value="">选择支持图片输入的模型</option><option v-for="item in visualModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label><button type="button" :disabled="!visionModelKey" @click="run(autoReview)">视觉模型辅助检查</button>
-              <p>辅助检查可能产生模型费用。视频按时间抽帧，只覆盖采样画面；请完整播放后记录运动和表演检查。</p>
+              <p>辅助检查可能产生模型费用。视频最多抽取 48 个全帧，较密采样可能增加费用，只覆盖采样画面；请完整播放后记录运动和表演检查。</p>
               <p class="reviewHint">确认前请对照画面看：{{ reviewFields.map(field => field[1]).join("、") }}{{ target.type === "take" ? "；视频请完整播放一遍" : "" }}。</p>
+              <label v-for="field in reviewFields" :key="field[0]"><input v-model="reviewedFields" type="checkbox" :value="field[0]" />已检查 {{ field[1] }}</label>
+              <label v-if="target.type === 'take'"><input v-model="fullPlayback" type="checkbox" />已完整播放，检查肢体增减、遮挡、手物接触及动作收势</label>
+              <label v-for="finding in priorFindings" :key="finding.kind"><input v-model="dismissedKinds" type="checkbox" :value="finding.kind" />复核后排除此告警：{{ finding.cause }}（须在说明中记录依据）</label>
               <div class="fieldGrid"><label>发现的问题<select v-model="observation"><option value="">没有发现问题</option><option v-for="item in observationKinds" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label></div>
               <label class="fullField">{{ observation ? "看到的具体情况（必填）" : "补充说明（选填）" }}<textarea v-model="reviewNote" rows="2" /></label>
               <template v-if="target.type === 'take'">
@@ -100,7 +110,7 @@
                 <div class="fieldGrid"><label v-for="item in shotAssets" :key="item.id">{{ item.name }}<textarea v-model="stateNotes[item.id]" rows="2" /></label></div>
               </template>
               <button v-if="observation" type="button" :disabled="!reviewNote.trim()" @click="run(saveReview)">记录问题</button>
-              <button v-else type="button" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "完整看过，批准此 Take" }}</button>
+              <button v-else type="button" :disabled="!reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && !fullPlayback)" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "完整看过，批准此 Take" }}</button>
               <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="finding in report.findings" :key="finding.kind">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
             </template>
           </template>
@@ -112,6 +122,7 @@
 
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, toRaw, watch } from "vue";
+import productionEdit from "./productionEdit.vue";
 import { ElMessageBox } from "element-plus";
 import type { MediaModel } from "@toonflow/tools-scaffold/runtime";
 const visible = defineModel<boolean>({ default: false });
@@ -121,18 +132,18 @@ const section = ref("world"), busy = ref(false), error = ref(""), message = ref(
 const controller = new AbortController();
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 onScopeDispose(() => { controller.abort(); clearTimeout(pollTimer); clearInterval(watchTimer); });
-const tabs = [{ id: "world", label: "世界与资产" }, { id: "shot", label: "镜头规格" }, { id: "generate", label: "生成" }, { id: "review", label: "检查与采用" }];
-const worldFields = [["era", "年代"], ["locationLogic", "地点与空间逻辑"], ["architecture", "建筑"], ["weather", "天气"], ["time", "时间"], ["material", "环境材质"], ["physics", "物理规则"]];
+const tabs = [{ id: "world", label: "世界与资产" }, { id: "shot", label: "镜头规格" }, { id: "generate", label: "生成" }, { id: "review", label: "检查与采用" }, { id: "edit", label: "剪辑与衔接" }];
+const worldFields = [["era", "年代"], ["locationLogic", "地点与空间逻辑"], ["architecture", "建筑"], ["weather", "天气"], ["time", "时间"], ["material", "环境材质"], ["physics", "物理规则"], ["realism", "影像媒介（摄影写实、动画等）"]];
 const lookFields = [["contrast", "对比"], ["saturation", "饱和度"], ["skinTone", "肤色"], ["highlightRolloff", "高光滚降"], ["shadowBehavior", "暗部表现"], ["lensCharacter", "镜头特性"], ["texture", "纹理"], ["sharpnessPhilosophy", "锐度策略"]];
-const cameraFields = [["shotSize", "景别"], ["position", "机位"], ["focus", "焦点"], ["depth", "景深"], ["motion", "摄影机运动"], ["motivation", "运镜动机"]];
-const lightingFields = [["motivatedLight", "光源依据"], ["key", "主光方向与软硬"], ["fill", "补光"], ["negativeFill", "负补光"], ["exposure", "曝光主体与策略"], ["colorTemp", "色温"]];
-const performanceFields = [["emotion", "情绪"], ["eyeline", "视线"], ["gesture", "表演动作"], ["timing", "表演节拍"]];
+const cameraFields = [["shotSize", "景别"], ["position", "机位"], ["focus", "焦点"], ["depth", "景深"], ["motion", "摄影机运动"], ["motivation", "运镜动机"], ["axisCrossing", "越轴动机（没有则留空）"]];
+const lightingFields = [["worldSource", "光源在场景中的固定位置"], ["motivatedLight", "光源依据"], ["key", "主光方向与软硬"], ["fill", "补光"], ["negativeFill", "负补光"], ["exposure", "曝光主体与策略"], ["colorTemp", "色温"]];
+const performanceFields = [["emotion", "情绪"], ["eyeline", "视线"], ["lookTarget", "注视对象"], ["gesture", "表演动作"], ["timing", "表演节拍"]];
 const blockingFields = [["foreground", "前景"], ["midground", "人物走位与中景"], ["background", "背景"]];
 const realismFields = [["surface", "表面材质", "逐项说明皮肤、头发、布料或物体的纹理与反光，避免统一磨皮。"], ["imaging", "成像", "曝光、高光、暗部、焦平面与光学表现。"], ["world", "空间与物理", "比例、接触、遮挡与物体恒常。"], ["motion", "运动", "动作起止、重心、受力、惯性与次级运动；视频必填。"], ["cinematic", "电影语言", "表演、调度、镜头职责与剪辑衔接。"]];
 const functions = [["Establish", "建立"], ["Reveal", "揭示"], ["Reaction", "反应"], ["Contrast", "对比"], ["Transition", "过渡"], ["Match", "匹配"], ["Rhythm", "节奏"]];
 const assetTypes = [["Character", "人物"], ["Environment", "场景"], ["Wardrobe", "服装"], ["Prop", "道具"], ["Product", "产品"], ["Vehicle", "车辆"]];
 const roles = [["IDENTITY", "身份"], ["GEOMETRY", "几何"], ["WARDROBE", "服装"], ["ENVIRONMENT", "场景"], ["COMPOSITION", "构图"], ["LIGHTING", "光线"], ["LOOK", "影调"], ["END_FRAME", "尾帧"], ["PERFORMANCE", "表演视频"], ["CAMERA_MOTION", "运镜视频"], ["AUDIO", "音频"]];
-const observationKinds = [["plastic_surface", "塑料材质或磨皮"], ["imaging_failure", "曝光或光学不可信"], ["temporal_drift", "视频身份或材质漂移"], ["performance_failure", "表演或运镜不可信"], ["motion_physics", "动作受力或接触错误"], ["scene_structure", "场景结构错误"], ["identity_drift", "身份漂移"], ["hand_artifact", "手部错误"], ["face_artifact", "面部错误"], ["color_shift", "色差"]];
+const observationKinds = [["anatomy_failure", "多肢、身体结构或遮挡错误"], ["wardrobe_drift", "服装或商品形状漂移"], ["plastic_surface", "塑料材质或磨皮"], ["imaging_failure", "曝光或光学不可信"], ["temporal_drift", "视频身份或材质漂移"], ["performance_failure", "表演或运镜不可信"], ["motion_physics", "动作受力或接触错误"], ["scene_structure", "场景结构错误"], ["identity_drift", "身份漂移"], ["hand_artifact", "手部错误"], ["face_artifact", "面部错误"], ["color_shift", "色差"]];
 const world = ref<Record<string, any>>({}), look = ref<Record<string, any>>({}), worldDirty = ref(false);
 const assets = ref<any[]>([]), shots = ref<any[]>([]), sequences = ref<any[]>([]), references = ref<any[]>([]);
 const editingAsset = ref(""), assetVersions = ref<any[]>([]);
@@ -140,6 +151,8 @@ const asset = ref({ type: "Character", name: "", description: "", invariants: ""
 let savedAsset = JSON.stringify(asset.value);
 let pendingRequestId = "";
 const binding = ref({ referenceId: "", role: "IDENTITY", lockLevel: "LOCK", weight: 1 });
+const cropEnabled = ref(false), referenceCrop = ref({ x: 0, y: 0, width: 1, height: 1, unit: "normalized" });
+const compiledMedia = ref<any[]>([]);
 let baseUpdatedAt: string | undefined;
 const shotId = ref(""), draft = ref<any>(null), detail = ref<any>(null), dirty = ref(false);
 const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref(""), ratio = ref("16:9");
@@ -148,6 +161,7 @@ const models = ref<MediaModel[]>([]), preview = ref<any>(null), jobs = ref<any[]
 const stateNotes = ref<Record<string, string>>({});
 const shotAssets = computed(() => assets.value.filter(item => detail.value?.assetIds?.includes(item.id)));
 const targetId = ref(""), reviewNote = ref(""), observation = ref("");
+const reviewedFields = ref<string[]>([]), dismissedKinds = ref<string[]>([]), fullPlayback = ref(false);
 const keyOf = (model: MediaModel) => JSON.stringify([model.providerId, model.modelId]);
 const availableModels = computed(() => models.value.filter(model => model.type === kind.value));
 const selectedModel = computed(() => availableModels.value.find(model => keyOf(model) === modelKey.value));
@@ -157,6 +171,7 @@ const durations = computed(() => [...new Set(selectedModel.value?.durationResolu
 const versions = computed(() => [...(detail.value?.keyframes ?? []).map((item: any) => ({ ...item, type: "keyframe" })), ...(detail.value?.takes ?? []).map((item: any) => ({ ...item, type: "take" }))]);
 const target = computed(() => versions.value.find(item => item.id === targetId.value));
 const targetReports = computed(() => (detail.value?.qc ?? []).filter((report: any) => report.targetId === targetId.value).reverse());
+const priorFindings = computed(() => (targetReports.value[0]?.findings ?? []).filter((item: any) => !item.kind.startsWith("continuity:")));
 const reviewFields = computed(() => realismFields.filter(field => target.value?.type === "take" || field[0] !== "motion"));
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
 const modeLabel = (mode: unknown) => Array.isArray(mode) ? `多参考 (${mode.join(" / ")})` : ({ singleImage: "首帧", startFrameOptional: "首帧可选", startEndRequired: "首尾帧", endFrameOptional: "首帧与可选尾帧", text: "纯文本" }[String(mode)] ?? String(mode));
@@ -244,7 +259,7 @@ async function selectShot(id: string) {
   baseUpdatedAt = detail.value.updatedAt ?? detail.value.createdAt;
   draft.value = structuredClone(toRaw(detail.value));
   draft.value.realism ??= Object.fromEntries(realismFields.map(field => [field[0], ""]));
-  duration.value = draft.value.duration;
+  duration.value = draft.value.generationDuration ?? draft.value.duration;
   selectPendingVersion();
   void refreshJobs().catch(() => {});
 }
@@ -266,7 +281,7 @@ async function uploadReference(event: Event) {
   const reference = await request(`/projects/${projectId}/references`, "POST", { kind: media.mime.split("/")[0], name: file.name, mediaId: media.id });
   references.value.push(reference); binding.value.referenceId = reference.id; input.value = "";
 }
-async function bindReference() { await saveShot(); await request(`/shots/${shotId.value}/bindings`, "POST", binding.value); detail.value = await request(`/shots/${shotId.value}`); preview.value = null; }
+async function bindReference() { await saveShot(); await request(`/shots/${shotId.value}/bindings`, "POST", { ...binding.value, ...(cropEnabled.value ? { crop: referenceCrop.value } : {}) }); detail.value = await request(`/shots/${shotId.value}`); preview.value = null; }
 async function removeBinding(item: any) {
   await ElMessageBox.confirm("解除此参考将改变镜头约束，已有输出需重新检查。", "解除参考", { confirmButtonText: "解除", cancelButtonText: "取消" });
   await request(`/bindings/${item.id}?confirm=1`, "DELETE"); detail.value = await request(`/shots/${shotId.value}`); preview.value = null;
@@ -279,7 +294,7 @@ async function production(requestId?: string) {
   const response = await fetch("/api/ai/media/production", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory: props.directory, shotId: shotId.value, kind: kind.value, request: generationRequest(), requestId, fingerprint: preview.value?.fingerprint }) });
   const result = await response.json(); if (!response.ok) throw new Error(result.message || "镜头生成失败"); return result.data;
 }
-async function compile() { if (kind.value === "video" && draft.value.duration !== duration.value) { draft.value.duration = duration.value; dirty.value = true; } await saveShot(); if (worldDirty.value) await saveWorld(); preview.value = await production(); pendingRequestId = ""; }
+async function compile() { if (kind.value === "video" && draft.value.generationDuration !== duration.value) { draft.value.generationDuration = duration.value; dirty.value = true; } await saveShot(); if (worldDirty.value) await saveWorld(); preview.value = await production(); compiledMedia.value = await Promise.all(preview.value.compiled.inputs.filter((item: any) => item.sent && item.mediaId).map(async (item: any) => ({ ...await request(`/media/${item.mediaId}`), role: item.role }))); pendingRequestId = ""; }
 async function generate() { pendingRequestId ||= crypto.randomUUID(); await production(pendingRequestId); pendingRequestId = ""; preview.value = null; message.value = "生成任务已提交"; await refreshJobs(); }
 // 助手或画布在别处发起的任务也要跟上：任务出现或状态变化时刷新当前镜头，几秒内跑完的任务也不会漏。
 let jobSignature = "";
@@ -340,6 +355,7 @@ function plannedNote(value: unknown) {
 let plannedStates: Record<string, { state: Record<string, unknown> | undefined; note: string }> = {};
 function selectVersion(item: any) {
   targetId.value = item.id; reviewNote.value = ""; observation.value = "";
+  reviewedFields.value = []; dismissedKinds.value = []; fullPlayback.value = false;
   const planned = detail.value?.state?.result ?? {};
   plannedStates = Object.fromEntries(shotAssets.value.map(asset => {
     const state = planned[kindOf(asset.type)]?.[asset.id];
@@ -348,7 +364,7 @@ function selectVersion(item: any) {
   stateNotes.value = Object.fromEntries(Object.entries(plannedStates).map(([id, item]) => [id, item.note]));
 }
 async function autoReview() { const item = target.value; await request(`/shots/${shotId.value}/qc`, "POST", { targetType: item.type, targetId: item.id, auto: true, visionModel: { providerId: JSON.parse(visionModelKey.value)[0], modelId: JSON.parse(visionModelKey.value)[1] } }); await refreshResults(); }
-// 检查项随确认一并记录：看过画面并点确认即视为完成本版本的人工检查。
+// 仅提交用户实际确认的维度；不把点击批准转换为所有维度自动通过。
 function reviewPayload(item: any) {
   const observedStateDelta: Record<string, Record<string, unknown>> = {};
   if (item.type === "take") for (const asset of shotAssets.value) {
@@ -357,7 +373,7 @@ function reviewPayload(item: any) {
     // 改过的说明以用户为准，规格里的结构化字段可能已不成立，只记文字。
     (observedStateDelta[kindOf(asset.type)] ??= {})[asset.id] = planned && note === planned.note && planned.state ? { ...planned.state, note } : { note };
   }
-  return { targetType: item.type, targetId: item.id, reviewed: reviewFields.value.map(field => field[0]), note: reviewNote.value,
+  return { targetType: item.type, targetId: item.id, reviewed: reviewedFields.value, note: reviewNote.value, fullPlayback: fullPlayback.value, dismissedKinds: dismissedKinds.value,
     ...(item.type === "take" ? { observedStateDelta } : {}), observations: observation.value ? [{ kind: observation.value, note: reviewNote.value }] : [] };
 }
 async function saveReview() {
@@ -396,6 +412,7 @@ defineExpose({ flushSave, openShot });
   .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
   .checkList { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; label { flex-direction: row; align-items: center; } input { width: 20px; min-height: 20px; } }
   .assetList, .jobList { padding: 0; list-style: none; li { padding: 12px 0; border-bottom: 1px solid var(--studioBorder); display: flex; justify-content: space-between; gap: 16px; } small { display: block; } }
+  .sentReferences { display: flex; flex-wrap: wrap; gap: 12px; figure { width: 180px; margin: 0; img, video, audio { width: 100%; max-height: 180px; object-fit: contain; } figcaption { overflow-wrap: anywhere; font-size: 12px; } } }
   .outputPreview { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--studioRail); margin: 16px 0; }
   .generationPreview, .reviewReport { padding: 16px 0; border-top: 1px solid var(--studioBorder); margin-top: 16px; }
   .errorMessage, .attention { color: var(--studioAttention); }

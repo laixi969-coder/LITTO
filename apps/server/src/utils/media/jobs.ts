@@ -79,7 +79,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
           const file = { path: `${folder}/${name}`, mimeType: reference.mime };
           if (reference.mime.startsWith("video/")) request.videos.push(file);
           else if (reference.mime.startsWith("audio/")) request.audios.push(file);
-          else if (reference.role === "START_FRAME" && !Array.isArray(request.mode) && request.mode !== "singleImage") request.firstFrame = file;
+          else if (input.kind === "video" && reference.role === "START_FRAME" && !Array.isArray(request.mode)) request.firstFrame = file;
           else if (reference.role === "END_FRAME") request.lastFrame = file;
           else request.images.push(file);
         }
@@ -114,7 +114,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode });
-  if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头规格一致，请先保存镜头时长"), { status: 400 });
+  if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio])).digest("hex");
   return result;
 }

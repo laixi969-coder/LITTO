@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "@toonflow/file";
+import { z } from "zod";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { scoped, type Scope } from "../db.ts";
@@ -8,7 +9,6 @@ import { bad, conflict, now } from "../util.ts";
 import { gradeFilters, isNeutral } from "./grade.ts";
 import { end, getEdit, resolveClip, type EClip } from "./nle.ts";
 
-const W = 1280, H = 720;
 const r3 = (n: number) => Number(n.toFixed(3));
 const ext = (mime: string | null) => ({ "video/mp4": "mp4", "video/webm": "webm", "audio/mpeg": "mp3", "audio/wav": "wav", "image/png": "png", "image/jpeg": "jpg" })[mime ?? ""] ?? "bin";
 const esc = (p: string) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
@@ -16,7 +16,13 @@ const esc = (p: string) => p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'
 /** atempo only accepts 0.5..2 per instance. */
 const atempo = (sp: number) => { const out: string[] = []; let x = sp; while (x > 2) { out.push("atempo=2"); x /= 2; } while (x < 0.5) { out.push("atempo=0.5"); x /= 0.5; } if (Math.abs(x - 1) > 1e-6 || !out.length) out.push(`atempo=${x.toFixed(4)}`); return sp === 1 ? [] : out; };
 
-type RenderOpts = { normalizeAudio?: boolean; targetLufs?: number; burnSubtitles?: boolean };
+export const renderOptionsSchema = z.object({
+    normalizeAudio: z.boolean().default(true), targetLufs: z.number().min(-40).max(-5).default(-16),
+    burnSubtitles: z.boolean().default(false),
+    width: z.number().int().min(2).max(8192).multipleOf(2).optional(),
+    height: z.number().int().min(2).max(8192).multipleOf(2).optional(),
+}).refine(options => (options.width === undefined) === (options.height === undefined), "导出宽高须同时指定");
+export type RenderOpts = z.input<typeof renderOptionsSchema>;
 
 export async function startNleRender(workspaceId: string, projectId: string, sequenceId: string, renderId: string, opts: RenderOpts) {
     const s = scoped(workspaceId);
@@ -30,10 +36,12 @@ export async function startNleRender(workspaceId: string, projectId: string, seq
     } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-export async function renderTimeline(s: Scope, sequenceId: string, dir: string, opts: RenderOpts) {
+export async function renderTimeline(s: Scope, sequenceId: string, dir: string, opts: RenderOpts, previewWindow?: { start: number; end: number }) {
+    opts = renderOptionsSchema.parse(opts);
+    const e = getEdit(s, sequenceId, false);
+    let width = opts.width ?? 0, height = opts.height ?? 0;
     const ff = await runCmd("ffmpeg", ["-version"]);
     if (ff.code !== 0) throw new Error("ffmpeg is not installed on the server; use the export package instead");
-    const e = getEdit(s, sequenceId, false);
     const tracks = new Map(e.tracks.map((t) => [t.id, t]));
     const video = e.clips.filter((c) => tracks.get(c.trackId)?.kind === "video" && !tracks.get(c.trackId)!.muted);
     const mainTrack = e.tracks.find((t) => t.kind === "video");
@@ -58,6 +66,13 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         const p = await probeFile(file);
         if (!p) throw new Error(`media ${m.id} could not be read by ffprobe (${m.mime})`);
         if ((isVideo) && !p.hasVideo) throw new Error(`media ${m.id} has no video stream`);
+        if (!width && c.id === main[0].id) {
+            if (!p.width || !p.height) throw bad("无法读取主轨素材尺寸，请指定导出宽高");
+            // ACT: 尚无项目画布尺寸时沿用首个主轨素材，偶数向上补齐以兼容 yuv420p。
+            width = Math.ceil(p.width / 2) * 2;
+            height = Math.ceil(p.height / 2) * 2;
+            renderOptionsSchema.parse({ width, height });
+        }
         inputs.push(isImage ? ["-loop", "1", "-framerate", String(e.fps), "-t", String(c.duration), "-i", file] : ["-i", file]);
         info.push({ hasAudio: p.hasAudio, image: !!isImage });
         return inputs.length - 1;
@@ -69,7 +84,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     const clipChain = (c: EClip, k: number, extra: string, startShift = false) => {
         const sp = c.speed, inn = c.in, out = c.in + c.duration * sp;
         const head = info[k].image ? `[${k}:v]` : `[${k}:v]trim=start=${r3(inn)}:end=${r3(out)},`;
-        return `${head}setpts=(PTS-STARTPTS)/${sp}${startShift ? `+${r3(c.start)}/TB` : ""},settb=AVTB,fps=${fps},scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p${extra ? "," + extra : ""}`;
+        return `${head}setpts=(PTS-STARTPTS)/${sp}${startShift ? `+${r3(c.start)}/TB` : ""},settb=AVTB,fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p${extra ? "," + extra : ""}`;
     };
 
     // ---- V1 layout: black gaps, cuts (concat), dissolves (xfade), dip-to-black (fades)
@@ -87,10 +102,10 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         const label = `v${i}`;
         g.push(`${clipChain(c, k, [gr, gr ? "format=yuv420p" : "", fades].filter(Boolean).join(","))}[${label}]`);
         const overlap = i > 0 ? Math.max(0, pos - c.start) : 0;
-        if (c.start > pos + 0.002) { const gl = `gap${i}`; g.push(`color=c=black:s=${W}x${H}:r=${fps}:d=${r3(c.start - pos)},format=yuv420p,setsar=1,settb=AVTB[${gl}]`); segs.push({ label: gl, dur: c.start - pos, dissolve: 0 }); pos = c.start; }
+        if (c.start > pos + 0.002) { const gl = `gap${i}`; g.push(`color=c=black:s=${width}x${height}:r=${fps}:d=${r3(c.start - pos)},format=yuv420p,setsar=1,settb=AVTB[${gl}]`); segs.push({ label: gl, dur: c.start - pos, dissolve: 0 }); pos = c.start; }
         segs.push({ label, dur: c.duration, dissolve: overlap > 0.002 && c.transition.type === "dissolve" ? Math.min(overlap, c.transition.duration) : 0 });
         pos = end(c);
-        if (info[k].hasAudio && !tracks.get(c.trackId)!.muted) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
+        if (info[k].hasAudio && !c.audioDetached && !tracks.get(c.trackId)!.muted) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
     }
     let cur = segs[0].label, curLen = segs[0].dur;
     for (const [i, sg] of segs.slice(1).entries()) {
@@ -100,14 +115,16 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         cur = o;
     }
     let total = Math.max(curLen, ...e.clips.filter((c) => tracks.get(c.trackId)?.kind === "audio" && !tracks.get(c.trackId)!.muted).map(end));
-    total = r3(Math.max(curLen, 0.1));
+    total = r3(Math.max(total, ...overlays.map(end), 0.1));
+    if (total > curLen) { g.push(`[${cur}]tpad=stop_mode=clone:stop_duration=${r3(total - curLen)}[extendedVideo]`); cur = "extendedVideo"; }
+    if (previewWindow && (!Number.isFinite(previewWindow.start) || !Number.isFinite(previewWindow.end) || previewWindow.start < 0 || previewWindow.end <= previewWindow.start || previewWindow.end > total + 0.001)) throw bad("接缝预览区间无效");
     // ---- overlay video tracks
     for (const [i, c] of overlays.entries()) {
         const k = await addInput(c, true);
         g.push(`${clipChain(c, k, "", true)}[ov${i}]`);
         g.push(`[${cur}][ov${i}]overlay=enable='between(t,${r3(c.start)},${r3(end(c))})':eof_action=pass[o${i}]`);
         cur = `o${i}`;
-        if (info[k].hasAudio) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
+        if (info[k].hasAudio && !c.audioDetached) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
     }
     // ---- sequence grade + optional burned subtitles
     const post: string[] = [];
@@ -163,14 +180,14 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     }
 
     const args = ["-y", "-hide_banner", "-loglevel", "error", ...inputs.flat()];
-    if (srt && !opts.burnSubtitles) { writeFileSync(join(dir, "soft.srt"), srt); args.push("-i", join(dir, "soft.srt")); }
+    if (srt && !opts.burnSubtitles && !previewWindow) { writeFileSync(join(dir, "soft.srt"), srt); args.push("-i", join(dir, "soft.srt")); }
     args.push("-filter_complex", g.join(";"), "-map", "[vout]"); // inline: -filter_complex_script was removed in ffmpeg 7
     if (hasAudio) args.push("-map", "[aout]");
-    if (srt && !opts.burnSubtitles) args.push("-map", `${inputs.length}:0`, "-c:s", "mov_text");
-    args.push("-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p", ...(hasAudio ? ["-c:a", "aac", "-b:a", "192k"] : []), "-t", String(total), "-movflags", "+faststart", join(dir, "out.mp4"));
+    if (srt && !opts.burnSubtitles && !previewWindow) args.push("-map", `${inputs.length}:0`, "-c:s", "mov_text");
+    args.push("-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p", ...(hasAudio ? ["-c:a", "aac", "-b:a", "192k"] : []), ...(previewWindow ? ["-ss", String(previewWindow.start)] : []), "-t", String(previewWindow ? previewWindow.end - previewWindow.start : total), "-movflags", "+faststart", join(dir, "out.mp4"));
     const r = await runCmd("ffmpeg", args);
     if (r.code !== 0) throw new Error(`ffmpeg failed: ${r.err.trim().split("\n").slice(-3).join(" | ").slice(-500)}`);
-    return { file: join(dir, "out.mp4"), duration: total };
+    return { file: join(dir, "out.mp4"), duration: previewWindow ? previewWindow.end - previewWindow.start : total };
 }
 
 /** Integrated loudness / true peak / LRA of the most recent successful render (EBU R128 via loudnorm analysis). */

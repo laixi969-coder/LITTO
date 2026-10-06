@@ -7,6 +7,8 @@ import { bad } from "../util.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
 const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string; penalty: number; severity: "high" | "medium" | "low" }> = {
+    anatomy_failure: { cause: "肢体增减、身体结构或遮挡关系错误", action: "motion_regenerate", detail: "定位多肢、消失或穿透的时间段，拒绝该候选；保持身份，简化为一次完整动作并重新生成，完整播放复核", penalty: 40, severity: "high" },
+    wardrobe_drift: { cause: "服装或商品形状与锁定参考不一致", action: "geometry_lock", detail: "核对实际商品参考、裤长、腰头、缝线与服装状态；更换不一致镜头，不用转场掩盖", penalty: 30, severity: "high" },
     plastic_surface: { cause: "皮肤或材质呈塑料感、统一磨皮", action: "material_reference", detail: "核对材质与光照参考，修正表面粗糙度、局部纹理与高光响应；保留身份后另出关键帧，不靠叠加锐化补救", penalty: 25, severity: "high" },
     imaging_failure: { cause: "曝光、焦平面或光学表现不可信", action: "imaging_revise", detail: "核对实景光源、曝光主体、高光滚降、暗部和景深，调整摄影规格后另出候选", penalty: 20, severity: "high" },
     temporal_drift: { cause: "视频材质、身份或空间随时间漂移", action: "motion_regenerate", detail: "标记出错时间段，锁定 Hero 和身份/环境参考，简化该段动作后生成新 Take", penalty: 25, severity: "high" },
@@ -23,13 +25,21 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
 };
 export const OBSERVATION_KINDS = Object.keys(DIAGNOSIS);
 
-export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown> } = {}) {
+export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; dismissedKinds?: string[] } = {}) {
     const shot = s.get("shots", shotId);
     if (!shot) throw notFound("shot");
     const obj = s.get(target.type === "take" ? "takes" : "keyframes", target.id);
     if (!obj || obj.shotId !== shotId) throw notFound(target.type);
     if (observations.some(o => !DIAGNOSIS[o.kind])) throw bad("未知的质检问题类型");
     const reviewed = [...new Set(review.reviewed ?? [])];
+    if (target.type === "take" && reviewed.length && review.fullPlayback !== true) throw bad("视频检查须确认已完整播放当前版本");
+    const fingerprint = shotFingerprint(s, shotId);
+    const previous = s.list("qc_reports", { targetType: target.type, targetId: target.id }, "created_at DESC, rowid DESC")[0];
+    const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind]) : [];
+    const dismissed = review.dismissedKinds ?? [];
+    if (dismissed.length && (!review.actor || !review.note?.trim() || !reviewed.length || dismissed.some(kind => !prior.some((item: any) => item.kind === kind)))) throw bad("排除旧告警须逐项选择，并记录复核依据");
+    // 重新提交空观察不能抹除同一素材的缺陷；规格变更也不能修复已经生成的视频。
+    observations = [...observations, ...prior.filter((item: any) => !dismissed.includes(item.kind) && !observations.some(o => o.kind === item.kind)).map((item: any) => ({ kind: item.kind, note: item.note }))];
     // 观察说明只在标了问题时必填（由检查接口校验）；"看过、没问题"的确认不要求逐条写字。
     if (reviewed.length && (!review.actor || reviewed.some(key => !realismChecks.includes(key as any)))) throw bad("人工检查须记录检查项和检查者");
     const findings: any[] = [];
@@ -47,7 +57,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     for (const i of issues) findings.push({ kind: `continuity:${i.category}`, cause: i.message, action: i.repair.action, detail: i.repair.detail, penalty: i.severity === "high" ? 20 : i.severity === "medium" ? 8 : 3, severity: i.severity });
     const complete = realismChecks.filter(key => target.type === "take" || key !== "motion").every(key => reviewed.includes(key));
     const score = complete ? Math.max(0, 100 - findings.reduce((a, f) => a + f.penalty, 0)) : null;
-    const evidence = { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint: shotFingerprint(s, shotId), vision: review.vision ?? null, observedStateDelta: review.observedStateDelta };
+    const evidence = { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? null, observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, dismissedKinds: dismissed, previousReportId: previous?.id };
     const report = s.insert("qc_reports", { project_id: shot.projectId, shot_id: shotId, target_type: target.type, target_id: target.id, score, findings, evidence });
     const actions = findings.map((f) => s.insert("repair_actions", { project_id: shot.projectId, qc_report_id: report.id, shot_id: shotId, action: f.action, cause: f.cause, detail: f.detail, status: "suggested" }));
     return { report: { id: report.id, score, findings, evidence }, repairActions: actions.map((a) => ({ id: a.id, action: a.action, cause: a.cause, detail: a.detail, status: a.status })) };

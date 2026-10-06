@@ -6,12 +6,39 @@ import { audioReport } from "../domain/nle-render.ts";
 import { parseGrade } from "../domain/grade.ts";
 import { notFound } from "../util.ts";
 import { authOf } from "../auth.ts";
+import { previewCut, soundBridge, suggestCuts } from "../domain/cutEditing.ts";
+import { inspectFinalQuality, reviewFinalQuality, finalReviewSchema } from "../domain/finalQuality.ts";
 
 /** Advanced NLE + colour + sound endpoints. Everything is workspace-scoped through ctx(); mutations need EDITOR. */
 export const nle = new Hono();
+nle.post("/renders/:id/quality/analyze", async c => {
+    const { s } = ctx(c, "EDITOR");
+    return c.json(await inspectFinalQuality(s, c.req.param("id")));
+});
+nle.post("/renders/:id/quality/review", async c => {
+    const { s, a } = ctx(c, "EDITOR");
+    return c.json(reviewFinalQuality(s, c.req.param("id"), await body(c, finalReviewSchema), a.user.id));
+});
 
 const view = (c: any, s: any, id: string, persist: boolean) => editView(s, getEdit(s, id, persist));
 const canWrite = (c: any) => ["EDITOR", "ADMIN", "OWNER"].includes(authOf(c).role);
+const cutPair = z.object({ leftId: z.string().min(1), rightId: z.string().min(1), expectedVersion: z.number().int().nonnegative() });
+
+nle.post("/sequences/:id/edit/suggestCuts", async c => {
+    const { s } = ctx(c, "EDITOR");
+    const input = await body(c, cutPair);
+    return c.json(await suggestCuts(s, c.req.param("id"), input.leftId, input.rightId, input.expectedVersion));
+});
+nle.post("/sequences/:id/edit/previewCut", async c => {
+    const { s } = ctx(c, "EDITOR");
+    const input = await body(c, cutPair);
+    return c.json(await previewCut(s, c.req.param("id"), input.leftId, input.rightId, input.expectedVersion));
+});
+nle.post("/sequences/:id/edit/soundBridge", async c => {
+    const { s } = ctx(c, "EDITOR");
+    const input = await body(c, cutPair.extend({ mode: z.enum(["jCut", "lCut", "crossfade", "none"]), duration: z.number().finite().min(0).max(3) }));
+    return c.json(await soundBridge(s, c.req.param("id"), input));
+});
 
 nle.get("/sequences/:id/edit", (c) => {
     const { s } = ctx(c);

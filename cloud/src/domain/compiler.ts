@@ -1,8 +1,10 @@
+import { bad } from "../util.ts";
 import { all, get, type Scope } from "../db.ts";
 import { statesOf } from "./state.ts";
 import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
+import { ensureReferenceCrop } from "./referenceCrop.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -54,10 +56,13 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         if (kind === "video" && extra.startFrameMediaId && b.role === "START_FRAME") continue;
         const ref = s.get("refs", b.referenceId);
         const adapterSupports = !(adapter === "openai-compatible" && kind === "video" && b.role !== "START_FRAME");
-        const supported = !b.crop && adapterSupports && !!caps[roleCap[b.role]] && used < maxInputs && ref?.mediaId;
-        if (supported) { inputs.push({ referenceId: b.referenceId, mediaId: ref?.mediaId ?? null, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: true }); used++; }
+        const supported = adapterSupports && !!caps[roleCap[b.role]] && used < maxInputs && ref?.mediaId;
+        if (supported) {
+            const mediaId = b.crop ? ensureReferenceCrop(s, proj, b.referenceId, b.crop) : ref!.mediaId;
+            inputs.push({ referenceId: b.referenceId, mediaId, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: true }); used++;
+        }
         else {
-            const why = b.crop ? "crop/segment must be materialised before sending" : !adapterSupports ? "adapter cannot send this role" : !caps[roleCap[b.role]] ? `model lacks ${roleCap[b.role]}` : used >= maxInputs ? "input limit reached" : "reference has no media";
+            const why = !adapterSupports ? "adapter cannot send this role" : !caps[roleCap[b.role]] ? `model lacks ${roleCap[b.role]}` : used >= maxInputs ? "input limit reached" : "reference has no media";
             degradations.push({ role: b.role, strategy: `${why}: ${b.role} expressed as text` });
             textFallback.push(`${b.role.toLowerCase()} reference "${ref?.name ?? ref?.text ?? b.referenceId}"${b.notes ? ` (${b.notes})` : ""}`);
             inputs.push({ referenceId: b.referenceId, mediaId: ref?.mediaId ?? null, text: ref?.text ?? ref?.name, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: false });
@@ -89,29 +94,39 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         if (a.approvalStatus === "approved") lock.push(...(a.invariants ?? []).map((i: string) => `${a.name}: ${i}`));
     }
     lock.push(...(extra.repair?.addLock ?? []));
-    const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : ["dust motes", "non-critical background", "natural reflections"] };
+    const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : [] };
 
     const sections: Record<string, string> = {
         subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
         assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
         narrative: shot.narrativeFunction,
         action: clean(shot.action || shot.title, "action"),
-        performance: J([shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`, shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`, shot.performance?.gesture && `gesture ${shot.performance.gesture}`, shot.performance?.timing && `timing ${shot.performance.timing}`]),
+        performance: J([shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`, shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`, shot.performance?.lookTarget && `looking at ${shot.performance.lookTarget}`, shot.performance?.gesture && `gesture ${shot.performance.gesture}`, shot.performance?.timing && `timing ${shot.performance.timing}`]),
         blocking: J([shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`, shot.blocking?.midground && `midground: ${shot.blocking.midground}`, shot.blocking?.background && `background: ${shot.blocking.background}`]),
         view: viewText,
-        camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.focus && `focus on ${cam.focus}`, kind === "video" && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
-        lighting: J([lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
-        world: world ? J([world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
+        camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
+        lighting: J([lt.worldSource && `fixed world light source: ${lt.worldSource}`, lt.keyDirection && lt.keyDirection !== "none" && `key direction ${lt.keyDirection} in ${lt.directionSpace ?? "screen"} coordinates`, lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
+        world: world ? J([world.realism && `medium: ${world.realism}`, world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
         look: look ? J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette?.length && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`]) : "",
         // Realism stack: concrete behaviours instead of adjectives.
         realism: J(Object.entries(shot.realism ?? {}).filter(([key, value]) => value && (kind === "video" || key !== "motion")).map(([key, value]) => `${key}: ${clean(String(value), `realism.${key}`)}`)),
         constraints: J(shot.constraints ?? []),
+        physicalContinuity: J([
+            assets.some(a => a.type === "Character") && "Preserve each character's reference anatomy and limb count through the entire action, including occlusions and mirror reflections; movement has preparation, contact, weight transfer and settling",
+            assets.some(a => a.type === "Product" || a.type === "Wardrobe") && "Preserve the referenced garment/product silhouette, length, seams, fastening and marks across frames; cloth deforms locally under actual contact rather than changing design",
+            "Keep surface response specific to each material and visible at this shot scale; preserve source-motivated light and contact shadows; do not replace missing texture with sharpening or artificial grain",
+        ]),
         state: J([...Object.entries<any>(start.props).filter(([, p]) => p.present).map(([id, p]) => `${p.name ?? id}${p.heldBy ? ` held by ${start.characters[p.heldBy]?.name ?? p.heldBy}` : ""}`), ...Object.entries<any>(start.characters).map(([id, c]) => c.wardrobeId ? `${c.name ?? id} wearing ${start.wardrobe[c.wardrobeId]?.name ?? c.wardrobeId}` : "")]),
         observedState: J(Object.values(start).flatMap(group => Object.values<any>(group).filter(value => value && typeof value === "object" && value.note).map(value => `${value.name ?? "asset"}: ${value.note}`))),
         opticalTexture: look ? J([look.shadowBehavior && `shadows: ${look.shadowBehavior}`, look.texture && `texture: ${look.texture}`, look.sharpnessPhilosophy && `sharpness: ${look.sharpnessPhilosophy}`, look.bloom && `bloom: ${look.bloom}`]) : "",
         referenceIntent: J(bindings.filter(b => b.notes).map(b => `${b.role}: ${b.notes}`)),
         references: textFallback.join("; "),
         lock: freedom.LOCK.join("; "),
+        control: freedom.CONTROL.join("; "),
+        allow: J([...freedom.ALLOW, ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]),
+        random: freedom.RANDOM.join("; "),
+        forbiddenChanges: J(assets.flatMap(a => (a.forbiddenChanges ?? []).map((value: string) => `${a.name}: ${value}`))),
+        constraintPriority: "Preserve identity and explicit invariants. Allow natural performance without changing identity. Forbidden changes override allowed variations; optional variation must not alter specified action, lighting or continuity.",
         repair: extra.repair?.note ?? "",
     };
     const prompt = Object.entries(sections).filter(([, v]) => v).map(([k, v]) => `${k.toUpperCase()}: ${v}`).join("\n");
@@ -123,3 +138,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
 }
 void all; void route;
 export type { Policy };
+
+export function requireCompiledInputs(compiled: Compiled) {
+    if (compiled.inputs.some(ref => !ref.sent && ref.lockLevel === "LOCK")) throw bad("当前模型无法发送锁定参考，请更换模式或模型");
+    const missing = compiled.warnings.filter(warning => warning.startsWith("未填写真实感规格"));
+    if (missing.length) throw bad(missing.join("；"));
+}

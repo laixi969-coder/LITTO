@@ -1,3 +1,4 @@
+import { renderOptionsSchema } from "../domain/nle-render.ts";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -14,6 +15,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { bad, forbidden, notFound, now, ulid } from "../util.ts";
 import { config } from "../config.ts";
+import { finalQualityView } from "../domain/finalQuality.ts";
 import { exportCsv, summary } from "../usage.ts";
 
 export const extra = new Hono();
@@ -31,12 +33,12 @@ extra.post("/sequences/:id/render", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
     const q = s.get("sequences", c.req.param("id"));
     if (!q) throw notFound("sequence");
-    const o = await body(c, z.object({ normalizeAudio: z.boolean().default(true), targetLufs: z.number().min(-40).max(-5).default(-16), burnSubtitles: z.boolean().default(false) }));
+    const o = await body(c, renderOptionsSchema);
     return c.json(startRender(a.workspaceId, q.projectId, q.id, a.user.id, o), 202);
 });
 extra.get("/sequences/:id/renders", (c) => {
     const { s } = ctx(c);
-    return c.json(s.list("renders", { sequenceId: c.req.param("id") }, "created_at DESC").map((r: any) => ({ id: r.id, status: r.status, error: r.error, createdAt: r.createdAt, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null })));
+    return c.json(s.list("renders", { sequenceId: c.req.param("id") }, "created_at DESC").map((r: any) => ({ id: r.id, status: r.status, quality: finalQualityView(s, r), error: r.error, createdAt: r.createdAt, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null })));
 });
 extra.put("/sequences/:id/subtitles", async (c) => {
     const { s } = ctx(c, "EDITOR");

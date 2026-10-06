@@ -91,7 +91,7 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     const id = ulid();
     const key = `${workspaceId}/${projectId ?? "_"}/${id}`;
     await storage.put(key, data);
-    const row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: opts.duration ?? probed?.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });
+    const row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: probed?.duration ?? opts.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });
     if (!process.env.LITTO_NO_DERIVATIVES) void makeDerivatives(row as any);
     return row;
 }

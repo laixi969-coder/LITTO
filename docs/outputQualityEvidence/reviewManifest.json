@@ -1,0 +1,18 @@
+{
+  "reviewDate": "2026-10-06",
+  "source": "data/tenants/01M41BFE9CRC8HEQENRBE2F09E/workspaces/lululemon瑜伽裤/assets/成片_人物统一_v1.mp4",
+  "sha256": "e8cf88e69b87927071ddd509fa5c66aba300195bb5fbf53f16ad5cff223f9b23",
+  "duration": 33.875,
+  "coverage": {
+    "decode": "all",
+    "visual": "4 fps temporal samples and selected native frames; not full playback",
+    "audio": "signal analysis only; listening and dialogue not verified"
+  },
+  "cuts": [
+    4.458333,
+    9.625,
+    16.208333,
+    23.5,
+    28.708333
+  ]
+}

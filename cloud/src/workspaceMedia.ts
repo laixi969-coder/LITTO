@@ -4,7 +4,7 @@ import { createProject } from "./routes/platform.ts";
 import { enqueue } from "./jobs.ts";
 import { ADAPTERS, upsertModel, upsertProvider } from "./providers/registry.ts";
 import { ProviderError, type GenRequest, type GenResult } from "./providers/adapter.ts";
-import { compileShot } from "./domain/compiler.ts";
+import { compileShot, requireCompiledInputs } from "./domain/compiler.ts";
 import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
 import { bad, conflict, notFound } from "./util.ts";
 
@@ -94,6 +94,7 @@ export function prepareWorkspaceShot(input: {
   const s = scoped(input.workspaceId);
   const shot = s.get("shots", input.shotId);
   if (!shot || shot.projectId !== input.projectId) throw notFound("shot");
+  if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
   const mode = input.mode;
   const imageModes = Array.isArray(mode) ? mode : [mode];
   const imageLimit = imageModes.includes("multiReference") ? 64 : imageModes.includes("singleImage") ? 1 : 0;
@@ -120,8 +121,7 @@ export function prepareWorkspaceShot(input: {
   // ACT: 主帧必占一个输入槽；不得为了多参考丢掉已批准主帧。
   if (compiled.inputs.filter(ref => ref.sent).length > capabilities.maxInputs) throw bad("参考数量超出当前模式容量，请减少参考或更换模式");
   if (mode === "startEndRequired" && !compiled.inputs.some(ref => ref.role === "END_FRAME" && ref.sent)) throw bad("此模式须绑定尾帧");
-  if (compiled.inputs.some(ref => !ref.sent && ref.lockLevel === "LOCK")) throw bad("当前模型无法发送锁定参考，请更换模式或模型");
-  if (compiled.warnings.some(w => w.startsWith("未填写真实感规格"))) throw bad(compiled.warnings.join("；"));
+  requireCompiledInputs(compiled);
   const counts = { image: 0, video: 0, audio: 0 };
   for (const ref of compiled.inputs.filter(ref => ref.sent)) {
     const media = ref.mediaId && s.get("media", ref.mediaId);
@@ -131,6 +131,15 @@ export function prepareWorkspaceShot(input: {
   }
   if (input.kind === "video" && Array.isArray(mode) && (counts.image > referenceLimit || counts.video > videoLimit || counts.audio > audioLimit)) throw bad("某类参考数量超过模型的模式上限");
   compiled.warnings.push("参考按媒体类型发送；用途与权重写入提示词，不代表供应商提供像素级锁定或数值权重控制。自动检查不替代观看验收。");
-  compiled.prompt += "\nREFERENCE PLAN: " + compiled.inputs.filter(ref => ref.sent).map((ref, i) => `input ${i + 1}: ${ref.role}, ${ref.lockLevel}, intended weight ${ref.weight}`).join("; ");
-  return { shotId: shot.id, keyframeId: keyframe?.id, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.duration };
+  const inputNumbers = { image: 0, video: 0, audio: 0 };
+  compiled.prompt += "\nREFERENCE PLAN: " + compiled.inputs.filter(ref => ref.sent).map(ref => {
+    const media = s.get("media", ref.mediaId!);
+    const kind = media!.mime.startsWith("video/") ? "video" : media!.mime.startsWith("audio/") ? "audio" : "image";
+    const slot = kind === "image" && ref.role === "END_FRAME" ? "native end frame"
+      : kind === "image" && ref.role === "START_FRAME" && input.kind === "video" && firstFrame ? "native start frame"
+      : `${kind} ${++inputNumbers[kind]}`;
+    const intent = ref.role === "START_FRAME" && !slot.startsWith("native") ? "approved appearance/composition reference; not a native start-frame constraint" : ref.role;
+    return `${slot}: ${intent}, ${ref.lockLevel}, intended weight ${ref.weight}, reference ${ref.referenceId}`;
+  }).join("; ");
+  return { shotId: shot.id, keyframeId: keyframe?.id, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration };
 }

@@ -182,7 +182,7 @@ production.post("/shots/:id/estimate", async (c) => {
     const b = await body(c, z.object({ kind: z.enum(["image", "video"]).default("image"), count: z.number().int().min(1).max(8).default(1) }));
     const roles = s.list("reference_bindings", { targetType: "shot", targetId: sh.id }).map((x: any) => x.role);
     const r = mustRoute({ kind: b.kind, workspaceId: a.workspaceId, projectId: sh.projectId, roles: b.kind === "video" ? ["START_FRAME", ...roles] : roles, policy: resolvePolicy(a.workspaceId, sh.projectId, sh.modelOverride) });
-    const e = estimate(r.chosen!.modelId, b.kind, { count: b.kind === "image" ? b.count : 1, duration: sh.duration ?? 4 });
+    const e = estimate(r.chosen!.modelId, b.kind, { count: b.kind === "image" ? b.count : 1, duration: sh.generationDuration ?? sh.duration ?? 4 });
     return c.json({ modelId: r.chosen!.modelId, degradations: r.chosen!.degradations, perJob: e, total: { usd: e.usd === null ? null : e.usd * (b.kind === "video" ? b.count : 1), credits: e.credits * (b.kind === "video" ? b.count : 1) }, candidates: r.candidates.map((x) => ({ modelId: x.modelId, usable: x.usable, degradations: x.degradations.length })) });
 });
 production.post("/shots/:id/skills/plan", (c) => {
@@ -234,13 +234,13 @@ production.post("/continuity-issues/:id/override", async (c) => {
 production.get("/qc/observation-kinds", (c) => c.json(OBSERVATION_KINDS));
 production.post("/shots/:id/qc", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
-    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), auto: z.boolean().default(false), visionModel: z.object({ providerId: z.string().min(1), modelId: z.string().min(1) }).optional(), reviewed: z.array(z.enum(["surface", "imaging", "world", "motion", "cinematic"])).default([]), note: z.string().max(4000).optional(), observedStateDelta: z.record(z.any()).optional(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
+    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), auto: z.boolean().default(false), visionModel: z.object({ providerId: z.string().min(1), modelId: z.string().min(1) }).optional(), fullPlayback: z.boolean().default(false), dismissedKinds: z.array(z.string()).max(30).default([]), reviewed: z.array(z.enum(["surface", "imaging", "world", "motion", "cinematic"])).default([]), note: z.string().max(4000).optional(), observedStateDelta: z.record(z.any()).optional(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
     if (b.reviewed.length && b.observations.length && !b.note?.trim()) throw bad("标了问题时，请写明看到的具体情况");
     const obs = [...b.observations];
     let vision: any = null;
     if (b.auto) vision = await autoObserve(s, c.req.param("id"), b.targetType, b.targetId, a.user.id, b.visionModel);
     if (vision?.observations) obs.push(...vision.observations);
-    return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs, { reviewed: b.reviewed, note: b.note, actor: a.user.id, vision, observedStateDelta: b.observedStateDelta }), vision });
+    return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs, { reviewed: b.reviewed, note: b.note, actor: a.user.id, vision, observedStateDelta: b.observedStateDelta, fullPlayback: b.fullPlayback, dismissedKinds: b.dismissedKinds }), vision });
 });
 production.post("/repair-actions/:id/apply", (c) => { const { s, a } = ctx(c, "EDITOR"); return c.json(applyRepair(s, c.req.param("id"), a.user.id)); });
 
