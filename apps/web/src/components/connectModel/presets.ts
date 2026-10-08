@@ -4,7 +4,7 @@ export type TextPreset = {
   keyHelp: string; custom?: boolean;
 };
 export const textPresets: TextPreset[] = [
-  { id: "deepseek", label: "DeepSeek", apiUrl: "https://api.deepseek.com", protocol: "openai-completions", probeModel: "deepseek-chat", defaultModel: "deepseek-chat", keyHelp: "登录 DeepSeek 开放平台，在「API keys」里创建一个 Key。" },
+  { id: "deepseek", label: "DeepSeek", apiUrl: "https://api.deepseek.com", protocol: "openai-completions", probeModel: "deepseek-flash", defaultModel: "deepseek-flash", keyHelp: "登录 DeepSeek 开放平台，在「API keys」里创建一个 Key。" },
   { id: "qwen", label: "通义千问", apiUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", protocol: "openai-completions", probeModel: "qwen-plus", defaultModel: "qwen-plus", keyHelp: "登录阿里云百炼控制台，在「API-KEY」里创建一个 Key。" },
   { id: "kimi", label: "Kimi", apiUrl: "https://api.moonshot.cn/v1", protocol: "openai-completions", probeModel: "moonshot-v1-8k", defaultModel: "kimi-k2-0905-preview", keyHelp: "登录 Moonshot 开放平台，在「API Key 管理」里创建一个 Key。" },
   { id: "openai", label: "OpenAI", apiUrl: "https://api.openai.com/v1", protocol: "openai-completions", probeModel: "gpt-4o-mini", defaultModel: "gpt-4o", keyHelp: "登录 OpenAI Platform，在「API keys」里创建一个 Key。" },

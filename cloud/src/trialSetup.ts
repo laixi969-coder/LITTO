@@ -1,7 +1,7 @@
 // 开启或关闭实验 1 的平台试用（见 docs/prdAudit.md「实验 1」）。直接写 cloud 数据库，无需管理员登录，服务运行中也可执行。
 // 开启：LITTO_TRIAL_KEY=<平台 Key> npm run trial:setup
 // 只换模型、沿用已保存的 Key：省略 LITTO_TRIAL_KEY，例如 LITTO_TRIAL_MODEL=agnes-2.5-flash npm run trial:setup（地址须与已保存的一致）
-// 可选：LITTO_TRIAL_BASE_URL（默认 https://api.deepseek.com）、LITTO_TRIAL_MODEL（默认 deepseek-chat）、
+// 可选：LITTO_TRIAL_BASE_URL（默认 https://api.deepseek.com）、LITTO_TRIAL_MODEL（默认 deepseek-flash）、
 //      LITTO_TRIAL_MODEL_NAME、LITTO_TRIAL_CREDITS_PER_1K（默认 1）；关闭：LITTO_TRIAL_DISABLE=1 npm run trial:setup
 import { resolve } from "node:path";
 
@@ -26,7 +26,7 @@ if (!key) {
     if (!previous || previous.base_url !== baseUrl) throw new Error("请通过环境变量 LITTO_TRIAL_KEY 提供平台 Key（只换模型时，地址须与已保存的一致）");
     if (!get("SELECT 1 FROM api_credentials WHERE provider_id=? AND scope='platform' AND enabled=1 AND deleted_at IS NULL", previous.id)) throw new Error("还没有保存过平台 Key，请通过 LITTO_TRIAL_KEY 提供");
 }
-const externalModelId = process.env.LITTO_TRIAL_MODEL ?? "deepseek-chat";
+const externalModelId = process.env.LITTO_TRIAL_MODEL ?? "deepseek-flash";
 const creditsPer1kTokens = Number(process.env.LITTO_TRIAL_CREDITS_PER_1K ?? 1);
 if (!(creditsPer1kTokens > 0)) throw new Error("LITTO_TRIAL_CREDITS_PER_1K 必须大于 0");
 
