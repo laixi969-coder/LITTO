@@ -9,6 +9,7 @@ export default {
       "../../build/mcp": "mcp",
       "../../build/web": "views/mainview",
       "../../build/tools": "tools",
+      "../../build/agents": "agents",
       "../../build/nodes": "nodes",
       "../../packages/providers/src": "providers",
       "../../packages/skills": "skills",

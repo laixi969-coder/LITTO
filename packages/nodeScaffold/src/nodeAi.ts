@@ -1,3 +1,4 @@
+export { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 import { onScopeDispose } from "vue";
 import { runAgentLoop, type AgentTool, type AgentToolResult } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, type AssistantMessage, type Context, type Message, type Model } from "@earendil-works/pi-ai";

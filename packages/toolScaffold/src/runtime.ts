@@ -3,6 +3,20 @@ import type { Rule } from "@form-create/element-ui";
 import type { FfmpegFactory } from "@toonflow/ffmpeg/types";
 import type { Stats } from "@toonflow/file";
 import { z } from "zod";
+import type { CameraTrajectory } from "@toonflow/providers";
+export type { CameraTrajectory } from "@toonflow/providers";
+
+const cameraPoseSchema = z.array(z.number().finite().min(-10000).max(10000)).length(12).refine(pose => {
+  if (pose.length !== 12) return false;
+  const dot = (a: number, b: number) => [0, 1, 2].reduce((sum, i) => sum + pose[a * 4 + i]! * pose[b * 4 + i]!, 0);
+  const determinant = pose[0]! * (pose[5]! * pose[10]! - pose[6]! * pose[9]!) - pose[1]! * (pose[4]! * pose[10]! - pose[6]! * pose[8]!) + pose[2]! * (pose[4]! * pose[9]! - pose[5]! * pose[8]!);
+  return [0, 1, 2].every(a => [0, 1, 2].every(b => Math.abs(dot(a, b) - Number(a === b)) < 0.001)) && Math.abs(determinant - 1) < 0.001;
+}, "相机旋转必须正交且为右手系，不接受缩放或镜像");
+export const cameraTrajectorySchema = z.strictObject({
+  version: z.literal(1), coordinateSystem: z.literal("opencvRelative"), fps: z.literal(24),
+  translationScale: z.number().finite().positive().max(100),
+  frames: z.array(z.strictObject({ pose: cameraPoseSchema, fov: z.number().finite().min(10).max(120) })).min(2).max(121),
+}).refine(value => value.frames.length > 0 && value.frames[0]!.pose.every((n, i) => Math.abs(n - ([0, 5, 10].includes(i) ? 1 : 0)) < 0.0001), "相对轨迹首帧必须为单位变换");
 
 export type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 export type { FfmpegFactory, FfmpegCommand, FfprobeData } from "@toonflow/ffmpeg/types";
@@ -72,6 +86,8 @@ export interface CanvasContext extends CanvasInfo {
 }
 
 export interface MediaModel {
+  cameraTrajectory?: boolean;
+  promptControl?: "imageAndCameraOnly";
   providerId: string;
   providerLabel: string;
   modelId: string;
@@ -93,6 +109,8 @@ export interface MediaReference {
 }
 
 export interface MediaGenerationRequest {
+  cameraTrajectory?: CameraTrajectory;
+  imageAndCameraOnly?: boolean;
   shotId?: string;
   productionFingerprint?: string;
   providerId: string;

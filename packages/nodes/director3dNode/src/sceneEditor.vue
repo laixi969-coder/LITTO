@@ -114,6 +114,7 @@
             </div>
           </el-popover>
           <el-button :icon="IconPlus" :disabled="!ready" aria-label="添加关键帧" @click="addAnchor">添加关键帧</el-button>
+          <el-button :disabled="!ready || !result" @click="emit('exportTrajectory')">导出轨迹</el-button>
           <el-button :icon="IconMovie" :disabled="!ready || !result || exportingVideo" :loading="exportingVideo" aria-label="导出视频节点" @click="emit('exportVideo', sceneAspect)">
             {{ exportingVideo ? `导出视频 ${exportProgress ?? 0}%` : '导出视频节点' }}
           </el-button>
@@ -189,7 +190,7 @@ const props = defineProps<{
   exportingImage: string;
   exportProgress?: number;
 }>();
-const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportVideo: [aspect: number]; exportImage: [anchor: CameraAnchor, aspect: number, time: number] }>();
+const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportTrajectory: []; exportVideo: [aspect: number]; exportImage: [anchor: CameraAnchor, aspect: number, time: number] }>();
 const anchors = defineModel<CameraAnchor[]>("anchors", { default: () => [] });
 const lighting = defineModel<LightingSettings>("lighting", { required: true });
 const sceneSettings = defineModel<SceneSettings>("sceneSettings", { required: true });

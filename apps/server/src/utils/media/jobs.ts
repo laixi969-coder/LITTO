@@ -7,7 +7,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { generateMediaDirect, listMediaModels } from "@/utils/media/generation";
+import { generateMediaDirect, listMediaModels, validateCameraRequest } from "@/utils/media/generation";
 import { assertModelSelection } from "@/utils/modelSelection";
 
 export function workspaceProject(directory: string) {
@@ -109,6 +109,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权制作镜头"), { status: 403 });
   const model = (await listMediaModels()).find(item => item.providerId === request.providerId && item.modelId === request.modelId && item.type === kind);
   if (!model) throw Object.assign(new Error("模型不存在"), { status: 400 });
+  validateCameraRequest(model, request, kind);
   if (kind === "video") {
     // 模式可能是字符串或一组参考上限；按完整候选比较，不能接受客户端自报能力。
     const modes = Array.isArray(model.mode) ? model.mode : [model.mode];
@@ -116,8 +117,9 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     if (model.durationResolutionMap?.length && !model.durationResolutionMap.some(rule => rule.duration.includes(request.duration!) && rule.resolution.includes(request.resolution!))) throw Object.assign(new Error("时长与分辨率组合不受模型支持"), { status: 400 });
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
-    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode });
+    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true });
+  if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
-  result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio])).digest("hex");
+  result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
   return result;
 }

@@ -2,7 +2,7 @@
 name: workflow
 description: 在 LITTO 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.9.0"
+  version: "2.10.0"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -107,3 +107,7 @@ metadata:
 导出成功后把真实文件挂到当前任务绑定画布的独立视频节点，命名“成片 · 作品名”，展示完整播放与下载入口；核对文件与节点持久化后才登记已合成。FFmpeg 自动挂载成功则复用回执中的节点，不重复添加；挂载失败时仅重试挂载，不重新渲染。导出不等于人工验收通过，不伪造看听记录。
 
 涉及武打、搏击、追逐、动作电影时，在镜头规格阶段读取 [动作编排](../cinema/references/actionChoreography.md)，将动作因果、空间、接触与连续状态应用到实际 action、blocking、camera 和剪点。模型专用格式仍服从已选模型规则。
+
+## 镜头方法接入
+
+涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](../cinema/references/masterShots.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。

@@ -8,6 +8,7 @@ import { mustRoute, resolvePolicy } from "../providers/router.ts";
 import { parseJson, runText } from "../llm.ts";
 import { cameraSchema, lightingSchema, NARRATIVE_FUNCTIONS } from "./schema.ts";
 import { z } from "zod";
+import { tx } from "../db.ts";
 
 type Step = { step: string; status: "done" | "skipped" | "needs_confirmation"; detail: any };
 
@@ -26,6 +27,7 @@ async function refineWithLlm(s: Scope, projectId: string, actor: string, script:
   const system = [
     "You are a film storyboard director and cinematographer. Refine the draft shot list. Return ONLY JSON {\"shots\":[...]} with exactly the same number of shots in the same order; keep each shot's fields (title, narrativeFunction, action, performance{emotion,intensity,eyeline,gesture,timing}, camera{shotSize,position,height,angle,lensMm,focus,depth,motion,motivation,side,screenDirection}, lighting{motivatedLight,key,fill,negativeFill,practicals,exposure,keyDirection,timeOfDay,colorTemp}, duration, subtitle).",
     "Respect: cut by narrative function, stay on one side of the 180-degree axis within a scene, motivate every camera move, keep lighting consistent within a scene. Describe performer paths separately from camera paths. Preserve story facts, exact dialogue and approved identity; no filler words like 8K or cinematic.",
+    "Add camera.design with technique, purpose, start, end, subjectPath, cameraPath, timing, cut, invariants (array), acceptance (array), fallback. Choose a static shot when sufficient. Dolly changes position, pan rotates, zoom changes field of view; orbit requires an arc, dolly zoom requires coordinated distance and FOV. Budget actual dialogue and action durations. Do not invent scene layout, emotional reactions or product capabilities to fill coverage. These are draft designs, not verified model controls.",
     // 方法来源与适配边界见 cinema/references/performanceDirectionLicense.md。
     "For shots with performers, put each character's immediate objective, tactic and observable behavior in action/performance.gesture, their attention target in eyeline, and the trigger, response order, dialogue delivery and ending residue in timing. Name the performer for each behavior. Emotion labels and intensity alone are not performance direction.",
     "Listening can start during a partner's line only after the relevant cue is available. Preserve emotional carryover across adjacent shots. Keep established voice identity while varying delivery for the scene. Give ensemble members distinct attention and responses when appropriate; do not force synchronized gestures, repetitive blinking, crying, damage, new props or new backstory. Match behavior scale to framing and leave room for the existing dialogue and pauses. Empty environment or object shots need no human acting notes.",
@@ -36,6 +38,7 @@ async function refineWithLlm(s: Scope, projectId: string, actor: string, script:
     try {
         const parsed = refined.parse(parseJson(r.text));
         if (parsed.shots.length !== drafts.length) throw new Error(`shot count changed ${drafts.length} → ${parsed.shots.length}`);
+        if (parsed.shots.some((shot, index) => shot.subtitle !== undefined && shot.subtitle !== (drafts[index].subtitle ?? ""))) throw new Error("原文台词不能被改写");
         parsed.shots.forEach((x, i) => Object.assign(drafts[i], { title: x.title, narrativeFunction: x.narrativeFunction, action: x.action, performance: x.performance, camera: x.camera, lighting: x.lighting, duration: x.duration, subtitle: x.subtitle ?? drafts[i].subtitle }));
         return { used: true, model: r.modelId, jobId: r.jobId };
     } catch (e) {
@@ -58,31 +61,36 @@ export async function directorRun(s: Scope, projectId: string, actor: string, in
     steps.push({ step: "world_and_assets", status: missing.length ? "done" : "done", detail: { approvedAssets: approved.map((a) => a.name), warnings: missing.map((m) => `missing ${m}`) } });
 
     let seq = input.sequenceId ? s.get("sequences", input.sequenceId) : null;
+    if (input.sequenceId && (!seq || seq.projectId !== projectId)) throw notFound("sequence");
     const existing = seq ? s.list("shots", { sequenceId: seq.id }) : [];
     const touchesApproved = existing.filter((x: any) => x.heroKeyframeId || x.approvedTakeId);
     if (input.replace && touchesApproved.length && !input.confirm) {
         steps.push({ step: "sequence_and_shots", status: "needs_confirmation", detail: { reason: `${touchesApproved.length} shot(s) with Hero Frame / Approved Take would be affected`, shotIds: touchesApproved.map((x: any) => x.id) } });
         return { steps, needsConfirmation: true };
     }
-    if (!seq) seq = s.insert("sequences", { project_id: projectId, name: "Sequence 1", ord: 0, script: input.script, data: {} });
-    else s.update("sequences", seq.id, { script: input.script });
-
-    const drafts = storyboardDirector(input.script, assets.map((a) => ({ id: a.id, name: a.name, type: a.type })), { minShots: input.minShots ?? 8 });
+    const drafts = storyboardDirector(input.script, assets.map((a) => ({ id: a.id, name: a.name, type: a.type })));
+    if (!drafts.length) throw bad("剧本没有可执行的动作或台词");
     const llm = input.useLlm ? await refineWithLlm(s, projectId, actor, input.script, drafts, world) : null;
-    const shots = createShotsFromDrafts(s, projectId, seq.id, drafts, { replace: input.replace });
+    const shots = tx(() => {
+        if (seq && s.get("sequences", seq.id)?.projectId !== projectId) throw notFound("sequence");
+        if (!seq) seq = s.insert("sequences", { project_id: projectId, name: "Sequence 1", ord: 0, script: input.script, data: {} });
+        else s.update("sequences", seq.id, { script: input.script });
+        return createShotsFromDrafts(s, projectId, seq.id, drafts, { replace: input.replace });
+    });
+    if (!seq) throw notFound("sequence");
     if (llm) steps.push({ step: "llm_refine", status: llm.used ? "done" : "skipped", detail: llm });
-    steps.push({ step: "sequence_and_shots", status: "done", detail: { sequenceId: seq.id, shotCount: shots.length, functions: shots.map((x: any) => x.narrativeFunction) } });
+    steps.push({ step: "sequence_and_shots", status: "done", detail: { sequenceId: seq.id, shotCount: shots.length, functions: shots.map((x: any) => x.narrativeFunction), warnings: input.minShots && shots.length < input.minShots ? ["原文节拍不足以支撑指定镜数，保留真实覆盖，需导演补充有目的的镜头设计"] : [] } });
 
     const vis = visualDirector(`${world?.realism ?? ""} ${input.goal ?? ""}`);
-    steps.push({ step: "skills", status: "done", detail: { storyboardDirector: "shots by narrative function", cinematographer: "lens/lighting per function", motionDirector: "biomechanics notes at compile", visualDirector: vis.look, assetDirector: assets.filter((a) => !a.invariants?.length).map((a) => ({ asset: a.name, suggested: assetDirector(a.type, a.name) })) } });
+    steps.push({ step: "skills", status: "done", detail: { storyboardDirector: "rule-based draft; director review required", cinematographer: "draft lens/lighting suggestions, not verified controls", motionDirector: "action-specific constraints require review", visualDirector: vis.look, assetDirector: assets.filter((a) => !a.invariants?.length).map((a) => ({ asset: a.name, suggested: assetDirector(a.type, a.name) })) } });
 
     const bindings = s.list("reference_bindings", { targetType: "shot" });
     steps.push({ step: "reference_plan", status: "done", detail: { perShot: shots.map((x: any) => ({ shotId: x.id, assets: x.assetIds.length, bound: bindings.filter((b: any) => b.targetId === x.id).map((b: any) => b.role) })) } });
     steps.push({ step: "freedom_map", status: "done", detail: { default: { LOCK: "approved asset invariants", CONTROL: "composition, lens, action, camera, lighting", ALLOW: "creases, micro-expression", RANDOM: "none unless specified by the story" } } });
 
     const policy = resolvePolicy(s.workspaceId, projectId);
-    const routed = shots.map((x: any) => ({ shotId: x.id, image: mustRoute({ kind: "image", workspaceId: s.workspaceId, projectId, roles: bindings.filter((b: any) => b.targetId === x.id).map((b: any) => b.role), policy }).chosen }));
-    steps.push({ step: "router", status: "done", detail: routed.map((r) => ({ shotId: r.shotId, model: r.image?.modelId, degradations: r.image?.degradations })) });
+    const routed = input.generate ? shots.map((x: any) => ({ shotId: x.id, image: mustRoute({ kind: "image", workspaceId: s.workspaceId, projectId, roles: bindings.filter((b: any) => b.targetId === x.id).map((b: any) => b.role), policy }).chosen })) : [];
+    steps.push({ step: "router", status: input.generate ? "done" : "skipped", detail: routed.map((r) => ({ shotId: r.shotId, model: r.image?.modelId, degradations: r.image?.degradations })) });
 
     if (input.generate) {
         const jobs = shots.map((x: any) => generateKeyframes(s, x.id, actor, { count: 2 }).job.id);

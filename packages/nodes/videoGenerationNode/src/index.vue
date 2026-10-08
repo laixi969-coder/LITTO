@@ -83,7 +83,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { cameraTrajectorySchema, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
@@ -103,7 +103,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "视频生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
+const data = computed(() => node.data as { cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -126,7 +126,7 @@ const { generating } = generationState;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
 // ACT: 供应商未声明视频比例范围，沿用界面的通用比例，具体支持范围由供应商校验。
-const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4"];
+const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4", "20:11"];
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
 const selectedMode = computed(() => selectedModel.value?.mode?.find((item) => JSON.stringify(item) === data.value.mode) as NodeVideoRequest["mode"]);
 const frameMode = computed(() => ["startEndRequired", "endFrameOptional", "startFrameOptional"].includes(String(selectedMode.value)));
@@ -251,6 +251,7 @@ async function startGeneration() {
   if (uploading.value) throw new Error("视频正在替换，请等待完成");
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择视频模型");
+  if (choice.cameraTrajectory && (!data.value.cameraTrajectory || !data.value.imageAndCameraOnly)) throw new Error("请先通过 setCameraTrajectory 配置并校准轨迹，或在镜头制作面板导入轨迹");
   if (!generationPrompt.value) throw new Error("请输入生成提示词");
   if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const images = refList.value.flatMap((item) => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
@@ -267,8 +268,9 @@ async function startGeneration() {
     ratio: data.value.ratio,
     generateAudio: choice.audio === "optional" ? data.value.generateAudio : choice.audio,
     outputDirectory: `assets/${id}`,
-    images: frameMode.value ? undefined : images,
-    firstFrame: frameMode.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
+    images: frameMode.value || choice.cameraTrajectory ? undefined : images,
+    firstFrame: choice.cameraTrajectory || frameMode.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
+    ...(choice.cameraTrajectory ? { cameraTrajectory: data.value.cameraTrajectory, imageAndCameraOnly: data.value.imageAndCameraOnly } : {}),
     lastFrame: frameMode.value ? images[selectedMode.value === "startFrameOptional" && images.length === 1 ? 0 : 1] : undefined,
     videos: refList.value.flatMap((item) => item.dataType === "VIDEO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
     audios: refList.value.flatMap((item) => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
@@ -358,6 +360,8 @@ function getConfig() {
       ratio: data.value.ratio,
       mode: selectedMode.value,
       generateAudio: data.value.generateAudio,
+      cameraTrajectory: data.value.cameraTrajectory,
+      imageAndCameraOnly: data.value.imageAndCameraOnly,
     },
     models: models.value,
     ratios: ratioOptions,
@@ -412,6 +416,19 @@ nodeTools.register({
     if (args.ratio !== undefined) data.value.ratio = args.ratio;
     if (args.mode !== undefined) data.value.mode = JSON.stringify(args.mode);
     if (args.generateAudio !== undefined) data.value.generateAudio = args.generateAudio;
+    return getConfig();
+  },
+});
+
+nodeTools.register({
+  name: "setCameraTrajectory",
+  description: "为支持 cameraTrajectory 的已选模型设置 3D 导演台导出的轨迹。先校准 translationScale 并核对首帧；imageAndCameraOnly 必须明确为 true，表示不支持逐请求文字表演/音频。只配置，不生成。",
+  parameters: z.strictObject({ cameraTrajectory: cameraTrajectorySchema, imageAndCameraOnly: z.literal(true) }),
+  execute(args) {
+    if (generating.value || deleting.value) throw new Error("节点正在生成或删除");
+    if (!selectedModel.value?.cameraTrajectory) throw new Error("当前模型不支持数值轨迹");
+    data.value.cameraTrajectory = args.cameraTrajectory;
+    data.value.imageAndCameraOnly = args.imageAndCameraOnly;
     return getConfig();
   },
 });

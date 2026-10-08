@@ -44,8 +44,17 @@ export const bindingInput = z.object({
 });
 
 export const cameraSchema = z.object({
+    design: z.object({
+        technique: z.string().max(200), purpose: z.string().max(2000),
+        start: z.string().max(2000), end: z.string().max(2000),
+        subjectPath: z.string().max(2000), cameraPath: z.string().max(2000),
+        timing: z.string().max(2000), cut: z.string().max(2000),
+        invariants: z.array(z.string().max(500)).max(30),
+        acceptance: z.array(z.string().max(500)).max(30),
+        fallback: z.string().max(2000),
+    }).strict().optional(),
     shotSize: z.string().default("MS"), position: z.string().default(""), height: z.string().default("eye level"), angle: z.string().default("neutral"),
-    lensMm: z.number().default(35), focus: z.string().default(""), depth: z.string().default(""), motion: z.string().default("static"), motivation: z.string().default(""),
+    lensMm: z.number().finite().positive().max(2000).default(35), focus: z.string().default(""), depth: z.string().default(""), motion: z.string().default("static"), motivation: z.string().default(""),
     axisCrossing: z.string().default(""),
     side: z.enum(["A", "B", "none"]).default("none"), // which side of the 180° axis
     screenDirection: z.enum(["left", "right", "none"]).default("none"),

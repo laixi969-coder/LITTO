@@ -44,7 +44,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         return r.clean;
     };
 
-    const roleCap: Record<string, string> = { IDENTITY: "identityReference", GEOMETRY: "multiReference", WARDROBE: "multiReference", ENVIRONMENT: "multiReference", COMPOSITION: "compositionReference", LIGHTING: "multiReference", LOOK: "multiReference", DEPTH: "depthReference", PANORAMA: "panoramaReference", PERFORMANCE: "motionReference", CAMERA_MOTION: "cameraControl", START_FRAME: "image2video", END_FRAME: "startEndFrame", AUDIO: "nativeAudio" };
+    const roleCap: Record<string, string> = { IDENTITY: "identityReference", GEOMETRY: "multiReference", WARDROBE: "multiReference", ENVIRONMENT: "multiReference", COMPOSITION: "compositionReference", LIGHTING: "multiReference", LOOK: "multiReference", DEPTH: "depthReference", PANORAMA: "panoramaReference", PERFORMANCE: "motionReference", CAMERA_MOTION: "motionReference", START_FRAME: "image2video", END_FRAME: "startEndFrame", AUDIO: "nativeAudio" };
     const adapter = get("SELECT adapter FROM providers WHERE id=?", model.providerId)?.adapter;
     const maxInputs = adapter === "openai-compatible" && kind === "video" ? 1 : Number(caps.maxInputs ?? 0);
     const degradations: Compiled["degradations"] = [];
@@ -97,6 +97,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : [] };
 
     const sections: Record<string, string> = {
+        shotDesign: cam.design ? `${kind === "image" ? "Render only the single start state; end, paths and timing are continuity context, not multiple panels. " : ""}${JSON.stringify(cam.design)}` : "",
         subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
         assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
         narrative: shot.narrativeFunction,

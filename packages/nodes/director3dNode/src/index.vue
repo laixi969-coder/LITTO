@@ -11,7 +11,7 @@
     :scene="scene" :result="selectedPlan" :models="models" :modelsLoading="modelsLoading" :addingMannequin="addingMannequin"
     :plans="plans" :selectedPlanId="data.selectedPlanId ?? ''" :tasks="tasks"
     :exportingVideo="exportingVideo" :exportingImage="exportingImage" :exportProgress="exportProgress"
-    @exportVideo="exportVideo" @exportImage="exportImage" @addMannequin="addMannequin"
+    @exportVideo="exportVideo" @exportImage="exportImage" @exportTrajectory="saveTrajectory" @addMannequin="addMannequin"
     @selectPlan="data.selectedPlanId = $event" @loadModels="loadModels" @generate="generate" @editInstruction="setPrompt" @close="editing = false">
     <template #input>
       <referenceItem v-if="refList.length" v-model="refList" @preview="setReferencePreview" @remove="removeReference" />
@@ -25,14 +25,14 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useVueFlow } from "@vue-flow/core";
 import { IconCube3dSphere } from "@tabler/icons-vue";
 import { ElLoading, ElMessage } from "element-plus";
-import { nodeSkeleton, useNode, useNodeFiles, useNodeReferences, z, type NodeHandle, type NodeData, type NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
+import { nodeSkeleton, nodeTools, useNode, useNodeFiles, useNodeReferences, z, type NodeHandle, type NodeData, type NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import sceneEditor from "./sceneEditor.vue";
 import { capturePreview, sceneSchema, createEmptyScene, createMannequinObject, createStage, disposeStage, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
 import { createDirectorDraft } from "./agentTools";
 import { directorPrompt } from "./agentPrompt";
-import { anchorSchema, prepareMotion, sampleMotion, type CameraAnchor } from "./motion";
+import { anchorSchema, prepareMotion, sampleMotion, exportCameraTrajectory, type CameraAnchor } from "./motion";
 import { directorPlanSchema, prepareSceneAnimation, type DirectorPlan, type DirectorGeneration } from "./sceneAnimation";
 import { renderImage, renderVideo } from "./renderMedia";
 
@@ -138,6 +138,29 @@ async function loadModel() {
 }
 
 let modelReady = loadModel();
+nodeTools.register({
+  name: "readCameraTrajectory",
+  description: "读取已选 3D 方案的数值相机轨迹。只支持不超过5秒且没有硬切的方案；OpenCV相对坐标，24fps/121帧。translationScale 必须按 GEN3C 深度尺度校准，返回值不是渲染视频。",
+  parameters: z.strictObject({ translationScale: z.number().finite().positive().max(100) }),
+  async execute({ translationScale }) {
+    await modelReady;
+    if (modelError.value || !selectedPlan.value) throw new Error("先加载并选定可用方案");
+    const plan = selectedPlan.value;
+    return { planId: plan.id, duration: 121 / 24, cameraTrajectory: exportCameraTrajectory(plan.cameraFrames, plan.duration, translationScale) };
+  },
+});
+
+async function saveTrajectory() {
+  const plan = selectedPlan.value;
+  if (!plan) return;
+  const workspaceFiles = files.getWorkspaceFiles();
+  try {
+    const cameraTrajectory = exportCameraTrajectory(plan.cameraFrames, plan.duration, 1);
+    const path = `assets/${node.id}/cameraTrajectory${crypto.randomUUID().replaceAll("-", "")}.json`;
+    await workspaceFiles.writeJson(path, { planId: plan.id, duration: 121 / 24, scaleCalibrated: false, cameraTrajectory }, true);
+    ElMessage.success(`已导出 ${path}；尺度为 1，生成前须校准`);
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : "轨迹导出失败"); }
+}
 async function openEditor() {
   if (modelError.value) modelReady = loadModel();
   await modelReady;

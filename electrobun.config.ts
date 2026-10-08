@@ -22,8 +22,7 @@ export default {
       "build/web": "views/mainview",
       "build/mcp": "mcp",
       "build/tools": "tools",
-      // ACT: 团队暂不打包，恢复时取消注释。
-      // "build/agents": "agents",
+      "build/agents": "agents",
       "build/nodes": "nodes",
       "packages/providers/src": "providers",
       "packages/skills": "skills",

@@ -5,6 +5,7 @@ import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
+import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { modelAccess } from "@/utils/modelAvailability";
 import { assertModelSelection, isSelectedModel } from "@/utils/modelSelection";
@@ -12,6 +13,19 @@ import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 
 const maxMediaSize = 100 * 1024 * 1024;
+const cameraSessions = new Set<string>();
+
+async function runCameraSession<T>(provider: Provider & { config: Record<string, unknown> }, action: () => Promise<T>) {
+  if (provider.id !== "gen3c") return action();
+  // ACT: 官方服务只有一个可变 3D 缓存。单进程按源站排他；异常时保留占用，
+  // 防止取消 HTTP 后仍在运行的 GPU 任务被下一次 seed 清空。恢复须重启两端。
+  const endpoint = new URL(String(provider.config.baseUrl)).origin;
+  if (cameraSessions.has(endpoint)) throw new Error("GEN3C 服务正在使用或上次结果不确定；不要重试 seed，异常恢复须重启 GEN3C 与 LITTO");
+  cameraSessions.add(endpoint);
+  const result = await action();
+  cameraSessions.delete(endpoint);
+  return result;
+}
 const mediaExtensions: Record<string, string> = {
   "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif",
   "image/avif": "avif", "image/bmp": "bmp", "image/tiff": "tiff",
@@ -22,6 +36,16 @@ const mediaExtensions: Record<string, string> = {
 
 function invalid(message: string): never {
   throw Object.assign(new Error(message), { status: 400 });
+}
+
+export function validateCameraRequest(model: { cameraTrajectory?: unknown; promptControl?: unknown }, request: MediaGenerationRequest, mediaType: string) {
+  if (request.cameraTrajectory) {
+    if (mediaType !== "video" || model.cameraTrajectory !== true) invalid("所选模型不支持原生数值相机轨迹");
+    request.cameraTrajectory = cameraTrajectorySchema.parse(request.cameraTrajectory);
+    if (request.duration === undefined || Math.abs(request.duration - request.cameraTrajectory.frames.length / request.cameraTrajectory.fps) > 0.000001) invalid("生成时长须等于轨迹帧数除以帧率");
+  }
+  if (model.cameraTrajectory === true && !request.cameraTrajectory) invalid("此模型需要数值相机轨迹");
+  if (model.promptControl === "imageAndCameraOnly" && request.imageAndCameraOnly !== true) invalid("此模型仅接受图像与相机轨迹，请明确设置 imageAndCameraOnly，不会执行文字表演指令");
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -41,6 +65,7 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
     return [{
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
+      cameraTrajectory: model.cameraTrajectory === true, promptControl: model.promptControl === "imageAndCameraOnly" ? "imageAndCameraOnly" : undefined,
       mode: model.mode, durationResolutionMap: model.durationResolutionMap, audio: model.audio, lipSync: model.lipSync === true, speechInstructions: model.speechInstructions === true,
       ...(model.type === "audio" ? { voices: model.voices } : {}),
       ...(model.type === "image" ? {
@@ -151,6 +176,7 @@ async function generateMediaUnrecorded(
   access.assert();
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
+  validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory);
@@ -160,6 +186,10 @@ async function generateMediaUnrecorded(
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
   const references = async (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => readReference(directory, item, type, signal))) : undefined;
   const images = await references(request.images, "image");
+  const videos = mediaType === "video" ? await references(request.videos, "video") : undefined;
+  const audios = mediaType === "video" ? await references(request.audios, "audio") : undefined;
+  const firstFrame = mediaType === "video" && request.firstFrame ? await readReference(directory, request.firstFrame, "image", signal) : undefined;
+  const lastFrame = mediaType === "video" && request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined;
   signal?.throwIfAborted();
   const assets = await (async () => mediaType === "audio"
     ? await provider.generateAudio!({
@@ -168,14 +198,13 @@ async function generateMediaUnrecorded(
     })
     : mediaType === "image"
     ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size })
-    : await provider.generateVideo!({
+    : await runCameraSession(provider, () => provider.generateVideo!({
       model: request.modelId, prompt: request.prompt, images,
-      videos: await references(request.videos, "video"), audios: await references(request.audios, "audio"),
-      firstFrame: request.firstFrame ? await readReference(directory, request.firstFrame, "image", signal) : undefined,
-      lastFrame: request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined,
+      videos, audios, firstFrame, lastFrame,
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
       generateAudio: request.generateAudio, mode: request.mode,
-    }))().catch(error => {
+      cameraTrajectory: request.cameraTrajectory, imageAndCameraOnly: request.imageAndCameraOnly,
+    })))().catch(error => {
       // 只记录供应商调用错误，下载结果、写文件或参数错误不代表模型失效。
       if (!signal?.aborted) access.failed(error);
       if (error instanceof Error && access.reason()) Object.assign(error, { retryable: false });

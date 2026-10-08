@@ -2,7 +2,7 @@
 name: musicfilm
 description: 把歌曲、纯音乐或歌词做成音乐影像（MV）的创作方案：理解音乐结构与情绪、解读歌词的隐喻与叙事，提出 2 到 4 套明显不同的影像方向，经用户确认后输出按段落组织的场次表，交给 breakdown 与 cinema 继续。用于 MV、音乐影像、歌词视频策划；剧情故事用 story，产品广告用 adfilm。
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   displayName: 音乐影像
   author: LITTO
 ---
@@ -62,3 +62,7 @@ MV 入口可提供 `musicAnalysis.txt`（`kind: littoMusicAnalysis`）和 `music
 场次表确认后交给 [breakdown](../breakdown/SKILL.md)：它提取角色、场景、道具与世界、影调草案，用户确认后进入 [cinema](../cinema/SKILL.md) 的镜头规划。音乐卡点计划可以从分析报告读取，整曲视频组装仍须使用实际可用的剪辑与渲染工具；未执行或未验收时，不声称已生成或已精准同步成片。
 
 场次表由 `saveSceneList` 写入工作区；音乐理解、影像方向按 [workflow](../workflow/SKILL.md) 的画布执行规则放入文本节点。用户只要对话文字或本轮没有对应工具时，直接回复并说明未保存，不改为手写 JSON。
+
+## 镜头方法接入
+
+涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](../cinema/references/masterShots.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。

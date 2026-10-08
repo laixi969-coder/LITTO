@@ -13,11 +13,13 @@ import atlasCloud from "./src/media/atlasCloud";
 import easyRouter from "./src/media/easyRouter";
 import qwenSpeech from "./src/media/qwenSpeech";
 import museTalk from "./src/media/museTalk";
+import gen3c from "./src/media/gen3c";
 
 export type Provider = ProviderDefinition;
+export type CameraTrajectory = CameraTrajectorySpec;
 export type ProviderTools = ProviderContext["tool"];
 export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[1];
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
 export const languageProviders = [deepSeek, atlasCloudText, easyRouterText] as const;
-export const mediaProviders = [apiMart, meta, agnes, volcengine, bailian, kling, atlasCloud, easyRouter, qwenSpeech, museTalk] as const;
+export const mediaProviders = [apiMart, meta, agnes, volcengine, bailian, kling, atlasCloud, easyRouter, qwenSpeech, museTalk, gen3c] as const;

@@ -41,6 +41,12 @@
               <label v-for="field in performanceFields" :key="field[0]">{{ field[1] }}<textarea v-model="draft.performance[field[0]]" rows="2" /></label>
               <label v-for="field in blockingFields" :key="field[0]">{{ field[1] }}<textarea v-model="draft.blocking[field[0]]" rows="2" /></label>
             </div>
+            <h3>镜头设计卡</h3>
+            <button v-if="!draft.camera.design" type="button" @click="draft.camera.design = Object.fromEntries([...designFields.map(field => [field[0], '']), ['invariants', []], ['acceptance', []]]); dirty = true">添加镜头设计</button>
+            <div v-else class="fieldGrid">
+              <label v-for="field in designFields" :key="field[0]">{{ field[1] }}<textarea v-model="draft.camera.design[field[0]]" @input="dirty = true" /></label>
+              <label v-for="field in [['invariants', '保持不变（每行一项）'], ['acceptance', '观看验收（每行一项）']]" :key="field[0]">{{ field[1] }}<textarea :value="draft.camera.design[field[0]].join('\n')" @input="draft.camera.design[field[0]] = ($event.target as HTMLTextAreaElement).value.split('\n'); dirty = true" /></label>
+            </div>
             <h3>真实感规格</h3>
             <div class="fieldGrid"><label v-for="field in realismFields" :key="field[0]">{{ field[1] }}<textarea v-model="draft.realism[field[0]]" rows="3" @input="dirty = true" /><small>{{ field[2] }}</small></label></div>
             <h3>原尺寸材质检查区域</h3>
@@ -73,7 +79,12 @@
               <label v-if="kind === 'video'">分辨率<select v-model="resolution"><option value="">选择分辨率</option><option v-for="value in resolutions" :key="value">{{ value }}</option></select></label>
               <label v-if="kind === 'video'">生成时长（含剪辑余量）<select v-model.number="duration"><option v-for="value in durations" :key="value" :value="value">{{ value }} 秒</option></select></label>
               <label v-if="kind === 'image' && selectedModel?.imageSizes?.length">尺寸<select v-model="size"><option v-for="value in selectedModel.imageSizes" :key="value">{{ value }}</option></select></label>
-              <label>画幅<select v-model="ratio"><option v-for="value in selectedModel?.imageRatios?.length ? selectedModel.imageRatios : ['16:9', '9:16', '1:1']" :key="value">{{ value }}</option></select></label>
+              <label>画幅<select v-model="ratio"><option v-for="value in selectedModel?.cameraTrajectory ? ['20:11'] : selectedModel?.imageRatios?.length ? selectedModel.imageRatios : ['16:9', '9:16', '1:1']" :key="value">{{ value }}</option></select></label>
+              <template v-if="kind === 'video' && selectedModel?.cameraTrajectory">
+                <label>3D 导演台导出的轨迹<input type="file" accept="application/json,.json" @change="run(() => loadTrajectory($event))" /></label>
+                <label v-if="cameraTrajectory">平移尺度<input v-model.number="cameraTrajectory.translationScale" type="number" min="0.0001" max="100" step="0.01" /></label>
+                <label><input v-model="imageAndCameraOnly" type="checkbox" />使用图像与相机轨迹生成；已校准尺度，逐请求文字表演指令和音频不受支持</label>
+              </template>
             </div>
             <button type="button" :disabled="!modelKey" @click="run(compile)">检查并预览生成内容</button>
             <div v-if="preview" class="generationPreview">
@@ -128,6 +139,7 @@ const editPanel = ref<InstanceType<typeof productionEdit>>();
 const getCanvas = inject<() => CanvasContext | undefined>("canvas");
 import { ElMessageBox } from "element-plus";
 import type { MediaModel } from "@toonflow/tools-scaffold/runtime";
+import { cameraTrajectorySchema, type CameraTrajectory } from "@toonflow/tools-scaffold/runtime";
 const visible = defineModel<boolean>({ default: false });
 const props = defineProps<{ projectId?: string; directory: string }>();
 const projectId = props.projectId;
@@ -139,6 +151,7 @@ const tabs = [{ id: "world", label: "世界与资产" }, { id: "shot", label: "�
 const worldFields = [["era", "年代"], ["locationLogic", "地点与空间逻辑"], ["architecture", "建筑"], ["weather", "天气"], ["time", "时间"], ["material", "环境材质"], ["physics", "物理规则"], ["realism", "影像媒介（摄影写实、动画等）"]];
 const lookFields = [["contrast", "对比"], ["saturation", "饱和度"], ["skinTone", "肤色"], ["highlightRolloff", "高光滚降"], ["shadowBehavior", "暗部表现"], ["lensCharacter", "镜头特性"], ["texture", "纹理"], ["sharpnessPhilosophy", "锐度策略"]];
 const cameraFields = [["shotSize", "景别"], ["position", "机位"], ["focus", "焦点"], ["depth", "景深"], ["motion", "摄影机运动"], ["motivation", "运镜动机"], ["axisCrossing", "越轴动机（没有则留空）"]];
+const designFields = [["technique", "技术"], ["purpose", "叙事目的"], ["start", "起始状态"], ["end", "结束状态"], ["subjectPath", "主体路线"], ["cameraPath", "相机路线"], ["timing", "动作、对白与停顿预算"], ["cut", "出入剪点"], ["fallback", "能力不足时的替代"]];
 const lightingFields = [["worldSource", "光源在场景中的固定位置"], ["motivatedLight", "光源依据"], ["key", "主光方向与软硬"], ["fill", "补光"], ["negativeFill", "负补光"], ["exposure", "曝光主体与策略"], ["colorTemp", "色温"]];
 const performanceFields = [["emotion", "情绪"], ["eyeline", "视线"], ["lookTarget", "注视对象"], ["gesture", "表演动作"], ["timing", "表演节拍"]];
 const blockingFields = [["foreground", "前景"], ["midground", "人物走位与中景"], ["background", "背景"]];
@@ -161,6 +174,8 @@ const shotId = ref(""), draft = ref<any>(null), detail = ref<any>(null), dirty =
 const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref(""), ratio = ref("16:9");
 const visualModels = ref<any[]>([]), visionModelKey = ref("");
 const models = ref<MediaModel[]>([]), preview = ref<any>(null), jobs = ref<any[]>([]);
+const cameraTrajectory = ref<CameraTrajectory>();
+const imageAndCameraOnly = ref(false);
 const stateNotes = ref<Record<string, string>>({});
 const shotAssets = computed(() => assets.value.filter(item => detail.value?.assetIds?.includes(item.id)));
 const targetId = ref(""), reviewNote = ref(""), observation = ref("");
@@ -179,7 +194,9 @@ const reviewFields = computed(() => realismFields.filter(field => target.value?.
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
 const modeLabel = (mode: unknown) => Array.isArray(mode) ? `多参考 (${mode.join(" / ")})` : ({ singleImage: "首帧", startFrameOptional: "首帧可选", startEndRequired: "首尾帧", endFrameOptional: "首帧与可选尾帧", text: "纯文本" }[String(mode)] ?? String(mode));
 watch([kind, modelKey, modeKey, resolution, duration, size, ratio, shotId], () => { preview.value = null; pendingRequestId = ""; });
-watch(selectedModel, model => { modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? ""; ratio.value = model?.imageRatios?.[0] ?? "16:9"; });
+watch(selectedModel, model => { modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? ""; ratio.value = model?.cameraTrajectory ? "20:11" : model?.imageRatios?.[0] ?? "16:9"; });
+watch([cameraTrajectory, imageAndCameraOnly], () => { preview.value = null; pendingRequestId = ""; }, { deep: true });
+watch([shotId, modelKey], () => { cameraTrajectory.value = undefined; imageAndCameraOnly.value = false; });
 watch(durations, values => { if (!values.includes(duration.value)) duration.value = values[0] ?? 4; });
 async function request(path: string, method = "GET", body?: unknown) {
   const response = await fetch(`/cloud${path}`, { method, signal: controller.signal, headers: { "Content-Type": "application/json", "x-litto-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -291,7 +308,21 @@ async function removeBinding(item: any) {
 }
 function generationRequest() {
   const model = selectedModel.value; if (!model) throw new Error("请选择模型");
-  return { providerId: model.providerId, modelId: model.modelId, ratio: ratio.value, ...(kind.value === "image" ? (size.value ? { size: size.value } : {}) : { mode: modeKey.value ? JSON.parse(modeKey.value) : undefined, resolution: resolution.value, duration: duration.value }) };
+  if (model.cameraTrajectory && (!cameraTrajectory.value || !imageAndCameraOnly.value)) throw new Error("请导入轨迹并确认图像与相机控制范围");
+  return { providerId: model.providerId, modelId: model.modelId, ratio: ratio.value, ...(kind.value === "image" ? (size.value ? { size: size.value } : {}) : { mode: modeKey.value ? JSON.parse(modeKey.value) : undefined, resolution: resolution.value, duration: duration.value, ...(model.cameraTrajectory ? { cameraTrajectory: cameraTrajectorySchema.parse(cameraTrajectory.value), imageAndCameraOnly: imageAndCameraOnly.value } : {}) }) };
+}
+async function loadTrajectory(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  const currentShot = shotId.value, currentModel = modelKey.value;
+  cameraTrajectory.value = undefined; imageAndCameraOnly.value = false;
+  if (!file) return;
+  if (file.size > 512 * 1024) throw new Error("轨迹文件超过 512 KB");
+  const document = JSON.parse(await file.text());
+  const trajectory = cameraTrajectorySchema.parse(document.cameraTrajectory ?? document);
+  if (shotId.value !== currentShot || modelKey.value !== currentModel) throw new Error("镜头或模型已切换，请重新导入轨迹");
+  cameraTrajectory.value = trajectory;
+  input.value = "";
 }
 async function production(requestId?: string) {
   const response = await fetch("/api/ai/media/production", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory: props.directory, shotId: shotId.value, kind: kind.value, request: generationRequest(), requestId, fingerprint: preview.value?.fingerprint }) });

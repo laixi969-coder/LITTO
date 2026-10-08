@@ -15,6 +15,7 @@ const dataOf = (i: ShotInput) => {
 export function createShot(s: Scope, projectId: string, input: ShotInput) {
     const seq = s.get("sequences", input.sequenceId);
     if (!seq || seq.projectId !== projectId) throw notFound("sequence");
+    if (input.sceneId && s.get("scenes", input.sceneId)?.sequenceId !== input.sequenceId) throw bad("scene does not belong to sequence");
     for (const id of input.assetIds) if (s.get("assets", id)?.projectId !== projectId) throw bad(`unknown project asset ${id}`);
     const ord = input.order ?? all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", input.sequenceId, s.workspaceId)[0].n;
     return tx(() => {
@@ -26,18 +27,22 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "generationDuration", "inspectionRegion"] as const;
+const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
+    if (patch.sequenceId !== undefined && patch.sequenceId !== shot.sequenceId) throw bad("use the sequence workflow to move a shot");
+    if (patch.sceneId && s.get("scenes", patch.sceneId)?.sequenceId !== shot.sequenceId) throw bad("scene does not belong to sequence");
     const changed = CORE.filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(shot[k]));
     if (changed.length && (shot.heroKeyframeId || shot.approvedTakeId) && !confirm) throw conflict(`changing ${changed.join(", ")} affects an approved Hero Frame/Take; resend with confirm:true`, "needs_confirmation", { fields: changed, heroKeyframeId: shot.heroKeyframeId, approvedTakeId: shot.approvedTakeId });
     for (const aid of patch.assetIds ?? []) if (s.get("assets", aid)?.projectId !== shot.projectId) throw bad(`unknown project asset ${aid}`);
     const { id: _i, workspaceId, projectId, sequenceId, sceneId, ord, schemaVersion, status, heroKeyframeId, approvedTakeId, createdAt, updatedAt, deletedAt, ...data } = shot;
     const { sequenceId: _s, sceneId: _c, order, ...rest } = patch;
-    const upd = s.update("shots", id, { data: { ...data, ...rest }, ...(patch.sceneId !== undefined ? { scene_id: patch.sceneId } : {}) });
-    recomputeStates(s, sequenceId);
-    return s.get("shots", upd.id)!;
+    return tx(() => {
+        const upd = s.update("shots", id, { data: { ...data, ...rest }, ...(patch.sceneId !== undefined ? { scene_id: patch.sceneId } : {}) });
+        recomputeStates(s, sequenceId);
+        return s.get("shots", upd.id)!;
+    });
 }
 
 export function moveShot(s: Scope, id: string, toOrder: number) {
@@ -67,10 +72,12 @@ export function bindReference(s: Scope, projectId: string, target: { type: "shot
 
 /** Materialise Storyboard Director output as real ShotSpecs (scenes created on demand). */
 export function createShotsFromDrafts(s: Scope, projectId: string, sequenceId: string, drafts: ShotDraft[], opts: { replace?: boolean } = {}) {
-    if (opts.replace) for (const sh of s.list("shots", { sequenceId })) if (!sh.approvedTakeId && !sh.heroKeyframeId) s.softDelete("shots", sh.id);
+    if (s.get("sequences", sequenceId)?.projectId !== projectId) throw notFound("sequence");
+    if (!drafts.length) throw bad("不能用空分镜替换已有镜头");
     const scenes = new Map<number, string>();
     const out: any[] = [];
     tx(() => {
+        if (opts.replace) for (const sh of s.list("shots", { sequenceId })) if (!sh.approvedTakeId && !sh.heroKeyframeId) s.softDelete("shots", sh.id);
         for (const d of drafts) {
             if (!scenes.has(d.sceneIndex)) scenes.set(d.sceneIndex, s.insert("scenes", { project_id: projectId, sequence_id: sequenceId, name: d.sceneName, ord: d.sceneIndex, data: {} }).id);
             const ord = all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", sequenceId, s.workspaceId)[0].n;

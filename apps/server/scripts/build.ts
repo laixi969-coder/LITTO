@@ -3,8 +3,7 @@ import { cp, rm } from "@toonflow/file";
 import { resolve } from "node:path";
 
 const projectDir = resolve(import.meta.dirname, "../../..");
-// ACT: 团队暂不打包，恢复时取消注释。
-// await $`${process.execPath} run build:teams`.cwd(projectDir);
+await $`${process.execPath} run build:teams`.cwd(projectDir);
 await $`${process.execPath} run build`.cwd(resolve(projectDir, "packages/mcp"));
 await $`${process.execPath} build src/index.ts --target=bun --minify --outdir ../../build/server`.cwd(resolve(projectDir, "apps/server"));
 const skillsOutput = resolve(projectDir, "build/skills");

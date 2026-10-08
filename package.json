@@ -28,7 +28,7 @@
     "dev:web": "bun run --filter '@toonflow/web' dev",
     "dev:server": "bun run --filter '@toonflow/server' dev",
     "dev:desktop": "bun run --filter '@toonflow/desktop' dev",
-    "dev:plugins": "NODE_ENV=dev bun run --filter './packages/tools/*' --filter './packages/nodes/*' build",
+    "dev:plugins": "NODE_ENV=dev bun run --filter './packages/tools/*' --filter './packages/nodes/*' --filter './packages/teams/*' build",
     "dev:updateServer": "bun run --filter '@toonflow/updateServer' dev",
     "start:updateServer": "bun run --filter '@toonflow/updateServer' start",
     "publish:update": "bun run apps/updateServer/scripts/publish.ts",

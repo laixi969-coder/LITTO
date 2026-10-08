@@ -21,6 +21,7 @@
     "./media/atlasCloud": "./src/media/atlasCloud.ts",
     "./media/easyRouter": "./src/media/easyRouter.ts",
     "./media/qwenSpeech": "./src/media/qwenSpeech.ts",
-    "./media/museTalk": "./src/media/museTalk.ts"
+    "./media/museTalk": "./src/media/museTalk.ts",
+    "./media/gen3c": "./src/media/gen3c.ts"
   }
 }

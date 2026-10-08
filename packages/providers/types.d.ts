@@ -12,6 +12,8 @@ type VideoMode =
   | (`${"video" | "image" | "audio"}Reference:${number}`)[];
 
 interface ProviderModel {
+  cameraTrajectory?: boolean;
+  promptControl?: "imageAndCameraOnly";
   id: string;
   label: string;
   type: ModelType;
@@ -120,6 +122,8 @@ interface ImageRequest extends MediaRequest {
 }
 
 interface VideoRequest extends MediaRequest {
+  cameraTrajectory?: CameraTrajectorySpec;
+  imageAndCameraOnly?: boolean;
   prompt: string;
   /** 当前生成模式；参考模式数组声明各类参考媒体数量上限。 */
   mode?: VideoMode;
@@ -137,6 +141,14 @@ interface VideoRequest extends MediaRequest {
   resolution?: string;
   generateAudio?: boolean;
   watermark?: boolean;
+}
+
+interface CameraTrajectorySpec {
+  version: 1;
+  coordinateSystem: "opencvRelative";
+  fps: 24;
+  translationScale: number;
+  frames: { pose: number[]; fov: number }[];
 }
 
 interface AudioRequest extends MediaRequest {

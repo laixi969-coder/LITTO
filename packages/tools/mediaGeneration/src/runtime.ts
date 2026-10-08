@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 
 export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia, MediaContext } from "@toonflow/tools-scaffold/runtime";
 
@@ -28,6 +29,8 @@ export const imageGenerationSchema = z.strictObject({
   size: z.string().trim().min(1).max(64).optional(),
 });
 export const videoGenerationSchema = z.strictObject({
+  cameraTrajectory: cameraTrajectorySchema.optional(),
+  imageAndCameraOnly: z.boolean().optional(),
   ...sharedFields,
   videos: z.array(videoReference).max(64).optional(),
   audios: z.array(audioReference).max(64).optional(),

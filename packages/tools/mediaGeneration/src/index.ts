@@ -22,7 +22,7 @@ const plugin: ToolPlugin = {
     const listTool: ToolDefinition = {
       name: "listMediaModels",
       label: "查询媒体模型",
-      description: "查询用户在默认模型设置中选定且当前可用的媒体模型，返回 providerId、modelId、类型、模式及支持的画幅、时长、分辨率或音色。生成前先查询；某类型没有结果时，请用户设置默认模型，禁止自行选平台、猜模型或回退。",
+      description: "查询用户在默认模型设置中选定且当前可用的媒体模型，返回 providerId、modelId、类型、cameraTrajectory（原生数值轨迹）、promptControl（文字控制限制）、模式及支持的画幅、时长、分辨率或音色。生成前先查询；某类型没有结果时，请用户设置默认模型，禁止自行选平台、猜模型或回退。",
       parameters: z.toJSONSchema(listMediaModelsSchema, { io: "input", target: "draft-07" }),
       async execute(_id, params, signal) {
         listMediaModelsSchema.parse(params);
@@ -35,7 +35,7 @@ const plugin: ToolPlugin = {
     const productionTools: ToolDefinition[] = media.production ? [{
       name: "productionSpec", label: "制片规格", executionMode: "sequential",
       description: "读写当前项目的真实领域规格。先 read。world/look 更新世界或影调；asset 创建含 type/name/description/invariants 的资产草稿；sequence 创建 name/script；shot 创建 sequenceId/title/narrativeFunction/assetIds/action/performance/blocking/camera/lighting/realism{surface,imaging,world,motion,cinematic}/duration/intendedStateDelta/freedomMap；updateShot 带 shotId 修改草稿；binding 带 shotId/referenceId/role/weight/lockLevel 绑定已有参考。不能替用户做视觉检查或批准资产/Hero/Take，需用户在镜头制作面板查看。",
-      promptSnippet: "电影制作必须先用 productionSpec 保存领域规格。compile 输入 shotId/kind/request（含实际 providerId/modelId/prompt 和模式规格），读取 warnings/degradations；生成时传 shotId 和返回的 fingerprint 作为 productionFingerprint，服务端会使用编译结果替代自由提示词。",
+      promptSnippet: "电影制作必须先用 productionSpec 保存领域规格。compile 输入 shotId/kind/request（含实际 providerId/modelId/prompt 和模式规格），camera.design 持久化 technique/purpose/start/end/subjectPath/cameraPath/timing/cut/invariants/acceptance/fallback。数值轨迹仅发给 cameraTrajectory 模型；GEN3C 须显式 imageAndCameraOnly:true。compile 与 generate 使用完全相同的轨迹与规格。读取 warnings/degradations；生成时传 shotId 和返回的 fingerprint 作为 productionFingerprint，服务端会使用编译结果替代自由提示词。",
       parameters: z.toJSONSchema(productionSchema, { io: "input", target: "draft-07" }),
       async execute(_id, params, signal) {
         const parsed = productionSchema.parse(params);

@@ -134,8 +134,7 @@ async function start() {
       nodesRoot: resolve(PATHS.VIEWS_FOLDER, "../nodes"),
       providersRoot: resolve(PATHS.VIEWS_FOLDER, "../providers"),
       skillsRoot: resolve(PATHS.VIEWS_FOLDER, "../skills"),
-      // ACT: 暂不安装内置团队，随团队打包一同恢复。
-      // agentsRoot: resolve(PATHS.VIEWS_FOLDER, "../agents"),
+      agentsRoot: resolve(PATHS.VIEWS_FOLDER, "../agents"),
       pluginRevision: hash,
     });
     const server = app.listen(0, "127.0.0.1");

@@ -89,7 +89,7 @@ export function enqueueWorkspaceMedia(input: {
 
 export function prepareWorkspaceShot(input: {
   workspaceId: string; projectId: string; shotId: string; kind: "image" | "video";
-  providerId: string; modelId: string; mode?: unknown;
+  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean;
 }) {
   const s = scoped(input.workspaceId);
   const shot = s.get("shots", input.shotId);
@@ -105,7 +105,7 @@ export function prepareWorkspaceShot(input: {
   const images = input.kind === "image" ? imageLimit > 0 : referenceLimit > 0;
   const capabilities = { image2video: firstFrame || referenceLimit > 0, startEndFrame: ["startEndRequired", "endFrameOptional"].includes(String(mode)),
     multiReference: images, identityReference: images, compositionReference: images,
-    motionReference: videoLimit > 0, cameraControl: videoLimit > 0, nativeAudio: audioLimit > 0,
+    motionReference: videoLimit > 0, cameraControl: input.cameraTrajectory === true, nativeAudio: audioLimit > 0,
     maxInputs: input.kind === "image" ? imageLimit : firstFrame ? (mode === "startEndRequired" || mode === "endFrameOptional" ? 2 : 1) : referenceLimit + videoLimit + audioLimit };
   const modelId = "workspace" + createHash("sha256").update(JSON.stringify([input.workspaceId, input.kind, input.providerId, input.modelId])).digest("hex");
   upsertModel(modelId, { providerId: "workspaceMedia", externalModelId: JSON.stringify([input.providerId, input.modelId]), name: input.modelId,

@@ -11,11 +11,12 @@ import { mountCloud, requireAdminForPlugins, requireSession } from "@/lib/cloud"
 import { noStoreApi, rateLimit, securityHeaders, staticCacheHeaders } from "@/lib/security";
 import { authEnabled } from "@/utils/tenant";
 import initializePlugins from "@/utils/plugins/initialize";
+import syncBuiltins from "@/utils/plugins/syncBuiltins";
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 
-const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "bailian.ts", "kling.ts", "atlasCloud.ts", "easyRouter.ts"];
+const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "bailian.ts", "kling.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts"];
 
 export async function createApp({
   webRoot,
@@ -48,11 +49,11 @@ export async function createApp({
   if (dataDirectory && toolsRoot)
     await initializePlugins(resolve(dataDirectory, "tools"), toolsRoot, /^[a-z][a-zA-Z0-9]*\.tool\.js$/, pluginRevision);
   if (dataDirectory && nodesRoot) await initializePlugins(resolve(dataDirectory, "nodes"), nodesRoot, /^[a-z][a-zA-Z0-9]*\.umd\.js$/, pluginRevision);
-  // ACT: 供应方和技能可由用户编辑，只补缺失内置目录，不随应用版本覆盖。
+  // ACT: 供应商只补缺失文件；技能/团队按内容指纹升级，保留用户编辑。
   if (dataDirectory && providersRoot)
     await initializePlugins(resolve(dataDirectory, "providers"), resolve(providersRoot, "media"), autoInstallProviders);
-  if (dataDirectory && skillsRoot) await initializePlugins(resolve(dataDirectory, "skills"), skillsRoot);
-  if (dataDirectory && agentsRoot) await initializePlugins(resolve(dataDirectory, "agents"), agentsRoot);
+  if (dataDirectory && skillsRoot) await syncBuiltins(resolve(dataDirectory, "skills"), skillsRoot, "skills");
+  if (dataDirectory && agentsRoot) await syncBuiltins(resolve(dataDirectory, "agents"), agentsRoot, "agents");
   const app = express();
   app.disable("x-powered-by");
   // 只有部署在可信反向代理之后才采用 x-forwarded-for，否则客户端可伪造来源绕过限流。

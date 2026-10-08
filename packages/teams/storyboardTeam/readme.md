@@ -7,3 +7,5 @@ team.json 声明成员、委派关系和资源访问范围。members 保存提�
 运行 `bun run build` 生成 build/agents/storyboardTeam 目录和 storyboardTeam.agent.zip。开发环境中首次构建可安装到 data/agents/storyboardTeam；该目录已存在时默认保留其中所有改动。确认要用源码完整替换开发安装副本时，使用 `NODE_ENV=dev bun run build --sync`；该命令会删除安装副本中不再属于源码的文件。
 
 对外 A2A 访问由宿主提供地址、认证、模型与工作区。团队包本身不包含密钥，不监听端口。
+
+应用构建现已包含分镜团队。启动时按内置内容指纹升级未修改安装，自定义目录保留并报告冲突。三成员使用 knowledge/shotDesign.md 完成方法选择、规格填写和独立审阅；媒体生成仍由主 Agent 在授权后执行。
