@@ -19,6 +19,5 @@ export type ProviderTools = ProviderContext["tool"];
 export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[1];
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
-// LITTO does not offer the Toonflow TF-Router relay (its adapters stay in src/ but are not listed or auto-installed).
 export const languageProviders = [deepSeek, atlasCloudText, easyRouterText] as const;
 export const mediaProviders = [apiMart, meta, agnes, volcengine, bailian, kling, atlasCloud, easyRouter, qwenSpeech, museTalk] as const;

@@ -1,7 +1,8 @@
 import logger from "morgan";
 import express from "express";
 import cors from "cors";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { unlink } from "@toonflow/file";
 import type { Request, Response, NextFunction } from "express";
 import buildRoute from "@/core";
 import { error } from "@/lib/responseFormat";
@@ -38,6 +39,10 @@ export async function createApp({
   // conf 由下方的路由动态加载，必须先确定整个进程共用的数据目录。
   if (dataDirectory) process.env.TOONFLOW_DATA_DIR = resolve(dataDirectory);
   const { default: conf } = await import("@/utils/conf");
+  // 移除旧安装遗留的供应商脚本，不会随新版再次安装。
+  await unlink(resolve(dirname(conf.path), "providers/tfRouter.ts")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error;
+  });
   setLocaleFallback(() => normalizeLocale((conf.get("settings", {}).ui as { language?: unknown } | undefined)?.language)
     ?? detectLocale([Intl.DateTimeFormat().resolvedOptions().locale]));
   if (dataDirectory && toolsRoot)
@@ -71,8 +76,6 @@ export async function createApp({
   if (authEnabled()) app.use("/api", rateLimit(2400));
   app.use("/api", noStoreApi, requireSession, requireAdminForPlugins);
 
-  const { default: initializeProviderModels } = await import("@/utils/ai/initialize");
-  await initializeProviderModels();
   const router = await import("@/router");
   router.default(app);
   // MCP / A2A are single-instance, token-per-process control surfaces: off in multi-tenant mode (they would cross tenants).

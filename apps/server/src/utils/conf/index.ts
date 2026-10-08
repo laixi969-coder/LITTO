@@ -9,7 +9,7 @@ import type { A2aSettings } from "@/agent/a2a/settings";
 import type { desktopUpdateAttempt } from "@/types/desktop";
 import type { ModelBlock } from "@/utils/modelAvailability";
 
-// LITTO ships no pre-installed text provider (the LITTO TF-Router seed was removed); users add their own.
+// Users configure their own text providers.
 const autoInstallProviders: { id: string; label: string; version?: string; apiUrl: string; protocol: string; models: unknown[] }[] = [];
 const dataDirectory = process.env.TOONFLOW_DATA_DIR ?? resolve(import.meta.dirname, "../../../../../data");
 mkdirSync(dataDirectory, { recursive: true });
@@ -25,6 +25,29 @@ const config = new conf<{ modelAvailability: Record<string, ModelBlock>; setting
 
 export function removeLegacySettings(settings: Record<string, unknown>) {
   let changed = false;
+  const removedIds = new Set(["tfrouter"]);
+  if (Array.isArray(settings.customProviders)) {
+    const providers = settings.customProviders.filter(provider => {
+      const removed = typeof provider?.id === "string" && provider.id.toLowerCase() === "tfrouter"
+        || typeof provider?.apiUrl === "string" && URL.canParse(provider.apiUrl) && new URL(provider.apiUrl).hostname === "api.toonflow.net";
+      if (removed && typeof provider.id === "string") removedIds.add(provider.id.toLowerCase());
+      return !removed;
+    });
+    if (providers.length !== settings.customProviders.length) { settings.customProviders = providers; changed = true; }
+  }
+  const media = settings.mediaProviderConfigs;
+  if (media && typeof media === "object" && !Array.isArray(media)) {
+    for (const key of Object.keys(media)) if (key.toLowerCase() === "tfrouter") { Reflect.deleteProperty(media, key); changed = true; }
+  }
+  const selection = settings.modelSelection;
+  if (selection && typeof selection === "object" && !Array.isArray(selection)) {
+    for (const [kind, value] of Object.entries(selection)) {
+      if (typeof value?.providerId === "string" && removedIds.has(value.providerId.toLowerCase())) {
+        Reflect.set(selection, kind, null);
+        changed = true;
+      }
+    }
+  }
   // ACT: 只清理已废弃字段，保留其他设置和插件配置。
   for (const [record, key] of [[settings, "developerConfirmed"], [settings.general, "systemPrompt"], [settings.stores, "toonflow.developer"]] as const) {
     if (record && typeof record === "object" && !Array.isArray(record) && Object.hasOwn(record, key)) {
@@ -59,6 +82,8 @@ function activeConfig(): Settings {
     const cwd = tenantDir(tenant.workspaceId);
     mkdirSync(cwd, { recursive: true });
     c = new conf({ cwd, configName: "settings", configFileMode: 0o600, watch: false }) as Settings;
+    const settings = c.get("settings", {});
+    if (removeLegacySettings(settings)) c.set("settings", settings);
     tenantConfigs.set(tenant.workspaceId, c);
   }
   return c;

@@ -7,9 +7,6 @@
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">
-          <div v-if="item.id.toLowerCase() === 'tfrouter'" class="providerMark" aria-hidden="true">
-            <brandLogo class="providerLogo" />
-          </div>
           <div class="providerInfo">
             <div class="providerHeading">
               <el-text class="providerName" tag="strong">{{ item.label }}</el-text>
@@ -49,7 +46,6 @@ import axios from "axios";
 import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, shallowRef, type Component } from "vue";
 import { ElMessage } from "element-plus";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconDownload } from "@tabler/icons-vue";
-import brandLogo from "@/components/brandLogo.vue";
 import type { MediaProvider } from "./types";
 import { saveSettings, reenableProvider } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";

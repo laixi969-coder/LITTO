@@ -7,9 +7,6 @@
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.id" class="providerItem" shadow="never">
         <div class="providerHeader">
-          <div v-if="isTfRouterProvider(item)" class="providerMark" aria-hidden="true">
-            <brandLogo class="providerLogo" />
-          </div>
           <div class="providerInfo">
             <div class="providerHeading">
               <el-text class="providerName" tag="strong">{{ item.label }}</el-text>
@@ -49,8 +46,6 @@ import { ElMessage } from "element-plus";
 import { customProviders, saveSettings, reenableProvider, type CustomProvider } from "@/stores/settings";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
-import brandLogo from "@/components/brandLogo.vue";
-import { isTfRouterProvider } from "@/lib/tf";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();
 const addProviderDialog = shallowRef<Component>();
