@@ -203,8 +203,8 @@ function loadModels() {
   modelsRequest = ai.getMediaModels().then((items) => {
     if (deleting.value) return;
     models.value = items.filter((item) => item.type === "image");
-    // ACT: 只给空配置选默认模型，保留暂时不可用的旧选择及其参数。
-    if (!data.value.model) {
+    // 运行列表只包含用户在设置中授权的默认模型。
+    if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model)) {
       const first = models.value[0];
       data.value.model = first ? JSON.stringify([first.providerId, first.modelId]) : "";
     }

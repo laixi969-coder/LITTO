@@ -7,6 +7,7 @@ import { mediaProviders, type Provider } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { modelAccess } from "@/utils/modelAvailability";
+import { assertModelSelection, isSelectedModel } from "@/utils/modelSelection";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 
@@ -31,11 +32,12 @@ function imageOptions(value: unknown, pattern: RegExp) {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === "string" && item.length <= 64 && item === item.trim() && pattern.test(item)))] : undefined;
 }
 
-export async function listMediaModels(): Promise<MediaModel[]> {
+export async function listMediaModels(all = false): Promise<MediaModel[]> {
   const installedProviders = await listMediaProviders();
   return installedProviders.flatMap(provider => provider.models.flatMap(model => {
     if (provider.loadError || modelAccess("media", provider.id, model.id).reason()) return [];
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
+    if (!all && !isSelectedModel(model.type, provider.id, model.id)) return [];
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
     return [{
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
@@ -140,6 +142,7 @@ async function generateMediaUnrecorded(
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
   if (!request.prompt.trim()) invalid("请输入生成提示词");
+  assertModelSelection(mediaType, request.providerId, request.modelId);
   const directory = await realpath(cwd);
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);

@@ -21,7 +21,7 @@
       </template>
       <el-form class="modelOptions" labelPosition="top">
         <el-form-item label="模型">
-          <el-select v-model="selectedModel" filterable :disabled="disabled" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="暂无可用模型，请检查 Key、连接或余额">
+          <el-select v-model="selectedModel" filterable :disabled="disabled" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="请先在设置 → 默认模型中选择可用的对话模型">
             <template #prefix><modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="18" /></template>
             <el-option-group v-for="provider in modelGroups" :key="provider.id" :label="provider.label">
               <el-option v-for="model in provider.models" :key="model.id" :label="model.label" :value="JSON.stringify([provider.id, model.id])">
@@ -57,14 +57,13 @@ const reasoningOptions = [
   { label: "中", value: "medium" },
   { label: "高", value: "high" },
 ];
-const modelGroups = computed(() => languageProviders.value.toSorted((left, right) => Number(right.id === "tfRouter") - Number(left.id === "tfRouter")));
+const modelGroups = computed(() => languageProviders.value);
 const selectedModelChoice = computed(() => modelChoices.value.find(item => item.value === selectedModel.value));
 const reasoningLabel = computed(() => reasoningOptions.find(item => item.value === reasoningEffort.value)?.label ?? "默认");
 watch(selectedModel, () => { reasoningEffort.value = ""; });
 watch(visible, open => { if (open) void loadAvailableModels(); });
-watch(modelChoices, items => {
-  if (selectedModel.value && !items.some(item => item.value === selectedModel.value)) { selectedModel.value = ""; return; }
-  if (!selectedModel.value) selectedModel.value = items[0]?.value ?? "";
+watch([modelChoices, selectedModel], ([items]) => {
+  if (!items.some(item => item.value === selectedModel.value)) selectedModel.value = items[0]?.value ?? "";
 }, { immediate: true });
 watch(() => !props.active || props.disabled, close => { if (close) visible.value = false; });
 </script>

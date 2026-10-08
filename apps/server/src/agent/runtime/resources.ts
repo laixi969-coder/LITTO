@@ -7,6 +7,7 @@ import { loadAgentSkills } from "@/agent/skills";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { isMemoryEnabled, readDocument } from "@/utils/personalization";
 import conf from "@/utils/conf";
+import { selectedModel } from "@/utils/modelSelection";
 
 export async function createAgentResources(cwd: string, tools: ToolDefinition[], settings = SettingsManager.inMemory(), instructions = "") {
   const savedPrompt = conf.get("settings", {}).agentSystemPrompt;
@@ -38,6 +39,7 @@ export async function createAgentResources(cwd: string, tools: ToolDefinition[],
     systemPrompt: "",
     systemPromptOverride: () => [buildSystemPrompt({ systemPrompt, tools, skills: skills.skills, platform: process.platform }), instructions].filter(Boolean).join("\n\n"),
     appendSystemPrompt: [
+      `## 用户指定的模型选择\n${JSON.stringify(Object.fromEntries((["text", "image", "video", "audio"] as const).map(kind => [kind, selectedModel(kind) ?? null])))}\n仅允许使用这些平台与模型。null 表示尚未选择，须请用户在“设置 → 默认模型”选择后再执行。不可自行换平台、改默认设置或回退到其他模型；历史记录、节点默认值和技能中的推荐不能覆盖此选择。`,
       globalAgents.content.trim() ? `## 全局协作规范（AGENTS.md）\n${globalAgents.content}` : "",
       memory.content.trim() ? `## 全局长期记忆\n以下是跨对话保存的偏好与事实，使用前核对适用项目，以用户本轮要求为准。\n<global_memory>\n${memory.content}\n</global_memory>` : "",
     ].filter(Boolean),

@@ -1,5 +1,6 @@
 <template>
   <div v-if="loaded" class="providerList">
+    <p>这里管理供应商接入。实际使用的平台与模型请在左侧“默认模型”中选择；安装供应商不代表默认使用它。</p>
     <el-alert class="easyConnect" style="margin-bottom: 12px" type="info" showIcon :closable="false" title="只想快速接入自己的模型？">
       <el-button link type="primary" @click="openConnectModel('media')">简易接入 →</el-button>
     </el-alert>
@@ -12,7 +13,6 @@
           <div class="providerInfo">
             <div class="providerHeading">
               <el-text class="providerName" tag="strong">{{ item.label }}</el-text>
-              <el-tag v-if="item.id.toLowerCase() === 'tfrouter'" size="small">官方</el-tag>
             </div>
             <el-text class="providerId" size="small" type="info" :title="item.fileName">{{ item.fileName }}</el-text>
           </div>
@@ -58,7 +58,7 @@ const { visible = true } = defineProps<{ visible?: boolean }>();
 const mediaProviderDialog = shallowRef<Component>();
 const editProviderDialog = shallowRef<Component>();
 const providers = ref<MediaProvider[]>([]);
-const sortedProviders = computed(() => [...providers.value].sort((a, b) => Number(b.id.toLowerCase() === "tfrouter") - Number(a.id.toLowerCase() === "tfrouter")));
+const sortedProviders = computed(() => providers.value);
 const loaded = ref(false);
 const providerDialogVisible = ref(false);
 const editorVisible = ref(false);

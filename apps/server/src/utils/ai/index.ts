@@ -11,6 +11,7 @@ import modelContextLimits from "@/utils/ai/modelContextLimits";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 import { modelAccess } from "@/utils/modelAvailability";
+import { assertModelSelection, isSelectedModel } from "@/utils/modelSelection";
 
 export { fetchProviderModels } from "@/utils/ai/models";
 
@@ -86,6 +87,7 @@ export function describeModelError(message: string | undefined) {
 }
 
 export function getConfiguredModel(providerId: string, modelId: string) {
+  assertModelSelection("text", providerId, modelId);
   if (providerId === cloud()?.trialProviderId) return trialConfiguredModel(modelId);
   const providers = conf.get("settings", {}).customProviders;
   const parsed = providerSchema.safeParse(Array.isArray(providers) ? providers.find(item => item?.id === providerId) : undefined);
@@ -106,10 +108,10 @@ export async function assertConfiguredUpstream(configured: ReturnType<typeof get
   await assertPublicHttpUrl(configured.baseUrl, { strictDns: false });
 }
 
-export function listAiModels() {
+export function listAiModels(all = false) {
   const providers = conf.get("settings", {}).customProviders;
   const trialState = trialModels();
-  const trial = (trialState.credits > 0 ? trialState.models : []).map(model => {
+  const trial = (trialState.credits > 0 ? trialState.models : []).filter(model => all || isSelectedModel("text", cloud()!.trialProviderId, model.id)).map(model => {
     const limits = getModelLimits(cloud()!.trialProviderId, model);
     return { providerId: cloud()!.trialProviderId, providerLabel: "平台试用", protocol: "openai-completions" as const, modelId: model.id, label: model.label,
       contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens };
@@ -119,7 +121,7 @@ export function listAiModels() {
     const parsed = providerSchema.extend({ id: z.string().min(1), label: z.string() }).safeParse(item);
     if (!parsed.success) return [];
     const provider = parsed.data;
-    return provider.models.filter(model => model.id.trim() && !modelAccess("text", provider.id, model.id).reason()).map(model => {
+    return provider.models.filter(model => model.id.trim() && !modelAccess("text", provider.id, model.id).reason() && (all || isSelectedModel("text", provider.id, model.id))).map(model => {
       const limits = getModelLimits(provider.id, model);
       return {
         providerId: provider.id, providerLabel: provider.label, protocol: provider.protocol, modelId: model.id, label: model.label,
@@ -183,6 +185,7 @@ export function streamAi(
   references: Awaited<ReturnType<typeof readAiReferences>> = [],
 ) {
   const { provider, model: configuredModel, baseUrl } = configured;
+  assertModelSelection("text", configured.providerId, configuredModel.id);
   const model: Model<typeof provider.protocol> = {
     // 回复里的 provider 恒为 "toonflow"；记录用量和平台试用扣费须用 configured.providerId。
     id: configuredModel.id, name: configuredModel.label, provider: "toonflow", api: provider.protocol, baseUrl,

@@ -51,11 +51,11 @@ const hiddenPanels = accounts ? (getMe()?.user.isAdmin ? ["mcp"] : ["mcp", "plug
 const settingsPanels = [
   { id: "ui", label: "界面设置", icon: IconPalette, component: defineAsyncComponent(() => import("./panels/ui.vue")) },
   { id: "general", label: "常规配置", icon: IconSettings, component: defineAsyncComponent(() => import("./panels/general/index.vue")) },
+  { id: "modelSelection", label: "默认模型", icon: IconSubtitlesAi, groupLabel: "模型", component: defineAsyncComponent(() => import("./panels/modelSelection.vue")) },
   {
     id: "languageModel",
     label: "文本模型",
     icon: IconSubtitlesAi,
-    groupLabel: "模型",
     component: defineAsyncComponent(() => import("./panels/languageModel/index.vue")),
   },
   { id: "mediaModel", label: "媒体模型", icon: IconPhotoVideo, component: defineAsyncComponent(() => import("./panels/mediaModel/index.vue")) },

@@ -8,6 +8,7 @@ import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { generateMediaDirect, listMediaModels } from "@/utils/media/generation";
+import { assertModelSelection } from "@/utils/modelSelection";
 
 export function workspaceProject(directory: string) {
   const tenant = currentTenant();
@@ -20,6 +21,7 @@ export function workspaceProject(directory: string) {
 }
 
 export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string) {
+  assertModelSelection(kind, request.providerId, request.modelId);
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
@@ -101,6 +103,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
 }
 
 export async function prepareShot(directory: string, kind: "image" | "video", shotId: string, request: MediaGenerationRequest) {
+  assertModelSelection(kind, request.providerId, request.modelId);
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权制作镜头"), { status: 403 });

@@ -181,7 +181,7 @@ async function loadModels() {
   modelsLoading.value = true;
   try {
     models.value = await ai.getModels();
-    if (!model.value) {
+    if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === model.value)) {
       const first = models.value[0];
       model.value = first ? JSON.stringify([first.providerId, first.modelId]) : "";
     }

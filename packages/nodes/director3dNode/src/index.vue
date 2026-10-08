@@ -289,8 +289,8 @@ async function loadModels() {
     if (disposed) return;
     models.value = available;
     const first = models.value[0];
-    // ACT: 只给空配置选默认模型，保留暂时不可用的旧选择。
-    if (!model.value) model.value = first ? JSON.stringify([first.providerId, first.modelId]) : "";
+    // 旧节点不能覆盖用户当前设置的默认模型。
+    if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === model.value)) model.value = first ? JSON.stringify([first.providerId, first.modelId]) : "";
   } catch (error) {
     if (!disposed) ElMessage.error(error instanceof Error ? error.message : "模型加载失败");
   } finally {

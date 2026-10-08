@@ -1,5 +1,6 @@
 <template>
   <div class="providerList">
+    <p>这里管理供应商接入。实际使用的平台与模型请在左侧“默认模型”中选择；安装供应商不代表默认使用它。</p>
     <el-alert class="easyConnect" style="margin-bottom: 12px" type="info" showIcon :closable="false" title="只想快速接入自己的模型？">
       <el-button link type="primary" @click="openConnectModel('text')">简易接入 →</el-button>
     </el-alert>
@@ -12,7 +13,6 @@
           <div class="providerInfo">
             <div class="providerHeading">
               <el-text class="providerName" tag="strong">{{ item.label }}</el-text>
-              <el-tag v-if="isTfRouterProvider(item)" size="small">官方</el-tag>
             </div>
             <el-text class="providerId" size="small" type="info" :title="item.id">{{ item.id }}</el-text>
           </div>
@@ -60,7 +60,7 @@ const customProviderDialogVisible = ref(false);
 const editingProvider = ref<CustomProvider>();
 const deletingId = ref("");
 const syncOnOpen = ref(false);
-const sortedProviders = computed(() => [...customProviders.value].sort((a, b) => Number(isTfRouterProvider(b)) - Number(isTfRouterProvider(a))));
+const sortedProviders = computed(() => customProviders.value);
 
 function getProviderVersion(provider: CustomProvider) {
   const version = languageProviders.find(item => item.id.toLowerCase() === provider.id.toLowerCase())?.version ?? provider.version;

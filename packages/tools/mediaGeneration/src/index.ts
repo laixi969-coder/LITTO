@@ -22,7 +22,7 @@ const plugin: ToolPlugin = {
     const listTool: ToolDefinition = {
       name: "listMediaModels",
       label: "查询媒体模型",
-      description: "查询已允许生成的媒体模型，返回 providerId、modelId、类型、模式及支持的画幅、时长、分辨率或音色。生成前先查询，不能猜测模型 ID。",
+      description: "查询用户在默认模型设置中选定且当前可用的媒体模型，返回 providerId、modelId、类型、模式及支持的画幅、时长、分辨率或音色。生成前先查询；某类型没有结果时，请用户设置默认模型，禁止自行选平台、猜模型或回退。",
       parameters: z.toJSONSchema(listMediaModelsSchema, { io: "input", target: "draft-07" }),
       async execute(_id, params, signal) {
         listMediaModelsSchema.parse(params);

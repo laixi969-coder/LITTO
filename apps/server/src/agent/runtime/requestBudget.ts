@@ -3,6 +3,7 @@ import { createAssistantMessageEventStream, type AssistantMessage, type Assistan
 import { resizeImage, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { modelAccess } from "@/utils/modelAvailability";
 import { cloud } from "@/lib/cloud";
+import { assertModelSelection } from "@/utils/modelSelection";
 
 const requestBytes = 1800 * 1024;
 const historyImageNote = "[历史图片预览已省略；原始素材与会话记录保留，需要检查细节时请按原路径重新读取。]";
@@ -64,6 +65,7 @@ export function installRequestBudget(session: AgentSession) {
     void (async () => {
       let last: AssistantMessage | undefined;
       try {
+        assertModelSelection("text", model.provider, model.id);
         access?.assert();
         for (let attempt = 0; attempt < 2; attempt++) {
           const stream = await streamFunction(model, context, { ...options,
