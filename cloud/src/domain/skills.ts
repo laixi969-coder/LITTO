@@ -63,7 +63,7 @@ export function storyboardDirector(script: string, assets: AssetLite[], opts: { 
         const envs = isNewScene ? assets.filter((a) => a.type === "Environment" && (b.sceneName.toLowerCase().includes(a.name.toLowerCase()) || b.text.toLowerCase().includes(a.name.toLowerCase()))) : [];
         const sceneEnv = isNewScene ? (envs.length ? envs.map((e) => e.id) : (assets.find((a) => a.type === "Environment") ? [assets.find((a) => a.type === "Environment")!.id] : [])) : envOf(b.scene);
         const night = NIGHT.test(b.sceneName);
-        const light = { motivatedLight: night ? "practical lamp / moonlight" : "window daylight", key: night ? "low-key warm practical" : "soft window key", fill: night ? "minimal" : "bounce fill", negativeFill: night ? "heavy" : "light", practicals: night ? ["table lamp"] : [], exposure: night ? "low-key, protect highlights" : "normal, protect window highlights", keyDirection: "left" as const, timeOfDay: night ? "night" : "day", colorTemp: night ? "3200K" : "5600K" };
+        const light = { motivatedLight: night ? "practical lamp / moonlight" : "window daylight", key: night ? "low-key warm practical" : "soft window key", fill: night ? "subtle bounce" : "bounce fill", negativeFill: night ? "moderate" : "light", practicals: night ? ["table lamp"] : [], exposure: night ? "low-key, faces readable, protect highlights" : "normal, protect window highlights", keyDirection: "none" as const, timeOfDay: night ? "night" : "day", colorTemp: night ? "3200K" : "5600K" };
         const emo = EMOTION.find(([re]) => re.test(b.text));
         const base = (fn: ShotDraft["narrativeFunction"], size: string, lens: number, title: string, extra: Partial<ShotDraft> = {}): ShotDraft => ({
             title, sceneName: b.sceneName, narrativeFunction: fn, assetIds: [...new Set([...sceneEnv, ...found.map((a) => a.id)])], action: b.text,
@@ -144,7 +144,7 @@ export function visualDirector(notes: string) {
         look: {
             contrast: has("high contrast", "noir", "harsh") ? "high" : has("flat", "soft") ? "low" : "medium",
             saturation: has("muted", "desaturated", "faded") ? "muted" : has("vivid", "saturated", "neon") ? "rich" : "natural",
-            palette: has("teal") ? ["teal", "amber"] : has("noir") ? ["black", "cold white", "amber"] : ["warm neutral", "desaturated green"],
+            palette: has("teal") ? ["teal", "amber"] : has("noir") ? ["black", "cold white", "amber"] : [],
             grain: has("16mm", "film", "grain") ? "visible 16mm-like" : "fine", halation: has("film", "halation") ? "subtle red halation on highlights" : "",
             highlightRolloff: has("film") ? "long, filmic" : "gentle", blackLevel: has("lifted", "faded") ? "lifted" : "rich but not crushed",
         },
@@ -158,7 +158,7 @@ export function cinematographer(fn: string, emotion: string, night: boolean) {
     return {
         lensMm: lens,
         shotSize: { Establish: "WS", Reveal: "CU", Reaction: "CU", Contrast: "MS", Transition: "WS", Match: "MS", Rhythm: "MCU" }[fn] ?? "MS",
-        lighting: { key: night ? "low-key practical" : "soft motivated window", negativeFill: emotion === "fear" || emotion === "anger" ? "heavy" : "light", exposure: night ? "protect highlights, let shadows fall" : "normal" },
+        lighting: { key: night ? "low-key practical" : "soft motivated window", negativeFill: emotion === "fear" || emotion === "anger" ? "heavy" : "light", exposure: night ? "protect highlights, keep faces readable" : "normal" },
         exposureNote: "Expose for skin; keep practicals below clipping; let the sensor noise show in deep shadow.",
         opticalBehavior: "Focus falls off naturally; no artificial sharpening halos; slight lens breathing on rack focus.",
     };
