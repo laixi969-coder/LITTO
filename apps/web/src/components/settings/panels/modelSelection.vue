@@ -10,7 +10,6 @@
         </el-select>
       </el-form-item>
       <el-space>
-        <el-button type="primary" :loading="saving" :disabled="loading" @click="save">保存默认模型</el-button>
         <el-button :loading="loading" :disabled="saving" @click="load">刷新可用模型</el-button>
       </el-space>
     </el-form>
@@ -19,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage } from "element-plus";
 import { settings, saveSettings } from "@/stores/settings";
@@ -32,9 +31,11 @@ const draft = ref<Record<Kind, string>>({ text: "", image: "", video: "", audio:
 const loading = ref(false);
 const saving = ref(false);
 const error = ref("");
+const autoSaveReady = ref(false);
 const keyOf = (model: { providerId: string; modelId: string }) => JSON.stringify([model.providerId, model.modelId]);
 const choices = (kind: Kind) => models.value.filter(model => model.type === kind);
 function unavailableLabel(value: string) { try { return JSON.parse(value).join(" / "); } catch { return "请重新选择"; } }
+function currentSelection() { return settings.value.modelSelection as Partial<Record<Kind, { providerId: string; modelId: string }>> | undefined; }
 
 async function load() {
   loading.value = true;
@@ -51,10 +52,12 @@ async function save() {
   saving.value = true;
   error.value = "";
   try {
+    const saved = currentSelection();
     const selection = Object.fromEntries(kinds.map(({ id }) => {
       if (!draft.value[id]) return [id, null];
       const model = choices(id).find(item => keyOf(item) === draft.value[id]);
-      if (!model) throw new Error("有模型已不可用，请重新选择或清空该项");
+      // 未改动的失效项保留服务端现值，避免阻断其他项的保存。
+      if (!model) return [id, saved?.[id] ?? null];
       return [id, { providerId: model.providerId, modelId: model.modelId }];
     }));
     await saveSettings(() => ({ modelSelection: selection }));
@@ -63,10 +66,12 @@ async function save() {
   finally { saving.value = false; }
 }
 
+watch(draft, () => { if (autoSaveReady.value) void save(); }, { deep: true });
+
 onMounted(() => {
-  const selection = settings.value.modelSelection as Partial<Record<Kind, { providerId: string; modelId: string }>> | undefined;
+  const selection = currentSelection();
   for (const { id } of kinds) draft.value[id] = selection?.[id] ? keyOf(selection[id]!) : "";
-  void load();
+  void load().finally(() => { autoSaveReady.value = true; });
 });
 </script>
 
