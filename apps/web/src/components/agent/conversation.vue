@@ -103,11 +103,14 @@
         @lostpointercapture="stopSenderResize"
         @keydown.up.prevent="setSenderHeight((sender?.chatElement.rollBox.clientHeight ?? 44) + 16)"
         @keydown.down.prevent="setSenderHeight((sender?.chatElement.rollBox.clientHeight ?? 44) - 16)" />
-      <attachmentList v-if="draftAttachments.length" class="draftAttachments" :attachments="draftAttachments" :directory="directory" removable restorable :disabled="locked" @remove="draftAttachments.splice($event, 1)" @restore="restoreTextAttachment" />
+      <attachmentList v-if="draftAttachments.length" class="draftAttachments" :attachments="draftAttachments" :directory="directory" removable restorable editableNames :disabled="locked" @remove="draftAttachments.splice($event, 1)" @restore="restoreTextAttachment" @rename="renameAttachment" />
+      <p v-if="draftAttachments.some(item => item.mimeType.startsWith('image/'))" class="attachmentHint">为每张图填写角色名或用途，同一角色的多张图使用同一角色名。发送时说明哪些角色出场；镜头的身份参考仍需绑定到具体镜头。</p>
       <div ref="senderElement" class="senderEditor" @keydown.capture="handleSenderKeydown"></div>
       <teleport v-for="target in draftMentionTargets" :key="target.key" :to="target.element"><mentionThumbnail v-bind="mentionThumbnailProps(target.mention)" :directory="directory"><icon-photo :size="14" /></mentionThumbnail></teleport>
       <mentionContent ref="draftMentionPreview" :mentions="draftMentions" :directory="directory" removable @remove="removeDraftMention" />
       <div class="senderActions">
+        <input ref="imageInput" type="file" accept="image/*" multiple hidden :disabled="locked || !directory" @change="selectImages" />
+        <el-button text :disabled="locked || !directory" @click="imageInput?.click()"><icon-photo :size="16" />上传图片</el-button>
         <modelPopover v-model="selectedModel" v-model:reasoningEffort="reasoningEffort" :active="active" :disabled="disabled" />
         <mentionMenu ref="mentionMenuRef" :directory="directory" :active="active" :disabled="locked || !directory" :query="mentionQuery" :editor="senderElement" :currentCanvasId="createCanvasContext?.()?.id" @open="captureMentionPosition" @select="insertMentions" @dismiss="mentionQuery = undefined" />
         <skillMenu ref="skillMenuRef" :directory="directory" :active="active" :disabled="locked || !directory" :query="skillQuery" :editor="senderElement" @select="selectSkill" @dismiss="skillQuery = undefined" />
@@ -195,6 +198,7 @@ const emit = defineEmits<{ session: [file: string]; sent: [prompt: string]; even
 const workspaceStore = useWorkspaceStore();
 const directory = workspaceStore.project?.directory;
 const draftAttachments = ref<AgentAttachment[]>([]);
+const imageInput = ref<HTMLInputElement>();
 const createCanvasContext = inject<(() => CanvasContext | undefined) | undefined>("canvas", undefined);
 const messages = ref<AgentMessage[]>((props.initialSession?.messages ?? []).map(message => ({ ...message })));
 const stream = createConversationStream(messages);
@@ -531,7 +535,7 @@ async function uploadAttachments(attachments: AgentAttachment[], directory: stri
   }
   for (const attachment of attachments) {
     if (!attachment.file) continue;
-    const extension = attachment.name.match(/\.[a-zA-Z0-9]{1,10}$/)?.[0].toLowerCase() ?? "";
+    const extension = attachment.file.name.match(/\.[a-zA-Z0-9]{1,10}$/)?.[0].toLowerCase() ?? "";
     const path = `assets/chat/${crypto.randomUUID()}${extension}`;
     await files.write(path, attachment.file, true, signal);
     attachment.path = path;
@@ -712,6 +716,19 @@ async function restoreTextAttachment(index: number) {
   }
 }
 
+function renameAttachment(index: number, name: string) {
+  const attachment = draftAttachments.value[index];
+  if (locked.value || !attachment) return;
+  draftAttachments.value[index] = { ...attachment, name: name.trim() || attachment.file?.name || attachment.name };
+}
+
+function selectImages(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  input.value = "";
+  addAttachments(files);
+}
+
 function pasteAttachments(event: ClipboardEvent) {
   const files = Array.from(event.clipboardData?.files ?? []);
   if (!files.length) {
@@ -728,7 +745,11 @@ function pasteAttachments(event: ClipboardEvent) {
   if (!files.length) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  if (locked.value) return;
+  addAttachments(files);
+}
+
+function addAttachments(files: File[]) {
+  if (locked.value || !props.active || !directory) return;
   for (const file of files) {
     const mimeType = /\.mp3$/i.test(file.name) ? "audio/mpeg" : /\.(txt|lrc|srt)$/i.test(file.name) ? "text/plain" : file.type;
     if (!/^(image|video)\//.test(mimeType) && mimeType !== "audio/mpeg" && mimeType !== "text/plain") {
@@ -1116,6 +1137,8 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
       padding: 12px 12px 0;
     }
 
+    .attachmentHint { margin: 8px 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+
     .senderEditor .chat-placeholder-wrap {
       font-size: 14px;
       font-style: normal;
@@ -1156,6 +1179,7 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
 
     .senderActions {
       display: flex;
+      flex-wrap: wrap;
       justify-content: flex-end;
       align-items: center;
       gap: 12px;
