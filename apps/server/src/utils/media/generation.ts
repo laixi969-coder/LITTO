@@ -6,6 +6,7 @@ import { join, relative } from "node:path";
 import { mediaProviders, type Provider } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
+import { modelAccess } from "@/utils/modelAvailability";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 
@@ -33,6 +34,7 @@ function imageOptions(value: unknown, pattern: RegExp) {
 export async function listMediaModels(): Promise<MediaModel[]> {
   const installedProviders = await listMediaProviders();
   return installedProviders.flatMap(provider => provider.models.flatMap(model => {
+    if (provider.loadError || modelAccess("media", provider.id, model.id).reason()) return [];
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
     return [{
@@ -142,6 +144,8 @@ async function generateMediaUnrecorded(
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);
   const providerInfo = await getMediaProvider(request.providerId);
+  const access = modelAccess("media", request.providerId, request.modelId);
+  access.assert();
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
@@ -154,7 +158,7 @@ async function generateMediaUnrecorded(
   const references = async (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => readReference(directory, item, type, signal))) : undefined;
   const images = await references(request.images, "image");
   signal?.throwIfAborted();
-  const assets = mediaType === "audio"
+  const assets = await (async () => mediaType === "audio"
     ? await provider.generateAudio!({
       model: request.modelId, text: request.prompt, audios: await references(request.audios, "audio"),
       voice: request.voice, instructions: request.instructions, speed: request.speed, volume: request.volume, format: request.format, sampleRate: request.sampleRate,
@@ -168,6 +172,11 @@ async function generateMediaUnrecorded(
       lastFrame: request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined,
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
       generateAudio: request.generateAudio, mode: request.mode,
+    }))().catch(error => {
+      // 只记录供应商调用错误，下载结果、写文件或参数错误不代表模型失效。
+      if (!signal?.aborted) access.failed(error);
+      if (error instanceof Error && access.reason()) Object.assign(error, { retryable: false });
+      throw error;
     });
   if (!Array.isArray(assets) || !assets.length) invalid("供应商未返回生成结果");
   const written: string[] = [];

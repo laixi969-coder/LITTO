@@ -175,7 +175,7 @@ import { createPastedTextFile, readTextAttachment } from "./textAttachments";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { writeClipboardText } from "@/lib/clipboard";
 import anonymousData from "@/lib/anonymousData";
-import { modelChoices } from "@/stores/settings";
+import { modelChoices, loadAvailableModels } from "@/stores/settings";
 import { useWorkspaceStore } from "@/stores/workspace";
 import type { AgentAttachment, AgentConversation, AgentMessage } from "./types";
 import type { AgentEvent, AgentMention } from "@toonflow/server/agent/types";
@@ -306,6 +306,7 @@ watch(() => props.active, active => {
 });
 
 function applyEvent(event: AgentEvent) {
+  if (event.type === "done" || event.type === "error") void loadAvailableModels();
   switch (event.type) {
     case "subAgent":
     case "subAgentEvent": emit("event", event); break;

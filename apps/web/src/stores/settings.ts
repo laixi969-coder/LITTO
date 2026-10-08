@@ -101,11 +101,29 @@ export async function loadPlatformTrial() {
     // 试用不可用时只是少了平台模型，用户仍可接入自己的模型。
   }
 }
-export const platformTrialProvider = computed<CustomProvider | undefined>(() => platformTrial.value.models.length
+export const platformTrialProvider = computed<CustomProvider | undefined>(() => platformTrial.value.credits > 0 && platformTrial.value.models.length
   ? { id: "littoPlatform", label: "平台试用", apiUrl: "", apiKey: "", protocol: "openai-completions", models: platformTrial.value.models }
   : undefined);
 // 可选文本模型：用户自己的供应商在前，平台试用在后。
-export const languageProviders = computed(() => platformTrialProvider.value ? [...customProviders.value, platformTrialProvider.value] : customProviders.value);
+const availableModels = ref<{ providerId: string; modelId: string }[]>([]);
+export async function loadAvailableModels() {
+  try {
+    const { data } = await axios.get("/api/ai/models", { headers: { "Cache-Control": "no-cache" } });
+    availableModels.value = data.code === 200 && Array.isArray(data.data) ? data.data : [];
+  } catch { availableModels.value = []; }
+  invalidateNodeModels("language");
+  invalidateNodeModels("media");
+}
+export async function reenableProvider(kind: "text" | "media", providerId: string) {
+  await axios.post("/api/providers/reenable", { kind, providerId }, { headers: { "x-toonflow-workspace": "1" } });
+  await loadAvailableModels();
+  ElMessage.success("已允许重新尝试，若仍不可用会自动停用");
+}
+export const languageProviders = computed(() => {
+  const configured = platformTrialProvider.value ? [...customProviders.value, platformTrialProvider.value] : customProviders.value;
+  return configured.map(provider => ({ ...provider, models: provider.models.filter(model => availableModels.value.some(item => item.providerId === provider.id && item.modelId === model.id)) }))
+    .filter(provider => provider.models.length);
+});
 
 export const modelChoices = computed(() => languageProviders.value.flatMap(provider => provider.models.map(model => ({
   value: JSON.stringify([provider.id, model.id]), providerId: provider.id, modelId: model.id, label: model.label, contextWindow: model.contextWindow,
@@ -123,6 +141,7 @@ export async function loadSettings() {
   await nextTick();
   settingsReady = true;
   await loadPlatformTrial();
+  await loadAvailableModels();
 }
 
 export function saveSettings(update?: (current: Record<string, unknown>) => Record<string, unknown> | undefined) {
@@ -138,6 +157,7 @@ export function saveSettings(update?: (current: Record<string, unknown>) => Reco
       try { settings.value = { ...settings.value, ...patch }; }
       finally { applyingSettings = false; }
     }
+    await loadAvailableModels();
     return true;
   });
   saveQueue = saving.then(() => {}, () => {});

@@ -13,6 +13,7 @@ import { describeModelError, readAiReferences, referenceContent } from "@/utils/
 import { createAgentTools } from "@/agent/tools";
 import { createAgentResources } from "@/agent/runtime/resources";
 import { createAgentModel } from "@/agent/runtime/model";
+import { installRequestBudget } from "@/agent/runtime/requestBudget";
 import { createSubAgentTool } from "@/agent/tools/subAgent";
 import { createMemoryTool } from "@/agent/tools/memory";
 import { createReportTool } from "@/agent/tools/report";
@@ -179,6 +180,7 @@ export async function run(
       customTools: tools,
     });
     active.session = session;
+    installRequestBudget(session);
 
     const streamFunction = session.agent.streamFunction;
     session.agent.streamFunction = async (...args) => {

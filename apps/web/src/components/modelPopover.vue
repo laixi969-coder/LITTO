@@ -21,7 +21,7 @@
       </template>
       <el-form class="modelOptions" labelPosition="top">
         <el-form-item label="模型">
-          <el-select v-model="selectedModel" filterable :disabled="disabled" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="请先在设置中添加模型">
+          <el-select v-model="selectedModel" filterable :disabled="disabled" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="暂无可用模型，请检查 Key、连接或余额">
             <template #prefix><modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="18" /></template>
             <el-option-group v-for="provider in modelGroups" :key="provider.id" :label="provider.label">
               <el-option v-for="model in provider.models" :key="model.id" :label="model.label" :value="JSON.stringify([provider.id, model.id])">
@@ -45,7 +45,7 @@
 import { computed, ref, watch } from "vue";
 import { IconChevronDown } from "@tabler/icons-vue";
 import { modelIcon } from "@toonflow/model-icons";
-import { languageProviders, modelChoices } from "@/stores/settings";
+import { languageProviders, modelChoices, loadAvailableModels } from "@/stores/settings";
 
 const selectedModel = defineModel<string>({ default: "" });
 const reasoningEffort = defineModel<string>("reasoningEffort", { default: "" });
@@ -61,7 +61,9 @@ const modelGroups = computed(() => languageProviders.value.toSorted((left, right
 const selectedModelChoice = computed(() => modelChoices.value.find(item => item.value === selectedModel.value));
 const reasoningLabel = computed(() => reasoningOptions.find(item => item.value === reasoningEffort.value)?.label ?? "默认");
 watch(selectedModel, () => { reasoningEffort.value = ""; });
+watch(visible, open => { if (open) void loadAvailableModels(); });
 watch(modelChoices, items => {
+  if (selectedModel.value && !items.some(item => item.value === selectedModel.value)) { selectedModel.value = ""; return; }
   if (!selectedModel.value) selectedModel.value = items[0]?.value ?? "";
 }, { immediate: true });
 watch(() => !props.active || props.disabled, close => { if (close) visible.value = false; });

@@ -87,6 +87,8 @@ async function readModels<T>(url: string, signal: AbortSignal): Promise<T[]> {
     });
     pending = request;
     modelCache.set(url, request);
+    // 模型可用性会随鉴权/余额错误变化，不把旧候选永久缓存在节点中。
+    void request.then(() => { setTimeout(() => { if (modelCache.get(url) === request) modelCache.delete(url); }, 5000); }, () => {});
   }
   // 单个节点关闭只取消自己的等待，不能中断其他节点共用的请求。
   let cancel = () => {};

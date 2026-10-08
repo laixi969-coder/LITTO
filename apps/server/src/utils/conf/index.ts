@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import type { RemoteTeam } from "@/utils/teams";
 import type { A2aSettings } from "@/agent/a2a/settings";
 import type { desktopUpdateAttempt } from "@/types/desktop";
+import type { ModelBlock } from "@/utils/modelAvailability";
 
 // LITTO ships no pre-installed text provider (the LITTO TF-Router seed was removed); users add their own.
 const autoInstallProviders: { id: string; label: string; version?: string; apiUrl: string; protocol: string; models: unknown[] }[] = [];
@@ -15,7 +16,7 @@ mkdirSync(dataDirectory, { recursive: true });
 const configDirectory = realpathSync(dataDirectory);
 process.env.TOONFLOW_DATA_DIR = configDirectory;
 
-const config = new conf<{ settings: Record<string, unknown>; toolConfigs: Record<string, Record<string, unknown>>; nodeConfigs: Record<string, Record<string, unknown>>; remoteConnections: Record<string, RemoteTeam>; a2a: A2aSettings; desktopUpdateAttempt: desktopUpdateAttempt }>({
+const config = new conf<{ modelAvailability: Record<string, ModelBlock>; settings: Record<string, unknown>; toolConfigs: Record<string, Record<string, unknown>>; nodeConfigs: Record<string, Record<string, unknown>>; remoteConnections: Record<string, RemoteTeam>; a2a: A2aSettings; desktopUpdateAttempt: desktopUpdateAttempt }>({
   cwd: configDirectory,
   configName: "settings",
   configFileMode: 0o600,

@@ -10,6 +10,7 @@ import { readReference } from "@/utils/media/generation";
 import modelContextLimits from "@/utils/ai/modelContextLimits";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
+import { modelAccess } from "@/utils/modelAvailability";
 
 export { fetchProviderModels } from "@/utils/ai/models";
 
@@ -73,6 +74,8 @@ function trialConfiguredModel(modelId: string) {
 // 上游 SDK 的错误是英文且不说明原因，转成用户能据此行动的说明，并附上原文便于管理员排查；无法识别的保持原文。
 export function describeModelError(message: string | undefined) {
   if (!message) return "模型请求失败";
+  if (/\b413\b|length limit exceeded|request body too large/i.test(message))
+    return "模型接口拒绝了过大的请求。请整理文字上下文或减少本次附件，避免原样重试；原始素材与记录已保留。";
   const hint = /^Connection error|ECONNREFUSED|ECONNRESET|ENOTFOUND|fetch failed|socket hang up/i.test(message) ? "无法连接模型服务，请检查网络或代理设置后重试"
     : /timed? ?out|ETIMEDOUT/i.test(message) ? "模型服务响应超时，请稍后重试"
       : /\b401\b|invalid api key|incorrect api key|unauthorized/i.test(message) ? "模型 Key 无效或已过期，请检查后重新填写"
@@ -88,6 +91,7 @@ export function getConfiguredModel(providerId: string, modelId: string) {
   const parsed = providerSchema.safeParse(Array.isArray(providers) ? providers.find(item => item?.id === providerId) : undefined);
   if (!parsed.success) throw Object.assign(new Error("请先在设置中配置模型供应商"), { status: 400 });
   const provider = parsed.data;
+  modelAccess("text", providerId, modelId).assert();
   const model = provider.models.find(item => item.id === modelId);
   if (!model) throw Object.assign(new Error("所选模型不存在，请重新选择"), { status: 400 });
   assertPublicUrlLiteral(provider.apiUrl); // literal private/loopback addresses never reach the model client
@@ -104,7 +108,8 @@ export async function assertConfiguredUpstream(configured: ReturnType<typeof get
 
 export function listAiModels() {
   const providers = conf.get("settings", {}).customProviders;
-  const trial = trialModels().models.map(model => {
+  const trialState = trialModels();
+  const trial = (trialState.credits > 0 ? trialState.models : []).map(model => {
     const limits = getModelLimits(cloud()!.trialProviderId, model);
     return { providerId: cloud()!.trialProviderId, providerLabel: "平台试用", protocol: "openai-completions" as const, modelId: model.id, label: model.label,
       contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens };
@@ -114,7 +119,7 @@ export function listAiModels() {
     const parsed = providerSchema.extend({ id: z.string().min(1), label: z.string() }).safeParse(item);
     if (!parsed.success) return [];
     const provider = parsed.data;
-    return provider.models.filter(model => model.id.trim()).map(model => {
+    return provider.models.filter(model => model.id.trim() && !modelAccess("text", provider.id, model.id).reason()).map(model => {
       const limits = getModelLimits(provider.id, model);
       return {
         providerId: provider.id, providerLabel: provider.label, protocol: provider.protocol, modelId: model.id, label: model.label,
@@ -187,7 +192,9 @@ export function streamAi(
     maxTokens: configuredModel.maxOutputTokens,
   };
   // ACT: 不按模型名预判附件能力；按供应商协议传递，是否支持由上游接口决定。
-  return aiApis[provider.protocol].streamSimple(model, context, {
+  const access = configured.providerId === cloud()?.trialProviderId ? undefined : modelAccess("text", configured.providerId, configuredModel.id);
+  access?.assert();
+  const stream = aiApis[provider.protocol].streamSimple(model, context, {
     apiKey: provider.apiKey,
     signal,
     onPayload: references.length ? (payload) => {
@@ -205,4 +212,6 @@ export function streamAi(
         : message) };
     } : undefined,
   });
+  void stream.result().then(result => { if (result.stopReason === "error") access?.failed(result.errorMessage); }).catch(() => {});
+  return stream;
 }

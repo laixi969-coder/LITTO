@@ -3,6 +3,7 @@ import { createAgentSession, SessionManager, SettingsManager } from "@earendil-w
 import type { AgentSession, CreateAgentSessionOptions, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { ToolCall } from "@toonflow/tools-scaffold/runtime";
 import { createAgentResources } from "@/agent/runtime/resources";
+import { installRequestBudget } from "@/agent/runtime/requestBudget";
 
 export type SubAgentModel = Pick<CreateAgentSessionOptions, "modelRuntime" | "model" | "thinkingLevel">;
 export type SubAgentResult = {
@@ -65,7 +66,7 @@ export async function runSubAgent(options: SubAgentModel & {
       },
     }));
     const resources = await createAgentResources(cwd, activeTools, SettingsManager.inMemory({
-      compaction: { enabled: false },
+      compaction: { enabled: true, reserveTokens: 16384, keepRecentTokens: 8000 },
       retry: { enabled: false, provider: { maxRetries: 0 } },
     }), instructions);
     signal.throwIfAborted();
@@ -75,6 +76,7 @@ export async function runSubAgent(options: SubAgentModel & {
       customTools: activeTools,
       tools: activeTools.map(tool => tool.name),
     }));
+    installRequestBudget(session);
     signal.throwIfAborted();
     session.agent.shouldStopAfterTurn = () => Boolean(inputRequired?.());
     session.subscribe(event => {

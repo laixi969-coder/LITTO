@@ -5,6 +5,7 @@ import { calculateContextTokens, estimateTokens, getLastAssistantUsage, parseSes
 import type { AgentSession, FileEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { AgentEvent, AgentMention, AgentSubAgent, AgentToolCall } from "@/agent/runtime/types";
 import { agentMentionsSchema } from "@/agent/runtime/mentions";
+import { agentContextWindow } from "@/agent/runtime/model";
 import conf from "@/utils/conf";
 import { providerSchema, getModelLimits } from "@/utils/ai";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
@@ -387,7 +388,7 @@ export async function getAgentSession(cwd: string, path: string) {
     name: history.getSessionName() || (firstUserMessage?.content.trim() || firstUserMessage?.attachments?.[0]?.name)?.slice(0, 60) || "新对话",
     messages,
     stats: getAgentStats(history),
-    contextUsage: configuredModel && model ? getAgentContext(history, getModelLimits(model.provider, configuredModel).contextWindow) : undefined,
+    contextUsage: configuredModel && model ? getAgentContext(history, Math.min(getModelLimits(model.provider, configuredModel).contextWindow, agentContextWindow)) : undefined,
     providerId: model?.provider,
     modelId: model?.modelId,
     thinkingLevel: context.thinkingLevel,

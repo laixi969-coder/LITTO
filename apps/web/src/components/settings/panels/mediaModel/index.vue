@@ -24,6 +24,7 @@
             <el-text size="small" type="info">{{ item.models.length }} 个模型</el-text>
           </div>
           <el-space class="itemActions" wrap>
+            <el-button text @click="reenableProvider('media', item.id).catch(() => ElMessage.error('重新启用失败'))">修复后重新启用</el-button>
             <el-button v-if="item.canSyncModels || item.modelsUrl" text :icon="IconDownload" :disabled="!!deletingFile || !!item.loadError || !item.revision" @click="editProvider(item, true)">同步并选择模型</el-button>
             <el-button text :icon="IconEdit" :disabled="!!deletingFile || !!item.loadError" @click="editProvider(item)">编辑模型</el-button>
             <el-popconfirm title="确定删除此供应商及其模型？" confirmButtonText="删除" cancelButtonText="取消" @confirm="deleteProvider(item)">
@@ -50,7 +51,7 @@ import { ElMessage } from "element-plus";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconDownload } from "@tabler/icons-vue";
 import brandLogo from "@/components/brandLogo.vue";
 import type { MediaProvider } from "./types";
-import { saveSettings } from "@/stores/settings";
+import { saveSettings, reenableProvider } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();

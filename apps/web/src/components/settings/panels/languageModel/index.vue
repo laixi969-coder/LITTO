@@ -23,6 +23,7 @@
             <el-text size="small" type="info">{{ item.models.length }} 个模型</el-text>
           </div>
           <el-space class="itemActions" wrap>
+            <el-button text @click="reenableProvider('text', item.id).catch(() => ElMessage.error('重新启用失败'))">修复后重新启用</el-button>
             <el-button text :icon="IconRefresh" :disabled="!!deletingId" @click="openCustomProvider(item, true)">同步并选择模型</el-button>
             <el-button text :icon="IconEdit" :disabled="!!deletingId" @click="openCustomProvider(item)">编辑</el-button>
             <el-popconfirm title="确定删除此供应商及其模型？" confirmButtonText="删除" cancelButtonText="取消" @confirm="deleteProvider(item.id)">
@@ -45,7 +46,7 @@
 import { openConnectModel } from "@/components/connectModel/state";
 import { computed, defineAsyncComponent, ref, shallowRef, type Component } from "vue";
 import { ElMessage } from "element-plus";
-import { customProviders, saveSettings, type CustomProvider } from "@/stores/settings";
+import { customProviders, saveSettings, reenableProvider, type CustomProvider } from "@/stores/settings";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
 import brandLogo from "@/components/brandLogo.vue";
