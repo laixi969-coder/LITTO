@@ -73,11 +73,21 @@ function trialConfiguredModel(modelId: string) {
 }
 
 // 上游 SDK 的错误是英文且不说明原因，转成用户能据此行动的说明，并附上原文便于管理员排查；无法识别的保持原文。
+// Bun 的 fetch 连不上目标时报 "Unable to connect..."，与 ECONNREFUSED 等同属连接类错误；
+// 配置了本机代理而代理未启动时，给出与 providers/test.ts 一致的精确提示。
+function connectionHint(message: string) {
+  const proxy = /unable to connect|econnrefused/i.test(message)
+    ? process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy || process.env.ALL_PROXY || process.env.all_proxy
+    : undefined;
+  return proxy ? `本机代理 ${proxy} 连不上，请先启动代理软件，或清空 HTTP_PROXY/HTTPS_PROXY 等代理环境变量后重启服务再试`
+    : "无法连接模型服务，请检查网络或代理设置后重试";
+}
+
 export function describeModelError(message: string | undefined) {
   if (!message) return "模型请求失败";
   if (/\b413\b|length limit exceeded|request body too large/i.test(message))
     return "模型接口拒绝了过大的请求。请整理文字上下文或减少本次附件，避免原样重试；原始素材与记录已保留。";
-  const hint = /^Connection error|ECONNREFUSED|ECONNRESET|ENOTFOUND|fetch failed|socket hang up/i.test(message) ? "无法连接模型服务，请检查网络或代理设置后重试"
+  const hint = /^Connection error|unable to connect|ECONNREFUSED|ECONNRESET|ENOTFOUND|fetch failed|socket hang up/i.test(message) ? connectionHint(message)
     : /timed? ?out|ETIMEDOUT/i.test(message) ? "模型服务响应超时，请稍后重试"
       : /\b401\b|invalid api key|incorrect api key|unauthorized/i.test(message) ? "模型 Key 无效或已过期，请检查后重新填写"
         : /\b402\b|insufficient[ _](user[ _])?(balance|quota)|pre-consume quota|余额不足/i.test(message) ? "模型服务账户余额不足，请充值后重试"

@@ -26,5 +26,10 @@ export default router.post("/", validateFields({
     }
     apiKey = stored.apiKey;
   }
-  res.json(success(await u.ai.fetchProviderModels({ apiUrl, protocol, apiKey })));
+  try {
+    res.json(success(await u.ai.fetchProviderModels({ apiUrl, protocol, apiKey })));
+  } catch (error) {
+    // Bun 等上游的网络层错误是英文原文，转成用户能据此行动的中文提示（见 describeModelError）。
+    throw Object.assign(new Error(u.ai.describeModelError(error instanceof Error ? error.message : String(error))), { status: 502 });
+  }
 });
