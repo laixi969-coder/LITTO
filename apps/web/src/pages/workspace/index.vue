@@ -43,7 +43,8 @@
     </el-tooltip>
     <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" />
     <settings v-model="settingsVisible" />
-    <div class="productionActions"><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <div class="productionActions"><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <storyPanel v-if="workspaceStore.project" :key="`story${workspaceStore.project.directory}`" ref="storyPanelRef" v-model="storyVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" @produce="prepareStoryProduction" />
     <voicePanel v-if="workspaceStore.project" :key="`voice${workspaceStore.project.directory}`" ref="voicePanelRef" v-model="voiceVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" />
     <productionPanel v-if="workspaceStore.project" :key="workspaceStore.project.directory" ref="productionPanelRef" v-model="productionVisible" :projectId="workspaceStore.project.projectId" :directory="workspaceStore.project.directory" />
   </main>
@@ -64,6 +65,15 @@ import workspaceMenu from "./components/workspaceMenu.vue";
 import floatingAgent from "./components/floatingAgent.vue";
 import productionPanel from "./components/productionPanel.vue";
 const voicePanel = defineAsyncComponent(() => import("./components/voicePanel.vue"));
+const storyPanel = defineAsyncComponent(() => import("./components/storyPanel.vue"));
+const storyVisible = ref(false);
+const storyPanelRef = ref<InstanceType<typeof storyPanel>>();
+function prepareStoryProduction(revisionId: string, model: string) {
+  const project = workspaceStore.project;
+  if (!project) return;
+  workspaceStore.pendingAgentMessage = { directory: project.directory, model, reasoningEffort: "", prompt: `请先 readStoryProject，核对已采用版本 ${revisionId}。仅整理这版剧本的制作场次表：saveSceneList 的 storyRevisionId 必须引用该版本，逐场保留 sceneId、顺序和正文语义；然后 saveBreakdown 提取资产与待定项。不要改写剧本，不生成图片、视频或音频。完成后列出下一步需要核对的制作事项。` };
+  agentVisible.value = true;
+}
 const voiceVisible = ref(false);
 const voicePanelRef = ref<InstanceType<typeof voicePanel>>();
 const productionVisible = ref(false);
@@ -135,6 +145,7 @@ registerWorkspaceControl({
 });
 
 async function flushSave() {
+  await storyPanelRef.value?.flushSave();
   await voicePanelRef.value?.flushSave();
   await productionPanelRef.value?.flushSave();
   await documentPanelRef.value?.flushSave();
@@ -200,7 +211,7 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
 
 <style scoped lang="scss">
 .workspacePage {
-  .productionActions { position: absolute; left: calc(var(--railWidth) + 16px); top: 64px; z-index: 7; display: flex; gap: 8px; .el-button { min-height: 44px; margin-left: 0; } }
+  .productionActions { position: absolute; left: calc(var(--railWidth) + 16px); right: 16px; top: 64px; z-index: 7; display: flex; flex-wrap: wrap; gap: 8px; pointer-events: none; .el-button { pointer-events: auto; min-height: 44px; margin-left: 0; } }
   --railWidth: 208px;
   position: relative;
   width: 100%;

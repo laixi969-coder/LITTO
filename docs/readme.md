@@ -32,6 +32,7 @@
 
 ## 使用与开发
 
+- [故事工作台](./storyStudio.md)：资料理解、故事版本、证据审稿、分镜预演与真实发布反馈。
 - [使用教程](https://qcn7xdsqgc4z.feishu.cn/docx/RXFqdgR2Xo0dXZxGfd0cZCGgnwf)：日常操作与创作流程。
 - [开发与扩展指南](./development.md)：源码运行、插件扩展、桌面打包和更新发布。
 - [贡献指南](../CONTRIBUTING.md)与[开发规范](../AGENTS.md)：参与项目的约定。

@@ -34,7 +34,7 @@ export async function createSourceAttachments(file: File): Promise<AgentAttachme
         const content = await page.getTextContent();
         const pageText = content.items.map(item => "str" in item ? item.str + (item.hasEOL ? "\n" : " ") : "").join("");
         if (!pageText.trim()) throw new Error(`第 ${pageNumber} 页没有可提取文字，请先 OCR 或将该页作为图片上传`);
-        text += `${pageText}\n\n`;
+        text += `【第 ${pageNumber} 页】\n${pageText}\n\n`;
         page.cleanup();
         if (text.length > 100000) throw new Error("文档正文不能超过 100000 个字符，请拆分后上传");
       }

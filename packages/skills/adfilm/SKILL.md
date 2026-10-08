@@ -2,7 +2,7 @@
 name: adfilm
 description: 把品牌或产品需求做成广告片：补问缺失的关键信息，写创意策略与脚本，以电影摄影、表演和剪辑标准产出保证产品形象一致的镜头表，按渠道定画幅与时长，做合规提醒，并落到画布与交付。用于产品广告、品牌片、短视频带货与 UGC 风格广告；纯叙事影片使用 cinema。
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   displayName: 广告与品牌片
   author: LITTO
 ---
@@ -16,6 +16,12 @@ metadata:
 - 消费者洞察靠 [insight](../insight/SKILL.md)。
 - 一致性靠 [continuity](../continuity/SKILL.md)：产品的形状、颜色、logo 与包装必须锁定；多镜头状态表照它做。
 - 画布操作与阶段确认靠 [canvas](../canvas/SKILL.md)；资产参考板、Seedance 分段与提示词靠 [workflow](../workflow/SKILL.md)。进入 workflow 的 Seedance 执行态后，**分段、时长、镜头格式一律以它为准**，本技能只负责广告内容层（策略、脚本、产品镜头、合规）。技能位置以 `available_skills` 中的 `location` 为准。
+
+## 故事工作台与真实反馈
+
+有 readStoryProject 时先恢复项目，用 updateStoryProject 保存资料理解、少量差异方向、脚本候选与证据审稿。事实资料必须由用户确认；样片只用于表达和制作参考，不作为产品功效证据。正式采用后再生成同版本场次表（storyRevisionId），保留 sceneId。局部修改保留旧版，并核对受影响的口播、口型、字幕与镜头。
+
+正式制作前可先用工作台合成低成本动态分镜。发布反馈关联实际版本、受众、渠道、观察窗口与投放条件；效果广告看卖点理解和行动，品牌片看品牌记忆。复盘引用真实记录，未知数据留空，不给爆款概率或伪造转化成绩。
 
 ## 1. 简报：只问缺的，一次问完
 

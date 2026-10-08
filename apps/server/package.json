@@ -28,6 +28,7 @@
     "@toonflow/providers": "*",
     "@toonflow/teams-scaffold": "*",
     "@toonflow/tool-canvas": "*",
+    "@toonflow/tool-scene-list": "*",
     "@toonflow/tool-media-generation": "*",
     "@toonflow/tools-scaffold": "*",
     "conf": "^15.1.0",

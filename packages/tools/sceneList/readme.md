@@ -2,6 +2,9 @@
 
 保存故事技能产出的场次表和剧本拆解清单，由服务端校验结构，不再从回复正文里解析 JSON。
 
+- `readStoryProject` / `updateStoryProject`：恢复与更新故事工作台。模型可提交资料理解、方向、剧本候选、审稿和局部改写；确认资料、选方向、采用版本及真实反馈须由用户操作。
+- 有故事项目时，`saveSceneList` 必须引用已采用的 `storyRevisionId`，逐场保留 `sceneId` 与顺序。旧版本会标记 `needsUpdate`，未更新的场次表不能继续保存拆解。详见[故事工作台](../../../docs/storyStudio.md)。
+
 - `saveSceneList`：人物、场景、道具、服装各带固定 id，场次只引用 id；校验 id 唯一、引用存在、场次连续、体量上限，写入工作区 `场次表.json`，旧版本移到 `场次表历史/`。
 - `readSceneList`：读取当前场次表及其版本号。
 - `saveBreakdown`：每项资产引用场次表实体 id，出场场次由场次表自动推导；场次表里的每个实体都必须被拆解或写明不单列的理由。写入 `拆解清单.json`。

@@ -193,6 +193,7 @@ export interface ToolFiles {
 }
 
 export interface ToolContext {
+  story?: { read(): Promise<unknown>; validateSources?(): Promise<void>; apply(expectedVersion: number, action: unknown): Promise<unknown> };
   ffmpeg(signal?: AbortSignal): Promise<FfmpegFactory>;
   media?: MediaContext;
   canvas?: CanvasContext;

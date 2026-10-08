@@ -178,6 +178,7 @@ import anonymousData from "@/lib/anonymousData";
 import { modelChoices, loadAvailableModels } from "@/stores/settings";
 import { useWorkspaceStore } from "@/stores/workspace";
 import type { AgentAttachment, AgentConversation, AgentMessage } from "./types";
+import { registerStorySources } from "@/lib/storySources";
 import type { AgentEvent, AgentMention } from "@toonflow/server/agent/types";
 import { createConversationStream, readAgentEvents } from "./replyStream";
 import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
@@ -520,7 +521,7 @@ async function stopMessage() {
 }
 
 async function uploadAttachments(attachments: AgentAttachment[], directory: string, signal: AbortSignal) {
-  if (!attachments.some(item => item.file)) return;
+  if (!attachments.some(item => item.file)) { await registerStorySources(directory, attachments); return; }
   const files = useWorkspaceFiles(directory);
   for (const path of ["assets", "assets/chat"]) {
     await files.mkdir(path).catch(error => {
@@ -537,6 +538,7 @@ async function uploadAttachments(attachments: AgentAttachment[], directory: stri
     attachment.file = undefined;
     signal.throwIfAborted();
   }
+  await registerStorySources(directory, attachments);
 }
 
 async function sendCanvasResult(event: Extract<AgentEvent, { type: "canvasCall" }>, canvasContext: CanvasContext | undefined, signal: AbortSignal) {
@@ -816,6 +818,7 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
   const instance = sender;
   if (!ready || !message || !instance || message.directory !== directory) return;
   workspaceStore.pendingAgentMessage = null;
+  if (message.model) selectedModel.value = message.model;
   draftAttachments.value = [...message.attachments ?? []];
   await fillPrompt(message.prompt);
   if (sender === instance && props.active) void sendMessage();

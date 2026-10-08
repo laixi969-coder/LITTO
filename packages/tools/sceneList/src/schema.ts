@@ -7,6 +7,7 @@ const text = (max: number) => z.string().trim().max(max);
 const entity = z.object({ id: entityId, name: text(60).min(1), description: text(400).default("") });
 
 export const sceneListSchema = z.object({
+  storyRevisionId: text(80).optional().describe("故事工作台已采用的版本 ID；有故事项目时必填"),
   title: text(80).min(1),
   kind: z.enum(["story", "musicFilm"]).default("story"),
   volume: z.enum(["micro", "short", "medium", "long"]).describe("micro≈1 分钟；short≈3–5 分钟；medium=单集；long=长篇"),

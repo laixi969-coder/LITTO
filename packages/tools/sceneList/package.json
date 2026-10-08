@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "exports": { "./storyProject": "./src/storyProject.ts", "./schema": "./src/schema.ts" },
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "tsc"

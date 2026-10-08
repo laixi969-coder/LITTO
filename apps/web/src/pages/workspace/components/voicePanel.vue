@@ -7,6 +7,7 @@
         <el-button :disabled="busy" @click="run(refreshModels)">刷新模型</el-button>
         <el-button :disabled="busy" @click="emit('settings')">配置语音 / 口型模型</el-button>
         <el-button :disabled="busy || !loaded || !dirty" @click="run(save)">保存配音方案</el-button>
+        <el-button :disabled="busy || !loaded" @click="run(importStory)">同步已采用剧本台词（保留旧方案）</el-button>
         <el-button v-if="operation" :disabled="stopping" @click="stop">停止处理</el-button>
       </div>
       <p class="hint">先为角色选定音色，再逐句配音和试听。对白可用已确定的配音驱动人物视频，旁白无需对口型。开源模型需先部署并在媒体模型设置中添加 Qwen3-TTS / MuseTalk。</p>
@@ -23,6 +24,7 @@
         <article v-for="(line, index) in project.lines" :key="line.id" class="speechLine">
           <div class="lineHeader">
             <strong>第 {{ index + 1 }} 句</strong>
+            <span v-if="line.storySource">来源场次 {{ line.storySource.sceneId }}</span>
             <el-button :disabled="index === 0" @click="moveLine(index, -1)">上移</el-button>
             <el-button :disabled="index === project.lines.length - 1" @click="moveLine(index, 1)">下移</el-button>
             <el-button @click="project.lines.splice(index, 1)">移除台词</el-button>
@@ -43,6 +45,7 @@
             <attachmentPreview v-if="selectedTake(line)" :attachment="{ ...selectedTake(line)!.audio, name: '试听配音' }" :directory="directory" />
           </div>
           <p v-if="selectedTake(line) && stale(line)" class="errorMessage">台词、音色或语气已修改，当前配音是旧版本。请重新生成后再对口型或合成。</p>
+          <p v-if="storySourceStale(line)" class="errorMessage">此句来源的剧本场次已改变或移除，请同步已采用剧本后核对台词、表演及人物视频。</p>
           <template v-if="line.kind === 'dialogue'">
             <div class="toolbar">
               <label class="fileLabel">上传此句人物视频<input type="file" accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm" @change="uploadVideo(line, $event)" /></label>
@@ -77,6 +80,8 @@ import { createBrowserFfmpeg } from "@toonflow/ffmpeg/browser";
 import { speechSourceKey, voiceProjectSchema, type VoiceProject, type VoiceLine, type VoiceRole } from "@toonflow/tool-media-generation/voiceProject";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
+import { readStory } from "@/lib/storyClient";
+import { storyStale, type StoryRevision } from "@toonflow/tool-scene-list/storyProject";
 
 const props = defineProps<{ directory: string }>();
 const visible = defineModel<boolean>({ default: false });
@@ -87,6 +92,7 @@ const files = useWorkspaceFiles(directory);
 const ai = useNodeAi();
 const project = ref<VoiceProject>({ littoVoice: 1, roles: [], lines: [], lipSyncProviderId: "", lipSyncModelId: "", mixes: [] });
 const models = ref<NodeMediaModel[]>([]);
+const storyRevision = ref<StoryRevision>();
 const loaded = ref(false);
 const busy = ref(false);
 const stopping = ref(false);
@@ -110,7 +116,34 @@ const roleModel = (role: VoiceRole) => speechModels.value.find(model => model.pr
 const lineRole = (line: VoiceLine) => project.value.roles.find(role => role.id === line.roleId);
 const lineModel = (line: VoiceLine) => { const role = lineRole(line); return role && roleModel(role); };
 const selectedTake = (line: VoiceLine) => line.takes.find(take => take.id === line.takeId);
-const stale = (line: VoiceLine) => selectedTake(line)?.sourceKey !== speechSourceKey(line, lineRole(line));
+const stale = (line: VoiceLine) => storySourceStale(line) || selectedTake(line)?.sourceKey !== speechSourceKey(line, lineRole(line));
+function storySourceStale(line: VoiceLine) {
+  const source = line.storySource;
+  if (!source) return false;
+  const scene = storyRevision.value?.scenes.find(item => item.sceneId === source.sceneId);
+  return !scene || source.sceneText !== scene.text || source.speech !== scene.speech;
+}
+async function refreshStory() {
+  const story = await readStory(directory);
+  const approved = story.revisions.find(item => item.id === story.approvedId);
+  storyRevision.value = approved && !storyStale(story, approved) ? approved : undefined;
+}
+async function importStory() {
+  await refreshStory();
+  const revision = storyRevision.value;
+  if (!revision) throw new Error("请先在故事工作台采用当前有效剧本");
+  const lines = revision.scenes.flatMap(scene => {
+    const previous = project.value.lines.filter(line => line.storySource?.sceneId === scene.sceneId);
+    if (previous.length && previous.every(line => !storySourceStale(line))) return previous;
+    return scene.speech.split(/\n+/).map(text => text.trim()).filter(Boolean).map(text => ({ id: crypto.randomUUID(), roleId: "", kind: "dialogue" as const, text, emotion: "", delivery: "", speed: 1, pauseAfter: 0.3, takes: [], takeId: "", storySource: { revisionId: revision.id, sceneId: scene.sceneId, sceneText: scene.text, speech: scene.speech } }));
+  });
+  const next = voiceProjectSchema.parse({ ...project.value, lines: [...lines, ...project.value.lines.filter(line => !line.storySource)] });
+  await save(); await ensureSpeechDirectory();
+  const historyPath = `assets/speech/voiceHistory${crypto.randomUUID().replaceAll("-", "")}.json`;
+  await files.writeJson(historyPath, project.value, true);
+  project.value = next; await save();
+  message.value = `已同步。按行导入，须核对对白 / 旁白并分配说话人；未变场次保留配音，旧方案保存在 ${historyPath}`;
+}
 
 function addRole() { project.value.roles.push({ id: crypto.randomUUID(), name: "", providerId: "", modelId: "", voice: "" }); }
 function addLine() { project.value.lines.push({ id: crypto.randomUUID(), roleId: "", kind: "dialogue", text: "", emotion: "", delivery: "", speed: 1, pauseAfter: 0.3, takes: [], takeId: "" }); }
@@ -136,6 +169,7 @@ async function load() {
   }
   savedSnapshot.value = JSON.stringify(project.value); loaded.value = true;
   await refreshModels();
+  await refreshStory();
 }
 
 async function save() {
@@ -160,6 +194,8 @@ async function run(action: () => Promise<void>, cancellable = false) {
 function signal() { return operation.value ? AbortSignal.any([lifetime.signal, operation.value.signal]) : lifetime.signal; }
 
 async function generateSpeech(line: VoiceLine) {
+  await refreshStory();
+  if (storySourceStale(line)) throw new Error("剧本来源已变化，请先同步采用版本");
   const role = lineRole(line);
   const model = lineModel(line);
   if (!role || !role.name.trim() || !model || !role.voice.trim()) throw new Error("请先填写角色名称并选择可用模型与音色");
@@ -194,6 +230,7 @@ async function uploadVideo(line: VoiceLine, event: Event) {
 }
 
 async function syncLine(line: VoiceLine) {
+  await refreshStory();
   const take = selectedTake(line);
   const model = lipSyncModel.value;
   if (line.kind !== "dialogue" || !take || stale(line) || !line.video || !model) throw new Error("请先确定当前对白配音、人物视频和对口型模型");
@@ -208,6 +245,7 @@ async function syncLine(line: VoiceLine) {
 }
 
 async function mixSpeech() {
+  await refreshStory();
   if (!canMix.value || project.value.mixes.length >= 100) throw new Error("请先为每句生成并选定当前配音版本");
   await save();
   const sourceKey = mixSourceKey.value;
@@ -240,7 +278,7 @@ async function stop() {
 }
 async function flushSave() { if (busy.value) throw new Error("配音正在处理，请完成或停止后离开"); await save(); }
 async function closePanel(done: () => void) { try { await flushSave(); done(); } catch (cause) { error.value = cause instanceof Error ? cause.message : "保存失败"; } }
-watch(visible, value => { if (value && !loaded.value) void run(load); });
+watch(visible, value => { if (value) void run(loaded.value ? refreshStory : load); });
 onScopeDispose(() => { lifetime.abort(); operation.value?.abort(); });
 defineExpose({ flushSave });
 </script>

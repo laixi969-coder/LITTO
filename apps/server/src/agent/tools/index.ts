@@ -16,6 +16,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 import { workspaceProject, prepareShot } from "@/utils/media/jobs";
 import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
+import { readStoryProject, applyStoryAction, checkSources } from "@/utils/story";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
@@ -57,10 +58,12 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       else await rm(target, { recursive });
     }),
     copyFile: (path, target, exclusive = false) => withWritePaths([path, target], async ([source, destination]) => {
+      protectWorkspaceRoot(cwd, destination);
       await copyFile(source, destination, exclusive ? constants.COPYFILE_EXCL : 0);
     }),
   };
   return {
+    story: { read: () => readStoryProject(cwd), validateSources: async () => checkSources(cwd, (await readStoryProject(cwd)).sources), apply: (version, action) => applyStoryAction(cwd, version, action) },
     cwd, config, files, resolvePath, writeFile: files.writeFile, canvas, question, skills: createSkillContext(cwd),
     ffmpeg: signal => createWorkspaceFfmpeg(cwd, signal),
     media: {

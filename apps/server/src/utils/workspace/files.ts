@@ -1,10 +1,14 @@
 import { constants, copyFile, lstat, rename, unlink, realpath, writeAtomic } from "@toonflow/file";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Request } from "express";
 import { resolveWorkspace } from "@/utils/workspace";
 
 export async function writeWorkspaceFile(path: string, content: string | Uint8Array, exclusive = false) {
+  protectStoryProject(path);
   await writeAtomic(path, content, { exclusive });
+}
+function protectStoryProject(path: string) {
+  if (basename(path).toLowerCase() === "storyproject.json") throw Object.assign(new Error("故事项目请通过故事工作台更新，以保留版本与采用记录"), { status: 403 });
 }
 
 export async function renameWorkspaceFile(source: string, target: string) {
@@ -68,4 +72,5 @@ export function lockWorkspaceFiles(paths: string[]) {
 
 export function protectWorkspaceRoot(directory: string, path: string) {
   if (directory === path) throw Object.assign(new Error("不能修改工作区根目录"), { status: 400 });
+  protectStoryProject(path);
 }

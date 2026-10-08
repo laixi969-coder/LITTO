@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ToolDefinition, ToolFiles, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 import { breakdownSchema, sceneListSchema, validateBreakdown, validateSceneList, type SceneList } from "./schema";
+import { storyActionSchema, storyProjectSchema, storyStale } from "./storyProject";
 
 const sceneListPath = "场次表.json";
 const historyDirectory = "场次表历史";
@@ -24,7 +25,16 @@ const json = (value: unknown) => ({ content: [{ type: "text" as const, text: JSO
 
 const plugin: ToolPlugin = {
   validateConfig: config => z.strictObject({}).parse(config),
-  createTools({ files }) {
+  createTools({ files, story }) {
+    async function checkStory(value: SceneList) {
+      if (!story) return;
+      const project = storyProjectSchema.parse(await story.read());
+      if (!project.version) return;
+      await story.validateSources?.();
+      const approved = project.revisions.find(item => item.id === project.approvedId);
+      if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先在故事工作台采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
+      if (JSON.stringify(value.scenes.map(item => item.sceneId)) !== JSON.stringify(approved.scenes.map(item => item.sceneId))) rejected(["场次表须按已采用剧本的顺序保留全部 sceneId"]);
+    }
     const tools: ToolDefinition[] = [
       {
         name: "saveSceneList",
@@ -36,6 +46,7 @@ const plugin: ToolPlugin = {
           signal?.throwIfAborted();
           const { value, issues } = validateSceneList(params);
           if (!value) rejected(issues);
+          await checkStory(value);
           const previous = await readSaved(files);
           if (previous) {
             await files.mkdir(historyDirectory, true);
@@ -54,6 +65,10 @@ const plugin: ToolPlugin = {
         parameters: z.toJSONSchema(z.object({}), { io: "input", target: "draft-07" }),
         async execute() {
           const saved = await readSaved(files);
+          if (saved) {
+            try { await checkStory(saved); }
+            catch (cause) { return json({ ...saved, needsUpdate: true, reason: cause instanceof Error ? cause.message : "故事版本已改变" }); }
+          }
           return json(saved ?? { saved: false, message: "还没有场次表，请先用 saveSceneList 保存" });
         },
       },
@@ -67,6 +82,7 @@ const plugin: ToolPlugin = {
           signal?.throwIfAborted();
           const sceneList = await readSaved(files);
           if (!sceneList) rejected(["还没有场次表，请先用 saveSceneList 保存场次表"]);
+          await checkStory(sceneList);
           const { value, issues } = validateBreakdown(params, sceneList);
           if (!value) rejected(issues);
           await files.writeFile(breakdownPath, JSON.stringify({ schemaVersion: 1, savedAt: new Date().toISOString(), ...value }, null, 2));
@@ -74,6 +90,15 @@ const plugin: ToolPlugin = {
         },
       },
     ];
+    if (story) tools.push({
+      name: "readStoryProject", label: "读取故事工作台", description: "恢复创作简报、资料理解、方向、故事版本、已采用版本的事实/线索、审稿与预演、真实发布反馈。继续创作前先读。", parameters: z.toJSONSchema(z.object({})),
+      async execute() { return json(await story.read()); },
+    }, {
+      name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
+      description: "按 readStoryProject 的 version 保存资料理解、创意方向、剧本候选、精确引句审稿或单场改写。不得代用户确认资料、采用方向/定稿、处置问题或录入观众反馈。旧版本保留。",
+      parameters: z.toJSONSchema(z.object({ expectedVersion: z.number().int().nonnegative(), action: storyActionSchema }), { target: "draft-07", io: "input" }),
+      async execute(_id, params) { const input = params as { expectedVersion: number; action: unknown }; return json(await story.apply(input.expectedVersion, input.action)); },
+    });
     return tools;
   },
 };

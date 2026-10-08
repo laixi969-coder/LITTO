@@ -278,6 +278,8 @@ import modelPopover from "@/components/modelPopover.vue";
 import attachmentList from "@/components/agent/attachmentList.vue";
 import { createPastedTextFile, readTextAttachment } from "@/components/agent/textAttachments";
 import { createSourceAttachments } from "@/components/agent/sourceAttachments";
+import { newStoryProject, type StoryProject } from "@toonflow/tool-scene-list/storyProject";
+import { updateStory } from "@/lib/storyClient";
 import type { AgentAttachment } from "@/components/agent/types";
 import brandLogo from "@/components/brandLogo.vue";
 import { useWorkspaceStore, type Project } from "@/stores/workspace";
@@ -456,7 +458,7 @@ async function renameProject(project: Project) {
 }
 
 // message 默认取首页输入框；通道弹窗传入带技能指令的消息，不能写回输入框，否则用户会看到内部指令。
-async function createProject(fromPrompt = true, message = prompt.value, attachments = promptAttachments.value) {
+async function createProject(fromPrompt = true, message = prompt.value, attachments = promptAttachments.value, storyBrief?: StoryProject["brief"]) {
   if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
   // Sending an idea without a text model would just fail: take the person to the one-minute wizard instead.
   if (fromPrompt && message.trim() && !hasTextModel.value) {
@@ -496,6 +498,7 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
       { toonflowCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
       true,
     );
+    if (storyBrief) await updateStory(directory, 0, { type: "brief", value: storyBrief });
     await workspaceStore.openProject(directory);
     if (fromPrompt && (message.trim() || attachments.length)) {
       workspaceStore.pendingAgentMessage = {
@@ -626,7 +629,7 @@ async function startBrief() {
       workspaceDirectory.value = (await relocationPicker.value?.chooseDirectory()) ?? "";
       if (!workspaceDirectory.value) return;
     }
-    await createProject(true, message, attachments);
+    await createProject(true, message, attachments, { ...newStoryProject().brief, kind: briefKind.value === "creative" ? "adfilm" : isMusic ? "musicFilm" : "story", idea: subject });
   } catch (cause) {
     ElMessage.error(cause instanceof Error ? cause.message : "创作准备失败");
   } finally {

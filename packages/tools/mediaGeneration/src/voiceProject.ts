@@ -11,6 +11,7 @@ const takeSchema = z.strictObject({
   videos: z.array(z.strictObject({ id: z.string().uuid(), video: videoSchema, sourceVideo: videoSchema, providerId: z.string().max(96), modelId: z.string().max(256) })).max(100),
 });
 const lineSchema = z.strictObject({
+  storySource: z.strictObject({ revisionId: z.string().uuid(), sceneId: z.string().regex(/^s\d{2,3}$/), sceneText: z.string().max(12000), speech: z.string().max(6000) }).optional(),
   id: z.string().uuid(), roleId: z.string().uuid().or(z.literal("")), kind: z.enum(["dialogue", "narration"]), text: z.string().max(10000),
   emotion: z.string().max(100), delivery: z.string().max(1800), speed: z.number().min(0.25).max(4), pauseAfter: z.number().min(0).max(10),
   video: videoSchema.optional(), takes: z.array(takeSchema).max(100), takeId: z.string().uuid().or(z.literal("")),
