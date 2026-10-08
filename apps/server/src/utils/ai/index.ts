@@ -8,6 +8,7 @@ import conf from "@/utils/conf";
 import { assertPublicHttpUrl, assertPublicUrlLiteral } from "@/utils/ssrf";
 import { readReference } from "@/utils/media/generation";
 import modelContextLimits from "@/utils/ai/modelContextLimits";
+import modelFetch from "@/utils/ai/modelFetch";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 import { modelAccess } from "@/utils/modelAvailability";
@@ -85,6 +86,8 @@ function connectionHint(message: string) {
 
 export function describeModelError(message: string | undefined) {
   if (!message) return "模型请求失败";
+  if (/certificate|CERT_HAS_EXPIRED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|SELF_SIGNED_CERT/i.test(message))
+    return `模型服务的 HTTPS 证书校验失败，请检查 API 地址、系统时间和服务端证书（${message.slice(0, 200)}）`;
   if (/\b413\b|length limit exceeded|request body too large/i.test(message))
     return "模型接口拒绝了过大的请求。请整理文字上下文或减少本次附件，避免原样重试；原始素材与记录已保留。";
   const hint = /^Connection error|unable to connect|ECONNREFUSED|ECONNRESET|ENOTFOUND|fetch failed|socket hang up/i.test(message) ? connectionHint(message)
@@ -208,6 +211,7 @@ export function streamAi(
   const access = configured.providerId === cloud()?.trialProviderId ? undefined : modelAccess("text", configured.providerId, configuredModel.id);
   access?.assert();
   const stream = aiApis[provider.protocol].streamSimple(model, context, {
+    fetch: modelFetch,
     apiKey: provider.apiKey,
     signal,
     onPayload: references.length ? (payload) => {

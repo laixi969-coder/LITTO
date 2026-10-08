@@ -1,6 +1,7 @@
 import { assertPublicHttpUrl } from "@/utils/ssrf";
 import { t } from "@/lib/i18n";
 import { z } from "zod";
+import modelFetch from "@/utils/ai/modelFetch";
 
 const modelSchema = z.object({
   id: z.string().optional(), name: z.string().optional(),
@@ -38,7 +39,7 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
   const cursors = new Set<string>();
   const signal = AbortSignal.timeout(30000);
   while (true) {
-    const response = await fetch(url, { headers, signal, redirect: "error" });
+    const response = await modelFetch(url, { headers, signal, redirect: "error" });
     if (!response.ok) throw new Error(t`获取模型列表失败（HTTP ${response.status}），请检查 API 地址、协议和密钥`);
     const result = z.object({
       data: z.array(modelSchema),

@@ -4,6 +4,7 @@ import { validateFields } from "@/lib/middleware";
 import { success } from "@/lib/responseFormat";
 import u from "@/utils";
 import { assertPublicHttpUrl, guardedFetch, UnsafeUpstreamError } from "@/utils/ssrf";
+import modelFetch from "@/utils/ai/modelFetch";
 
 /**
  * Connection test for the "connect your models" wizard. Makes the cheapest real, non-generating call it can and answers in plain Chinese.
@@ -33,6 +34,7 @@ const failure = (message: string, extra: Record<string, unknown> = {}) => ({ ok:
 function describeError(error: unknown) {
   if (error instanceof UnsafeUpstreamError) return error.message;
   const text = error instanceof Error ? error.message : String(error);
+  if (/certificate|CERT_HAS_EXPIRED|UNABLE_TO_VERIFY_LEAF_SIGNATURE|SELF_SIGNED_CERT/i.test(text)) return u.ai.describeModelError(text);
   const status = /HTTP (\d{3})/.exec(text)?.[1];
   if (status) return explain(Number(status));
   if (/timed? ?out|TimeoutError|aborted/i.test(text)) return "连接超时，请检查地址是否正确、网络是否通畅";
@@ -59,7 +61,7 @@ async function textTest({ apiUrl, apiKey, protocol, probeModel }: { apiUrl: stri
   try {
     const base = new URL(await assertPublicHttpUrl(apiUrl));
     base.pathname = `${base.pathname.replace(/\/+$/, "")}/chat/completions`;
-    const response = await guardedFetch(base, {
+    const response = await (base.origin === "https://api.deepseek.com" ? modelFetch : guardedFetch)(base, {
       method: "POST", signal: AbortSignal.timeout(20000),
       headers: { "Content-Type": "application/json", Accept: "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
       body: JSON.stringify({ model: probeModel, max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),

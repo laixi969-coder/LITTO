@@ -1,6 +1,8 @@
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { assertConfiguredUpstream, getConfiguredModel } from "@/utils/ai";
+import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import modelFetch from "@/utils/ai/modelFetch";
 
 export const agentContextWindow = 262144;
 
@@ -12,6 +14,9 @@ export async function createAgentModel(providerId: string, modelId: string, thin
   runtime.registerProvider(providerId, {
     api: provider.protocol,
     baseUrl,
+    streamSimple: provider.protocol === "openai-completions" && new URL(baseUrl).origin === "https://api.deepseek.com"
+      ? (model, context, options) => openAICompletionsApi().streamSimple({ ...model, api: "openai-completions" }, context, { ...options, fetch: modelFetch })
+      : undefined,
     models: [{
       id: model.id, name: model.label, reasoning: thinkingLevel !== "off",
       // ACT: 保留图片输入，由实际供应方判断该模型是否支持。
