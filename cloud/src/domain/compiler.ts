@@ -128,7 +128,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         constraints: J(shot.constraints ?? []),
         physicalContinuity: J([
             assets.some(a => a.type === "Character") && "Preserve each character's reference anatomy and limb count through the entire action, including occlusions and mirror reflections; movement has preparation, contact, weight transfer and settling",
-            assets.some(a => a.type === "Product" || a.type === "Wardrobe") && "Preserve the referenced garment/product silhouette, length, seams, fastening and marks across frames; cloth deforms locally under actual contact rather than changing design",
+            assets.some(a => a.type === "Product" || a.type === "Wardrobe") && "Preserve the referenced garment/product silhouette, length, seams, fastening and marks except for explicitly planned changes at their specified action or timeline beat; preserve unaffected details and identity. Cloth deforms locally under actual contact rather than changing design",
             "Keep surface response specific to each material and visible at this shot scale; preserve source-motivated light and contact shadows; do not replace missing texture with sharpening or artificial grain",
         ]),
         state: J([...Object.entries<any>(start.props).filter(([, p]) => p.present).map(([id, p]) => `${p.name ?? id}${p.heldBy ? ` held by ${start.characters[p.heldBy]?.name ?? p.heldBy}` : ""}`), ...Object.entries<any>(start.characters).map(([id, c]) => c.wardrobeId ? `${c.name ?? id} wearing ${start.wardrobe[c.wardrobeId]?.name ?? c.wardrobeId}` : "")]),
@@ -142,7 +142,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         random: freedom.RANDOM.join("; "),
         forbiddenChanges: J(assets.flatMap(a => (a.forbiddenChanges ?? []).map((value: string) => `${a.name}: ${value}`))),
         assetCondition: "Preserve the condition specified by the story and approved references. When unspecified, use intact, normally maintained surfaces and clean clothing; texture and realism do not imply dirt, wear, rust, damage or poverty. Preserve age-appropriate anatomy and natural torso-to-leg proportions; do not compress limbs to fit the composition.",
-        constraintPriority: "Preserve identity and explicit invariants. Allow natural performance without changing identity. Forbidden changes override allowed variations; optional variation must not alter specified action, lighting or continuity.",
+        constraintPriority: "Preserve identity and explicit invariants. Current starting continuity state takes precedence over baseline mutable appearance; apply only explicitly planned changes at their action or timeline beat and preserve unaffected details. Allow natural performance without changing identity. Forbidden changes override allowed variations; optional variation must not alter specified action, lighting or continuity.",
         repair: extra.repair?.note ?? "",
     };
     let negativePrompt = J(["extra fingers", "warped hands", "identity drift from references", "text artifacts / garbled logos", "floating objects", ...(freedom.LOCK.length ? ["changes to locked elements"] : [])]);
@@ -161,12 +161,16 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             sections = {
                 Objective: J([shot.title, sections.narrative, sections.action]),
                 "Reference binding": inputs.filter(input => input.sent).map(input => `${input.referenceId}: ${input.role}`).join("; "),
-                "Immutable locks": J([sections.lock, sections.state, sections.observedState, sections.constraintPriority]),
+                "Immutable locks": J([sections.lock, sections.constraintPriority]),
                 "Target duration": `${shot.generationDuration ?? shot.duration} seconds`,
                 Timeline: timeline,
-                "Visual direction": Object.entries(sections).filter(([key]) => !["narrative", "action", "lock", "state", "observedState", "constraintPriority", "forbiddenChanges"].includes(key)).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join("; "),
+                "Visual direction": J([
+                    // ACT: 起始状态用于接戏，不作为禁止本段剧情变化的永久锁。
+                    J([sections.state, sections.observedState]) && `Starting continuity state (apply only explicitly planned changes during the shot): ${J([sections.state, sections.observedState])}`,
+                    Object.entries(sections).filter(([key]) => !["narrative", "action", "lock", "state", "observedState", "constraintPriority", "forbiddenChanges"].includes(key)).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join("; "),
+                ]),
                 "Audio direction": audio,
-                Preserve: J([sections.subject, sections.assetDetails, sections.lock]),
+                Preserve: J([sections.lock, "Preserve reference identity and all details not explicitly changed; baseline styling is not a permanent lock on planned costume or makeup changes"]),
                 Avoid: J([sections.forbiddenChanges, negativePrompt]),
             };
             negativePrompt = "";

@@ -2,7 +2,7 @@
 name: breakdown
 description: 把已确认的剧本或场次表拆解成可确认的资产清单与世界/影调草案：角色、服装、场景、道具、产品各自出现在哪些场次、哪些特征必须保持不变，并在用户确认后写入项目资产。用于剧本定稿后、制作资产之前；不写故事、不规划镜头。
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   displayName: 剧本拆解
   author: LITTO
 ---
@@ -34,6 +34,8 @@ metadata:
 资产一律按实体 id 对应，不按名称匹配。场次表里同一个人或物被登记成了两个 id，先用 `saveSceneList` 修正场次表，再重新读取拆解，不在拆解里私下合并。同一场景的不同时段、同一物件的状态变化写进该资产的 `stateChanges`，不拆成两项资产。仅一闪而过、不影响叙事的实体放进 `skipped` 并写明理由。
 
 ### 2. 世界与影调草案
+
+有妆发、换装或持续外观变化时，按[妆造设计](../workflow/references/methods/characterStyling.md)补人物处境、当前造型与事件触发的变化。拆解阶段仍用现有 invariants / allowedVariations / stateChanges / gaps 保存依据，不给 saveBreakdown 添加未支持字段；确认后再将当前造型写入资产 attributes。身份、临时妆造和当场表情分开，不把“红唇不变”写成需要卸妆的角色永久锁。
 
 从剧本与场次表归纳，写成可确认的提案：
 

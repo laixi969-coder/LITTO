@@ -2,7 +2,7 @@
 name: musicfilm
 description: 创作开场吸引人、有人物行动与剧情推进的 MV：从歌曲、歌词或参考图形成故事，设计音乐驱动的转折与回收，再制作场次、镜头与完整模型提示词。支持短 MV、演唱表演、既有歌曲配影像及提示词交付；明确要求纯演唱或抽象影像时遵守该方向。普通剧情影片用 story，产品广告用 adfilm。
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
   displayName: 音乐影像
   author: LITTO
 ---
@@ -75,6 +75,8 @@ MV 入口可提供 `musicAnalysis.txt`（`kind: littoMusicAnalysis`）和 `music
 - 高风险内容（需要口型对齐的近景演唱、精确文字）标注在 `risk`。
 
 ## 5. 镜头编排与完整提示词
+
+人物妆发、服装和造型变化按[妆造设计](../workflow/references/methods/characterStyling.md)服务故事：开头从行动或问题进入，造型变化强化人物选择。演唱舞台与剧情时间线分别绑定正确状态，不把演唱造型带回尚未换装的剧情镜头；表演保持[目标、触发与反应](../cinema/references/performanceDirection.md)，不只填情绪词。
 
 进入短 MV、剧情演唱、多图编排、音画切点或生成反馈修订时，读取 [MV 导演编排](references/musicVideoDirection.md)。它负责把故事、表演与音乐写成同一个可执行时间轴；摄影与资产继续复用 cinema 和 continuity，不重复建立另一套制作系统。
 

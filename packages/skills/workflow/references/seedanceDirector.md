@@ -4,7 +4,7 @@
 
 已确认的电影或 Music Film 意图、World/Look、ShotSpec、音乐时间轴和资产状态是输入。本文件约束对应模型的分段上限、参考与提示词格式，不能把音乐影像改成剧情片、拒绝有意的节奏剪辑或要求换模型。未指定模型时先查现场可用模型；只在已确定使用 Seedance但版本不明时确认2.0/2.5。
 
-Seedance提示词阶段只使用这份模型规则；必要资产设计可读 assets.md、methods/visualDesign.md、methods/colorAndLight.md。提示词定稿后由 canvasExecution.md执行。模型切换时退出本文件，保留创作规格并按新模型能力编译。
+Seedance提示词阶段只使用这份模型规则；必要资产设计可读 assets.md、methods/visualDesign.md、methods/colorAndLight.md、[妆造设计](methods/characterStyling.md)。这些方法只补资产与已定剧情的表演依据，不另立提示词格式。提示词定稿后由 canvasExecution.md执行。模型切换时退出本文件，保留创作规格并按新模型能力编译。
 
 ## Music Film 适用边界
 
@@ -842,6 +842,7 @@ Reference binding:
 
 Immutable locks:
 - 只写会直接影响生成稳定性的不可变条件：角色身份/服装、关键世界位置与左右关系、连续场景的光线逻辑、关键道具状态、商品结构、对白原文与口型、必要的画外锁定等。
+- 不把起始妆造、持物或服装状态直接锁成全程不变。剧情已有换装、卸妆、脱帽或损坏时，在 Timeline 写清触发、变化与结果；Immutable locks 只保留该变化期间仍须成立的身份、结构和未变化细节。没有明确变化的状态继续保持。
 - 不把整段剧情重新抄一遍。
 - 连续场景跨段时，把上一段结束状态改写成本段的绝对初始状态，不写“延续上一段”。
 
