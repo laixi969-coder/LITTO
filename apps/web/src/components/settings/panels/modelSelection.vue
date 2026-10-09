@@ -4,8 +4,8 @@
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-form labelPosition="top" @submit.prevent="save">
       <el-form-item v-for="kind in kinds" :key="kind.id" :label="kind.label">
-        <el-select v-model="draft[kind.id]" :aria-label="`${kind.label}默认模型`" filterable clearable :disabled="loading || saving" placeholder="未设置，请选择平台和模型" noDataText="没有可用模型，请先配置 API Key 并检查连接和余额">
-          <el-option v-if="draft[kind.id] && !choices(kind.id).some(item => keyOf(item) === draft[kind.id])" :value="draft[kind.id]" :label="`已不可用：${unavailableLabel(draft[kind.id])}`" disabled />
+        <el-select v-model="draft[kind.id]" :aria-label="`${kind.label}默认模型`" filterable clearable :disabled="loading || saving || !modelsReady" placeholder="未设置，请选择平台和模型" noDataText="没有可用模型，请先配置 API Key 并检查连接和余额">
+          <el-option v-if="draft[kind.id] && !choices(kind.id).some(item => keyOf(item) === draft[kind.id])" :value="draft[kind.id]" :label="`${modelsReady ? '已不可用' : '待确认'}：${unavailableLabel(draft[kind.id])}`" disabled />
           <el-option v-for="model in choices(kind.id)" :key="keyOf(model)" :value="keyOf(model)" :label="`${model.providerLabel} · ${model.label}`" />
         </el-select>
       </el-form-item>
@@ -29,6 +29,7 @@ const kinds: { id: Kind; label: string }[] = [{ id: "text", label: "对话与文
 const models = ref<Choice[]>([]);
 const draft = ref<Record<Kind, string>>({ text: "", image: "", video: "", audio: "" });
 const loading = ref(false);
+const modelsReady = ref(false);
 const saving = ref(false);
 const error = ref("");
 const autoSaveReady = ref(false);
@@ -38,17 +39,26 @@ function unavailableLabel(value: string) { try { return JSON.parse(value).join("
 function currentSelection() { return settings.value.modelSelection as Partial<Record<Kind, { providerId: string; modelId: string }>> | undefined; }
 
 async function load() {
+  if (loading.value) return;
   loading.value = true;
+  modelsReady.value = false;
   error.value = "";
   try {
-    const [text, media] = await Promise.all([axios.get("/api/ai/models?all=true"), axios.get("/api/ai/media/models?all=true")]);
-    if (text.data.code !== 200 || media.data.code !== 200) throw new Error("读取可用模型失败");
+    const [text, media] = await Promise.all([axios.get("/api/ai/models?all=true", { timeout: 15000 }), axios.get("/api/ai/media/models?all=true", { timeout: 15000 })]);
+    if (text.data.code !== 200 || media.data.code !== 200 || !Array.isArray(text.data.data) || !Array.isArray(media.data.data)) throw new Error("读取可用模型失败");
     models.value = [...text.data.data.map((model: Choice) => ({ ...model, type: "text" })), ...media.data.data];
-  } catch (cause) { models.value = []; error.value = axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : "读取可用模型失败"; }
+    modelsReady.value = true;
+  } catch (cause) {
+    // 读取失败不能证明模型失效，保留上次列表与已保存的选择。
+    error.value = axios.isAxiosError(cause) && (!cause.response || [502, 503, 504].includes(cause.response.status))
+      ? "无法连接 LITTO 服务或请求超时，模型状态暂时无法确认。已保留原设置，请在服务恢复后刷新可用模型。"
+      : axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : "读取可用模型失败";
+  }
   finally { loading.value = false; }
 }
 
 async function save() {
+  if (!modelsReady.value || loading.value || saving.value) return;
   saving.value = true;
   error.value = "";
   try {

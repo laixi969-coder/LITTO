@@ -40,6 +40,10 @@ cd apps/web && npx vite
 
 数据（设置、插件、工作区）默认保存在仓库的 `data/`，可用环境变量 `TOONFLOW_DATA_DIR` 指定其他位置。
 
+macOS 上长期使用本地工作台时，可先停止终端或 Coding 工具里运行的前后端，再在仓库根目录执行 `bun run local:start`。此命令用系统 launchd 托管前后端，固定访问 `http://localhost:5188/#/workspace`，后端使用 3000；关闭终端或聊天工具后继续运行，进程退出后自动拉起，登录 macOS 后自动启动。沿用仓库 `data/` 和默认账号模式，不自动安装依赖或构建。端口被占用时会报错，不会换端口或结束其他进程。
+
+用 `bun run local:status` 查看进程和退出状态，日志位于 `data/logs/littoServer.log`、`data/logs/littoWeb.log`。`bun run local:stop` 停止本次登录的服务；若要永久取消自动启动，停止后移除 `~/Library/LaunchAgents/littoServer.plist` 和 `~/Library/LaunchAgents/littoWeb.plist`。切换仓库路径前应先在原仓库停止服务，再从新路径启动。
+
 MV 听歌识词可使用自托管 Speaches，无需用户提供商业 API Key。CPU/GPU 容器配置、环境变量与部署验收见 [MV 开源转写部署](docs/musicDeployment.md)。
 
 默认启用邮箱验证码、Session 与租户隔离；`LITTO_AUTH=off` 为本地单用户模式。当前工作台的 BYOK 设置尚未接入云端加密凭据系统，部署状态与其他未满足项见 V3 核查表。

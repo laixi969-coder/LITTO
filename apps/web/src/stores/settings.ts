@@ -108,9 +108,11 @@ export const platformTrialProvider = computed<CustomProvider | undefined>(() => 
 const availableModels = ref<{ providerId: string; modelId: string }[]>([]);
 export async function loadAvailableModels() {
   try {
-    const { data } = await axios.get("/api/ai/models", { headers: { "Cache-Control": "no-cache" } });
-    availableModels.value = data.code === 200 && Array.isArray(data.data) ? data.data : [];
-  } catch { availableModels.value = []; }
+    const { data } = await axios.get("/api/ai/models", { headers: { "Cache-Control": "no-cache" }, timeout: 15000 });
+    if (data.code === 200 && Array.isArray(data.data)) availableModels.value = data.data;
+  } catch {
+    // 连接失败时保留最后成功的列表；实际调用仍由服务端校验可用性。
+  }
   invalidateNodeModels("language");
   invalidateNodeModels("media");
 }
