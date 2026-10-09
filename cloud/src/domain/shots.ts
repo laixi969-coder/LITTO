@@ -1,6 +1,6 @@
 import { all, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
-import { SCHEMA_VERSION, shotInput, cameraSchema, lightingSchema, type ShotInput } from "./schema.ts";
+import { SCHEMA_VERSION, shotInput, cameraSchema, lightingSchema, validateMusicVideoTiming, type ShotInput } from "./schema.ts";
 import { recomputeStates } from "./state.ts";
 import type { ShotDraft } from "./skills.ts";
 import type { z } from "zod";
@@ -13,6 +13,7 @@ const dataOf = (i: ShotInput) => {
 };
 
 export function createShot(s: Scope, projectId: string, input: ShotInput) {
+    validateMusicVideoTiming(input);
     const seq = s.get("sequences", input.sequenceId);
     if (!seq || seq.projectId !== projectId) throw notFound("sequence");
     if (input.sceneId && s.get("scenes", input.sceneId)?.sequenceId !== input.sequenceId) throw bad("scene does not belong to sequence");
@@ -27,10 +28,11 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion"] as const;
+const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
+    validateMusicVideoTiming({ ...shot, ...patch } as ShotInput);
     if (patch.sequenceId !== undefined && patch.sequenceId !== shot.sequenceId) throw bad("use the sequence workflow to move a shot");
     if (patch.sceneId && s.get("scenes", patch.sceneId)?.sequenceId !== shot.sequenceId) throw bad("scene does not belong to sequence");
     const changed = CORE.filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(shot[k]));

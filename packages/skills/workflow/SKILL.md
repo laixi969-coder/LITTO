@@ -2,7 +2,7 @@
 name: workflow
 description: 在 LITTO 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.10.0"
+  version: "2.11.0"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -35,7 +35,7 @@ metadata:
 | 多镜头、续作、局部重做、反打或跨镜动作 | 读取[连续性守则](../continuity/SKILL.md)，按实际状态承接身份、光线、情绪、道具与动作 |
 | 只有角色身份资产、无人场景或静物产品图 | 使用[资产制作](references/assets.md)与适用的摄影方法；不自动套哭戏、打斗、眨眼或群像规则 |
 | 真人 MV、生活类短片或宣传视觉中的情境人像、摄影样片 | 按下文[情境人像](#情境人像)组织已定稿角色的事件、姿态与摄影；只做身份资产时不启用 |
-| 对口型演唱或音乐卡点 | 先沿用 musicfilm 的真实音乐分析与段落计划；需要角色表现时再加入表演指导，精确同步须按实际音频与视频验证 |
+| 剧情 MV、短 MV、多图音乐编排、演唱或音乐卡点 | 读取 [MV 导演编排](../musicfilm/references/musicVideoDirection.md)，用开场问题、人物行动与回收组织故事，保存 musicVideo 时间轴与声音方案；精确同步须按实际音频与视频验证 |
 
 资料用于补足当前 action、performance、blocking、camera 和剪辑计划，不改变已确认的媒介风格、模型、故事与生成授权。纯文字方案完成不等于已出图、已生成视频或已验收。
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bad } from "../util.ts";
 
 export const SCHEMA_VERSION = 1;
 
@@ -72,6 +73,27 @@ export const freedomMapSchema = z.object({
     LOCK: z.array(z.string()).default([]), CONTROL: z.array(z.string()).default([]), ALLOW: z.array(z.string()).default([]), RANDOM: z.array(z.string()).default([]),
 });
 
+export const musicVideoSchema = z.object({
+    audioMode: z.enum(["sourceTrack", "generated", "silent"]),
+    audioDirection: z.string().trim().min(1).max(8000),
+    sourceStart: z.number().finite().nonnegative().optional(),
+    timeline: z.array(z.object({
+        start: z.number().finite().nonnegative(),
+        end: z.number().finite().positive(),
+        description: z.string().trim().min(1).max(4000),
+    }).strict()).min(1).max(120),
+}).strict().superRefine((value, context) => {
+    if (value.audioMode === "sourceTrack" && value.sourceStart === undefined) {
+        context.addIssue({ code: "custom", path: ["sourceStart"], message: "使用原曲须记录本段对应的歌曲起点秒数" });
+    }
+    value.timeline.forEach((item, index) => {
+        const previousEnd = index ? value.timeline[index - 1].end : 0;
+        if (item.end <= item.start || Math.abs(item.start - previousEnd) > 0.000001) {
+            context.addIssue({ code: "custom", path: ["timeline", index], message: "MV 时间块须从 0 连续排列，无空隙、倒序或重叠，且结束晚于开始" });
+        }
+    });
+});
+
 export const shotInput = z.object({
     sequenceId: z.string(), sceneId: z.string().optional(), order: z.number().int().optional(),
     title: z.string().default(""),
@@ -84,6 +106,7 @@ export const shotInput = z.object({
     freedomMap: freedomMapSchema.optional(), constraints: z.array(z.string()).default([]),
     duration: z.number().finite().positive().max(3600).default(4),
     generationDuration: z.number().finite().positive().max(3600).optional(),
+    musicVideo: musicVideoSchema.nullable().optional(),
     inspectionRegion: referenceCropSchema.nullable().optional(),
     subtitle: z.string().default(""),
     modelOverride: z.any().optional(),
@@ -96,3 +119,14 @@ export const shotInput = z.object({
     }).default({}),
 });
 export type ShotInput = z.infer<typeof shotInput>;
+
+export function validateMusicVideoTiming(shot: Pick<ShotInput, "musicVideo" | "duration" | "generationDuration">) {
+    if (!shot.musicVideo) return;
+    const parsed = musicVideoSchema.safeParse(shot.musicVideo);
+    if (!parsed.success) throw bad("MV 编排参数无效", parsed.error.issues);
+    const musicVideo = parsed.data;
+    const duration = shot.generationDuration ?? shot.duration;
+    if (!Number.isFinite(duration) || duration < shot.duration || Math.abs(musicVideo.timeline.at(-1)!.end - duration) > 0.000001) {
+        throw bad("MV 时间轴须完整覆盖生成时长，生成时长不能短于计划使用时长");
+    }
+}

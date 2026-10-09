@@ -5,6 +5,8 @@ import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
 import { ensureReferenceCrop } from "./referenceCrop.ts";
+import { validateMusicVideoTiming } from "./schema.ts";
+import type { ShotInput } from "./schema.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -22,12 +24,24 @@ export type Compiled = {
     degradations: { role: string; strategy: string }[]; warnings: string[]; freedomMap: Record<string, string[]>; sections: Record<string, string>;
 };
 
+export function renderCompiledPrompt(sections: Record<string, string>) {
+    const seedanceMusicVideo = "Objective" in sections;
+    return Object.entries(sections).filter(([, value]) => value).map(([key, value]) => `${seedanceMusicVideo ? key : key.toUpperCase()}: ${value}`).join("\n");
+}
+
+function musicTimecode(seconds: number) {
+    const rounded = Math.round(seconds * 1000000) / 1000000;
+    const remainder = (rounded % 60).toFixed(6).replace(/\.?0+$/, "");
+    return `${Math.floor(rounded / 60)}:${Number(remainder) < 10 ? "0" : ""}${remainder}`;
+}
+
 /**
  * Prompt is NOT source data. It is compiled from ShotSpec + Skills output + Provider capabilities.
  * Unsupported reference roles degrade to text (explicitly reported), never silently disappear.
  */
 export function compileShot(s: Scope, shotId: string, kind: "image" | "video", modelId: string, extra: { startFrameMediaId?: string; repair?: { addLock?: string[]; note?: string } } = {}): Compiled {
     const shot = s.get("shots", shotId)!;
+    validateMusicVideoTiming(shot as ShotInput);
     const proj = shot.projectId;
     const world = s.list("worlds", { projectId: proj })[0] as any;
     const looks = s.list("looks", { projectId: proj }) as any[];
@@ -96,7 +110,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     lock.push(...(extra.repair?.addLock ?? []));
     const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : [] };
 
-    const sections: Record<string, string> = {
+    let sections: Record<string, string> = {
         shotDesign: cam.design ? `${kind === "image" ? "Render only the single start state; end, paths and timing are continuity context, not multiple panels. " : ""}${JSON.stringify(cam.design)}` : "",
         subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
         assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
@@ -120,7 +134,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         state: J([...Object.entries<any>(start.props).filter(([, p]) => p.present).map(([id, p]) => `${p.name ?? id}${p.heldBy ? ` held by ${start.characters[p.heldBy]?.name ?? p.heldBy}` : ""}`), ...Object.entries<any>(start.characters).map(([id, c]) => c.wardrobeId ? `${c.name ?? id} wearing ${start.wardrobe[c.wardrobeId]?.name ?? c.wardrobeId}` : "")]),
         observedState: J(Object.values(start).flatMap(group => Object.values<any>(group).filter(value => value && typeof value === "object" && value.note).map(value => `${value.name ?? "asset"}: ${value.note}`))),
         opticalTexture: look ? J([look.shadowBehavior && `shadows: ${look.shadowBehavior}`, look.texture && `texture: ${look.texture}`, look.sharpnessPhilosophy && `sharpness: ${look.sharpnessPhilosophy}`, look.bloom && `bloom: ${look.bloom}`]) : "",
-        referenceIntent: J(bindings.filter(b => b.notes).map(b => `${b.role}: ${b.notes}`)),
+        referenceIntent: J(bindings.filter(b => b.notes).map(b => `${b.referenceId} (${b.role}): ${b.notes}`)),
         references: textFallback.join("; "),
         lock: freedom.LOCK.join("; "),
         control: freedom.CONTROL.join("; "),
@@ -131,8 +145,38 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         constraintPriority: "Preserve identity and explicit invariants. Allow natural performance without changing identity. Forbidden changes override allowed variations; optional variation must not alter specified action, lighting or continuity.",
         repair: extra.repair?.note ?? "",
     };
-    const prompt = Object.entries(sections).filter(([, v]) => v).map(([k, v]) => `${k.toUpperCase()}: ${v}`).join("\n");
-    const negativePrompt = J(["extra fingers", "warped hands", "identity drift from references", "text artifacts / garbled logos", "floating objects", ...(freedom.LOCK.length ? ["changes to locked elements"] : [])]);
+    let negativePrompt = J(["extra fingers", "warped hands", "identity drift from references", "text artifacts / garbled logos", "floating objects", ...(freedom.LOCK.length ? ["changes to locked elements"] : [])]);
+    const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
+    if (kind === "video" && musicVideo) {
+        const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}】${item.description}`).join("\n");
+        const audio = J([
+            musicVideo.audioMode === "sourceTrack" && `原曲从 ${musicVideo.sourceStart}s 起对应本段 0s；最终剪辑沿用同一原曲，不在切镜处重启或重作歌曲`,
+            musicVideo.audioMode === "generated" && "按已确认的音乐方案生成本段声音；跨段曲目与声音身份须实际试听核对",
+            musicVideo.audioMode === "silent" && "本段不生成声音",
+            musicVideo.audioDirection,
+        ]);
+        const externalModelId = model.limits.workspaceExecution ? JSON.parse(model.externalModelId)[1] : model.externalModelId;
+        if (typeof externalModelId === "string" && /(?:^|[/_-])seedance[-_ ]?2[._-]5(?:$|[/_-])/i.test(externalModelId)) {
+            // ACT: 只重排已保存的规格，不由编译器编故事。其他模型继续使用通用段落。
+            sections = {
+                Objective: J([shot.title, sections.narrative, sections.action]),
+                "Reference binding": inputs.filter(input => input.sent).map(input => `${input.referenceId}: ${input.role}`).join("; "),
+                "Immutable locks": J([sections.lock, sections.state, sections.observedState, sections.constraintPriority]),
+                "Target duration": `${shot.generationDuration ?? shot.duration} seconds`,
+                Timeline: timeline,
+                "Visual direction": Object.entries(sections).filter(([key]) => !["narrative", "action", "lock", "state", "observedState", "constraintPriority", "forbiddenChanges"].includes(key)).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join("; "),
+                "Audio direction": audio,
+                Preserve: J([sections.subject, sections.assetDetails, sections.lock]),
+                Avoid: J([sections.forbiddenChanges, negativePrompt]),
+            };
+            negativePrompt = "";
+        } else {
+            sections.timeline = timeline;
+            sections.audio = audio;
+            sections.duration = `${shot.generationDuration ?? shot.duration} seconds`;
+        }
+    }
+    const prompt = renderCompiledPrompt(sections);
     for (const key of ["surface", "imaging", "world", "cinematic", ...(kind === "video" ? ["motion"] : [])]) {
         if (!shot.realism?.[key]?.trim()) warnings.push(`未填写真实感规格：${key}`);
     }

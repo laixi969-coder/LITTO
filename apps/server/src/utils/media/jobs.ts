@@ -37,7 +37,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     projectId,
     directory,
     kind,
-    request: { ...request, ...(production ? { prompt: production.compiled.prompt + "\nAVOID: " + production.compiled.negativePrompt } : {}) },
+    request: { ...request, ...(production ? { prompt: production.compiled.prompt + (production.compiled.negativePrompt ? "\nAVOID: " + production.compiled.negativePrompt : "") } : {}) },
     requestId,
     production,
   });
@@ -118,6 +118,12 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true });
+  if (kind === "video" && result.audioMode === "generated" && (!model.audio || request.generateAudio === false || (model.audio === "optional" && request.generateAudio !== true))) {
+    throw Object.assign(new Error("MV 方案需要生成声音，请选用支持音频的模型并开启 generateAudio"), { status: 400 });
+  }
+  if (kind === "video" && result.audioMode === "silent" && (model.audio === true || request.generateAudio === true || (model.audio === "optional" && request.generateAudio !== false))) {
+    throw Object.assign(new Error("MV 方案要求无声素材，请关闭 generateAudio 或更换支持无声输出的模型"), { status: 400 });
+  }
   if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");

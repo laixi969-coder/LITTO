@@ -4,7 +4,7 @@ import { createProject } from "./routes/platform.ts";
 import { enqueue } from "./jobs.ts";
 import { ADAPTERS, upsertModel, upsertProvider } from "./providers/registry.ts";
 import { ProviderError, type GenRequest, type GenResult } from "./providers/adapter.ts";
-import { compileShot, requireCompiledInputs } from "./domain/compiler.ts";
+import { compileShot, requireCompiledInputs, renderCompiledPrompt } from "./domain/compiler.ts";
 import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
 import { bad, conflict, notFound } from "./util.ts";
 
@@ -132,7 +132,7 @@ export function prepareWorkspaceShot(input: {
   if (input.kind === "video" && Array.isArray(mode) && (counts.image > referenceLimit || counts.video > videoLimit || counts.audio > audioLimit)) throw bad("某类参考数量超过模型的模式上限");
   compiled.warnings.push("参考按媒体类型发送；用途与权重写入提示词，不代表供应商提供像素级锁定或数值权重控制。自动检查不替代观看验收。");
   const inputNumbers = { image: 0, video: 0, audio: 0 };
-  compiled.prompt += "\nREFERENCE PLAN: " + compiled.inputs.filter(ref => ref.sent).map(ref => {
+  const referencePlan = compiled.inputs.filter(ref => ref.sent).map(ref => {
     const media = s.get("media", ref.mediaId!);
     const kind = media!.mime.startsWith("video/") ? "video" : media!.mime.startsWith("audio/") ? "audio" : "image";
     const slot = kind === "image" && ref.role === "END_FRAME" ? "native end frame"
@@ -141,5 +141,7 @@ export function prepareWorkspaceShot(input: {
     const intent = ref.role === "START_FRAME" && !slot.startsWith("native") ? "approved appearance/composition reference; not a native start-frame constraint" : ref.role;
     return `${slot}: ${intent}, ${ref.lockLevel}, intended weight ${ref.weight}, reference ${ref.referenceId}`;
   }).join("; ");
-  return { shotId: shot.id, keyframeId: keyframe?.id, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration };
+  compiled.sections["Objective" in compiled.sections ? "Reference binding" : "reference plan"] = referencePlan;
+  compiled.prompt = renderCompiledPrompt(compiled.sections);
+  return { shotId: shot.id, keyframeId: keyframe?.id, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: shot.musicVideo?.audioMode as string | undefined };
 }

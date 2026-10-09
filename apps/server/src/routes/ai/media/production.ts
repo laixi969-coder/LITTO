@@ -22,7 +22,7 @@ export default Router().post("/", validateFields({
   const tenant = currentTenant()!;
   const job = cloud()!.enqueueWorkspaceMedia({ workspaceId: tenant.workspaceId, userId: tenant.userId,
     projectId: u.mediaJobs.workspaceProject(directory)!, directory, kind, production, requestId,
-    request: { ...request, prompt: production.compiled.prompt + "\nAVOID: " + production.compiled.negativePrompt },
+    request: { ...request, prompt: production.compiled.prompt + (production.compiled.negativePrompt ? "\nAVOID: " + production.compiled.negativePrompt : "") },
   });
   res.status(202).json(success({ jobId: job.id }));
 });

@@ -78,6 +78,7 @@
               <label v-if="kind === 'video'">模式<select v-model="modeKey"><option value="">选择模式</option><option v-for="mode in modes" :key="JSON.stringify(mode)" :value="JSON.stringify(mode)">{{ modeLabel(mode) }}</option></select></label>
               <label v-if="kind === 'video'">分辨率<select v-model="resolution"><option value="">选择分辨率</option><option v-for="value in resolutions" :key="value">{{ value }}</option></select></label>
               <label v-if="kind === 'video'">生成时长（含剪辑余量）<select v-model.number="duration"><option v-for="value in durations" :key="value" :value="value">{{ value }} 秒</option></select></label>
+              <label v-if="kind === 'video' && draft.musicVideo && selectedModel?.audio === 'optional'"><input v-model="generateAudio" type="checkbox" />生成声音</label>
               <label v-if="kind === 'image' && selectedModel?.imageSizes?.length">尺寸<select v-model="size"><option v-for="value in selectedModel.imageSizes" :key="value">{{ value }}</option></select></label>
               <label>画幅<select v-model="ratio"><option v-for="value in selectedModel?.cameraTrajectory ? ['20:11'] : selectedModel?.imageRatios?.length ? selectedModel.imageRatios : ['16:9', '9:16', '1:1']" :key="value">{{ value }}</option></select></label>
               <template v-if="kind === 'video' && selectedModel?.cameraTrajectory">
@@ -193,7 +194,8 @@ const priorFindings = computed(() => (targetReports.value[0]?.findings ?? []).fi
 const reviewFields = computed(() => realismFields.filter(field => target.value?.type === "take" || field[0] !== "motion"));
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
 const modeLabel = (mode: unknown) => Array.isArray(mode) ? `多参考 (${mode.join(" / ")})` : ({ singleImage: "首帧", startFrameOptional: "首帧可选", startEndRequired: "首尾帧", endFrameOptional: "首帧与可选尾帧", text: "纯文本" }[String(mode)] ?? String(mode));
-watch([kind, modelKey, modeKey, resolution, duration, size, ratio, shotId], () => { preview.value = null; pendingRequestId = ""; });
+const generateAudio = ref(false);
+watch([kind, modelKey, modeKey, resolution, duration, size, ratio, shotId, generateAudio], () => { preview.value = null; pendingRequestId = ""; });
 watch(selectedModel, model => { modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? ""; ratio.value = model?.cameraTrajectory ? "20:11" : model?.imageRatios?.[0] ?? "16:9"; });
 watch([cameraTrajectory, imageAndCameraOnly], () => { preview.value = null; pendingRequestId = ""; }, { deep: true });
 watch([shotId, modelKey], () => { cameraTrajectory.value = undefined; imageAndCameraOnly.value = false; });
@@ -280,6 +282,7 @@ async function selectShot(id: string) {
   draft.value = structuredClone(toRaw(detail.value));
   draft.value.realism ??= Object.fromEntries(realismFields.map(field => [field[0], ""]));
   duration.value = draft.value.generationDuration ?? draft.value.duration;
+  generateAudio.value = draft.value.musicVideo?.audioMode === "generated";
   selectPendingVersion();
   void refreshJobs().catch(() => {});
 }
@@ -309,7 +312,7 @@ async function removeBinding(item: any) {
 function generationRequest() {
   const model = selectedModel.value; if (!model) throw new Error("请选择模型");
   if (model.cameraTrajectory && (!cameraTrajectory.value || !imageAndCameraOnly.value)) throw new Error("请导入轨迹并确认图像与相机控制范围");
-  return { providerId: model.providerId, modelId: model.modelId, ratio: ratio.value, ...(kind.value === "image" ? (size.value ? { size: size.value } : {}) : { mode: modeKey.value ? JSON.parse(modeKey.value) : undefined, resolution: resolution.value, duration: duration.value, ...(model.cameraTrajectory ? { cameraTrajectory: cameraTrajectorySchema.parse(cameraTrajectory.value), imageAndCameraOnly: imageAndCameraOnly.value } : {}) }) };
+  return { providerId: model.providerId, modelId: model.modelId, ratio: ratio.value, ...(kind.value === "image" ? (size.value ? { size: size.value } : {}) : { mode: modeKey.value ? JSON.parse(modeKey.value) : undefined, resolution: resolution.value, duration: duration.value, ...(draft.value?.musicVideo && model.audio === "optional" ? { generateAudio: generateAudio.value } : {}), ...(model.cameraTrajectory ? { cameraTrajectory: cameraTrajectorySchema.parse(cameraTrajectory.value), imageAndCameraOnly: imageAndCameraOnly.value } : {}) }) };
 }
 async function loadTrajectory(event: Event) {
   const input = event.target as HTMLInputElement;

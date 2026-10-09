@@ -2,7 +2,7 @@
 name: cinema
 description: 制作以好莱坞电影质感为目标的叙事影片、电影短片或电影式动画：从故事意图、世界与视觉设定出发，规划有叙事职责的镜头、人物调度、表演、摄影、光线、运动和剪辑衔接，建立资产与状态连续性，再制作关键帧和视频片段。用于电影创作及既有影片的续作、局部修改；产品广告使用 adfilm，画布与模型执行使用 workflow 和 canvas。
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   displayName: 电影创作
   author: LITTO
 ---
@@ -19,6 +19,7 @@ metadata:
 - [canvas](../canvas/SKILL.md)：查询实际节点、配置、参考顺序并操作画布，不猜节点能力。
 - [continuity](../continuity/SKILL.md)：身份、服装、道具、空间、动作、光线与情绪的跨镜状态；锁定资产与版本修复。
 - 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)。
+- MV 镜头另外读取 [MV 导演编排](../musicfilm/references/musicVideoDirection.md)：沿用 musicfilm 的开场悬念与故事选择，音乐和表演共同占用时间；完整内容保存到 `musicVideo` 后编译，不只写自由提示词。
 
 ## 1. 理解目标：只补问缺失信息，最多四项
 
