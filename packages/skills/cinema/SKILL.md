@@ -44,6 +44,8 @@ metadata:
 
 ## 3. 世界、视觉与资产
 
+制定本阶段方案前，按当前对象读取[视觉设计](../workflow/references/methods/visualDesign.md)、[色彩与用光](../workflow/references/methods/colorAndLight.md)，涉及人物时再读[妆造设计](../workflow/references/methods/characterStyling.md)。将场景结构、维护状态、资产本色、空间受光、后期色彩与当前造型分开决定，再组合成相容方案；已有已确认内容直接继承，不把电影质感默认为暗、脏、旧或疲惫。
+
 先调用 `productionSpec(read)` 读取当前项目，用 `world`、`look`、`asset` 操作保存已确认设定；补充说明可放在工作区 `设定.md`，但不能代替领域对象：
 
 - 世界：年代、地点、建筑与空间逻辑、天气、时间、材质、重力与物理尺度。

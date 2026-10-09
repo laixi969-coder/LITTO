@@ -15,7 +15,7 @@ metadata:
 
 - 画布工具的调用、参数和连线规则以 [canvas](../canvas/SKILL.md) 为准；制作阶段、Seedance 提示词和资产参考板版式以 [workflow](../workflow/SKILL.md) 为准。技能位置以 `available_skills` 中的实际 `location` 为准，找不到就说明缺项，不凭记忆补造。
 - 进入 workflow 的 Seedance 执行态（PART A）后，**分段、时长、镜头格式、`{{ref N}}` 写法一律以 PART A 为准**。本技能不改这些，只提供：设定表、状态表、核对清单、修复方法。核对发现问题时，回到 PART A 受影响的段落修改，不另写一套提示词。
-- 角色先采用单张完整全身主参考，再按需补视角；具体展示方式见 workflow 的[资产制作](../workflow/references/assets.md)，这里不另设版式。
+- 新角色默认采用同一身份、同一造型的正面、右侧面、背面完整全身三视图；具体展示方式及用户指定版式的处理见 workflow 的[资产制作](../workflow/references/assets.md)，这里不另设版式。
 
 ## 1. 开拍前：先建设定，再出镜头
 
