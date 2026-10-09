@@ -2,7 +2,7 @@
 name: workflow
 description: 在 LITTO 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.13.0"
+  version: "2.13.1"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -30,7 +30,7 @@ metadata:
 
 | 当前任务 | 使用资料与时机 |
 | --- | --- |
-| 妆发、服装搭配、换装、卸妆或持续外观状态 | 读取[妆造设计](references/methods/characterStyling.md)，将人物处境、当前造型、变化时点与参考分工落实到现有资产和镜头 |
+| 妆发、服装搭配、换装、卸妆或持续外观状态 | 读取[妆造设计](references/methods/characterStyling.md)，将人物处境、当前造型、变化时点与参考分工落实到现有资产和镜头；现代真人 MV 人物资产或精致人像参考在出图前应用其中的肤面、妆发与搭配标准 |
 | 对白、倾听、无声反应、情绪变化、群像，或修复僵硬表演 | 规划或修复前读取[表演指导](../cinema/references/performanceDirection.md)，落实角色目标、触发、目光与节拍 |
 | 武打、搏击、追逐、兵器或复杂身体交互 | 规划或修复前读取[动作编排](../cinema/references/actionChoreography.md)，落实空间、受力、反应与状态衔接；同时有表演诉求时结合表演指导 |
 | 多镜头、续作、局部重做、反打或跨镜动作 | 读取[连续性守则](../continuity/SKILL.md)，按实际状态承接身份、光线、情绪、道具与动作 |
@@ -84,6 +84,8 @@ metadata:
 ## 真人质感与镜头接点
 
 真人项目先审看母图的皮肤、发际线、衣物材质和接触关系，不把磨皮母图交给视频后再靠颗粒或锐化补救。身份不变量与自然表演变化分开：用现有 `performance.timing`、`gesture`、`eyeline` 和 `action` 表达触发、反应、行动、余波，不机械套固定秒数或同时堆叠强表情。光源继承场景位置，不随人物情绪自动换灯、柔焦或加辉光。
+
+精致人像的局部肤面修饰不等于磨平身份纹理；按[妆造方法](references/methods/characterStyling.md#精致写真人像皮肤妆发与搭配)检查高光过渡、纹理尺度、妆发与搭配，不统一增加毛孔、油光、皱纹或粗粝颗粒。用户已选的纪实、粗粝或其他画风仍优先。
 
 角色板按当前景别提取必要参考。绑定 `crop` 使用 `{ x, y, width, height, unit }`：`normalized` 为原图像素坐标归一化的 0–1 区域，`pixels` 为原图整数像素；不支持视频分段裁切。核对编译结果的实际媒体，原生首尾帧与普通多参图片区分说明。
 
