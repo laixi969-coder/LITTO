@@ -4,7 +4,7 @@ import { createProject } from "./routes/platform.ts";
 import { enqueue } from "./jobs.ts";
 import { ADAPTERS, upsertModel, upsertProvider } from "./providers/registry.ts";
 import { ProviderError, type GenRequest, type GenResult } from "./providers/adapter.ts";
-import { compileShot, requireCompiledInputs, renderCompiledPrompt } from "./domain/compiler.ts";
+import { compileShot, compileWorkspacePrompt, requireCompiledInputs, renderCompiledPrompt } from "./domain/compiler.ts";
 import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
 import { bad, conflict, notFound } from "./util.ts";
 
@@ -71,6 +71,7 @@ export function enqueueWorkspaceMedia(input: {
     price: {},
     capabilities: input.production?.capabilities ?? {},
   });
+  const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt);
   return enqueue({
     workspaceId: input.workspaceId,
     createdBy: input.userId,
@@ -79,8 +80,8 @@ export function enqueueWorkspaceMedia(input: {
     targetType: input.production ? "shot" : undefined,
     targetId: input.production?.shotId,
     modelId,
-    compiledPrompt: input.request.prompt,
-    parameters: { directory: input.directory, request: input.request, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}) },
+    compiledPrompt: prompt,
+    parameters: { directory: input.directory, request: { ...input.request, prompt }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}) },
     inputRefs: input.production?.compiled.inputs ?? [],
     fallbackAllowed: false,
     idempotencyKey: "workspaceMedia:" + input.requestId,

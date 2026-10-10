@@ -12,6 +12,36 @@
 
 另核验 [qualsenWeb/fight-video-create-skill](https://github.com/qualsenWeb/fight-video-create-skill)，83 星，提交 `8a5afd27822ebef540f2669c877cabeffa62256b`。其源代码与文档为 Apache-2.0，但 data/、reference/ 为 CC BY-NC-ND 4.0；未将其资料、样本、脚本或文档纳入本项目。未引入未经核验的模型效果承诺或外部安装命令。
 
+## 2026-10-10 增补：漫剧老李
+
+来源：[lixiaoxiao9888-create/manju-laoli-skill](https://github.com/lixiaoxiao9888-create/manju-laoli-skill)，固定提交 `079df685f7cf2f0de635362bd359c233db38f9fe`。仓库根目录与 short-drama-director/LICENSE 均为以下 MIT 许可。
+
+采用范围：short-drama-director/references 下的 action-previs-15grid.md、combat-direction-engine.md、combat-rhythm-defense3state.md、action-cinematography-breakdown.md、xuanhuan-magic-combat.md 的表现分档、状态过渡、多人路径、接剪、长镜头与法术媒介方法。另查阅 martial-arts-arsenal.md、martial-arts-combat-library.md、authentic-martial-taxonomy.md，未移植其完整招式名录或将其中武术分类当作史实。
+
+修改声明：LITTO 将上述方法归纳、删减并重新组织为 manjuActionDirection.md，接入 cinema 与 workflow 的按需读取流程。删除固定模型、强制 15 秒/宫格数量、招式配额、强制破坏/血腥、禁用静止与慢镜等绝对规则；不沿用完播率预测或未经本项目验证的模型效果结论。改用现有 ShotSpec 字段、用户已选媒体规格、模型能力查询和实际结果验收。没有执行或移植上游脚本，也没有安装其全套工作流。上游作者不为本项目修改背书。
+
+MIT License
+
+Copyright (c) 2026 Short-Drama Director Suite contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ## fight-prompt-director：MIT
 
 MIT License

@@ -109,6 +109,7 @@ export interface MediaReference {
 }
 
 export interface MediaGenerationRequest {
+  purpose?: "asset" | "standalone";
   cameraTrajectory?: CameraTrajectory;
   imageAndCameraOnly?: boolean;
   shotId?: string;

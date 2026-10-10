@@ -15,7 +15,6 @@
     @drop="dropFiles">
     <vue-flow
       class="flowViewport"
-      :class="{ withShots: shots.length }"
       :id="runtimeKey"
       :onlyRenderVisibleElements="false"
       :nodesDraggable="true"
@@ -1002,7 +1001,10 @@ const defaultEdgeOptions = markRaw({
 .canvas {
   width: 100%;
   height: 100%;
-  .flowViewport.withShots { height: calc(100% - 180px); }
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  .flowViewport { flex: 1; min-height: 0; }
 
   &.compositingEnabled :deep(.vue-flow__transformationpane) {
     will-change: transform;

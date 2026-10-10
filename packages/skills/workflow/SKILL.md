@@ -2,7 +2,7 @@
 name: workflow
 description: 在 LITTO 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.13.1"
+  version: "2.13.2"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -40,7 +40,7 @@ metadata:
 | --- | --- |
 | 妆发、服装搭配、换装、卸妆或持续外观状态 | 读取[妆造设计](references/methods/characterStyling.md)，将人物处境、当前造型、变化时点与参考分工落实到现有资产和镜头；现代真人 MV 人物资产或精致人像参考在出图前应用其中的肤面、妆发与搭配标准 |
 | 对白、倾听、无声反应、情绪变化、群像，或修复僵硬表演 | 规划或修复前读取[表演指导](../cinema/references/performanceDirection.md)，落实角色目标、触发、目光与节拍 |
-| 武打、搏击、追逐、兵器或复杂身体交互 | 规划或修复前读取[动作编排](../cinema/references/actionChoreography.md)，落实空间、受力、反应与状态衔接；同时有表演诉求时结合表演指导 |
+| 武打、搏击、追逐、兵器、仙侠法术或复杂身体交互 | 规划或修复前读取[动作编排](../cinema/references/actionChoreography.md)，落实空间、受力、反应与状态衔接；攻防节拍、多人换位、法术及连续长镜头再读[武打导演专项](../cinema/references/manjuActionDirection.md)；同时有表演诉求时结合表演指导 |
 | 多镜头、续作、局部重做、反打或跨镜动作 | 读取[连续性守则](../continuity/SKILL.md)，按实际状态承接身份、光线、情绪、道具与动作 |
 | 只有角色身份资产、无人场景或静物产品图 | 使用[资产制作](references/assets.md)与适用的摄影方法；不自动套哭戏、打斗、眨眼或群像规则 |
 | 真人 MV、生活类短片或宣传视觉中的情境人像、摄影样片 | 按下文[情境人像](#情境人像)组织已定稿角色的事件、姿态与摄影；只做身份资产时不启用 |

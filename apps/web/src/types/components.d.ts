@@ -89,6 +89,7 @@ declare module 'vue' {
     MarkdownImage: typeof import('./../components/markdownImage.vue')['default']
     Mcp: typeof import('./../components/settings/panels/mcp/index.vue')['default']
     MediaModel: typeof import('./../components/settings/panels/mediaModel/index.vue')['default']
+    MediaPreferences: typeof import('./../components/mediaPreferences.vue')['default']
     MentionContent: typeof import('./../components/agent/mentionContent.vue')['default']
     MentionMenu: typeof import('./../components/agent/mentionMenu.vue')['default']
     MentionThumbnail: typeof import('./../components/agent/mentionThumbnail.vue')['default']

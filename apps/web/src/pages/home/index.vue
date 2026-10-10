@@ -78,6 +78,7 @@
               aria-label="创作描述"
               @paste.capture="pasteText" />
             <template #footer>
+              <mediaPreferences v-model="mediaPreferencesValue" :disabled="creating || opening" />
               <div class="composerFooter">
                 <workspacePicker v-if="!accounts" ref="promptWorkspacePicker" v-model="workspaceDirectory" :disabled="creating || opening" />
                 <span v-else class="composerHint">先写想法，再一起细化。</span>
@@ -233,6 +234,7 @@
             :disabled="creating"
             :placeholder="currentLane.placeholder" />
         </el-form-item>
+        <mediaPreferences v-model="mediaPreferencesValue" :disabled="creating" />
         <p class="briefHint">受众、时长和画面风格不用现在想好，助手会在需要时再问你。</p>
       </el-form>
       <template #footer>
@@ -294,6 +296,7 @@ import { getMe, isAuthDisabled, logout } from "@/lib/session";
 import { openConnectModel } from "@/components/connectModel/state";
 import { customProviders, loadPlatformTrial, platformTrial, settings as settingsStore } from "@/stores/settings";
 import workspacePicker from "./workspacePicker.vue";
+import mediaPreferences from "@/components/mediaPreferences.vue";
 import musicAnalysis from "./musicAnalysis.vue";
 
 const settingsVisible = ref(false);
@@ -458,6 +461,7 @@ async function renameProject(project: Project) {
 }
 
 // message 默认取首页输入框；通道弹窗传入带技能指令的消息，不能写回输入框，否则用户会看到内部指令。
+const mediaPreferencesValue = ref({ imageRatio: "", imageSize: "", videoRatio: "", videoResolution: "" });
 async function createProject(fromPrompt = true, message = prompt.value, attachments = promptAttachments.value, storyBrief?: StoryProject["brief"]) {
   if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
   // Sending an idea without a text model would just fail: take the person to the one-minute wizard instead.
@@ -503,7 +507,9 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
     if (fromPrompt && (message.trim() || attachments.length)) {
       workspaceStore.pendingAgentMessage = {
         directory: workspaceStore.project!.directory,
-        prompt: message,
+        prompt: message + (Object.values(mediaPreferencesValue.value).some(Boolean)
+          ? `\n用户在开始创作前选择的媒体规格：${JSON.stringify(mediaPreferencesValue.value)}。imageRatio/imageSize 分别对应图片 ratio/size，videoRatio/videoResolution 分别对应视频 ratio/resolution。空值使用模型默认。生成及 productionSpec compile 必须遵循这些规格；先查询 listMediaModels，若当前模型不支持所选规格，先告知用户并确认，不能静默降级。`
+          : ""),
         attachments: [...attachments],
         model: selectedModel.value,
         reasoningEffort: reasoningEffort.value,

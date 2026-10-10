@@ -1,5 +1,5 @@
 <template>
-  <section class="shotStrip" aria-label="镜头与素材">
+  <section v-if="productionShots.length || shots.length || loadError" class="shotStrip" aria-label="镜头与素材">
     <header>
       <strong>{{ productionShots.length ? '镜头条' : '画布素材' }}</strong>
       <span v-if="productionShots.length">{{ productionShots.length }} 个镜头 · {{ productionShots.filter(item => item.approvedTake).length }} 个已批准 Take</span>
@@ -77,7 +77,10 @@ const emit = defineEmits<{ select: [id: string]; finalize: [id: string, finalize
 
 <style scoped lang="scss">
 .shotStrip {
-  height: 180px;
+  flex: none;
+  max-height: 180px;
+  box-sizing: border-box;
+  overflow: auto;
   border-top: 1px solid var(--studioBorder);
   background: var(--studioSurface);
   padding: 12px 16px;

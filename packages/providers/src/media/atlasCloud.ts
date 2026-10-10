@@ -29,8 +29,9 @@ async function uploadImage(context: ProviderContext, input: MediaInput, signal: 
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(bytes)], { type: input.mimeType }), `image.${input.mimeType.split("/")[1]}`);
   const result = await fetchJson(context, "/api/v1/model/uploadMedia", signal, form);
-  if (typeof result.url !== "string" || !/^https?:\/\//i.test(result.url)) throw new Error("Atlas Cloud 上传未返回有效地址");
-  return result.url;
+  const url = result.data?.download_url ?? result.url;
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) throw new Error("Atlas Cloud 上传未返回有效地址");
+  return url;
 }
 
 function wait(signal: AbortSignal, milliseconds: number) {
@@ -127,7 +128,7 @@ export default {
     if (!Array.isArray(result.data)) throw new Error("Atlas Cloud 目录格式错误");
     // ACT: 只导入已映射请求参数的家族，复杂任务和未知新协议需单独适配。
     const catalogue: AtlasModel[] = result.data.filter(item => item.display_console === true && typeof item.model === "string" && (
-      item.type === "Image" && (/^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2\/(text-to-image|image-to-image)$/.test(item.model))
+      item.type === "Image" && (/^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2\/(text-to-image|edit|image-to-image)$/.test(item.model))
       || item.type === "Video" && /^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model)
     )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(), schemaUrl: item.schema }));
     if (!modelIds) return catalogue;

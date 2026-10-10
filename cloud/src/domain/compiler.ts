@@ -5,7 +5,7 @@ import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
 import { ensureReferenceCrop } from "./referenceCrop.ts";
-import { validateMusicVideoTiming } from "./schema.ts";
+import { lookSchema, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
@@ -29,6 +29,38 @@ export function renderCompiledPrompt(sections: Record<string, string>) {
     return Object.entries(sections).filter(([, value]) => value).map(([key, value]) => `${seedanceMusicVideo ? key : key.toUpperCase()}: ${value}`).join("\n");
 }
 
+// ACT: 同一渲染约束用于自由生成与镜头编译；只约束已选写实媒介，不将插画/动画改成摄影。
+const photographicRendering = "For photographic or live-action imagery, render the entire frame as one coherent photographed scene, including landscapes and empty environments. Use the scene's actual light sources, consistent light direction, exposure, bounce light, occlusion and contact shadows across subjects and surroundings. Preserve material-specific roughness and highlights: skin, cloth, paper, foliage, soil, stone, concrete and metal must not share a uniform glossy or smoothed finish. Keep fine detail appropriate to focus, distance and atmospheric depth; distant scenery is not as crisp or contrasty as the foreground. Retain natural, non-repeating variation in vegetation and surfaces without inventing damage or clutter. Grade highlights and color transitions without clipped golden saturation, HDR halos or uniformly glowing surfaces. For people, preserve specified age, identity, natural skin tone variation and scale-appropriate texture; clean, energetic or well-groomed does not mean de-aged or poreless. Respect intentional makeup and soft light without erasing anatomy or material response. Do not simulate realism by adding wrinkles, dirt, damage, grain or sharpening. Explicit illustration, animation and other stylized media retain their chosen rendering rules.";
+
+function effectiveLook(s: Scope, projectId: string, sequenceId?: string, shotId?: string) {
+  const looks = s.list("looks", { projectId });
+  const result: Record<string, unknown> = {};
+  for (const layer of [
+    looks.find(item => item.scope === "project"),
+    sequenceId ? looks.find(item => item.scope === "sequence" && item.scopeId === sequenceId) : undefined,
+    shotId ? looks.find(item => item.scope === "shot" && item.scopeId === shotId) : undefined,
+  ]) {
+    if (!layer) continue;
+    // 未填写字段继承上层；显式关闭效果请写 none，不以空字符串清掉项目质感。
+    for (const [key, value] of Object.entries(lookSchema.parse(layer))) {
+      if (typeof value === "string" ? value.trim() : value.length) result[key] = value;
+    }
+  }
+  return lookSchema.parse(result);
+}
+
+export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: string) {
+  if (!s.get("projects", projectId)) throw bad("生成项目不存在");
+  const world = s.list("worlds", { projectId })[0];
+  const look = effectiveLook(s, projectId);
+  return renderCompiledPrompt({
+    request: prompt,
+    projectVisualContext: `Inherit these project defaults unless the request explicitly changes the medium or scene. Do not relocate the requested scene or change its time of day to match a style reference. ${JSON.stringify({ medium: world?.realism, materials: world?.material, look })}`,
+    renderingStandard: photographicRendering,
+    referenceUse: "Use each supplied reference only for its stated role. Identity references preserve identity, not baked-in lighting or skin smoothing. Look references inform material and photographic response, not copied locations, costumes or time of day. A text description is not an image reference; do not invent missing reference content.",
+  });
+}
+
 function musicTimecode(seconds: number) {
     const rounded = Math.round(seconds * 1000000) / 1000000;
     const remainder = (rounded % 60).toFixed(6).replace(/\.?0+$/, "");
@@ -44,8 +76,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     validateMusicVideoTiming(shot as ShotInput);
     const proj = shot.projectId;
     const world = s.list("worlds", { projectId: proj })[0] as any;
-    const looks = s.list("looks", { projectId: proj }) as any[];
-    const look = looks.find((l) => l.scope === "shot" && l.scopeId === shotId) ?? looks.find((l) => l.scope === "sequence" && l.scopeId === shot.sequenceId) ?? looks.find((l) => l.scope === "project");
+    const look = effectiveLook(s, proj, shot.sequenceId, shotId);
     const assets = (shot.assetIds as string[]).map((id) => s.get("assets", id)).filter(Boolean) as any[];
     const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId }) as any[];
     const model = modelView(get("SELECT * FROM models WHERE id=?", modelId)!);
@@ -122,9 +153,10 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
         lighting: J([lt.worldSource && `fixed world light source: ${lt.worldSource}`, lt.keyDirection && lt.keyDirection !== "none" && `key direction ${lt.keyDirection} in ${lt.directionSpace ?? "screen"} coordinates`, lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
         world: world ? J([world.realism && `medium: ${world.realism}`, world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
-        look: look ? J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette?.length && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`]) : "",
+        look: J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette.length > 0 && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`]),
         // Realism stack: concrete behaviours instead of adjectives.
         realism: J(Object.entries(shot.realism ?? {}).filter(([key, value]) => value && (kind === "video" || key !== "motion")).map(([key, value]) => `${key}: ${clean(String(value), `realism.${key}`)}`)),
+        renderingStandard: photographicRendering,
         constraints: J(shot.constraints ?? []),
         physicalContinuity: J([
             assets.some(a => a.type === "Character") && "Preserve each character's reference anatomy and limb count through the entire action, including occlusions and mirror reflections; movement has preparation, contact, weight transfer and settling",

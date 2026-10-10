@@ -47,7 +47,7 @@ const plugin: ToolPlugin = {
       name: operation.name,
       label: operation.label,
       description: `${operation.description}providerId 和 modelId 必须来自 listMediaModels。引用素材的 path 及 outputDirectory 均为工作区相对路径；省略输出目录使用默认媒体目录。等待生成完成后返回已保存的文件路径，不返回 Base64。`,
-      promptSnippet: "生成媒体前先查询 listMediaModels，复用实际模型和工作区参考素材。",
+      promptSnippet: "生成媒体前先查询 listMediaModels，复用实际模型和工作区参考素材。正式分镜先保存 productionSpec 并 compile，生成传 shotId/productionFingerprint；不可用独立文生图绕过同批 Look 与角色/场景参考。写实约束同时覆盖人和环境的材质、光源、曝光、接触与空间层次；整洁、精神好不等于磨皮或去龄。参考须真实发送且按用途说明，文本描述不能冒充已传图片。",
       parameters: z.toJSONSchema(operation.parameters, { io: "input", target: "draft-07" }),
       executionMode: "sequential",
       async execute(_id, params, signal) {

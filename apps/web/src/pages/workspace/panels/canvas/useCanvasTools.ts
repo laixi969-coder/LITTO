@@ -120,23 +120,32 @@ export function useCanvasTools(options: {
       return readCanvas(request, canvasId, signal);
     }
     switch (request.name) {
-      case "publishVideo": {
-        const args = canvasSchemas.publishVideo.parse(request.args);
+      case "publishVideo":
+      case "publishFile": {
+        const args = canvasSchemas[request.name].parse(request.args);
         if (args.canvasId && args.canvasId !== canvasId) throw new Error("目标画布已切换，请回到原画布后重试展示成片");
         const path = args.path.replaceAll("\\", "/");
-        const mimeTypes: Record<string, string> = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", m4v: "video/mp4", mkv: "video/x-matroska" };
+        const mimeTypes: Record<string, string> = { mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", m4v: "video/mp4", mkv: "video/x-matroska", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml", avif: "image/avif", mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", ogg: "audio/ogg", flac: "audio/flac", md: "text/markdown", txt: "text/plain", markdown: "text/markdown" };
         const mimeType = mimeTypes[path.split(".").at(-1)?.toLowerCase() ?? ""];
-        if (!mimeType) throw new Error("成片必须是支持的视频文件");
-        if (!await files.readText(path, 16)) throw new Error("成片文件为空");
+        if (!mimeType || (request.name === "publishVideo" && !mimeType.startsWith("video/"))) throw new Error("不支持展示该文件类型");
+        const kind = mimeType.split("/")[0]!;
+        const text = kind === "text" ? await files.readText(path) : undefined;
+        if (text === undefined && !await files.readText(path, 16)) throw new Error("素材文件为空");
         signal.throwIfAborted();
-        const existing = flow.nodes.value.find(node => node.type === "remote-videoNode" && node.data.outputs?.video?.value?.url === path);
-        if (existing) return nodeInfo(existing.id);
-        if (!options.availableNodes.value.some(node => node.type === "remote-videoNode")) throw new Error("请先启用视频素材节点");
+        const type = `remote-${kind}Node`;
+        const existing = flow.nodes.value.find(node => node.type === type && (node.data.sourcePath === path || node.data.outputs?.[kind]?.value?.url === path));
+        if (existing) {
+          if (text !== undefined) await getNodeTools().call({ nodeId: existing.id, name: "node:setText", args: { text } }, signal);
+          await flow.fitView({ nodes: [existing.id], padding: 0.2, duration: 0 });
+          return nodeInfo(existing.id);
+        }
+        if (!options.availableNodes.value.some(node => node.type === type)) throw new Error("请先启用对应的素材节点");
         const id = crypto.randomUUID();
         const right = Math.max(0, ...flow.nodes.value.filter(node => !node.parentNode).map(node => node.position.x + (node.dimensions.width || 400)));
-        flow.addNodes({ id, type: "remote-videoNode", position: { x: right + 80, y: 0 }, data: { label: args.label ?? `成片 · ${path.split("/").at(-1)}`, outputs: { video: { dataType: "VIDEO", value: { url: path, mimeType } } } } });
+        flow.addNodes({ id, type, position: { x: right + 80, y: 0 }, data: { label: args.label ?? path.split("/").at(-1), sourcePath: path, ...(text !== undefined ? { textSnapshot: text } : { outputs: { [kind]: { dataType: kind.toUpperCase(), value: { url: path, mimeType } } } }) } });
         await nextTick();
         signal.throwIfAborted();
+        await flow.fitView({ nodes: [id], padding: 0.2, duration: 0 });
         return nodeInfo(id);
       }
       case "addCanvas": {

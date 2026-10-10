@@ -32,6 +32,23 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     finally { release(); }
   };
   const mediaSignal = (signal?: AbortSignal) => parentSignal && signal ? AbortSignal.any([parentSignal, signal]) : parentSignal ?? signal;
+  async function publishFile(path: string, signal?: AbortSignal) {
+    if (!canvas) return;
+    try { await canvas.call({ name: "publishFile", args: { path } }, mediaSignal(signal)); }
+    catch (error) { throw new Error(`文件已保存：${path}，但画布展示失败：${error instanceof Error ? error.message : error}。仅重试 publishFile，禁止重新生成或覆盖文件。`); }
+  }
+  async function generateAndPublish(kind: "image" | "video" | "audio", request: Parameters<typeof generateMedia>[2], signal?: AbortSignal) {
+    if (kind !== "audio" && !request.shotId && !request.purpose) {
+      const api = cloud(), tenant = currentTenant();
+      const projectId = api && tenant ? workspaceProject(cwd) : undefined;
+      if (projectId && api!.scoped(tenant!.workspaceId).list("shots", { projectId }).length) {
+        throw new Error("当前项目已有正式镜头，生成分镜须传 shotId 并先 compile 取得 productionFingerprint，以继承共同质感与参考。仅基础资产可标 purpose=asset；用户明确要求的独立画面可标 purpose=standalone。此次未提交生成、未消耗算力。");
+      }
+    }
+    const result = await generateMedia(cwd, kind, request, mediaSignal(signal));
+    for (const asset of result) await publishFile(asset.path, signal);
+    return result;
+  }
   const files: ToolFiles = {
     readFile: async (path, readOnly = false) => readFile(await resolvePath(path, readOnly)),
     access: async (path, readOnly = false) => access(await resolvePath(path, readOnly)),
@@ -41,9 +58,10 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       const target = await resolvePath(path, readOnly);
       return withFileAccess([target], "read", () => detectSupportedImageMimeTypeFromFile(target));
     },
-    writeFile: (path, content, exclusive = false) => withWritePaths([path], async ([target]) => {
-      await writeWorkspaceFile(target, content, exclusive);
-    }),
+    async writeFile(path, content, exclusive = false) {
+      await withWritePaths([path], async ([target]) => { await writeWorkspaceFile(target, content, exclusive); });
+      if (/\.(md|markdown|txt)$/i.test(path)) await publishFile(relative(cwd, await resolvePath(path)).split("\\").join("/"));
+    },
     mkdir: (path, recursive = false) => withWritePaths([path], async ([target]) => {
       await mkdir(target, { recursive });
     }),
@@ -86,9 +104,9 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         return api.workspaceProduction(api.scoped(tenant.workspaceId), workspaceProject(cwd)!, operation, data);
       },
       listModels: listMediaModels,
-      generateImage: (request, signal) => generateMedia(cwd, "image", request, mediaSignal(signal)),
-      generateVideo: (request, signal) => generateMedia(cwd, "video", request, mediaSignal(signal)),
-      generateAudio: (request, signal) => generateMedia(cwd, "audio", request, mediaSignal(signal)),
+      generateImage: (request, signal) => generateAndPublish("image", request, signal),
+      generateVideo: (request, signal) => generateAndPublish("video", request, signal),
+      generateAudio: (request, signal) => generateAndPublish("audio", request, signal),
     },
     sdk: {
       defineTool, createReadToolDefinition, createWriteToolDefinition, createEditToolDefinition, createLsToolDefinition,
