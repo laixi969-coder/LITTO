@@ -2,7 +2,7 @@
 name: workflow
 description: 在 LITTO 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.13.2"
+  version: "2.13.3"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -13,6 +13,8 @@ metadata:
 从用户已有内容接续，把成果放到当前 LITTO 项目。以本次剧本与真实素材组织制作，不要求用户先补齐一套制片文档。这个包包含所需方法，不依赖原来的多岗位 Skill 组。
 
 ## 从哪里开始
+
+从想法创作故事或剧本时先读取 [story](../story/SKILL.md)，短剧分集按其中的专项选择规则处理。主 Agent 按作品目标选主方法并主动推进已授权阶段，不将电影、剧集、短剧的所有模板同时强制执行；已有定稿继续按制作提取流程，不重新立项。
 
 沿用用户确认的影片定位、世界、视觉、资产、时长和版本。电影使用 [cinema](../cinema/SKILL.md)，产品广告使用 [adfilm](../adfilm/SKILL.md)，跨镜状态使用 [continuity](../continuity/SKILL.md)。Music Film 以音乐、歌词、章节和确认的视听方向组织，不能套用剧情片的固定分段或拒绝有意的节奏剪辑。
 
