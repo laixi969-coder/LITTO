@@ -119,11 +119,26 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const degradations: Compiled["degradations"] = [];
     const inputs: Compiled["inputs"] = [];
     let used = kind === "video" && extra.startFrameMediaId ? 1 : 0;
+    // 已验收主帧承载视频身份；关键帧生成须实际发送定妆图，不能只把媒体 ID 写进提示词。
+    if (!extra.startFrameMediaId) for (const asset of assets) {
+        const mediaId = asset.attributes?.authoritativeReference;
+        if (!mediaId) continue;
+        const media = s.get("media", mediaId);
+        if (!media?.mime.startsWith("image/")) throw bad(`${asset.name} 的权威参考图不可用`);
+        const role = asset.type === "Character" || asset.type === "Creature" ? "IDENTITY"
+            : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
+        if (inputs.some(input => input.mediaId === mediaId && input.role === role)) continue;
+        const sent = !!caps[roleCap[role]] && used < maxInputs && !(adapter === "openai-compatible" && kind === "video");
+        inputs.push({ referenceId: `asset:${asset.id}`, mediaId, role, weight: 1, lockLevel: "LOCK", sent });
+        if (sent) used++;
+        else degradations.push({ role, strategy: `${asset.name}: 当前模型或输入容量无法发送权威参考图` });
+    }
     const sorted = [...bindings].sort((a, b) => b.weight - a.weight);
     const textFallback: string[] = [];
     for (const b of sorted) {
         if (kind === "video" && extra.startFrameMediaId && b.role === "START_FRAME") continue;
         const ref = s.get("refs", b.referenceId);
+        if (!b.crop && inputs.some(input => input.mediaId === ref?.mediaId && input.role === b.role && input.sent)) continue;
         const adapterSupports = !(adapter === "openai-compatible" && kind === "video" && b.role !== "START_FRAME");
         const supported = adapterSupports && !!caps[roleCap[b.role]] && used < maxInputs && ref?.mediaId;
         if (supported) {

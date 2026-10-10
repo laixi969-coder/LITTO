@@ -86,9 +86,9 @@ export function enqueueWorkspaceMedia(input: {
     targetId: input.production?.shotId,
     modelId,
     compiledPrompt: prompt,
-    negativePrompt: input.negativePrompt ?? (input.production ? input.request.negativePrompt : undefined),
+    negativePrompt: input.negativePrompt ?? input.request.negativePrompt,
     parameters: { directory: input.directory, request: { ...input.request, prompt }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
-    seed: input.seed,
+    seed: input.seed ?? input.request.seed,
     inputRefs: input.production?.compiled.inputs ?? [],
     fallbackAllowed: false,
     idempotencyKey: "workspaceMedia:" + input.requestId,
@@ -134,7 +134,10 @@ export function prepareWorkspaceShot(input: {
   for (const ref of compiled.inputs.filter(ref => ref.sent)) {
     const media = ref.mediaId && s.get("media", ref.mediaId);
     const kind = ref.role === "AUDIO" ? "audio" : ["PERFORMANCE", "CAMERA_MOTION"].includes(ref.role) ? "video" : "image";
-    if (!media || media.projectId !== input.projectId || !media.mime.startsWith(`${kind}/`)) throw bad(`参考须是当前项目的有效 ${kind} 媒体`);
+    const asset = ref.referenceId.startsWith("asset:") ? s.get("assets", ref.referenceId.slice(6)) : undefined;
+    const libraryReference = asset?.projectId === input.projectId && asset.attributes?.authoritativeReference === ref.mediaId
+      && asset.attributes?.importedFrom && s.get("library_assets", asset.attributes.importedFrom);
+    if (!media || (media.projectId !== input.projectId && !libraryReference) || !media.mime.startsWith(`${kind}/`)) throw bad(`参考须是当前项目或已导入角色库的有效 ${kind} 媒体`);
     counts[kind]++;
   }
   if (input.kind === "video" && Array.isArray(mode) && (counts.image > referenceLimit || counts.video > videoLimit || counts.audio > audioLimit)) throw bad("某类参考数量超过模型的模式上限");

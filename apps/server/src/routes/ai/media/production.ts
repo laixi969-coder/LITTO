@@ -10,6 +10,7 @@ import u from "@/utils";
 export default Router().post("/", validateFields({
   directory: z.string().min(1), shotId: z.string().min(1), kind: z.enum(["image", "video"]),
   request: z.record(z.string(), z.unknown()), requestId: z.string().uuid().optional(), fingerprint: z.string().optional(),
+  candidateBatchId: z.string().min(1).max(128).optional(),
 }), async (req, res) => {
   const { shotId, kind, requestId, fingerprint } = req.body;
   const directory = await u.workspace.resolveWorkspace(req, req.body.directory);
@@ -25,7 +26,7 @@ export default Router().post("/", validateFields({
     // 负面词走独立字段，不拼进提示词正文；种子与抽卡批次一并透传。
     request: { ...request, prompt: production.compiled.prompt },
     negativePrompt: production.compiled.negativePrompt || undefined,
-    candidateBatchId: typeof req.body.candidateBatchId === "string" && req.body.candidateBatchId ? req.body.candidateBatchId : undefined,
+    candidateBatchId: req.body.candidateBatchId,
   });
   res.status(202).json(success({ jobId: job.id }));
 });

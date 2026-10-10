@@ -58,9 +58,11 @@ export function generateKeyframes(s: Scope, shotId: string, actor: string, o: Ge
 export function promoteHero(s: Scope, keyframeId: string, actor: string) {
     const kf = s.get("keyframes", keyframeId);
     if (!kf) throw notFound("keyframe");
+    const shot = s.get("shots", kf.shotId);
+    const media = kf.mediaId ? s.get("media", kf.mediaId) : undefined;
+    if (!shot || shot.projectId !== kf.projectId || !media?.mime.startsWith("image/") || media.projectId !== kf.projectId) throw bad("关键帧的镜头或媒体已失效");
     requireReviewed(s, "keyframe", kf);
     return tx(() => {
-        const shot = s.get("shots", kf.shotId)!;
         // Previous Hero is preserved (status superseded), never deleted.
         for (const k of s.list("keyframes", { shotId: shot.id, status: "hero" })) s.update("keyframes", k.id, { status: "superseded" });
         s.update("keyframes", keyframeId, { status: "hero" });
@@ -96,7 +98,7 @@ export function generateTakes(s: Scope, shotId: string, actor: string, o: GenOpt
     if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
     const jobs = [];
     const n = o.count ?? 2;
-    for (let i = 0; i < n; i++) jobs.push(enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "video", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "video"), duration: shot.generationDuration ?? shot.duration ?? 4, keyframeId: kf.id, count: 1, ...(o.candidateBatchId ? { candidateBatchId: o.candidateBatchId } : {}) }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey ? `${o.idempotencyKey}:${i}` : undefined, label: `TAKE ${i + 1} · shot ${shot.ord + 1}`, seed: o.seed ? o.seed + i : undefined }));
+    for (let i = 0; i < n; i++) jobs.push(enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "video", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "video"), duration: shot.generationDuration ?? shot.duration ?? 4, keyframeId: kf.id, count: 1, ...(o.candidateBatchId ? { candidateBatchId: o.candidateBatchId } : {}) }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey ? `${o.idempotencyKey}:${i}` : undefined, label: `TAKE ${i + 1} · shot ${shot.ord + 1}`, seed: o.seed !== undefined ? o.seed + i : undefined }));
     return { jobs, degradations: [...chosen!.degradations, ...c.degradations], warnings: c.warnings };
 }
 

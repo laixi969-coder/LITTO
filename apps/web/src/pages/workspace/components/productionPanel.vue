@@ -109,7 +109,7 @@
               <div class="sentReferences"><figure v-for="item in compiledMedia" :key="item.id"><img v-if="item.mime.startsWith('image/')" :src="mediaUrl(item.url)" :alt="item.role + ' 实际发送参考'" /><video v-else-if="item.mime.startsWith('video/')" :src="mediaUrl(item.url)" controls preload="metadata" /><audio v-else :src="mediaUrl(item.url)" controls /><figcaption>{{ item.role }} · {{ item.id }}</figcaption></figure></div>
               <details><summary>查看实际发送的镜头规格与参考</summary><pre>{{ preview.compiled.prompt }}</pre></details>
               <label><input v-model="asBatch" type="checkbox" />本次生成登记为抽卡批次，完成后在「检查与采用」页对比并选出定妆图</label>
-              <label v-if="asBatch && candidateBatches.length">加入已有批次<select v-model="batchId"><option value="">新建批次</option><option v-for="item in candidateBatches" :key="item.id" :value="item.id">{{ item.kind === 'image' ? '关键帧' : '视频' }}批次 · {{ item.count }} 张 · {{ item.id.slice(-5) }}</option></select></label>
+              <label v-if="asBatch && compatibleBatches.length">加入已有批次<select v-model="batchId"><option value="">新建批次</option><option v-for="item in compatibleBatches" :key="item.id" :value="item.id">{{ item.kind === 'image' ? '关键帧' : '视频' }}批次 · {{ item.count }} 张 · {{ item.id.slice(-5) }}</option></select></label>
               <label v-if="asBatch && draft.assetIds?.length && !batchId">绑定资产（选出后成为该资产定妆参考）<select v-model="batchAssetId"><option value="">不绑定</option><option v-for="item in shotAssets" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
               <p>供应商费用未知，按你接入的模型实际计费。提交后可在下方停止。</p>
               <button type="button" @click="run(generate)">提交一次生成</button>
@@ -153,7 +153,7 @@
                   <div class="candidateActions">
                     <input v-model.number="candidateScores[item.id]" type="number" min="0" max="100" placeholder="分" :disabled="item.status === 'promoted'" />
                     <button type="button" :disabled="item.status === 'promoted' || candidateScores[item.id] == null" @click="run(() => scoreOne(item))">打分</button>
-                    <button type="button" :disabled="item.status === 'promoted'" @click="run(() => promoteOne(item))">采用为定妆图</button>
+                    <button v-if="item.assetId && item.media?.mime.startsWith('image/')" type="button" :disabled="item.status === 'promoted'" @click="run(() => promoteOne(item))">采用为定妆图</button>
                   </div>
                 </figure>
               </div>
@@ -225,6 +225,9 @@ const shotId = ref(""), draft = ref<any>(null), detail = ref<any>(null), dirty =
 const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref(""), ratio = ref("16:9");
 const visualModels = ref<any[]>([]), visionModelKey = ref("");
 const models = ref<MediaModel[]>([]), preview = ref<any>(null), jobs = ref<any[]>([]);
+const compatibleBatches = computed(() => candidateBatches.value.filter(item => item.shotId === shotId.value && item.kind === kind.value && item.promptFingerprint === preview.value?.fingerprint));
+watch(compatibleBatches, items => { if (!items.some(item => item.id === batchId.value)) batchId.value = ""; });
+watch(shotId, () => { asBatch.value = false; batchId.value = ""; batchAssetId.value = ""; });
 const cameraTrajectory = ref<CameraTrajectory>();
 const imageAndCameraOnly = ref(false);
 const stateNotes = ref<Record<string, string>>({});
@@ -362,9 +365,8 @@ async function selectShot(id: string) {
 }
 async function refreshCandidatePool() {
   candidateBatches.value = await request(`/projects/${projectId}/candidateBatches`);
-  const shotBatch = [...candidateBatches.value].reverse().find(item => item.shotId === shotId.value);
+  const shotBatch = candidateBatches.value.find(item => item.shotId === shotId.value);
   if (!shotBatch) { candidatePool.value = []; candidateScores.value = {}; return; }
-  batchId.value = shotBatch.id;
   candidatePool.value = await request(`/candidateBatches/${shotBatch.id}/candidates`);
   candidateScores.value = Object.fromEntries(candidatePool.value.map(item => [item.id, item.scores?.overall ?? null]));
 }
@@ -377,6 +379,8 @@ async function scoreOne(item: any) {
 async function promoteOne(item: any) {
   await ElMessageBox.confirm("采用后，该候选将成为绑定资产的定妆参考，后续镜头默认沿用。同批其余候选标记落选。", "采用定妆图", { confirmButtonText: "采用", cancelButtonText: "取消" });
   const result = await request(`/candidates/${item.id}/promote`, "POST", {});
+  assets.value = await request(`/projects/${projectId}/assets`);
+  preview.value = null;
   await refreshCandidatePool();
   message.value = result.heroKeyframeId ? "已采用并同步为主关键帧" : "已采用为资产定妆参考";
 }
@@ -428,10 +432,12 @@ async function production(requestId?: string, candidateBatchId?: string) {
 async function compile() { if (kind.value === "video" && draft.value.generationDuration !== duration.value) { draft.value.generationDuration = duration.value; dirty.value = true; } await saveShot(); if (worldDirty.value) await saveWorld(); preview.value = await production(); compiledMedia.value = await Promise.all(preview.value.compiled.inputs.filter((item: any) => item.sent && item.mediaId).map(async (item: any) => ({ ...await request(`/media/${item.mediaId}`), role: item.role }))); pendingRequestId = ""; }
 async function generate() {
   pendingRequestId ||= crypto.randomUUID();
-  let candidateBatchId = batchId.value || undefined;
+  let candidateBatchId = asBatch.value ? batchId.value || undefined : undefined;
   if (asBatch.value && !candidateBatchId) {
     const batch = await request(`/projects/${projectId}/candidateBatches`, "POST", { kind: kind.value, promptFingerprint: preview.value?.fingerprint ?? crypto.randomUUID(), shotId: shotId.value, ...(batchAssetId.value ? { assetId: batchAssetId.value } : {}) });
     candidateBatchId = batch.id;
+    candidateBatches.value.unshift(batch);
+    batchId.value = batch.id;
   }
   await production(pendingRequestId, candidateBatchId); pendingRequestId = ""; preview.value = null; message.value = "生成任务已提交";
   asBatch.value = false; batchAssetId.value = "";
@@ -455,6 +461,7 @@ async function refreshResults() {
     const { id, heroKeyframeId, approvedTakeId } = detail.value;
     shots.value = shots.value.map(shot => shot.id === id ? { ...shot, heroKeyframeId, approvedTakeId } : shot);
     if (!targetId.value) selectPendingVersion();
+    await refreshCandidatePool();
   }
   window.dispatchEvent(new Event("littoProductionUpdated"));
 }

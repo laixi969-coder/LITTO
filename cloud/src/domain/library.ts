@@ -1,7 +1,7 @@
 import { all, get, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
 import { audit } from "../db.ts";
-import { personaTagSchema, type PersonaTags } from "./schema.ts";
+import { ASSET_TYPES, assetInput, personaTagSchema, type PersonaTags } from "./schema.ts";
 import { createAsset, event } from "./assets.ts";
 import { mediaView } from "../storage.ts";
 
@@ -13,8 +13,6 @@ import { mediaView } from "../storage.ts";
  * 新项目引用后即拥有同一定妆基准，复用次数越高，资产越经得起考验。
  */
 
-const LIBRARY_TYPES = ["Character", "Wardrobe", "Environment", "Prop", "Product", "Vehicle", "Creature", "Custom"] as const;
-
 /** 入池前必须已有权威参考图，否则等于把「未确认的脸」当成可复用资产。 */
 export function publishToLibrary(s: Scope, assetId: string, actor: string, personaTags?: PersonaTags) {
     const asset = s.get("assets", assetId);
@@ -22,6 +20,8 @@ export function publishToLibrary(s: Scope, assetId: string, actor: string, perso
     if (asset.approvalStatus !== "approved") throw conflict("资产须先采用才能进入角色库", "asset_not_approved");
     const authoritative = asset.attributes?.authoritativeReference;
     if (!authoritative) throw bad("该资产还没有权威参考图，请先用候选池选出定妆图再入池", "no_authoritative_reference");
+    const media = s.get("media", authoritative);
+    if (!media?.mime.startsWith("image/")) throw bad("权威参考图不可用");
     const existing = all("SELECT * FROM library_assets WHERE workspace_id=? AND source_asset_id=? AND deleted_at IS NULL", s.workspaceId, assetId)[0];
     if (existing) throw conflict("该资产已在角色库中", "already_published");
     const tags = personaTags ? personaTagSchema.parse(personaTags) : (asset.personaTags ?? {});
@@ -71,12 +71,21 @@ export function importFromLibrary(s: Scope, libraryId: string, projectId: string
     const entry = s.get("library_assets", libraryId);
     if (!entry) throw notFound("library asset");
     if (!s.get("projects", projectId)) throw notFound("project");
-    if (!(LIBRARY_TYPES as readonly string[]).includes(entry.type)) throw bad("资产类型不受支持");
+    if (!(ASSET_TYPES as readonly string[]).includes(entry.type)) throw bad("资产类型不受支持");
     // ACT: library_assets.data 同样被 hydrate 摊平，资产字段位于顶层。
     const data = entry;
-    const references = [...(data.references ?? [])];
-    if (data.authoritativeReference && !references.includes(data.authoritativeReference)) references.push(data.authoritativeReference);
+    const media = data.authoritativeReference ? s.get("media", data.authoritativeReference) : undefined;
+    if (!media?.mime.startsWith("image/")) throw bad("角色库的权威参考图不可用");
     return tx(() => {
+        // ACT: 同租户媒体复用；参考记录属于目标项目，不把来源项目的参考 ID 当成本地引用。
+        const sourceReferences = (data.references ?? []).map((id: string) => s.get("refs", id)).filter(Boolean);
+        const references = sourceReferences.map((ref: any) => s.insert("refs", {
+            project_id: projectId, kind: ref.kind, name: ref.name, media_id: ref.mediaId,
+            text: ref.text, source: "library", source_ref: ref.id,
+        }).id);
+        if (!sourceReferences.some((ref: any) => ref.mediaId === media.id)) references.push(s.insert("refs", {
+            project_id: projectId, kind: "image", name: entry.name, media_id: media.id, source: "library", source_ref: libraryId,
+        }).id);
         const created = createAsset(s, projectId, {
             type: entry.type, name: overrides.name ?? entry.name, description: data.description ?? "",
             attributes: { ...(data.attributes ?? {}), authoritativeReference: data.authoritativeReference, importedFrom: libraryId },
@@ -84,11 +93,8 @@ export function importFromLibrary(s: Scope, libraryId: string, projectId: string
             invariants: overrides.invariants ?? data.invariants ?? [],
             allowedVariations: data.allowedVariations ?? [],
             forbiddenChanges: data.forbiddenChanges ?? [],
+            personaTags: entry.personaTags,
         });
-        // 角色库条目里的气质标签带进项目资产，便于后续再检索与去重。
-        if (entry.personaTags && Object.keys(entry.personaTags).length) {
-            s.update("assets", created.id, { data: { ...stripRow(created), personaTags: entry.personaTags } });
-        }
         run("UPDATE library_assets SET reuse_count=reuse_count+1, updated_at=? WHERE id=?", new Date().toISOString(), libraryId);
         event(s, projectId, "asset", created.id, "import_from_library", actor, `library ${libraryId}`);
         return s.get("assets", created.id)!;
@@ -101,11 +107,15 @@ export function updateLibraryReference(s: Scope, libraryId: string, mediaId: str
     if (!entry) throw notFound("library asset");
     const media = s.get("media", mediaId);
     if (!media) throw notFound("media");
+    if (!media.mime.startsWith("image/")) throw bad("权威参考须是图像");
     if (media.projectId && !s.get("projects", media.projectId)) throw bad("参考图所属项目不可用");
     return tx(() => {
-        const references = [...new Set([...(entry.references ?? []), mediaId])];
-        s.update("library_assets", libraryId, { data: { ...entry, references, authoritativeReference: mediaId } });
-        event(s, media.projectId ?? entry.source_asset_id ?? "", "library_asset", libraryId, "update_reference", actor, `media ${mediaId}`);
+        const { type, name, ...data } = assetInput.parse(entry);
+        s.update("library_assets", libraryId, { data: {
+            ...data, attributes: { ...data.attributes, authoritativeReference: mediaId },
+            authoritativeReference: mediaId, sourceProjectId: entry.sourceProjectId,
+        } });
+        event(s, entry.sourceProjectId, "library_asset", libraryId, "update_reference", actor, `media ${mediaId}`);
         return s.get("library_assets", libraryId)!;
     });
 }
@@ -114,10 +124,4 @@ function mediaOf(ws: string, id: string | null) {
     if (!id) return null;
     const m = get("SELECT * FROM media WHERE id=? AND workspace_id=?", id, ws);
     return m ? mediaView({ ...m, storageKey: m.storage_key, createdAt: m.created_at }) : null;
-}
-
-/** 把资产行还原成 assetInput 形状（去掉仓储元数据）。 */
-function stripRow(a: any) {
-    const { id, workspaceId, projectId, version, schemaVersion, approvalStatus, approvedVersion, parentAssetId, createdAt, updatedAt, deletedAt, ...rest } = a;
-    return rest;
 }

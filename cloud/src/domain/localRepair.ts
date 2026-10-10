@@ -1,8 +1,9 @@
-import { get, tx, type Scope } from "../db.ts";
+import { tx, type Scope } from "../db.ts";
 import { bad, notFound } from "../util.ts";
 import { enqueue } from "../jobs.ts";
 import { resolvePolicy, mustRoute } from "../providers/router.ts";
 import { event } from "./assets.ts";
+import { promoteHero } from "./lifecycle.ts";
 
 /**
  * 局部修复（对应 QC 的 inpaint_local / hand_artifact / face_artifact）。
@@ -15,7 +16,7 @@ import { event } from "./assets.ts";
  */
 
 /** 各缺陷类型的局部修复指令：写清楚修什么、保留什么。 */
-const REGION_DIRECTIVES: Record<string, { region: string; fix: string; preserve: string }> = {
+const regionDirectives: Record<string, { region: string; fix: string; preserve: string }> = {
     face_artifact: {
         region: "the face region of every person in frame",
         fix: "rebuild correct human facial anatomy: exactly two eyes aligned to the head's perspective, one nose, one mouth, natural jaw and ear placement",
@@ -39,7 +40,7 @@ const REGION_DIRECTIVES: Record<string, { region: string; fix: string; preserve:
 };
 
 export function repairDirective(kind: string) {
-    const d = REGION_DIRECTIVES[kind];
+    const d = Object.hasOwn(regionDirectives, kind) ? regionDirectives[kind] : undefined;
     if (!d) throw bad(`暂无 ${kind} 的局部修复策略，请改用重新生成`);
     return d;
 }
@@ -63,7 +64,7 @@ export function scheduleLocalRepair(s: Scope, input: {
     const { chosen } = mustRoute({
         kind: "image", workspaceId: s.workspaceId, projectId: shot.projectId,
         // 参考图作为身份与整体保持依据，因此按多参考能力选模型。
-        roles: ["IDENTITY"], policy,
+        roles: ["IDENTITY"], need: ["identityReference"], policy,
     });
     if (!chosen?.usable) throw bad("当前没有可用于局部修复的图像模型");
     const prompt = [
@@ -96,13 +97,10 @@ export function acceptLocalRepair(s: Scope, keyframeId: string, actor: string) {
     if (!origin) throw bad("该关键帧不是局部修复产物");
     const originKf = s.get("keyframes", origin);
     if (!originKf) throw notFound("原关键帧");
-    const shot = s.get("shots", kf.shotId)!;
+    if (originKf.shotId !== kf.shotId || originKf.projectId !== kf.projectId) throw bad("修复产物与原关键帧不属于同一镜头");
     return tx(() => {
-        for (const k of s.list("keyframes", { shotId: shot.id, status: "hero" })) s.update("keyframes", k.id, { status: "superseded" });
-        s.update("keyframes", keyframeId, { status: "hero" });
-        s.update("shots", shot.id, { hero_keyframe_id: keyframeId });
-        event(s, shot.projectId, "keyframe", keyframeId, "accept_local_repair", actor, `replaced ${origin}`, shot.id);
+        promoteHero(s, keyframeId, actor);
+        event(s, kf.projectId, "keyframe", keyframeId, "accept_local_repair", actor, `replaced ${origin}`, kf.shotId);
         return { heroKeyframeId: keyframeId, replaced: origin };
     });
 }
-void get;

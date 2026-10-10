@@ -33,6 +33,12 @@ export function enqueue(spec: JobSpec) {
     const limits = JSON.parse(model.limits);
     if (limits.workspaceId && limits.workspaceId !== spec.workspaceId) throw bad("model unavailable");
     if (spec.projectId && !scoped(spec.workspaceId).get("projects", spec.projectId)) throw bad("project unavailable");
+    if (spec.parameters.candidateBatchId) {
+        const batch = scoped(spec.workspaceId).get("candidate_batches", spec.parameters.candidateBatchId);
+        if (!batch || batch.projectId !== spec.projectId || batch.kind !== spec.kind
+            || spec.targetType !== "shot" || batch.shotId !== spec.targetId) throw bad("候选批次与生成项目、镜头或媒体类型不一致");
+        if (spec.parameters.fingerprint && batch.promptFingerprint !== spec.parameters.fingerprint) throw conflict("镜头规格已改变，请新建候选批次", "candidate_batch_changed");
+    }
     const prov = get("SELECT * FROM providers WHERE id=?", model.provider_id)!;
     const est = estimate(spec.modelId, spec.kind, spec.parameters);
     const id = ulid();

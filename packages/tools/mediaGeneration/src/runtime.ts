@@ -17,6 +17,8 @@ const sharedFields = {
   providerId: z.string().regex(/^[a-z][a-zA-Z0-9]{0,95}$/),
   modelId: z.string().trim().min(1).max(256),
   prompt: z.string().trim().min(1).max(100000),
+  negativePrompt: z.string().max(100000).optional(),
+  seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
   outputDirectory: relativePath.optional(),
   images: z.array(imageReference).max(64).optional(),
   ratio: z.string().regex(/^[1-9]\d{0,3}:[1-9]\d{0,3}$/).optional(),
