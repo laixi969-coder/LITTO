@@ -6,7 +6,7 @@ await createToolConfig({
   displayName: "场次表与拆解",
   description: "保存并校验故事的场次表和剧本拆解清单。",
   prompt: `开始或继续故事、广告、品牌片、MV 创作时先 readStoryProject，恢复目标、资料理解、候选、正式采用的事实和线索及真实反馈。
-故事工作台存在时，通过 updateStoryProject 保存资料分析、2–3 个方向、剧本候选与精确引句审稿。用户在工作台确认事实、选方向和采用版本；不调用通用文件工具改 storyProject.json。已授权下一阶段时不重复询问。
+故事工作台存在时，通过 updateStoryProject 保存资料分析、2–3 个方向、剧本候选与精确引句审稿。资料理解确认、选方向和审稿问题保留决定使用可用的 requestStoryDecision，在聊天中展示具体内容并等待用户点击，返回 applied: true 才代表已保存；审稿完成后调用可用的 requestStoryApproval 展示版本采用卡片，返回 approved: true 后继续已授权的下一阶段。不让用户去工作台寻找确认按钮；没有相应工具时才引导工作台入口。暂不决定、跳过或取消时保留成果，等待用户决定，不循环追问。不调用通用文件工具改 storyProject.json。已确认资料、已选方向及已授权下一阶段不重复询问。
 saveSceneList 必须引用正式采用的 storyRevisionId，保留其 sceneId 与顺序，再 saveBreakdown。局部改写生成新版本，核对依赖场次，旧镜头、配音和预演不覆盖。
 异常开场、反转、开放结尾、人物变化都是可选方法，服从用户的作品目标。不同类型分开评价：故事的理解和继续观看、广告的卖点和行动、品牌片的记忆、剧情 MV 的行动因果及音画关系。不给爆款概率，不把模型审读当作观众实验。
 ${musicFilmWritingGuide}

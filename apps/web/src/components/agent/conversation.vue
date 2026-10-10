@@ -82,7 +82,7 @@
     <div v-if="compacting" class="compactionStatus" role="status">
       <span>正在压缩上下文…</span>
     </div>
-    <div class="runControls"><span>{{ activity === 'attention' ? '回答流中的问题后继续' : activity === 'running' ? '可以随时停止当前任务' : '下一步由你决定' }}</span><el-button class="stopButton" :disabled="!busy && !(remoteRunning && initialSession?.parentFile)" @click="busy ? stopMessage() : emit('stopRequest')"><icon-player-stop-filled :size="12" />停止</el-button></div>
+    <div class="runControls"><el-button v-if="pendingQuestions.length" class="pendingQuestionButton" text @click="showPendingQuestion">有 {{ pendingQuestions.length }} 项待确认 · 点击处理</el-button><span v-else>{{ activity === 'running' ? '可以随时停止当前任务' : '下一步由你决定' }}</span><el-button class="stopButton" :disabled="!busy && !(remoteRunning && initialSession?.parentFile)" @click="busy ? stopMessage() : emit('stopRequest')"><icon-player-stop-filled :size="12" />停止</el-button></div>
     <div class="messageInput">
       <div v-if="editingId" class="editingBanner"><span>编辑消息</span><el-button text size="small" :disabled="busy" @click="cancelEdit">取消</el-button></div>
       <div
@@ -207,9 +207,11 @@ const stats = ref(props.initialSession?.stats);
 const contextUsage = ref(props.initialSession?.contextUsage);
 const busy = ref(false);
 const compacting = ref(false);
+const pendingQuestions = computed(() => messages.value.flatMap((item, index) => (item.parts ?? []).flatMap(part =>
+  part.type === "tool" && part.tool.status === "running" && part.tool.question ? [{ index, toolId: part.tool.id }] : [])));
 const activity = computed(() => {
   const last = messages.value.findLast(item => item.role === "assistant");
-  if (busy.value || remoteRunning.value) return last?.parts?.some(part => part.type === "tool" && part.tool.status === "running" && part.tool.question) ? "attention" : "running";
+  if (busy.value || remoteRunning.value) return pendingQuestions.value.length ? "attention" : "running";
   return last?.error ? "error" : "idle";
 });
 const activityLabels = { idle: "准备就绪", running: "AI 正在工作", attention: "等待你确认", error: "任务未完成" };
@@ -227,7 +229,7 @@ const atLatestMessage = ref(true);
 let messageListInitialized = false;
 let messageScrollOffset = 0;
 const messageKeys = computed(() => messages.value.map(item => item.id));
-const retainedMessages = computed(() => messages.value.flatMap((item, index) => item.streaming || item.id === editingId.value ? [index] : []));
+const retainedMessages = computed(() => [...new Set([...messages.value.flatMap((item, index) => item.streaming || item.id === editingId.value ? [index] : []), ...pendingQuestions.value.map(item => item.index)])]);
 const messageVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(computed(() => {
   const keys = messageKeys.value;
   const retained = retainedMessages.value;
@@ -257,6 +259,15 @@ const visibleMessages = computed(() => messageVirtualizer.value.getVirtualItems(
 
 function measureMessage(element: Element | ComponentPublicInstance | null) {
   messageVirtualizer.value.measureElement(element instanceof HTMLDivElement ? element : null);
+}
+async function showPendingQuestion() {
+  const question = pendingQuestions.value[0];
+  if (!question) return;
+  messageVirtualizer.value.scrollToIndex(question.index, { align: "start" });
+  await nextTick();
+  const card = messageList.value?.querySelector<HTMLElement>(`[data-tool-id="${CSS.escape(question.toolId)}"]`);
+  card?.scrollIntoView({ block: "center" });
+  card?.focus({ preventScroll: true });
 }
 
 watch([() => props.active, messageList], async ([active, element]) => {
@@ -849,7 +860,7 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
 <style lang="scss">
 .agentConversation {
   .runStatus { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--studioBorder); color: var(--studioMuted); font-size: 12px; &[data-state="attention"] { color: var(--studioAttention); background: var(--studioAttentionSoft); } &[data-state="error"] { color: var(--el-color-danger); } span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
-  .runControls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 16px; font-size: 11px; color: var(--studioMuted); .stopButton { min-height: 36px; gap: 6px; margin: 0; color: var(--studioAttention); border-color: var(--studioBorder); &.is-disabled { color: var(--studioMuted); opacity: 0.55; } } }
+  .runControls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 16px; font-size: 11px; color: var(--studioMuted); .pendingQuestionButton { min-width: 0; min-height: 36px; height: auto; white-space: normal; color: var(--studioAttention); } .stopButton { min-height: 36px; gap: 6px; margin: 0; color: var(--studioAttention); border-color: var(--studioBorder); &.is-disabled { color: var(--studioMuted); opacity: 0.55; } } }
 
   display: flex;
   flex: 1;

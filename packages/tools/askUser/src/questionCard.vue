@@ -1,19 +1,22 @@
 <template>
-  <el-card class="questionCard" shadow="never" @keydown.stop @keyup.stop>
+  <el-card class="questionCard" :class="{ decisionCard: storyDecision }" shadow="never" @keydown.stop @keyup.stop>
     <div class="questionHeader">
       <icon-message-question :size="18" />
       <span class="questionTitle">{{ title }}</span>
-      <el-tag size="small" :type="answer && !skipped ? 'success' : 'info'">{{ statusText }}</el-tag>
+      <el-tag size="small" :type="(storyDecision ? toolResult?.approved || toolResult?.applied : answer && !skipped) ? 'success' : 'info'">{{ statusText }}</el-tag>
     </div>
     <template v-if="tool.status === 'error'">
-      <p class="questionText">表单暂时未生成，请 AI 重新整理。</p>
+      <p class="questionText">{{ storyDecision ? '本次决定未保存，请根据错误重新核对。' : '表单暂时未生成，请 AI 重新整理。' }}</p>
       <details v-if="tool.result" class="errorDetails">
         <summary>查看错误详情</summary>
         <pre class="errorText">{{ tool.result }}</pre>
       </details>
     </template>
-    <p v-else-if="question" class="questionText">{{ question }}</p>
-    <template v-if="waiting">
+    <p v-else-if="question" class="questionText" :tabindex="storyDecision ? 0 : undefined">{{ question }}</p>
+    <div v-if="waiting && storyDecision" class="questionActions">
+      <el-button v-for="(option, index) in options" :key="option" :type="index < options.length - 1 ? 'primary' : 'default'" :disabled="!directory || submitting" @click="submitAnswer(false, option)">{{ option }}</el-button>
+    </div>
+    <template v-else-if="waiting">
       <form-create v-if="formRules.length" v-model="formValues" v-model:api="formApi" :rule="formRules" :option="formOptions" />
       <template v-else>
         <el-radio-group v-if="options.length" v-model="selected" class="questionOptions" :disabled="submitting" :aria-label="question">
@@ -37,6 +40,7 @@
         <el-button :disabled="!directory || submitting" @click="submitAnswer(true)">跳过</el-button>
       </div>
     </template>
+    <p v-if="submitError" class="submitError" role="alert">{{ submitError }}</p>
     <p v-else-if="answer" class="answerText">{{ answer }}</p>
   </el-card>
 </template>
@@ -47,7 +51,7 @@ import axios from "axios";
 import formCreate, { type Api, type Options, type Rule } from "@form-create/element-ui";
 import {
   ElCard, ElTag, ElButton, ElText,
-  ElMessage, ElForm, ElFormItem, ElRow, ElCol,
+  ElForm, ElFormItem, ElRow, ElCol,
   ElInput, ElInputNumber, ElSwitch, ElSelect,
   ElOption, ElCheckbox, ElCheckboxGroup, ElRadio, ElRadioGroup,
 } from "element-plus";
@@ -80,10 +84,13 @@ for (const component of [
 
 <script setup lang="ts">
 const props = defineProps<{ tool: ToolCall; directory?: string }>();
-const title = computed(() => props.tool.question?.title || (typeof props.tool.args?.title === "string" ? props.tool.args.title.trim() : "") || "请确认");
+const storyApproval = computed(() => props.tool.name === "requestStoryApproval");
+const storyDecision = computed(() => storyApproval.value || props.tool.name === "requestStoryDecision");
+const title = computed(() => props.tool.question?.title || toolResult.value?.title || (typeof props.tool.args?.title === "string" ? props.tool.args.title.trim() : "") || (storyApproval.value ? "确认采用故事" : "请确认"));
 const selected = ref("");
 const text = ref("");
 const submitting = ref(false);
+const submitError = ref("");
 const submittedAnswer = ref("");
 const submittedSkipped = ref(false);
 const formApi = shallowRef<Api>();
@@ -109,39 +116,43 @@ const formRules = computed<Rule[]>(() => (props.tool.question?.fields ?? []).map
     ...(["input", "textarea"].includes(field.type) ? { whitespace: true } : {}),
   }] : [],
 })));
-const question = computed(() => props.tool.question?.question ?? (typeof props.tool.args?.question === "string" ? props.tool.args.question : ""));
+const question = computed(() => props.tool.question?.question ?? toolResult.value?.question ?? (typeof props.tool.args?.question === "string" ? props.tool.args.question : ""));
 const options = computed(() => {
-  const values = props.tool.question?.options ?? props.tool.args?.options;
+  const values = props.tool.question?.options ?? toolResult.value?.options ?? props.tool.args?.options;
   return Array.isArray(values) ? [...new Set(values.filter((value): value is string => typeof value === "string" && value.trim().length > 0))] : [];
 });
 const toolResult = computed(() => {
   if (props.tool.status !== "success" || !props.tool.result) return;
   try {
-    return JSON.parse(props.tool.result) as { answer?: unknown; skipped?: boolean };
+    return JSON.parse(props.tool.result) as { answer?: unknown; skipped?: boolean; title?: string; question?: string; options?: string[]; approved?: boolean; applied?: boolean };
   } catch { return; }
 });
 const skipped = computed(() => submittedSkipped.value || toolResult.value?.skipped === true);
 const answer = computed(() => {
-  if (submittedAnswer.value) return submittedAnswer.value;
-  if (props.tool.status !== "success") return "";
-  return typeof toolResult.value?.answer === "string" ? toolResult.value.answer : props.tool.result ?? "";
+  if (props.tool.status === "success") return typeof toolResult.value?.answer === "string" ? toolResult.value.answer : props.tool.result ?? "";
+  return submittedAnswer.value;
 });
 const waiting = computed(() => props.tool.status === "running" && !!props.tool.question?.callId && !answer.value);
 const draftAnswer = computed(() => [selected.value, text.value.trim()].filter(Boolean).join("\n"));
 const statusText = computed(() => {
-  if (props.tool.status === "error") return "待重新生成";
+  if (props.tool.status === "error") return storyDecision.value ? "未保存" : "待重新生成";
+  if (props.tool.status === "interrupted") return "已停止";
+  if (submitting.value) return "正在提交";
+  if (storyApproval.value && props.tool.status === "success") return toolResult.value?.approved ? "已采用" : "未采用";
+  if (storyDecision.value && props.tool.status === "success") return toolResult.value?.applied ? "已保存" : "未确认";
+  if (storyDecision.value && answer.value) return "正在处理";
   if (skipped.value) return "已跳过";
   if (answer.value) return "已回答";
-  if (props.tool.status === "interrupted") return "已停止";
   return waiting.value ? "等待回答" : "提问记录";
 });
 
-async function submitAnswer(skip: boolean) {
+async function submitAnswer(skip: boolean, choice?: string) {
   const callId = props.tool.question?.callId;
-  const value = draftAnswer.value;
+  const value = choice ?? draftAnswer.value;
   if (!waiting.value || submitting.value || !props.directory || !callId) return;
   if (!skip && !formRules.value.length && (!value || value.length > 8000)) return;
   submitting.value = true;
+  submitError.value = "";
   try {
     if (!skip && formRules.value.length && !(await formApi.value?.validate().catch(() => false))) return;
     const response = await axios.post("/api/agent/answer", {
@@ -154,7 +165,7 @@ async function submitAnswer(skip: boolean) {
     submittedSkipped.value = response.data.data.skipped === true;
   } catch (error) {
     const message = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
-    ElMessage.error(message || (error instanceof Error ? error.message : "提交回答失败"));
+    submitError.value = message || (error instanceof Error ? error.message : "提交回答失败，请重试；已填写内容保留");
   } finally {
     submitting.value = false;
   }
@@ -163,6 +174,7 @@ async function submitAnswer(skip: boolean) {
 
 <style scoped lang="scss">
 .questionCard {
+  &.decisionCard .questionText { max-height: min(40vh, 360px); overflow: auto; overscroll-behavior: contain; }
   .questionHeader {
     display: flex;
     align-items: center;
@@ -181,10 +193,13 @@ async function submitAnswer(skip: boolean) {
 
   .questionText,
   .answerText,
+  .submitError,
   .errorText {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+
+  .submitError { color: var(--el-color-danger); }
 
   .errorDetails {
     color: var(--el-text-color-secondary);
@@ -224,12 +239,18 @@ async function submitAnswer(skip: boolean) {
 
   .questionActions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     margin-top: 12px;
 
     .el-button {
       margin: 0;
+      max-width: 100%;
+      height: auto;
+      min-height: 32px;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
   }
 }

@@ -1,11 +1,12 @@
 import { z } from "zod";
 import type { ToolDefinition, ToolFiles, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 import { breakdownSchema, sceneListSchema, validateBreakdown, validateSceneList, type SceneList } from "./schema";
-import { storyActionSchema, storyProjectSchema, storyStale } from "./storyProject";
+import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale } from "./storyProject";
 
 const sceneListPath = "场次表.json";
 const historyDirectory = "场次表历史";
 const breakdownPath = "拆解清单.json";
+const storyApprovalSchema = z.strictObject({ revisionId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/) });
 
 type SavedSceneList = SceneList & { schemaVersion: 1; version: number; savedAt: string };
 
@@ -32,7 +33,7 @@ const plugin: ToolPlugin = {
       if (!project.version) return;
       await story.validateSources?.();
       const approved = project.revisions.find(item => item.id === project.approvedId);
-      if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先在故事工作台采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
+      if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先调用 requestStoryApproval 在聊天中确认采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
       if (JSON.stringify(value.scenes.map(item => item.sceneId)) !== JSON.stringify(approved.scenes.map(item => item.sceneId))) rejected(["场次表须按已采用剧本的顺序保留全部 sceneId"]);
       if (project.brief.kind === "musicFilm") {
         if (value.kind !== "musicFilm") rejected(["MV 的场次表 kind 必须为 musicFilm"]);
@@ -113,9 +114,24 @@ const plugin: ToolPlugin = {
       async execute() { return json(await story.read()); },
     }, {
       name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
-      description: "按 readStoryProject 的 version 保存资料理解、创意方向、剧本候选、精确引句审稿或单场改写。不得代用户确认资料、采用方向/定稿、处置问题或录入观众反馈。旧版本保留。",
+      description: "按 readStoryProject 的 version 保存资料理解、创意方向、剧本候选、精确引句审稿或单场改写。采用故事版本请调用 requestStoryApproval，在聊天中显示确认卡片。不得代用户确认资料、采用方向/定稿、处置问题或录入观众反馈。旧版本保留。",
       parameters: z.toJSONSchema(z.object({ expectedVersion: z.number().int().nonnegative(), action: storyActionSchema }), { target: "draft-07", io: "input" }),
       async execute(_id, params) { const input = params as { expectedVersion: number; action: unknown }; return json(await story.apply(input.expectedVersion, input.action)); },
+    });
+    if (story?.requestApproval) tools.push({
+      name: "requestStoryApproval", label: "确认采用故事", executionMode: "sequential",
+      description: "审稿完成后调用，在聊天里展示指定故事版本的采用确认卡片并等待用户点击；确认后自动保存采用记录，返回 approved。不要让用户自行去故事工作台寻找按钮。暂不采用、跳过或取消均不授权后续制作。已采用版本不会重复询问。",
+      parameters: z.toJSONSchema(storyApprovalSchema, { target: "draft-07", io: "input" }),
+      async execute(id, params, signal) {
+        const { revisionId } = storyApprovalSchema.parse(params);
+        return json(await story.requestApproval!(id, revisionId, signal));
+      },
+    });
+    if (story?.requestDecision) tools.push({
+      name: "requestStoryDecision", label: "确认故事创作选择", executionMode: "sequential",
+      description: "在聊天中请用户确认资料理解、比较并选择已保存的故事方向，或按展示的理由保留审稿问题。confirmSource 传资料 id；chooseDirection 展示全部候选，不代用户选定；decideIssue 传 reviewId、issueId、reason，理由须展示给用户确认。返回 applied: true 才表示决定已保存；跳过或暂不决定时等待，不循环追问。已有明确决定不重复询问。采用定稿用 requestStoryApproval。",
+      parameters: z.toJSONSchema(storyDecisionSchema, { target: "draft-07", io: "input" }),
+      async execute(id, params, signal) { return json(await story.requestDecision!(id, storyDecisionSchema.parse(params), signal)); },
     });
     return tools;
   },

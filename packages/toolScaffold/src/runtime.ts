@@ -211,7 +211,13 @@ export interface ToolFiles {
 }
 
 export interface ToolContext {
-  story?: { read(): Promise<unknown>; validateSources?(): Promise<void>; apply(expectedVersion: number, action: unknown): Promise<unknown> };
+  story?: {
+    read(): Promise<unknown>;
+    validateSources?(): Promise<void>;
+    apply(expectedVersion: number, action: unknown): Promise<unknown>;
+    requestApproval?(toolCallId: string, revisionId: string, signal?: AbortSignal): Promise<unknown>;
+    requestDecision?(toolCallId: string, decision: unknown, signal?: AbortSignal): Promise<unknown>;
+  };
   ffmpeg(signal?: AbortSignal): Promise<FfmpegFactory>;
   media?: MediaContext;
   canvas?: CanvasContext;

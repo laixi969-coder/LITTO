@@ -1,9 +1,9 @@
 <template>
-  <section v-if="renderer" class="toolInteraction" :class="{ awaiting: tool.status === 'running' && !!tool.question }">
-    <div v-if="tool.status === 'running' && tool.question" class="attentionHeader"><icon-message-question :size="16" /><strong>需要你确认</strong><a :href="'#toolStep' + tool.id">查看提出此问题的步骤</a></div>
+  <section v-if="renderer" class="toolInteraction" :class="{ awaiting: tool.status === 'running' && !!tool.question }" :data-tool-id="tool.id" tabindex="-1">
+    <div v-if="tool.status === 'running' && tool.question" class="attentionHeader"><icon-message-question :size="16" /><strong>需要你确认</strong><el-button link @click="collapsed = false">查看提出此问题的步骤</el-button></div>
     <component :is="renderer" :tool="tool" :directory="directory" @copy="emit('copy', $event)" />
   </section>
-  <el-text v-if="rendererError" type="danger">工具界面加载失败，请停止后重试：{{ rendererError }}</el-text>
+  <div v-if="rendererError" class="rendererError" role="alert" :data-tool-id="tool.id" tabindex="-1"><el-text type="danger">确认界面暂时无法显示：{{ rendererError }}</el-text><el-button size="small" @click="rendererRetry++">重新加载卡片</el-button></div>
   <chat-reasoning :id="'toolStep' + tool.id" v-model:collapsed="collapsed" class="messageReasoning toolCall" expandIconPlacement="left">
     <template #header>
       <span class="toolHeader" :data-status="tool.status">
@@ -41,14 +41,15 @@ const { tool, directory, duration } = defineProps<{ tool: AgentToolCall; directo
 const emit = defineEmits<{ copy: [content: string] }>();
 const renderer = shallowRef<Component>();
 const rendererError = ref("");
-watch(() => [tool.name, tool.question?.callId] as const, async ([name], _previous, onCleanup) => {
+const rendererRetry = ref(0);
+watch(() => [tool.name, tool.question?.callId, rendererRetry.value] as const, async ([name], _previous, onCleanup) => {
   let active = true;
   onCleanup(() => { active = false; });
   renderer.value = undefined;
   rendererError.value = "";
   if (name === "subAgent") return;
   try {
-    const component = await loadToolComponent(name);
+    const component = await loadToolComponent(["requestStoryApproval", "requestStoryDecision"].includes(name) ? "askUser" : name);
     if (active) {
       renderer.value = component;
       if (!component && tool.status === "running" && tool.question?.callId) rendererError.value = "该工具未提供可用的交互组件";
@@ -65,7 +66,7 @@ onErrorCaptured(error => {
 });
 const collapsed = defineModel<boolean>("collapsed", { default: true });
 const toolStatusLabels = { running: "调用中…", success: "已完成", error: "调用失败", interrupted: "已中断" };
-const toolLabels: Record<string, string> = { read: "读取文件", write: "写入文件", edit: "修改文件", askUser: "确认创作需求", subAgent: "委派任务", generateImage: "生成图片", generateVideo: "生成视频", generateAudio: "生成音频", getCanvas: "读取画布", getCanvasNodes: "读取画面节点", addCanvasNodes: "添加画面节点", listMediaModels: "读取可用模型" };
+const toolLabels: Record<string, string> = { read: "读取文件", write: "写入文件", edit: "修改文件", askUser: "确认创作需求", requestStoryApproval: "确认采用故事", requestStoryDecision: "确认故事创作选择", subAgent: "委派任务", generateImage: "生成图片", generateVideo: "生成视频", generateAudio: "生成音频", getCanvas: "读取画布", getCanvasNodes: "读取画面节点", addCanvasNodes: "添加画面节点", listMediaModels: "读取可用模型" };
 const toolLabel = computed(() => toolLabels[tool.name] || tool.name || "工具调用");
 const targetPath = computed(() => {
   const path = tool.args?.path ?? tool.args?.filePath ?? tool.args?.canvasId;
@@ -88,9 +89,10 @@ function formatToolData(value: unknown) {
 </script>
 
 <style scoped lang="scss">
+.rendererError { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; }
 .toolInteraction {
   &.awaiting { padding: 12px; margin: 8px 0; border: 1px solid var(--studioAttention); border-radius: var(--ui-radius); background: var(--studioAttentionSoft); }
-  .attentionHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--studioAttention); font-size: 12px; margin-bottom: 12px; a { margin-left: auto; color: inherit; } }
+  .attentionHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--studioAttention); font-size: 12px; margin-bottom: 12px; .el-button { margin-left: auto; color: inherit; } }
 }
 .toolCall {
   min-width: 0;

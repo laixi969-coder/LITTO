@@ -1,8 +1,9 @@
 import { readFile, stat, writeAtomic } from "@toonflow/file";
 import { createHash, randomUUID } from "node:crypto";
-import { storyActionSchema, storyProjectSchema, newStoryProject, storyStale, storyPreviewKey, storyBoard, validateStoryDraft, type StoryProject, type StorySource } from "@toonflow/tool-scene-list/storyProject";
+import { storyActionSchema, storyDecisionSchema, storyProjectSchema, newStoryProject, storyStale, storyPreviewKey, storyBoard, validateStoryDraft, type StoryAction, type StoryProject, type StorySource } from "@toonflow/tool-scene-list/storyProject";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
+import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
 
 const fileName = "storyProject.json";
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -29,12 +30,90 @@ async function sourceFingerprint(directory: string, source: StorySource) {
 export async function checkSources(directory: string, sources: StoryProject["sources"]) {
   for (const source of sources) if (await sourceFingerprint(directory, source) !== source.fingerprint) fail(`资料「${source.name}」原件或正文已修改，请重新分析并确认`, 409);
 }
+async function validateApproval(directory: string, project: StoryProject, revisionId: string) {
+  const revision = project.revisions.find(item => item.id === revisionId) ?? fail("故事版本不存在");
+  await checkSources(directory, project.sources);
+  if (storyStale(project, revision)) fail("故事依据已更新，请产生新版本并重新审阅", 409);
+  const reviews = project.reviews.filter(item => item.revisionId === revision.id);
+  const coverage = new Set(reviews.flatMap(item => item.coverage));
+  if (revision.scenes.some(scene => !coverage.has(scene.sceneId))) fail("还有场次未审阅，请先完成审稿");
+  if (reviews.some(review => review.issues.some(issue => issue.category === "contradiction" && !review.decisions[issue.id]))) fail("存在未处置的明确矛盾，请修改或记录保留理由");
+  if (project.sources.some(source => source.purpose === "fact" && !source.confirmed)) fail("作为事实使用的资料尚未确认");
+  return revision;
+}
+export async function requestStoryApproval(directory: string, toolCallId: string, revisionId: string, question: QuestionContext, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  if (currentTenant()?.role === "VIEWER") fail("只读成员不能修改故事项目", 403);
+  const project = await readStoryProject(directory);
+  const revision = await validateApproval(directory, project, revisionId);
+  const title = `采用《${revision.title}》`;
+  if (project.approvedId === revision.id) return { title, approved: true, revisionId, answer: "此版本已采用，无需再次确认" };
+  const request = {
+    title,
+    question: `故事版本 ${project.revisions.indexOf(revision) + 1} · ${revision.scenes.length} 场\n${revision.id}\n\n${revision.outline}\n\n采用后将以此版本继续制作。`,
+    options: ["采用此版本", "暂不采用"],
+  };
+  const response = await question.ask(toolCallId, request, signal);
+  signal?.throwIfAborted();
+  if (response.skipped || response.answer !== request.options[0]) return { ...request, ...response, approved: false, revisionId };
+  // ACT: 确认绑定展示时的项目版本；等待期间任何修改都须重新核对，不自动套用到新版本。
+  const updated = await applyStoryAction(directory, project.version, { type: "approve", id: revisionId, reason: "用户在聊天确认卡片中采用" }, true);
+  return { ...request, approved: true, revisionId, version: updated.version, answer: "已采用此版本，可继续已授权的后续工作" };
+}
+export async function requestStoryDecision(directory: string, toolCallId: string, input: unknown, question: QuestionContext, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  if (currentTenant()?.role === "VIEWER") fail("只读成员不能修改故事项目", 403);
+  const decision = storyDecisionSchema.parse(input);
+  const project = await readStoryProject(directory);
+  let title: string, content: string;
+  let choices: { label: string; action: StoryAction }[];
+  switch (decision.type) {
+    case "confirmSource": {
+      const source = project.sources.find(item => item.id === decision.id) ?? fail("资料不存在");
+      if (!source.coverage.trim()) fail("请先说明读取覆盖范围和未知项");
+      await checkSources(directory, [source]);
+      title = `确认资料理解：${source.name}`;
+      if (source.confirmed) return { title, applied: true, answer: "这份资料理解已确认，无需重复确认" };
+      const purposes = { fact: "事实依据", style: "风格参考", reference: "结构 / 剧情参考" };
+      content = `用途：${purposes[source.purpose]}\n读取范围：${source.coverage}\n\n${source.observations.map(item => `${item.statement}\n依据：${item.quote || '画面观察'}\n位置：${item.locator}`).join("\n\n")}\n\n未知项：${source.unknowns.join("；") || "无"}`;
+      choices = [{ label: "确认上述理解", action: decision }];
+      break;
+    }
+    case "chooseDirection": {
+      if (!project.directions.length) fail("请先保存候选方向");
+      title = "选择故事方向";
+      content = project.directions.map((item, index) => `${index + 1}. ${item.title}${item.id === project.directionId ? "（当前方向）" : ""}\n${item.premise}\n观众为什么在意：${item.audienceReason}\n代表性场面：${item.signatureScene}\n制作难点：${item.risk}`).join("\n\n");
+      choices = project.directions.map((item, index) => ({ label: `选择 ${index + 1}：${item.title}`, action: { type: "chooseDirection", id: item.id } }));
+      break;
+    }
+    case "decideIssue": {
+      const review = project.reviews.find(item => item.id === decision.reviewId) ?? fail("审稿记录不存在");
+      const issue = review.issues.find(item => item.id === decision.issueId) ?? fail("问题不存在");
+      const revision = project.revisions.find(item => item.id === review.revisionId) ?? fail("故事版本不存在");
+      title = `确认保留：${revision.title} · ${issue.sceneId}`;
+      if (review.decisions[issue.id]) return { title, applied: true, answer: `此问题已有保留决定：${review.decisions[issue.id]!.reason}` };
+      content = `故事版本 ${project.revisions.indexOf(revision) + 1}\n原文：${issue.quote}\n问题：${issue.problem}\n依据：${issue.basis}\n建议改法：${issue.suggestion}\n\n本次提议的保留理由：${decision.reason}\n\n确认会记录保留决定，不会修改剧本正文。`;
+      choices = [{ label: "按此理由保留", action: decision }];
+      break;
+    }
+  }
+  const request = { title, question: content, options: [...choices.map(item => item.label), "暂不决定"] };
+  const response = await question.ask(toolCallId, request, signal);
+  signal?.throwIfAborted();
+  const choice = response.skipped ? undefined : choices.find(item => item.label === response.answer);
+  if (!choice) return { ...request, ...response, applied: false };
+  const updated = await applyStoryAction(directory, project.version, choice.action, true);
+  return { ...request, applied: true, version: updated.version, action: choice.action, answer: `${choice.label}，已保存` };
+}
 export async function applyStoryAction(directory: string, expectedVersion: number, input: unknown, human = false) {
   if (currentTenant()?.role === "VIEWER") fail("只读成员不能修改故事项目", 403);
   const parsed = storyActionSchema.safeParse(input);
   if (!parsed.success) fail(parsed.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("；"));
   const action = parsed.data;
-  if (!human && ["confirmSource", "chooseDirection", "decideIssue", "approve", "release"].includes(action.type)) fail("此操作需要用户在故事工作台中决定", 403);
+  if (!human && ["confirmSource", "chooseDirection", "decideIssue", "approve", "release"].includes(action.type)) {
+    const tool = action.type === "approve" ? "requestStoryApproval" : "requestStoryDecision";
+    fail(action.type === "release" ? "发布反馈须由用户在故事工作台录入" : `请调用 ${tool}，在聊天中展示具体内容并等待用户决定`, 403);
+  }
   const { path } = await resolveWorkspacePath(directory, fileName);
   const release = lockWorkspaceFiles([path]);
   try {
@@ -101,14 +180,7 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
         review.decisions[action.issueId] = { reason: action.reason, at: now }; break;
       }
       case "approve": {
-        const revision = getRevision(action.id);
-        await checkSources(directory, project.sources);
-        if (storyStale(project, revision)) fail("故事依据已更新，请产生新版本并重新审阅", 409);
-        const reviews = project.reviews.filter(item => item.revisionId === revision.id);
-        const coverage = new Set(reviews.flatMap(item => item.coverage));
-        if (revision.scenes.some(scene => !coverage.has(scene.sceneId))) fail("还有场次未审阅，请先完成审稿");
-        if (reviews.some(review => review.issues.some(issue => issue.category === "contradiction" && !review.decisions[issue.id]))) fail("存在未处置的明确矛盾，请修改或记录保留理由");
-        if (project.sources.some(source => source.purpose === "fact" && !source.confirmed)) fail("作为事实使用的资料尚未确认");
+        const revision = await validateApproval(directory, project, action.id);
         project.approvedId = revision.id; project.approvals.push({ revisionId: revision.id, at: now, reason: action.reason }); break;
       }
       case "board": {

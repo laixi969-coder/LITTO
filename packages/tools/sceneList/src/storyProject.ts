@@ -76,6 +76,11 @@ export const storyActionSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("learning"), value: learningSchema }),
 ]);
 export type StoryAction = z.infer<typeof storyActionSchema>;
+export const storyDecisionSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("confirmSource"), id }),
+  z.strictObject({ type: z.literal("chooseDirection") }),
+  z.strictObject({ type: z.literal("decideIssue"), reviewId: id, issueId: id, reason: text(2000).min(1) }),
+]);
 export function storyActionParameters(type: StoryAction["type"]) {
   return z.toJSONSchema(storyActionSchema.options.find(option => option.shape.type.value === type)!, { io: "input", target: "draft-07" });
 }
@@ -135,4 +140,4 @@ export const storyWritingGuide = `你是 LITTO 创作搭档。先读当前作品
 创作目标区分故事/连载、效果广告、品牌片、MV。用户的观众、目标、体量、类型、语气和结尾选择优先；异常开场、反转、留白和人物弧光是可选方法，不强制全部作品使用。给 2–3 个在人物选择或冲突上真正不同的方向，解释观众在意的理由与制作难点，不自评爆款分数。
 剧本按场保存稳定 sceneId（s01 等），写可见行动与声音。每场记录目标、阻碍、变化、人物和观众各自知道什么、依赖哪些场次；speech 仅放实际需要朗读的对白/旁白，不含表演说明。canon/threads 是待确认的事实与线索，写出来源场次。回忆与倒叙注明，因果依据可以来自叙事顺序之后的场次。
 审稿仅针对指定版本，coverage 逐场列出真正审阅的范围，每个问题有原文精确引句、依据、类别（明确矛盾/理解风险/审美建议）和最小改法。空问题不等于爆款。模型审稿不是观众实验；没有观众数据不要编造完播、转化或传播效果。
-局部改写只替换指定场，保留 sceneId。确认、采用和放弃问题由用户在工作台决定，不代用户确认。输出必须通过提供的结构化工具保存；工具拒绝时修正后再提交。`;
+局部改写只替换指定场，保留 sceneId。确认、采用和放弃问题由用户决定，不代用户确认。提供 requestStoryDecision 时，资料理解、方向选择与审稿保留决定通过聊天卡片确认；提供 requestStoryApproval 时，采用版本通过它在聊天中确认，不让用户去工作台寻找按钮；没有相应工具时才使用工作台入口。已确认的内容不重复询问。输出必须通过提供的结构化工具保存；工具拒绝时修正后再提交。`;

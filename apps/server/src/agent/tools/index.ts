@@ -16,7 +16,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 import { workspaceProject, prepareShot } from "@/utils/media/jobs";
 import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
-import { readStoryProject, applyStoryAction, checkSources } from "@/utils/story";
+import { readStoryProject, applyStoryAction, checkSources, requestStoryApproval, requestStoryDecision } from "@/utils/story";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
@@ -63,7 +63,13 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     }),
   };
   return {
-    story: { read: () => readStoryProject(cwd), validateSources: async () => checkSources(cwd, (await readStoryProject(cwd)).sources), apply: (version, action) => applyStoryAction(cwd, version, action) },
+    story: {
+      read: () => readStoryProject(cwd),
+      validateSources: async () => checkSources(cwd, (await readStoryProject(cwd)).sources),
+      apply: (version, action) => applyStoryAction(cwd, version, action),
+      requestApproval: question ? (toolCallId, revisionId, signal) => requestStoryApproval(cwd, toolCallId, revisionId, question, mediaSignal(signal)) : undefined,
+      requestDecision: question ? (toolCallId, decision, signal) => requestStoryDecision(cwd, toolCallId, decision, question, mediaSignal(signal)) : undefined,
+    },
     cwd, config, files, resolvePath, writeFile: files.writeFile, canvas, question, skills: createSkillContext(cwd),
     ffmpeg: signal => createWorkspaceFfmpeg(cwd, signal),
     media: {
@@ -114,5 +120,5 @@ export async function createAgentTools(cwd: string, canvas?: CanvasContext, ques
       });
     }
   }
-  return tools;
+  return tools.filter(tool => !["requestStoryApproval", "requestStoryDecision"].includes(tool.name) || names.has("askUser"));
 }
