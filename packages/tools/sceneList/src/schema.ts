@@ -6,6 +6,12 @@ const sceneId = z.string().regex(/^s\d{2,3}$/, "场次 id 形如 s01");
 const text = (max: number) => z.string().trim().max(max);
 const entity = z.object({ id: entityId, name: text(60).min(1), description: text(400).default("") });
 
+export const musicSceneFields = {
+  musicRange: text(80).optional().describe("仅 MV：歌曲段落名或有依据的时间范围；无时间码时写段落与大致占比"),
+  syncMode: z.enum(["free", "beat", "phrase", "lyric", "energy"]).optional(),
+  lyricLines: z.array(text(200)).max(40).optional().describe("仅 MV：本场对应的原歌词，不为迁就剧情改词"),
+};
+
 export const sceneListSchema = z.object({
   storyRevisionId: text(80).optional().describe("故事工作台已采用的版本 ID；有故事项目时必填"),
   title: text(80).min(1),
@@ -29,9 +35,7 @@ export const sceneListSchema = z.object({
     narrativeFunction: text(300).min(1).describe("这场让观众获得什么：建立、揭示、反应、对比、过渡"),
     durationHint: text(80).min(1),
     risk: text(400).default("").describe("模型难以稳定生成的内容及原因，没有则留空"),
-    musicRange: text(80).optional().describe("仅 MV：段落名或时间范围"),
-    syncMode: z.enum(["free", "beat", "phrase", "lyric", "energy"]).optional(),
-    lyricLines: z.array(text(200)).max(40).optional(),
+    ...musicSceneFields,
   })).min(1).max(200),
   overLimitReason: text(400).optional().describe("人物或场景数超出体量上限时，说明必须保留的叙事理由"),
 });

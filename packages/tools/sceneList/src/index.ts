@@ -34,6 +34,16 @@ const plugin: ToolPlugin = {
       const approved = project.revisions.find(item => item.id === project.approvedId);
       if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先在故事工作台采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
       if (JSON.stringify(value.scenes.map(item => item.sceneId)) !== JSON.stringify(approved.scenes.map(item => item.sceneId))) rejected(["场次表须按已采用剧本的顺序保留全部 sceneId"]);
+      if (project.brief.kind === "musicFilm") {
+        if (value.kind !== "musicFilm") rejected(["MV 的场次表 kind 必须为 musicFilm"]);
+        for (const [index, scene] of value.scenes.entries()) {
+          const source = approved.scenes[index]!;
+          for (const key of ["musicRange", "syncMode", "lyricLines"] as const) {
+            if (source[key] !== undefined && JSON.stringify(scene[key]) !== JSON.stringify(source[key])) rejected([`场次 ${scene.sceneId} 的 ${key} 须沿用已采用剧本；调整音乐编排请先更新故事版本`]);
+          }
+        }
+      }
+      return approved;
     }
     const tools: ToolDefinition[] = [
       {
@@ -61,12 +71,20 @@ const plugin: ToolPlugin = {
       {
         name: "readSceneList",
         label: "读取场次表",
-        description: "读取当前保存的场次表及其 version。拆解前先读取，拆解时引用其中的实体 id 和 version。",
+        description: "读取场次表及 version，并附已采用版本的 storyContext 与逐场 story 正文、目标、阻碍、变化、因果和音乐段落，供拆解和分镜使用。附加故事字段只读，不传回 saveSceneList；needsUpdate 时先更新场次表。",
         parameters: z.toJSONSchema(z.object({}), { io: "input", target: "draft-07" }),
         async execute() {
           const saved = await readSaved(files);
           if (saved) {
-            try { await checkStory(saved); }
+            try {
+              const approved = await checkStory(saved);
+              if (approved) return json({
+                ...saved,
+                storyContext: { revisionId: approved.id, title: approved.title, outline: approved.outline, canon: approved.canon, threads: approved.threads },
+                // ACT: 从采用版本即时关联正文，不在场次表再存一份可能过期的故事。
+                scenes: saved.scenes.map((scene, index) => ({ ...scene, story: approved.scenes[index] })),
+              });
+            }
             catch (cause) { return json({ ...saved, needsUpdate: true, reason: cause instanceof Error ? cause.message : "故事版本已改变" }); }
           }
           return json(saved ?? { saved: false, message: "还没有场次表，请先用 saveSceneList 保存" });
