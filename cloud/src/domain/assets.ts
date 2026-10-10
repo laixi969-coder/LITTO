@@ -5,7 +5,8 @@ import type { z } from "zod";
 
 type AssetIn = z.infer<typeof assetInput>;
 
-const snapshot = (a: any) => ({ name: a.name, type: a.type, description: a.description, attributes: a.attributes, references: a.references, invariants: a.invariants, allowedVariations: a.allowedVariations, forbiddenChanges: a.forbiddenChanges });
+/** 气质标签只用于检索去重，不参与生成编译，也不进入锁定语义。 */
+const snapshot = (a: any) => ({ name: a.name, type: a.type, description: a.description, attributes: a.attributes, ...(a.personaTags ? { personaTags: a.personaTags } : {}), references: a.references, invariants: a.invariants, allowedVariations: a.allowedVariations, forbiddenChanges: a.forbiddenChanges });
 
 export function createAsset(s: Scope, projectId: string, input: AssetIn, parentAssetId?: string) {
     const { type, name, ...rest } = input;

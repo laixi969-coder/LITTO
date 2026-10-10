@@ -22,7 +22,10 @@ export default Router().post("/", validateFields({
   const tenant = currentTenant()!;
   const job = cloud()!.enqueueWorkspaceMedia({ workspaceId: tenant.workspaceId, userId: tenant.userId,
     projectId: u.mediaJobs.workspaceProject(directory)!, directory, kind, production, requestId,
-    request: { ...request, prompt: production.compiled.prompt + (production.compiled.negativePrompt ? "\nAVOID: " + production.compiled.negativePrompt : "") },
+    // 负面词走独立字段，不拼进提示词正文；种子与抽卡批次一并透传。
+    request: { ...request, prompt: production.compiled.prompt },
+    negativePrompt: production.compiled.negativePrompt || undefined,
+    candidateBatchId: typeof req.body.candidateBatchId === "string" && req.body.candidateBatchId ? req.body.candidateBatchId : undefined,
   });
   res.status(202).json(success({ jobId: job.id }));
 });

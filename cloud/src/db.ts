@@ -103,6 +103,19 @@ CREATE INDEX idx_usage_ws_time ON usage_events(workspace_id, created_at);
         id: "0008_passwordLogin",
         sql: `CREATE TABLE user_passwords(user_id TEXT PRIMARY KEY, password_hash TEXT NOT NULL, updated_at TEXT NOT NULL);`,
     },
+    {
+        id: "0009_realismAssets",
+        sql: `
+-- 抽卡候选池：一批生成 = 一个候选批次，胜出者晋升为资产权威参考，摊薄后续镜头成本。
+CREATE TABLE candidate_batches(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, asset_id TEXT, shot_id TEXT, kind TEXT NOT NULL, prompt_fingerprint TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT);
+CREATE INDEX idx_batches_project ON candidate_batches(workspace_id, project_id);
+CREATE TABLE candidates(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, batch_id TEXT NOT NULL, asset_id TEXT, keyframe_id TEXT, take_id TEXT, media_id TEXT, status TEXT NOT NULL DEFAULT 'candidate', scores TEXT NOT NULL DEFAULT '{}', findings TEXT NOT NULL DEFAULT '[]', promoted INTEGER NOT NULL DEFAULT 0, meta TEXT NOT NULL DEFAULT '{}', created_at TEXT, updated_at TEXT);
+CREATE INDEX idx_candidates_batch ON candidates(batch_id);
+-- 租户级资产库：项目级资产采用后入池，跨项目复用同一张定妆脸，解决「同角色跨项目崩脸」。
+CREATE TABLE library_assets(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, source_asset_id TEXT, type TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL, persona_tags TEXT NOT NULL DEFAULT '{}', reuse_count INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT, deleted_at TEXT);
+CREATE INDEX idx_library_type ON library_assets(workspace_id, type);
+`,
+    },
 ];
 
 export const db = await openSqlite(config.dbFile);
@@ -162,6 +175,7 @@ const JSON_COLS: Record<string, string[]> = {
     shot_states: ["data"], state_deltas: ["data"], keyframes: ["meta"], takes: ["meta"], qc_reports: ["findings", "evidence"],
     projects: ["canvas"], asset_versions: ["snapshot"], reference_bindings: ["crop", "provider_compat"],
     generation_jobs: ["parameters", "input_refs", "fallback_chain"], renders: ["manifest"], timelines: ["data"], generation_outputs: ["meta"], continuity_issues: ["repair"],
+    candidates: ["scores", "findings", "meta"], library_assets: ["data", "persona_tags"],
 };
 export const camel = (s: string) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export const snake = (s: string) => s.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
@@ -185,7 +199,7 @@ export function hydrate(table: string, r: Row | undefined): Row | undefined {
  * here so that workspace_id is enforced server-side, never by the UI.
  */
 export function scoped(workspaceId: string) {
-    const live = (table: string) => (["assets", "projects", "sequences", "scenes", "shots", "keyframes", "takes", "refs", "media"].includes(table) ? " AND deleted_at IS NULL" : "");
+    const live = (table: string) => (["assets", "projects", "sequences", "scenes", "shots", "keyframes", "takes", "refs", "media", "library_assets"].includes(table) ? " AND deleted_at IS NULL" : "");
     return {
         workspaceId,
         get(table: string, id: string, includeDeleted = false) {

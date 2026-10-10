@@ -18,10 +18,34 @@ export function stripFluff(text: string) {
 
 const J = (xs: (string | undefined | false)[]) => xs.filter(Boolean).join("; ");
 
+/**
+ * 负向词针对可信度硬伤，而不是通用画质词。
+ * 画质压制（worst quality / lowres）会把皮肤和材质一并压平，
+ * 与渲染标准要求的「按景别保留纹理」直接冲突，因此不采用。
+ */
+export const anatomyAndMaterialAvoid = [
+    "extra fingers, fused or duplicated limbs, missing limbs",
+    "warped or asymmetric hands, malformed hands",
+    "limbs merging into or passing through other bodies or objects",
+    "plastic or waxy skin, uniform glossy sheen across skin, cloth and surfaces",
+    "poreless airbrushed faces, over-sharpened halos, painterly smoothing",
+    "skin, cloth, foliage, stone and metal sharing one identical finish",
+    "text artifacts, garbled letters, watermark, signature",
+];
+const shotAvoid = (freedom: Record<string, string[]>) => [
+    ...anatomyAndMaterialAvoid,
+    "identity drift from the identity reference",
+    "floating objects, objects appearing without a cause",
+    ...(freedom.LOCK.length ? ["changes to locked elements"] : []),
+];
+
+
 export type Compiled = {
     prompt: string; negativePrompt: string;
     inputs: { referenceId: string; mediaId: string | null; text?: string; role: string; weight: number; lockLevel: string; sent: boolean }[];
     degradations: { role: string; strategy: string }[]; warnings: string[]; freedomMap: Record<string, string[]>; sections: Record<string, string>;
+    /** 同一镜头重跑时复用该种子，得到同机位变体，只改变被修改的条件。 */
+    seed?: number;
 };
 
 export function renderCompiledPrompt(sections: Record<string, string>) {
@@ -177,7 +201,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         constraintPriority: "Preserve identity and explicit invariants. Current starting continuity state takes precedence over baseline mutable appearance; apply only explicitly planned changes at their action or timeline beat and preserve unaffected details. Allow natural performance without changing identity. Forbidden changes override allowed variations; optional variation must not alter specified action, lighting or continuity.",
         repair: extra.repair?.note ?? "",
     };
-    let negativePrompt = J(["extra fingers", "warped hands", "identity drift from references", "text artifacts / garbled logos", "floating objects", ...(freedom.LOCK.length ? ["changes to locked elements"] : [])]);
+    let negativePrompt = J(shotAvoid(freedom));
     const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
     if (kind === "video" && musicVideo) {
         const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}】${item.description}`).join("\n");
@@ -203,9 +227,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
                 ]),
                 "Audio direction": audio,
                 Preserve: J([sections.lock, "Preserve reference identity and all details not explicitly changed; baseline styling is not a permanent lock on planned costume or makeup changes"]),
+                // ACT: 该模型的排除项只经 Avoid 段落表达；独立 negativePrompt 字段对它无效，仍返回给调用方用于模型切换后复用。
                 Avoid: J([sections.forbiddenChanges, negativePrompt]),
             };
-            negativePrompt = "";
         } else {
             sections.timeline = timeline;
             sections.audio = audio;

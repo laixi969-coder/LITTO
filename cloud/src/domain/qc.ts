@@ -3,6 +3,7 @@ import { notFound } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
 import { generateKeyframes, generateTakes } from "./lifecycle.ts";
 import { realismChecks, shotFingerprint } from "./realism.ts";
+import { scheduleLocalRepair } from "./localRepair.ts";
 import { bad } from "../util.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
@@ -71,10 +72,17 @@ export function applyRepair(s: Scope, repairId: string, actor: string) {
     const video = qc?.targetType === "take";
     const lock = ["identity_drift", "reference_replace"].includes(r.action) ? ["IDENTITY at weight 1.0 — do not alter facial geometry"] : r.action === "geometry_lock" || r.action === "environment_lock" ? ["geometry of environment and key props — do not alter layout"] : [];
     const o = { repair: { addLock: lock, note: r.detail }, count: video ? 1 : 2 };
+    const policy = r.action === "switch_model" ? { disabledModelIds: qc ? [(s.get(video ? "takes" : "keyframes", qc.targetId) as any)?.meta?.modelId].filter(Boolean) : [] } : undefined;
     let res: any;
     if (r.action === "look_normalization") return normalizeLook(s, r);
-    if (["inpaint_local"].includes(r.action)) return { applied: false, manual: true, message: r.action === "inpaint_local" ? "Local inpaint needs a mask — use the editor on the selected frame." : "Colour normalisation is applied in post; nothing to regenerate.", repairActionId: r.id };
-    const policy = r.action === "switch_model" ? { disabledModelIds: qc ? [(s.get(video ? "takes" : "keyframes", qc.targetId) as any)?.meta?.modelId].filter(Boolean) : [] } : undefined;
+    // 局部缺陷改为真实排单：整帧重绘 + 其余元素锁定，结果作为新关键帧走人工验收。
+    if (r.action === "inpaint_local" && qc?.targetType === "keyframe") {
+        const kind = qc.findings.find((f: any) => f.action === "inpaint_local")?.kind ?? "face_artifact";
+        const out = scheduleLocalRepair(s, { keyframeId: qc.targetId, kind, actor, note: r.detail }, { policy });
+        s.update("repair_actions", repairId, { status: "applied" });
+        return { applied: true, ...out };
+    }
+    if (["inpaint_local"].includes(r.action)) return { applied: false, manual: true, message: "视频局部修复需要逐帧遮罩，当前供应商不支持；请改为更换该 Take 或重新生成整段", repairActionId: r.id };
     res = video ? generateTakes(s, r.shotId, actor, { ...o, policy }) : generateKeyframes(s, r.shotId, actor, { ...o, policy });
     s.update("repair_actions", repairId, { status: "applied" });
     return { applied: true, ...res };

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { all, get, run } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
-import { ASSET_TYPES, assetInput, bindingInput, lookSchema, worldSchema, shotInput } from "../domain/schema.ts";
+import { ASSET_TYPES, PERSONA_AXES, assetInput, bindingInput, lookSchema, personaTagSchema, worldSchema, shotInput } from "../domain/schema.ts";
 import { approveAsset, assetVersions, createAsset, createVariant, newAssetVersion, rollbackAsset, updateAsset } from "../domain/assets.ts";
 import { bindReference, createShot, deleteShot, moveShot, shotPartial, updateShot } from "../domain/shots.ts";
 import { statesOf, recomputeStates } from "../domain/state.ts";
@@ -19,6 +19,9 @@ import { importLegacyCanvas } from "../legacy.ts";
 import { mediaView } from "../storage.ts";
 import { estimate } from "../jobs.ts";
 import { autoObserve } from "../domain/qc-vision.ts";
+import { createBatch, listBatches, listCandidates, promoteCandidate, scoreCandidate } from "../domain/candidates.ts";
+import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference } from "../domain/library.ts";
+import { acceptLocalRepair, repairDirective, scheduleLocalRepair } from "../domain/localRepair.ts";
 
 export const production = new Hono();
 const P = "/projects/:pid";
@@ -332,3 +335,70 @@ production.post(`${P}/bootstrap`, async (c) => {
     if (b.generate) out.jobs = shots.map((x: any) => generateKeyframes(s, x.id, a.user.id, { count: 2 }).job.id);
     return c.json(out);
 });
+
+// ---- Candidate pool (抽卡回本闭环) ----
+production.post(`${P}/candidateBatches`, async (c) => {
+    const { s, a } = project(c, c.req.param("pid"), "EDITOR");
+    const b = await body(c, z.object({
+        kind: z.enum(["image", "video"]), promptFingerprint: z.string().min(1).max(200),
+        assetId: z.string().optional(), shotId: z.string().optional(),
+    }));
+    if (b.assetId && !s.get("assets", b.assetId)) throw notFound("asset");
+    if (b.shotId && !s.get("shots", b.shotId)) throw notFound("shot");
+    return c.json(createBatch(s, { projectId: c.req.param("pid"), kind: b.kind, promptFingerprint: b.promptFingerprint, assetId: b.assetId, shotId: b.shotId }, a.user.id), 201);
+});
+production.get(`${P}/candidateBatches`, (c) => { const { s } = project(c, c.req.param("pid")); return c.json(listBatches(s, c.req.param("pid"))); });
+production.get("/candidateBatches/:id/candidates", (c) => { const { s } = ctx(c); const b = s.get("candidate_batches", c.req.param("id")); if (!b) throw notFound("candidate batch"); return c.json(listCandidates(s, b.id)); });
+production.post("/candidates/:id/score", async (c) => {
+    const { s } = ctx(c, "EDITOR");
+    const b = await body(c, z.object({
+        scores: z.record(z.number().finite()).optional(),
+        findings: z.array(z.object({ kind: z.string(), note: z.string().optional() })).optional(),
+    }));
+    return c.json(scoreCandidate(s, c.req.param("id"), b));
+});
+/** 采用胜出候选：成为资产的权威参考图，可选同步晋升主关键帧。 */
+production.post("/candidates/:id/promote", async (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    const b = await body(c, z.object({ asHero: z.boolean().default(false) }));
+    return c.json(promoteCandidate(s, c.req.param("id"), a.user.id, b));
+});
+
+// ---- Tenant library (跨项目复用角色与资产) ----
+production.get("/library/assets", (c) => {
+    const { s } = ctx(c);
+    const t = c.req.query("type"), n = c.req.query("name");
+    const tags = PERSONA_AXES.reduce((acc, axis) => {
+        const v = c.req.query(axis);
+        if (v) (acc as any)[axis] = v;
+        return acc;
+    }, {} as Record<string, string>);
+    return c.json(searchLibrary(s, { type: t, tags: Object.keys(tags).length ? (tags as any) : undefined, excludeName: n }));
+});
+production.post("/library/assets/:assetId/publish", async (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    const b = await body(c, z.object({ personaTags: personaTagSchema.optional() }).default({}));
+    return c.json(publishToLibrary(s, c.req.param("assetId"), a.user.id, b.personaTags), 201);
+});
+production.post(`${P}/library/import/:libraryId`, async (c) => {
+    const { s, a } = project(c, c.req.param("pid"), "EDITOR");
+    const b = await body(c, z.object({ name: z.string().optional(), invariants: z.array(z.string()).optional() }).default({}));
+    return c.json(importFromLibrary(s, c.req.param("libraryId"), c.req.param("pid"), a.user.id, b), 201);
+});
+production.put("/library/assets/:id/reference", async (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    const b = await body(c, z.object({ mediaId: z.string().min(1) }));
+    return c.json(updateLibraryReference(s, c.req.param("id"), b.mediaId, a.user.id));
+});
+
+// ---- Local repair (QC inpaint_local 的真实执行) ----
+production.post("/keyframes/:id/repair", async (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    const b = await body(c, z.object({ kind: z.string().min(1), note: z.string().optional() }));
+    return c.json(scheduleLocalRepair(s, { keyframeId: c.req.param("id"), kind: b.kind, actor: a.user.id, note: b.note }), 202);
+});
+production.post("/keyframes/:id/repair/accept", (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    return c.json(acceptLocalRepair(s, c.req.param("id"), a.user.id));
+});
+production.get("/repairStrategies/:kind", (c) => c.json(repairDirective(c.req.param("kind"))));

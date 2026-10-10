@@ -48,14 +48,19 @@ export function linkWorkspaceProject(workspaceId: string, directory: string, nam
 }
 
 export function enqueueWorkspaceMedia(input: {
-  workspaceId: string;
-  userId: string;
-  projectId: string;
-  directory: string;
-  kind: "image" | "video";
-  request: { providerId: string; modelId: string; prompt: string; [key: string]: unknown };
-  requestId: string;
-  production?: ReturnType<typeof prepareWorkspaceShot>;
+    workspaceId: string;
+    userId: string;
+    projectId: string;
+    directory: string;
+    kind: "image" | "video";
+    request: { providerId: string; modelId: string; prompt: string; negativePrompt?: string; seed?: number; [key: string]: unknown };
+    /** 固定随机种子：同一镜头可复现同机位变体，便于只改单要素做对照。 */
+    seed?: number;
+    /** 抽卡候选批次：任务完成后本批产物自动入池，供评分与采用。 */
+    candidateBatchId?: string;
+    negativePrompt?: string;
+    requestId: string;
+    production?: ReturnType<typeof prepareWorkspaceShot>;
 }) {
   const modelId =
     "workspace" +
@@ -81,7 +86,9 @@ export function enqueueWorkspaceMedia(input: {
     targetId: input.production?.shotId,
     modelId,
     compiledPrompt: prompt,
-    parameters: { directory: input.directory, request: { ...input.request, prompt }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}) },
+    negativePrompt: input.negativePrompt ?? (input.production ? input.request.negativePrompt : undefined),
+    parameters: { directory: input.directory, request: { ...input.request, prompt }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
+    seed: input.seed,
     inputRefs: input.production?.compiled.inputs ?? [],
     fallbackAllowed: false,
     idempotencyKey: "workspaceMedia:" + input.requestId,

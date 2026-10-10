@@ -8,6 +8,25 @@ export const ASSET_TYPES = ["Character", "Wardrobe", "Environment", "Prop", "Pro
 export const LOCK_LEVELS = ["LOCK", "CONTROL", "ALLOW", "RANDOM"] as const;
 export const NARRATIVE_FUNCTIONS = ["Establish", "Reveal", "Reaction", "Contrast", "Transition", "Match", "Rhythm"] as const;
 
+/**
+ * 中性气质标签（骨皮形神的可执行化）。
+ * 每维两极，只描述观感与节奏，不指向性别、年龄、职业或族群；
+ * 用途是检索、去重与快速锁定方向，不作为生成时的强制条件。
+ */
+export const PERSONA_AXES = ["bearing", "gaze", "focus", "rapport"] as const;
+export const PERSONA_POLES = ["poised", "liveliness", "striking", "enduring", "focused", "relaxed", "distant", "familiar"] as const;
+export const personaTagSchema = z.object({
+    bearing: z.enum(["poised", "liveliness"]).optional(),
+    gaze: z.enum(["striking", "enduring"]).optional(),
+    focus: z.enum(["focused", "relaxed"]).optional(),
+    rapport: z.enum(["distant", "familiar"]).optional(),
+}).strict();
+export type PersonaTags = z.infer<typeof personaTagSchema>;
+
+/** 观测到的可信度硬伤；用于候选排序，不作为审美判断。 */
+export const personaDefectSignals = ["anatomy", "identity", "material", "composition"] as const;
+
+
 export const worldSchema = z.object({
     era: z.string().default(""), locationLogic: z.string().default(""), architecture: z.string().default(""), culture: z.string().default(""),
     weather: z.string().default(""), time: z.string().default(""), material: z.string().default(""), physics: z.string().default("real-world"),
@@ -25,6 +44,8 @@ export const assetInput = z.object({
     type: z.enum(ASSET_TYPES), name: z.string().min(1).max(120),
     description: z.string().default(""),
     attributes: z.record(z.any()).default({}), // type-specific: faceGeometry, bodyProportion, layout, geometry, fabric ...
+    /** 中性气质标签；仅用于检索去重，不强制写入生成提示词。 */
+    personaTags: personaTagSchema.optional(),
     references: z.array(z.string()).default([]), // reference ids
     invariants: z.array(z.string()).default([]),
     allowedVariations: z.array(z.string()).default([]),

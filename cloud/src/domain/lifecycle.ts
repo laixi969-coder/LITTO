@@ -8,6 +8,8 @@ import { enqueue, estimate } from "../jobs.ts";
 import { mustRoute, resolvePolicy, type Policy } from "../providers/router.ts";
 import { mediaView } from "../storage.ts";
 import { requireReviewed } from "./realism.ts";
+import { registerCandidates } from "./candidates.ts";
+import { log } from "../util.ts";
 
 /** Job success → materialise domain objects. Nothing is overwritten: every output is a new Keyframe variant or Take candidate. */
 export function onJobSucceeded(s: Scope, job: any, mediaIds: string[]) {
@@ -23,9 +25,18 @@ export function onJobSucceeded(s: Scope, job: any, mediaIds: string[]) {
         for (const m of mediaIds) s.insert("takes", { project_id: job.projectId, shot_id: shot.id, job_id: job.id, media_id: m, keyframe_id: kfId ?? null, status: "candidate", meta });
         s.update("shots", shot.id, { status: shot.approvedTakeId ? shot.status : "taking" });
     }
+    // 抽卡入池：本批产物自动登记为候选，等待质检与采用；否则抽卡结果无法回本。
+    const batchId = job.parameters?.candidateBatchId;
+    if (batchId) {
+        try {
+            registerCandidates(s, batchId, mediaIds, { jobId: job.id, seed: job.seed, modelId: job.modelId });
+        } catch (e) {
+            log.error("candidate registration failed", (e as Error).message);
+        }
+    }
 }
 
-type GenOpts = { count?: number; policy?: Policy; idempotencyKey?: string; repair?: { addLock?: string[]; note?: string }; seed?: number };
+type GenOpts = { count?: number; policy?: Policy; idempotencyKey?: string; repair?: { addLock?: string[]; note?: string }; seed?: number; candidateBatchId?: string; assetId?: string };
 
 const sizeOf = (shot: any, kind: "image" | "video") => {
     const portrait = shot.camera?.aspect === "9:16";
@@ -40,7 +51,7 @@ export function generateKeyframes(s: Scope, shotId: string, actor: string, o: Ge
     const { chosen } = mustRoute({ kind: "image", workspaceId: s.workspaceId, projectId: shot.projectId, roles: bindings.map((b: any) => b.role), policy });
     const c = compileShot(s, shotId, "image", chosen!.modelId, { repair: o.repair });
     requireCompiledInputs(c);
-    const job = enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "image", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "image"), count: o.count ?? 3 }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey, label: `KEYFRAME · shot ${shot.ord + 1}`, seed: o.seed });
+    const job = enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "image", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "image"), count: o.count ?? 3, ...(o.candidateBatchId ? { candidateBatchId: o.candidateBatchId } : {}) }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey, label: `KEYFRAME · shot ${shot.ord + 1}`, seed: o.seed });
     return { job, degradations: [...chosen!.degradations, ...c.degradations], warnings: c.warnings, compiled: { prompt: c.prompt, freedomMap: c.freedomMap, inputs: c.inputs.map((i) => ({ role: i.role, sent: i.sent, weight: i.weight })) } };
 }
 
@@ -85,7 +96,7 @@ export function generateTakes(s: Scope, shotId: string, actor: string, o: GenOpt
     if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
     const jobs = [];
     const n = o.count ?? 2;
-    for (let i = 0; i < n; i++) jobs.push(enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "video", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "video"), duration: shot.generationDuration ?? shot.duration ?? 4, keyframeId: kf.id, count: 1 }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey ? `${o.idempotencyKey}:${i}` : undefined, label: `TAKE ${i + 1} · shot ${shot.ord + 1}`, seed: o.seed ? o.seed + i : undefined }));
+    for (let i = 0; i < n; i++) jobs.push(enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "video", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "video"), duration: shot.generationDuration ?? shot.duration ?? 4, keyframeId: kf.id, count: 1, ...(o.candidateBatchId ? { candidateBatchId: o.candidateBatchId } : {}) }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: policy.allowFallback !== false, idempotencyKey: o.idempotencyKey ? `${o.idempotencyKey}:${i}` : undefined, label: `TAKE ${i + 1} · shot ${shot.ord + 1}`, seed: o.seed ? o.seed + i : undefined }));
     return { jobs, degradations: [...chosen!.degradations, ...c.degradations], warnings: c.warnings };
 }
 

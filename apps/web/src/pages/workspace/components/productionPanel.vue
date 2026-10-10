@@ -20,9 +20,24 @@
             <label>名称<input v-model="asset.name" /></label>
             <label>几何、肤质、材质与空间说明<textarea v-model="asset.description" /></label>
             <label>不可改变的特征（每行一项）<textarea v-model="asset.invariants" /></label>
+            <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="asset.personaTags[axis.key]"><option value="">未指定</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
           </div>
+          <p class="reviewHint">气质标签仅用于角色库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
           <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
-          <ul class="assetList"><li v-for="item in assets" :key="item.id"><button type="button" @click="run(() => editAsset(item))">编辑与历史</button><span>{{ item.name }} · v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</span><button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button></li></ul><ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
+          <ul class="assetList"><li v-for="item in assets" :key="item.id"><button type="button" @click="run(() => editAsset(item))">编辑与历史</button><span>{{ item.name }} · v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}<template v-if="hasPersonaTags(item.personaTags)"> · {{ personaSummary(item.personaTags) }}</template></span><button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button><button v-else-if="!librarySourceIds.has(item.id)" type="button" @click="run(() => publishAsset(item.id))">入池角色库</button></li></ul><ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
+          <h3>角色库（跨项目复用）</h3>
+          <p class="reviewHint">已采用且选出定妆参考图的资产可入池；新项目导入后继承同一张脸，避免跨项目崩脸。</p>
+          <div class="fieldGrid">
+            <label>类型<select v-model="libraryFilter.type"><option value="">全部</option><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
+            <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="libraryFilter[axis.key]"><option value="">不限</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
+          </div>
+          <button type="button" @click="run(searchLibraryAssets)">检索角色库</button>
+          <ul class="libraryList"><li v-for="entry in libraryAssets" :key="entry.id">
+            <figure v-if="entry.media"><img :src="mediaUrl(entry.media.url)" :alt="entry.name" /></figure>
+            <div class="libraryMeta"><strong>{{ entry.name }}</strong><span>{{ assetTypeLabel(entry.type) }} · 复用 {{ entry.reuseCount }} 次<template v-if="hasPersonaTags(entry.personaTags)"> · {{ personaSummary(entry.personaTags) }}</template></span><small>{{ entry.description }}</small></div>
+            <button type="button" @click="run(() => importLibraryAsset(entry))">导入本项目</button>
+          </li></ul>
+          <p v-if="librarySearched && !libraryAssets.length" class="reviewHint">角色库暂无匹配资产。</p>
         </template>
         <template v-else-if="section !== 'edit'">
           <div class="shotNavigation">
@@ -93,6 +108,9 @@
               <p v-for="item in preview.compiled.degradations" :key="item.role" class="attention">{{ item.role }}：{{ item.strategy }}</p>
               <div class="sentReferences"><figure v-for="item in compiledMedia" :key="item.id"><img v-if="item.mime.startsWith('image/')" :src="mediaUrl(item.url)" :alt="item.role + ' 实际发送参考'" /><video v-else-if="item.mime.startsWith('video/')" :src="mediaUrl(item.url)" controls preload="metadata" /><audio v-else :src="mediaUrl(item.url)" controls /><figcaption>{{ item.role }} · {{ item.id }}</figcaption></figure></div>
               <details><summary>查看实际发送的镜头规格与参考</summary><pre>{{ preview.compiled.prompt }}</pre></details>
+              <label><input v-model="asBatch" type="checkbox" />本次生成登记为抽卡批次，完成后在「检查与采用」页对比并选出定妆图</label>
+              <label v-if="asBatch && candidateBatches.length">加入已有批次<select v-model="batchId"><option value="">新建批次</option><option v-for="item in candidateBatches" :key="item.id" :value="item.id">{{ item.kind === 'image' ? '关键帧' : '视频' }}批次 · {{ item.count }} 张 · {{ item.id.slice(-5) }}</option></select></label>
+              <label v-if="asBatch && draft.assetIds?.length && !batchId">绑定资产（选出后成为该资产定妆参考）<select v-model="batchAssetId"><option value="">不绑定</option><option v-for="item in shotAssets" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
               <p>供应商费用未知，按你接入的模型实际计费。提交后可在下方停止。</p>
               <button type="button" @click="run(generate)">提交一次生成</button>
             </div>
@@ -123,6 +141,22 @@
               <button v-if="observation" type="button" :disabled="!reviewNote.trim()" @click="run(saveReview)">记录问题</button>
               <button v-else type="button" :disabled="!reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && !fullPlayback)" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "完整看过，批准此 Take" }}</button>
               <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="finding in report.findings" :key="finding.kind">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
+            </template>
+            <template v-if="candidatePool.length">
+              <h3>抽卡批次对比</h3>
+              <p class="reviewHint">同一批提示词的产物并排比较：打分后选出定妆图，后续镜头默认沿用该参考，抽卡成本才回得来。</p>
+              <div class="candidateGrid">
+                <figure v-for="item in candidatePool" :key="item.id" :class="{ promoted: item.status === 'promoted' }">
+                  <img v-if="item.media?.mime.startsWith('image/')" :src="mediaUrl(item.media.url)" :alt="`候选 ${item.id.slice(-5)}`" />
+                  <video v-else-if="item.media?.mime.startsWith('video/')" :src="mediaUrl(item.media.url)" controls preload="metadata" />
+                  <figcaption>{{ item.id.slice(-5) }} · {{ statusLabel(item.status) }}<template v-if="item.scores?.overall != null"> · {{ item.scores.overall }} 分</template></figcaption>
+                  <div class="candidateActions">
+                    <input v-model.number="candidateScores[item.id]" type="number" min="0" max="100" placeholder="分" :disabled="item.status === 'promoted'" />
+                    <button type="button" :disabled="item.status === 'promoted' || candidateScores[item.id] == null" @click="run(() => scoreOne(item))">打分</button>
+                    <button type="button" :disabled="item.status === 'promoted'" @click="run(() => promoteOne(item))">采用为定妆图</button>
+                  </div>
+                </figure>
+              </div>
             </template>
           </template>
         </template>
@@ -159,12 +193,28 @@ const blockingFields = [["foreground", "前景"], ["midground", "人物走位与
 const realismFields = [["surface", "表面材质", "逐项说明皮肤、头发、布料或物体的纹理与反光，避免统一磨皮。"], ["imaging", "成像", "曝光、高光、暗部、焦平面与光学表现。"], ["world", "空间与物理", "比例、接触、遮挡与物体恒常。"], ["motion", "运动", "动作起止、重心、受力、惯性与次级运动；视频必填。"], ["cinematic", "电影语言", "表演、调度、镜头职责与剪辑衔接。"]];
 const functions = [["Establish", "建立"], ["Reveal", "揭示"], ["Reaction", "反应"], ["Contrast", "对比"], ["Transition", "过渡"], ["Match", "匹配"], ["Rhythm", "节奏"]];
 const assetTypes = [["Character", "人物"], ["Environment", "场景"], ["Wardrobe", "服装"], ["Prop", "道具"], ["Product", "产品"], ["Vehicle", "车辆"]];
+const personaAxes = [
+  { key: "bearing", label: "气质", poles: [["poised", "沉稳"], ["liveliness", "灵动"]] },
+  { key: "gaze", label: "观感", poles: [["striking", "抓眼"], ["enduring", "耐看"]] },
+  { key: "focus", label: "状态", poles: [["focused", "聚焦"], ["relaxed", "松弛"]] },
+  { key: "rapport", label: "距离", poles: [["distant", "疏远"], ["familiar", "亲近"]] },
+] as const;
+const personaLabel: Record<string, string> = { poised: "沉稳", liveliness: "灵动", striking: "抓眼", enduring: "耐看", focused: "聚焦", relaxed: "松弛", distant: "疏远", familiar: "亲近" };
+const hasPersonaTags = (tags: any) => !!tags && Object.values(tags).some(Boolean);
+const personaSummary = (tags: any) => Object.values(tags ?? {}).filter(Boolean).map(v => personaLabel[v as string] ?? v).join(" / ");
+const assetTypeLabel = (type: string) => assetTypes.find(item => item[0] === type)?.[1] ?? type;
+const libraryAssets = ref<any[]>([]), librarySearched = ref(false), librarySourceIds = ref(new Set<string>());
+const libraryFilter = ref<Record<string, string>>({ type: "Character", bearing: "", gaze: "", focus: "", rapport: "" });
+const asBatch = ref(false), batchId = ref(""), batchAssetId = ref(""), candidateBatches = ref<any[]>([]);
+const candidatePool = ref<any[]>([]), candidateScores = ref<Record<string, number | null>>({});
+const statusLabel = (status: string) => ({ candidate: "待评", promoted: "已采用", rejected: "落选" }[status] ?? status);
 const roles = [["IDENTITY", "身份"], ["GEOMETRY", "几何"], ["WARDROBE", "服装"], ["ENVIRONMENT", "场景"], ["COMPOSITION", "构图"], ["LIGHTING", "光线"], ["LOOK", "影调"], ["END_FRAME", "尾帧"], ["PERFORMANCE", "表演视频"], ["CAMERA_MOTION", "运镜视频"], ["AUDIO", "音频"]];
 const observationKinds = [["anatomy_failure", "多肢、身体结构或遮挡错误"], ["wardrobe_drift", "服装或商品形状漂移"], ["plastic_surface", "塑料材质或磨皮"], ["imaging_failure", "曝光或光学不可信"], ["temporal_drift", "视频身份或材质漂移"], ["performance_failure", "表演或运镜不可信"], ["motion_physics", "动作受力或接触错误"], ["scene_structure", "场景结构错误"], ["identity_drift", "身份漂移"], ["hand_artifact", "手部错误"], ["face_artifact", "面部错误"], ["color_shift", "色差"]];
 const world = ref<Record<string, any>>({}), look = ref<Record<string, any>>({}), worldDirty = ref(false);
 const assets = ref<any[]>([]), shots = ref<any[]>([]), sequences = ref<any[]>([]), references = ref<any[]>([]);
 const editingAsset = ref(""), assetVersions = ref<any[]>([]);
-const asset = ref({ type: "Character", name: "", description: "", invariants: "" });
+const emptyPersona = () => ({ bearing: "", gaze: "", focus: "", rapport: "" });
+const asset = ref({ type: "Character", name: "", description: "", invariants: "", personaTags: emptyPersona() });
 let savedAsset = JSON.stringify(asset.value);
 let pendingRequestId = "";
 const binding = ref({ referenceId: "", role: "IDENTITY", lockLevel: "LOCK", weight: 1 });
@@ -226,6 +276,7 @@ async function load() {
   const languageResponse = await fetch("/api/ai/models", { signal: controller.signal });
   if (!languageResponse.ok) throw new Error("检查模型列表读取失败");
   visualModels.value = (await languageResponse.json()).data;
+  await refreshLibrarySources().catch(() => {});
   await refreshJobs();
 }
 let loaded = false;
@@ -243,16 +294,18 @@ async function saveWorld() {
   await request(`/projects/${projectId}/looks/project`, "PUT", look.value);
   worldDirty.value = false; preview.value = null; message.value = "世界与影调已保存";
 }
-function clearAsset() { editingAsset.value = ""; assetVersions.value = []; asset.value = { type: "Character", name: "", description: "", invariants: "" }; savedAsset = JSON.stringify(asset.value); }
+function clearAsset() { editingAsset.value = ""; assetVersions.value = []; asset.value = { type: "Character", name: "", description: "", invariants: "", personaTags: emptyPersona() }; savedAsset = JSON.stringify(asset.value); }
 async function editAsset(item: any) {
   if (JSON.stringify(asset.value) !== savedAsset) throw new Error("请先保存当前资产，再切换编辑对象");
   const value = await request(`/assets/${item.id}`); editingAsset.value = item.id; assetVersions.value = value.versions;
-  asset.value = { type: value.type, name: value.name, description: value.description, invariants: value.invariants.join("\n") };
+  asset.value = { type: value.type, name: value.name, description: value.description, invariants: value.invariants.join("\n"), personaTags: { ...emptyPersona(), ...(value.personaTags ?? {}) } };
   savedAsset = JSON.stringify(asset.value);
 }
+const personaPayload = (tags: Record<string, string>) => Object.fromEntries(Object.entries(tags).filter(([, v]) => v));
 async function createAsset() {
   if (editingAsset.value) await ElMessageBox.confirm("将建立新的资产版本，已采用镜头需重新检查。历史版本保留。", "建立版本", { confirmButtonText: "建立", cancelButtonText: "取消" });
-  const item = await request(editingAsset.value ? `/assets/${editingAsset.value}/versions` : `/projects/${projectId}/assets`, "POST", { ...asset.value, invariants: asset.value.invariants.split(/\n/).map(value => value.trim()).filter(Boolean) });
+  const tags = personaPayload(asset.value.personaTags);
+  const item = await request(editingAsset.value ? `/assets/${editingAsset.value}/versions` : `/projects/${projectId}/assets`, "POST", { ...asset.value, invariants: asset.value.invariants.split(/\n/).map(value => value.trim()).filter(Boolean), ...(Object.keys(tags).length ? { personaTags: tags } : {}) });
   assets.value = editingAsset.value ? assets.value.map(value => value.id === item.id ? item : value) : [...assets.value, item]; clearAsset();
 }
 async function rollbackAsset(version: number) {
@@ -263,6 +316,26 @@ async function approveAsset(id: string) {
   await ElMessageBox.confirm("批准后这些特征将作为生成约束。请确认资产说明已核对。", "批准资产", { confirmButtonText: "批准", cancelButtonText: "取消" });
   const item = await request(`/assets/${id}/approve`, "POST", {});
   assets.value = assets.value.map(asset => asset.id === id ? item : asset);
+}
+async function publishAsset(id: string) {
+  const entry = await request(`/library/assets/${id}/publish`, "POST", {});
+  await refreshLibrarySources();
+  message.value = `已入池角色库：${entry.name}`;
+}
+async function searchLibraryAssets() {
+  const params = new URLSearchParams(Object.entries(libraryFilter.value).filter(([, v]) => v));
+  const rows = await request(`/library/assets${params.size ? "?" + params : ""}`);
+  libraryAssets.value = rows; librarySearched.value = true;
+}
+async function refreshLibrarySources() {
+  const rows = await request("/library/assets");
+  librarySourceIds.value = new Set(rows.map((row: any) => row.sourceAssetId).filter(Boolean));
+}
+async function importLibraryAsset(entry: any) {
+  const created = await request(`/projects/${projectId}/library/import/${entry.id}`, "POST", {});
+  assets.value = [...assets.value, created];
+  entry.reuseCount += 1;
+  message.value = `已导入：${created.name}（继承定妆参考）`;
 }
 async function saveShot() {
   if (!draft.value || !dirty.value) return;
@@ -285,6 +358,27 @@ async function selectShot(id: string) {
   generateAudio.value = draft.value.musicVideo?.audioMode === "generated";
   selectPendingVersion();
   void refreshJobs().catch(() => {});
+  await refreshCandidatePool();
+}
+async function refreshCandidatePool() {
+  candidateBatches.value = await request(`/projects/${projectId}/candidateBatches`);
+  const shotBatch = [...candidateBatches.value].reverse().find(item => item.shotId === shotId.value);
+  if (!shotBatch) { candidatePool.value = []; candidateScores.value = {}; return; }
+  batchId.value = shotBatch.id;
+  candidatePool.value = await request(`/candidateBatches/${shotBatch.id}/candidates`);
+  candidateScores.value = Object.fromEntries(candidatePool.value.map(item => [item.id, item.scores?.overall ?? null]));
+}
+async function scoreOne(item: any) {
+  const overall = candidateScores.value[item.id];
+  if (overall == null) return;
+  await request(`/candidates/${item.id}/score`, "POST", { scores: { overall } });
+  message.value = "已记录评分";
+}
+async function promoteOne(item: any) {
+  await ElMessageBox.confirm("采用后，该候选将成为绑定资产的定妆参考，后续镜头默认沿用。同批其余候选标记落选。", "采用定妆图", { confirmButtonText: "采用", cancelButtonText: "取消" });
+  const result = await request(`/candidates/${item.id}/promote`, "POST", {});
+  await refreshCandidatePool();
+  message.value = result.heroKeyframeId ? "已采用并同步为主关键帧" : "已采用为资产定妆参考";
 }
 async function createShot() {
   await saveShot();
@@ -327,12 +421,22 @@ async function loadTrajectory(event: Event) {
   cameraTrajectory.value = trajectory;
   input.value = "";
 }
-async function production(requestId?: string) {
-  const response = await fetch("/api/ai/media/production", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory: props.directory, shotId: shotId.value, kind: kind.value, request: generationRequest(), requestId, fingerprint: preview.value?.fingerprint }) });
+async function production(requestId?: string, candidateBatchId?: string) {
+  const response = await fetch("/api/ai/media/production", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory: props.directory, shotId: shotId.value, kind: kind.value, request: generationRequest(), requestId, fingerprint: preview.value?.fingerprint, ...(candidateBatchId ? { candidateBatchId } : {}) }) });
   const result = await response.json(); if (!response.ok) throw new Error(result.message || "镜头生成失败"); return result.data;
 }
 async function compile() { if (kind.value === "video" && draft.value.generationDuration !== duration.value) { draft.value.generationDuration = duration.value; dirty.value = true; } await saveShot(); if (worldDirty.value) await saveWorld(); preview.value = await production(); compiledMedia.value = await Promise.all(preview.value.compiled.inputs.filter((item: any) => item.sent && item.mediaId).map(async (item: any) => ({ ...await request(`/media/${item.mediaId}`), role: item.role }))); pendingRequestId = ""; }
-async function generate() { pendingRequestId ||= crypto.randomUUID(); await production(pendingRequestId); pendingRequestId = ""; preview.value = null; message.value = "生成任务已提交"; await refreshJobs(); }
+async function generate() {
+  pendingRequestId ||= crypto.randomUUID();
+  let candidateBatchId = batchId.value || undefined;
+  if (asBatch.value && !candidateBatchId) {
+    const batch = await request(`/projects/${projectId}/candidateBatches`, "POST", { kind: kind.value, promptFingerprint: preview.value?.fingerprint ?? crypto.randomUUID(), shotId: shotId.value, ...(batchAssetId.value ? { assetId: batchAssetId.value } : {}) });
+    candidateBatchId = batch.id;
+  }
+  await production(pendingRequestId, candidateBatchId); pendingRequestId = ""; preview.value = null; message.value = "生成任务已提交";
+  asBatch.value = false; batchAssetId.value = "";
+  await refreshJobs();
+}
 // 助手或画布在别处发起的任务也要跟上：任务出现或状态变化时刷新当前镜头，几秒内跑完的任务也不会漏。
 let jobSignature = "";
 async function refreshJobs() {
@@ -456,6 +560,8 @@ defineExpose({ flushSave, openShot });
   .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
   .checkList { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; label { flex-direction: row; align-items: center; } input { width: 20px; min-height: 20px; } }
   .assetList, .jobList { padding: 0; list-style: none; li { padding: 12px 0; border-bottom: 1px solid var(--studioBorder); display: flex; justify-content: space-between; gap: 16px; } small { display: block; } }
+  .libraryList { padding: 0; list-style: none; li { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--studioBorder); } figure { width: 64px; flex: none; margin: 0; img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--ui-radius); } } .libraryMeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; small { color: var(--studioMuted); } } button { flex: none; } }
+  .candidateGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 12px; figure { margin: 0; border: 1px solid var(--studioBorder); border-radius: var(--ui-radius); padding: 8px; img, video { width: 100%; max-height: 220px; object-fit: contain; background: var(--studioRail); } &.promoted { border-color: var(--studioDone); border-width: 2px; } figcaption { font-size: 12px; margin: 8px 0; } .candidateActions { display: flex; gap: 8px; align-items: center; input { width: 64px; flex: none; min-height: 36px; } button { min-height: 36px; padding: 4px 10px; font-size: 12px; flex: none; } } } }
   .sentReferences { display: flex; flex-wrap: wrap; gap: 12px; figure { width: 180px; margin: 0; img, video, audio { width: 100%; max-height: 180px; object-fit: contain; } figcaption { overflow-wrap: anywhere; font-size: 12px; } } }
   .outputPreview { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--studioRail); margin: 16px 0; }
   .generationPreview, .reviewReport { padding: 16px 0; border-top: 1px solid var(--studioBorder); margin-top: 16px; }

@@ -31,13 +31,22 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const projectId = workspaceProject(directory)!;
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
   if (production && request.productionFingerprint !== production.fingerprint) throw Object.assign(new Error("镜头规格须先预览；请重新编译后提交"), { status: 409 });
+  // 负面词与种子走独立字段，不拼进提示词正文：拼接后模型只会当作要绘制的文字内容。
+  const compiled = production?.compiled;
+  const merged = {
+    ...request,
+    ...(production ? { prompt: compiled!.prompt } : {}),
+    ...(compiled?.negativePrompt ? { negativePrompt: compiled!.negativePrompt } : {}),
+  };
+  const seed = request.seed ?? compiled?.seed;
   return api.enqueueWorkspaceMedia({
     workspaceId: tenant.workspaceId,
     userId: tenant.userId,
     projectId,
     directory,
     kind,
-    request: { ...request, ...(production ? { prompt: production.compiled.prompt + (production.compiled.negativePrompt ? "\nAVOID: " + production.compiled.negativePrompt : "") } : {}) },
+    request: merged,
+    seed,
     requestId,
     production,
   });
@@ -86,7 +95,12 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
           else request.images.push(file);
         }
       }
-      const files = await generateMediaDirect(directory, input.kind as "image" | "video", request, input.signal);
+      const files = await generateMediaDirect(directory, input.kind as "image" | "video", {
+        ...request,
+        // 任务记录中的负面词与种子优先；镜头编译产出的负面词不能因路径不同而丢失。
+        ...(input.negativePrompt ? { negativePrompt: input.negativePrompt } : {}),
+        ...(input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
+      }, input.signal);
       const outputs = [];
       for (const file of files) {
         const { path } = await resolveWorkspacePath(directory, file.path);

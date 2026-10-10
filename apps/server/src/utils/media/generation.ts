@@ -197,9 +197,10 @@ async function generateMediaUnrecorded(
       voice: request.voice, instructions: request.instructions, speed: request.speed, volume: request.volume, format: request.format, sampleRate: request.sampleRate,
     })
     : mediaType === "image"
-    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, images, ratio: request.ratio, size: request.size })
+    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, negativePrompt: request.negativePrompt, seed: request.seed, images, ratio: request.ratio, size: request.size })
     : await runCameraSession(provider, () => provider.generateVideo!({
-      model: request.modelId, prompt: request.prompt, images,
+      model: request.modelId, prompt: request.prompt, negativePrompt: request.negativePrompt, seed: request.seed,
+      images,
       videos, audios, firstFrame, lastFrame,
       ratio: request.ratio, resolution: request.resolution, duration: request.duration,
       generateAudio: request.generateAudio, mode: request.mode,

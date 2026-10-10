@@ -106,6 +106,10 @@ interface ProviderTools {
 
 interface ImageRequest extends MediaRequest {
   prompt: string;
+  /** 排除性描述；不支持的供应商须在生成说明中声明未生效，不得静默丢弃。 */
+  negativePrompt?: string;
+  /** 固定随机种子，用于同机位变体对照与可复现生成。 */
+  seed?: number;
   /** 参考图。 */
   images?: MediaInput[];
   mask?: MediaInput;
@@ -125,6 +129,10 @@ interface VideoRequest extends MediaRequest {
   cameraTrajectory?: CameraTrajectorySpec;
   imageAndCameraOnly?: boolean;
   prompt: string;
+  /** 排除性描述；不支持的供应商须在生成说明中声明未生效，不得静默丢弃。 */
+  negativePrompt?: string;
+  /** 固定随机种子，用于同机位变体对照与可复现生成。 */
+  seed?: number;
   /** 当前生成模式；参考模式数组声明各类参考媒体数量上限。 */
   mode?: VideoMode;
   /** 参考图；首尾帧通过 firstFrame、lastFrame 单独传入。 */

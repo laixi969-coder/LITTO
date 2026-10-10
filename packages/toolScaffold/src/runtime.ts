@@ -117,6 +117,10 @@ export interface MediaGenerationRequest {
   providerId: string;
   modelId: string;
   prompt: string;
+  /** 排除性描述；供应商不支持时如实降级，不假装已生效。 */
+  negativePrompt?: string;
+  /** 固定随机种子；同种子同参数可复现，用于同机位变体对照。 */
+  seed?: number;
   outputDirectory?: string;
   images?: MediaReference[];
   videos?: MediaReference[];
