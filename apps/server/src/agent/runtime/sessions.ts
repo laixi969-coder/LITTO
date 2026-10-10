@@ -60,7 +60,7 @@ export function trackAgentEvent(cwd: string, file: string | undefined, event: Ag
   if (!file || event.type !== "question") return;
   const active = getActiveAgentSession(resolve(cwd, ".agent/sessions", file));
   const tool = active?.tools.get(event.toolCallId);
-  if (tool) tool.question = { callId: event.callId, title: event.title, question: event.question, options: event.options, fields: event.fields };
+  if (tool) tool.question = { callId: event.callId, title: event.title, question: event.question, options: event.options, fields: event.fields, images: event.images, media: event.media };
 }
 
 export function registerAgentSession(path: string, active: ActiveAgentSession) {

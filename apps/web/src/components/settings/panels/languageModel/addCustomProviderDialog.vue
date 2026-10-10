@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="provider ? '编辑供应商' : '添加自定义供应商'"
+    :title="provider ? '编辑供应商' : '添加供应商'"
     width="min(760px, 94vw)"
     alignCenter
     appendToBody
@@ -13,72 +13,77 @@
     <el-scrollbar maxHeight="65vh">
       <el-form ref="providerForm" :model="form" :rules="rules" labelPosition="top" :disabled="saving" class="customProviderForm">
         <div class="formGrid">
-          <el-form-item label="Provider ID" prop="id"><el-input v-model="form.id" placeholder="例如 myProvider" /></el-form-item>
-          <el-form-item label="显示名称" prop="label"><el-input v-model="form.label" placeholder="供应商的显示名称" /></el-form-item>
-          <el-form-item label="API 地址" prop="apiUrl"><el-input v-model="form.apiUrl" dir="ltr" placeholder="https://api.example.com/v1" /></el-form-item>
-          <el-form-item label="API 协议" prop="protocol">
-            <el-select v-model="form.protocol" aria-label="API 协议">
-              <el-option v-for="protocol in protocols" :key="protocol" :label="protocol" :value="protocol" />
-            </el-select>
-          </el-form-item>
+          <el-form-item label="供应商名称" prop="label"><el-input v-model="form.label" aria-label="供应商名称" placeholder="例如 我的模型服务" /></el-form-item>
+          <el-form-item label="供应商 ID（可自动生成）" prop="id"><el-input v-model="form.id" aria-label="供应商 ID" placeholder="留空自动生成，例如 myProvider" /></el-form-item>
         </div>
-        <el-form-item label="API 密钥" prop="apiKey">
-          <el-input v-model="form.apiKey" type="password" dir="ltr" showPassword autocomplete="off" placeholder="本地无鉴权服务可留空" />
+        <el-form-item label="Base URL" prop="apiUrl"><el-input v-model="form.apiUrl" dir="ltr" aria-label="Base URL" placeholder="https://api.example.com/v1" /></el-form-item>
+        <el-form-item label="API Key" prop="apiKey">
+          <el-input v-model="form.apiKey" type="password" dir="ltr" showPassword autocomplete="off" aria-label="API Key" placeholder="本地无鉴权服务可留空" />
         </el-form-item>
-        <div class="modelHeader">
-          <el-text tag="strong">模型列表</el-text>
-          <el-button :icon="IconDownload" :loading="fetching" @click="fetchModels()">同步并选择模型</el-button>
-        </div>
-        <div class="modelList">
-          <div v-for="item in models" :key="item.key" class="modelItem">
-            <div class="modelRow">
-              <el-input v-model="item.id" placeholder="模型 ID" aria-label="模型 ID" />
-              <el-input v-model="item.label" placeholder="显示名称" aria-label="模型显示名称" />
-              <el-button
-                text
-                :icon="expandedModels.has(item.key) ? IconChevronUp : IconChevronDown"
-                :aria-expanded="expandedModels.has(item.key)"
-                aria-label="展开 token 设置"
-                @click="expandedModels.has(item.key) ? expandedModels.delete(item.key) : expandedModels.add(item.key)" />
-              <el-button
-                text
-                type="danger"
-                :icon="IconTrash"
-                aria-label="删除模型"
-                @click="models = models.filter((model) => model.key !== item.key)" />
+        <el-text v-if="!provider" type="info" size="small">默认使用 OpenAI 兼容接口，保存时自动获取模型。</el-text>
+        <el-collapse v-model="optionsOpen">
+          <el-collapse-item title="接口类型与模型（可选）" name="models">
+            <el-form-item label="接口类型" prop="protocol">
+              <el-select v-model="form.protocol" aria-label="接口类型">
+                <el-option v-for="protocol in protocols" :key="protocol.value" :label="protocol.label" :value="protocol.value" />
+              </el-select>
+            </el-form-item>
+            <div class="modelHeader">
+              <el-text tag="strong">模型列表</el-text>
+              <el-button :icon="IconDownload" :loading="fetching" @click="fetchModels()">同步并选择模型</el-button>
             </div>
-            <div v-if="expandedModels.has(item.key)" class="formGrid tokenSettings">
-              <el-form-item label="上下文窗口">
-                <el-input-number
-                  v-model="item.contextWindow"
-                  :min="1"
-                  :max="Number.MAX_SAFE_INTEGER"
-                  :precision="0"
-                  controlsPosition="right"
-                  placeholder="未设置"
-                  aria-label="上下文窗口" />
-              </el-form-item>
-              <el-form-item label="最大输出 token">
-                <el-input-number
-                  v-model="item.maxOutputTokens"
-                  :min="1"
-                  :max="Number.MAX_SAFE_INTEGER"
-                  :precision="0"
-                  controlsPosition="right"
-                  placeholder="未设置"
-                  aria-label="最大输出 token" />
-              </el-form-item>
+            <div class="modelList">
+              <div v-for="item in models" :key="item.key" class="modelItem">
+                <div class="modelRow">
+                  <el-input v-model="item.id" placeholder="模型 ID" aria-label="模型 ID" />
+                  <el-input v-model="item.label" placeholder="显示名称" aria-label="模型显示名称" />
+                  <el-button
+                    text
+                    :icon="expandedModels.has(item.key) ? IconChevronUp : IconChevronDown"
+                    :aria-expanded="expandedModels.has(item.key)"
+                    aria-label="展开 token 设置"
+                    @click="expandedModels.has(item.key) ? expandedModels.delete(item.key) : expandedModels.add(item.key)" />
+                  <el-button
+                    text
+                    type="danger"
+                    :icon="IconTrash"
+                    aria-label="删除模型"
+                    @click="models = models.filter((model) => model.key !== item.key)" />
+                </div>
+                <div v-if="expandedModels.has(item.key)" class="formGrid tokenSettings">
+                  <el-form-item label="上下文窗口">
+                    <el-input-number
+                      v-model="item.contextWindow"
+                      :min="1"
+                      :max="Number.MAX_SAFE_INTEGER"
+                      :precision="0"
+                      controlsPosition="right"
+                      placeholder="未设置"
+                      aria-label="上下文窗口" />
+                  </el-form-item>
+                  <el-form-item label="最大输出 token">
+                    <el-input-number
+                      v-model="item.maxOutputTokens"
+                      :min="1"
+                      :max="Number.MAX_SAFE_INTEGER"
+                      :precision="0"
+                      controlsPosition="right"
+                      placeholder="未设置"
+                      aria-label="最大输出 token" />
+                  </el-form-item>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <el-button class="manualAdd" :icon="IconPlus" @click="addManualModel">手动添加模型</el-button>
+            <el-button class="manualAdd" :icon="IconPlus" @click="addManualModel">手动添加模型</el-button>
+          </el-collapse-item>
+        </el-collapse>
         <el-alert v-if="formError" :title="formError" type="error" :closable="false" showIcon />
       </el-form>
     </el-scrollbar>
     <template #footer>
       <el-button :disabled="saving" @click="visible = false">取消</el-button>
       <el-button type="primary" :loading="saving" :disabled="fetching" @click="addProvider">
-        {{ provider ? "保存修改" : "确定添加供应商" }}
+        {{ provider ? "保存修改" : "保存并连接" }}
       </el-button>
     </template>
   </el-dialog>
@@ -132,7 +137,12 @@ const fetchedModels = shallowRef<CustomProviderModel[]>([]);
 const selectedIds = ref(new Set<string>());
 const modelSearch = ref("");
 const saving = ref(false);
-const protocols = ["openai-completions", "openai-responses", "anthropic-messages"];
+const optionsOpen = ref<string[]>([]);
+const protocols = [
+  { value: "openai-completions", label: "OpenAI 兼容（默认）" },
+  { value: "openai-responses", label: "OpenAI Responses" },
+  { value: "anthropic-messages", label: "Anthropic Claude" },
+];
 const addedIds = computed(() => new Set(models.value.map((item) => item.id.trim())));
 const filteredModels = computed(() => {
   const query = modelSearch.value.trim().toLowerCase();
@@ -161,7 +171,6 @@ const formError = ref("");
 let request: AbortController | undefined;
 const rules: FormRules = {
   id: [
-    { required: true, message: "请输入 Provider ID", trigger: "blur" },
     { pattern: /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, message: "仅支持字母、数字、点、下划线和短横线", trigger: "blur" },
   ],
   label: [{ required: true, whitespace: true, message: "请输入显示名称", trigger: "blur" }],
@@ -201,6 +210,7 @@ watch(visible, async (value) => {
 onBeforeUnmount(() => request?.abort());
 
 function resetForm() {
+  optionsOpen.value = props.provider ? ["models"] : [];
   Object.assign(form, { id: "", label: "", apiUrl: "", protocol: "openai-completions", apiKey: "" });
   models.value = [];
   expandedModels.value = new Set();
@@ -263,6 +273,7 @@ function addManualModel() {
 async function addProvider() {
   if (fetching.value) return;
   formError.value = "";
+  form.id = form.id.trim() || `provider${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
   if (saving.value || !(await providerForm.value?.validate().catch(() => false))) return;
   const providerId = props.provider?.id;
   const ids = models.value.map((item) => item.id.trim());
@@ -280,6 +291,14 @@ async function addProvider() {
   }
   saving.value = true;
   try {
+    if (!models.value.length && !props.provider) {
+      await fetchModels(true);
+      if (!models.value.length) {
+        optionsOpen.value = ["models"];
+        formError.value = `${formError.value || "服务商未返回模型列表"}。也可以在这里手动填写模型 ID 后保存。`;
+        return;
+      }
+    }
     const updatedProvider = {
       ...props.provider,
       ...form,

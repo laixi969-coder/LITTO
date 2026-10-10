@@ -90,7 +90,6 @@ export function listBatches(s: Scope, projectId: string) {
 export function promoteCandidate(s: Scope, candidateId: string, actor: string, options: { asHero?: boolean } = {}) {
     const c = s.get("candidates", candidateId);
     if (!c) throw notFound("candidate");
-    if (c.promoted) throw conflict("候选已晋升", "candidate_promoted");
     const media = c.mediaId ? s.get("media", c.mediaId) : undefined;
     if (!media || media.projectId !== c.projectId || !media.mime.startsWith("image/")) throw bad("定妆参考须是当前项目的有效图像");
     return tx(() => {
@@ -101,6 +100,9 @@ export function promoteCandidate(s: Scope, candidateId: string, actor: string, o
             const kf = c.keyframeId ? s.get("keyframes", c.keyframeId) : undefined;
             if (!kf || kf.projectId !== c.projectId || kf.mediaId !== c.mediaId) throw bad("候选没有有效的关键帧");
             heroId = promoteHero(s, kf.id, actor).id;
+        }
+        if (c.promoted && asset.attributes?.authoritativeReference === c.mediaId) {
+            return { candidate: c, assetId: asset.id, authoritativeReference: c.mediaId, heroKeyframeId: heroId ?? null };
         }
         // references 保存参考记录 ID，媒体 ID 仅保存在 authoritativeReference。
         const reference = s.list("refs", { projectId: asset.projectId, mediaId: c.mediaId })[0]

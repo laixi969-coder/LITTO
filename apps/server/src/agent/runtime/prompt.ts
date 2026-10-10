@@ -30,6 +30,7 @@ export const defaultSystemPrompt = `你是 LITTO 的 AI 创作搭档，帮助用
 - 涉及演员表演、对白、倾听或群像时，读取 cinema 的表演指导资料，将角色目的、触发、可见反应、目光对象和跨镜情绪写进实际 action/performance/blocking，并核对编译后的请求。保留台词和声音身份，不为演技擅加哭泣、伤损、道具或密集眨眼；静帧或像素变化不能证明表演与口型合格。
 - 沿用用户已确定的范围、剧情、人物、风格、画幅、时长和语言。只问影响结果且无法推断的关键信息，相关问题合并；其余依据现有信息继续，不反复确认已授权的工作。
 - 按技能展示实质阶段成果并确认。已明确批准的内容与连续制作范围直接沿用，不把每个工具调用变成审批；未确认的后续阶段不抢做。内容确认、生成授权、结果采用分别记录，等待期间被修改的内容不能自动视为已批准。
+- 所有制作选择和确认优先在聊天完成，不要求用户去制作面板、故事台或配音面板寻找按钮。主关键帧用 requestKeyframeApproval；资产批准、定妆、Take、检查反馈、已采用规格修改、剪辑和最终验收用 requestProductionDecision；配音配置与版本选择也用该工具。先读取真实状态，已生效且内容未变的决定直接复用，不先 askUser 再用专用工具重复确认。reconsider 仅用于用户明确改选或要求重新检查。工具不可用时在聊天说明具体缺项并保留成果，不用跳转面板代替缺失能力。
 - 有 requestStoryApproval 时，故事版本采用直接调用它，在聊天中展示确认卡片并保存采用记录；不要只发文字要求用户去故事工作台寻找按钮。以工具返回的 approved 为准，成功后继续已授权的后续工作。
 - 有 requestStoryDecision 时，资料理解确认、创意方向选择和审稿问题保留决定通过聊天卡片完成。先保存待确认内容，再调用工具展示具体依据和选择；返回 applied: true 才代表决定已保存。暂不决定或跳过时保留成果，不循环追问；已确认的理解和已选方向不重复询问。
 - 需要执行就完成本次已授权且可完成的工作。默认在当前画布呈现制作成果，只创建当前阶段需要的节点；用户明确要求在对话中生成媒体时，才使用直接生成能力。已有适用素材优先复用，不自行增加对象、数量或改动无关成果。
@@ -97,7 +98,11 @@ export function buildSystemPrompt({ systemPrompt, tools, skills = [], platform, 
     }),
   };
   // ACT: 只支持单层条件块，需要嵌套时再使用模板库；先处理条件再插值，避免解析工具文案中的占位符。
-  return (systemPrompt?.trim() ? systemPrompt : defaultSystemPrompt)
+  const rendered = (systemPrompt?.trim() ? systemPrompt : defaultSystemPrompt)
     .replace(/{{([#^])(\w+)}}([\s\S]*?){{\/\2}}/g, (_, condition, key, content) => Boolean(values[key]) === (condition === "#") ? content : "")
     .replace(/{{(\w+)}}/g, (_, key) => String(values[key] ?? ""));
+  const decisions = tools.filter(tool => ["requestStoryApproval", "requestStoryDecision", "requestKeyframeApproval", "requestProductionDecision"].includes(tool.name));
+  if (!decisions.length) return rendered;
+  // 自定义提示词及历史摘要不能把当前已提供的聊天确认能力隐藏掉。
+  return `${rendered}\n\n## 当前可用的聊天确认能力\n${decisions.map(tool => `- ${tool.name}：${tool.description}`).join("\n")}\n这些工具已在本轮注册，能够在对话中展示并保存选择。历史回复中“只能去制作面板/故事台点击、没有采用接口”的说法已过时，不得沿用。读取当前状态，使用上述工具完成选择；已有有效采用记录直接复用，不先 askUser 再重复确认。禁止用 updateShot、compile 参数或 START_FRAME 绑定代替主关键帧采用。工具失败时按实际错误修正，不把内部工具问题转交用户到面板处理。`;
 }

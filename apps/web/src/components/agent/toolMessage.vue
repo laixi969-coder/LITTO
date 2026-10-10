@@ -49,7 +49,7 @@ watch(() => [tool.name, tool.question?.callId, rendererRetry.value] as const, as
   rendererError.value = "";
   if (name === "subAgent") return;
   try {
-    const component = await loadToolComponent(["requestStoryApproval", "requestStoryDecision"].includes(name) ? "askUser" : name);
+    const component = await loadToolComponent(["requestStoryApproval", "requestStoryDecision", "requestKeyframeApproval", "requestProductionDecision"].includes(name) ? "askUser" : name);
     if (active) {
       renderer.value = component;
       if (!component && tool.status === "running" && tool.question?.callId) rendererError.value = "该工具未提供可用的交互组件";
@@ -66,7 +66,7 @@ onErrorCaptured(error => {
 });
 const collapsed = defineModel<boolean>("collapsed", { default: true });
 const toolStatusLabels = { running: "调用中…", success: "已完成", error: "调用失败", interrupted: "已中断" };
-const toolLabels: Record<string, string> = { read: "读取文件", write: "写入文件", edit: "修改文件", askUser: "确认创作需求", requestStoryApproval: "确认采用故事", requestStoryDecision: "确认故事创作选择", subAgent: "委派任务", generateImage: "生成图片", generateVideo: "生成视频", generateAudio: "生成音频", getCanvas: "读取画布", getCanvasNodes: "读取画面节点", addCanvasNodes: "添加画面节点", listMediaModels: "读取可用模型" };
+const toolLabels: Record<string, string> = { read: "读取文件", write: "写入文件", edit: "修改文件", askUser: "确认创作需求", requestStoryApproval: "确认采用故事", requestStoryDecision: "确认故事创作选择", requestKeyframeApproval: "确认采用主关键帧", requestProductionDecision: "确认制作选择", subAgent: "委派任务", generateImage: "生成图片", generateVideo: "生成视频", generateAudio: "生成音频", getCanvas: "读取画布", getCanvasNodes: "读取画面节点", addCanvasNodes: "添加画面节点", listMediaModels: "读取可用模型" };
 const toolLabel = computed(() => toolLabels[tool.name] || tool.name || "工具调用");
 const targetPath = computed(() => {
   const path = tool.args?.path ?? tool.args?.filePath ?? tool.args?.canvasId;

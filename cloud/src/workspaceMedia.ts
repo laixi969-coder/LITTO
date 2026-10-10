@@ -121,7 +121,7 @@ export function prepareWorkspaceShot(input: {
   let keyframe: any;
   if (input.kind === "video") {
     keyframe = shot.heroKeyframeId ? s.get("keyframes", shot.heroKeyframeId) : null;
-    if (!keyframe || keyframe.shotId !== shot.id || keyframe.status !== "hero") throw conflict("先检查并选定主关键帧，再生成视频", "no_hero_frame");
+    if (!keyframe || keyframe.shotId !== shot.id || keyframe.status !== "hero") throw conflict("请先调用 requestKeyframeApproval，在聊天中展示并采用本镜头的关键帧（可合并多个镜头一次确认），再重新 compile。不要让用户去制作面板点击，不用 START_FRAME 绑定或 updateShot 代替采用", "no_hero_frame");
     requireReviewed(s, "keyframe", keyframe);
     if (!capabilities.image2video) throw bad("当前模式不能接收主关键帧，请选择图生视频模式");
   }

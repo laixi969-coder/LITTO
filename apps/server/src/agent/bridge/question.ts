@@ -62,7 +62,8 @@ export function answerQuestion(cwd: string, callId: string, response: { answer?:
       else if (field.type === "switch") schema = z.boolean();
       else if (["radio", "select"].includes(field.type)) schema = z.enum(field.options!);
       else if (field.type === "checkbox") schema = z.array(z.enum(field.options!)).max(field.options!.length)
-        .refine(value => new Set(value).size === value.length, "选项不能重复");
+        .refine(value => new Set(value).size === value.length, "选项不能重复")
+        .refine(value => value.length >= (field.minSelected ?? 0), `${field.title}尚未完成`);
       if (field.required) schema = schema.refine(value => value !== "" && (!Array.isArray(value) || value.length > 0), `${field.title}不能为空`);
       else schema = z.preprocess(value => value === "" || value === null ? undefined : value, schema.optional());
       return [field.field, schema];

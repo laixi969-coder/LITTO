@@ -32,6 +32,7 @@ export function approveAsset(s: Scope, id: string, actor: string) {
     const a = s.get("assets", id);
     if (!a) throw notFound("asset");
     if (!a.invariants?.length) throw bad("an asset needs at least one invariant before approval (what must never change?)");
+    if (a.approvalStatus === "approved" && a.approvedVersion === a.version) return a;
     return tx(() => {
         run("UPDATE asset_versions SET approval_status='approved' WHERE asset_id=? AND version=? AND workspace_id=?", id, a.version, s.workspaceId);
         const u = s.update("assets", id, { approval_status: "approved", approved_version: a.version });

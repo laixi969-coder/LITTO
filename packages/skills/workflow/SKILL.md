@@ -66,7 +66,7 @@ metadata:
 
 按镜头保存规格和关键帧候选，采用 Hero Frame 后生成视频 Take。模型支持多镜片段且用户采用该方案时才合并执行，仍保留各镜版本和起止状态。连线传递素材，不代表审批或自动调度。
 
-账号工作区的电影制作通过 `productionSpec` 读写世界、影调、资产与镜头，并先 `compile`，再带 `shotId` 和 `productionFingerprint` 调用图片或视频生成。用户在「镜头制作」中查看输出、检查真实感并采用 Hero/Take；Agent 不代填人工验收。文本与普通画布节点仅可作为辅助记录，不能替代领域审批。未提供该工具时明确说明执行能力缺失。音乐分析、歌词对齐、Music Timeline 未接通时说明缺项，不能以通用音频节点冒充完整 Music Film。
+账号工作区的电影制作通过 `productionSpec` 读写世界、影调、资产与镜头，并先 `compile`，再带 `shotId` 和 `productionFingerprint` 调用图片或视频生成。提供 `requestKeyframeApproval` 时，在聊天中展示并确认主关键帧，可合并多个镜头一次采用，返回 `approved: true` 后继续已授权的视频生成；已采用且有效的帧不重复确认，不要求用户到「镜头制作」再点一次。资产批准、定妆选择、Take、规格变更、剪辑、配音和成片验收使用 requestProductionDecision，在聊天中预览、填写观察并保存。Take 仍须完整播放并记录实际结束状态。工具缺失时在聊天说明缺项，不强制跳转面板。Agent 不代填人工验收。文本与普通画布节点仅可作为辅助记录，不能替代领域审批。未提供规格工具时明确说明执行能力缺失。音乐分析、歌词对齐、Music Timeline 未接通时说明缺项，不能以通用音频节点冒充完整 Music Film。
 
 ## 按问题读取方法
 

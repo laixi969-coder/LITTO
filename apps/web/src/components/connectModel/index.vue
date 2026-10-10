@@ -1,9 +1,9 @@
 <template>
   <el-dialog v-model="connectModelVisible" title="接入你的模型" width="min(880px, 94vw)" alignCenter appendToBody destroyOnClose :closeOnClickModal="!busy" :closeOnPressEscape="!busy">
     <p class="intro">模型用的是你自己的账号：把服务商给你的 Key 粘贴进来就行，费用直接结算给服务商。Key 只保存在你的账号里，页面上只会显示末四位。</p>
-    <div class="cards">
+    <div class="cards" :class="{ single: connectModelFocus }">
       <!-- ① text -->
-      <section class="card" :class="{ focus: connectModelFocus === 'text' }" aria-label="剧本与对话模型">
+      <section v-if="connectModelFocus !== 'media'" class="card" aria-label="剧本与对话模型">
         <header>
           <div>
             <h3>剧本与对话模型</h3>
@@ -12,9 +12,10 @@
           <el-tag :type="connectedTextIds.size ? 'success' : 'info'" effect="light" round>{{ connectedTextIds.size ? "已连接 ✓" : "未连接" }}</el-tag>
         </header>
         <div class="chips" role="radiogroup" aria-label="选择服务商">
-          <el-check-tag v-for="item in textPresets" :key="item.id" :checked="textPresetId === item.id" @change="pickText(item.id)">
+          <el-check-tag v-for="item in textPresets.filter(item => !item.custom)" :key="item.id" :checked="textPresetId === item.id" @change="pickText(item.id)">
             {{ connectedTextIds.has(item.id) ? "✓ " : "" }}{{ item.label }}
           </el-check-tag>
+          <el-button size="small" @click="openCustom('text')">添加新供应商</el-button>
         </div>
         <template v-if="textConnected && !textReplacing">
           <div class="connected">
@@ -45,7 +46,7 @@
       </section>
 
       <!-- ② media -->
-      <section class="card" :class="{ focus: connectModelFocus === 'media' }" aria-label="图片与视频模型">
+      <section v-if="connectModelFocus !== 'text'" class="card" aria-label="图片与视频模型">
         <header>
           <div>
             <h3>图片与视频模型</h3>
@@ -57,6 +58,7 @@
           <el-check-tag v-for="item in mediaPresets" :key="item.id" :checked="mediaPresetId === item.id" @change="pickMedia(item.id)">
             {{ connectedMediaIds.has(item.id) ? "✓ " : "" }}{{ item.label }}
           </el-check-tag>
+          <el-button size="small" @click="openCustom('media')">添加新供应商</el-button>
         </div>
         <p class="desc">{{ mediaPreset.desc }}</p>
         <template v-if="mediaConnectedKey && !mediaReplacing">
@@ -89,15 +91,16 @@
       </section>
     </div>
     <template #footer>
-      <el-text class="footnote" type="info" size="small">需要自己指定协议、模型清单或添加其他服务商？到「设置」里的模型页面使用高级选项。</el-text>
+      <el-text class="footnote" type="info" size="small">服务商不在列表中？点击「添加新供应商」，填写名称、Base URL 和 API Key 即可配置。</el-text>
       <el-button type="primary" @click="connectModelVisible = false">完成</el-button>
     </template>
   </el-dialog>
+  <component :is="customProviderDialog" v-model="customVisible" v-bind="customKind === 'media' ? { mode: 'connection' } : {}" />
 </template>
 
 <script setup lang="ts">
 import axios from "axios";
-import { computed, ref, watch } from "vue";
+import { computed, defineAsyncComponent, ref, shallowRef, watch, type Component } from "vue";
 import { ElMessage } from "element-plus";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 import { customProviders, saveSettings, settings, type CustomProvider } from "@/stores/settings";
@@ -105,6 +108,18 @@ import { mediaPresets, nonChatModel, textPresets } from "./presets";
 import { connectModelFocus, connectModelVisible } from "./state";
 
 type TestResult = { ok: boolean; verified?: boolean; message: string; models?: { id: string; label: string; contextWindow?: number; maxOutputTokens?: number }[] };
+
+const customProviderDialog = shallowRef<Component>();
+const customVisible = ref(false);
+const customKind = ref<"text" | "media">("text");
+function openCustom(kind: "text" | "media") {
+  connectModelVisible.value = false;
+  customKind.value = kind;
+  customProviderDialog.value = kind === "text"
+    ? defineAsyncComponent(() => import("@/components/settings/panels/languageModel/addCustomProviderDialog.vue"))
+    : defineAsyncComponent(() => import("@/components/settings/panels/mediaModel/addCustomProviderDialog.vue"));
+  customVisible.value = true;
+}
 
 const textPresetId = ref(textPresets[0]!.id);
 const textKey = ref("");
@@ -237,9 +252,10 @@ async function disconnectMedia() {
 
 <style scoped lang="scss">
 .intro { margin: 0 0 16px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.6; }
-.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;
+  &.single { grid-template-columns: minmax(0, 1fr); }
+}
 .card { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--el-border-color-light); border-radius: 14px; background: var(--el-bg-color); min-width: 0;
-  &.focus { border-color: var(--el-color-primary); box-shadow: 0 0 0 3px var(--el-color-primary-light-8); }
   header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; h3 { margin: 0 0 4px; font-size: 16px; } p { margin: 0; font-size: 12px; color: var(--el-text-color-secondary); } }
 }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }

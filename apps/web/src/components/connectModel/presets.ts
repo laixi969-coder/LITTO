@@ -16,6 +16,7 @@ export const textPresets: TextPreset[] = [
 
 export type MediaPreset = { id: string; label: string; desc: string; regions?: boolean; keyHelp: string; baseUrl?: string; urlRequired?: boolean; secret?: boolean };
 export const mediaPresets: MediaPreset[] = [
+  { id: "vidu", label: "Vidu", desc: "Q4 Preview 图生视频与参考生视频：支持单首帧，或 1–15 张参考图及最多 3 段 MP3 参考音频（每段 3–12 秒）。3–16 秒，540P 至 4K，可选音画同出。", baseUrl: "https://api.vidu.cn", keyHelp: "在 Vidu 开放平台创建 API Key，地址默认已填好。" },
   { id: "apiMart", label: "APIMart / 中转", desc: "一个 Key 同时用 Seedance 视频，以及 Seedream、GPT-Image、Nano Banana 出图、Wan 视频", regions: true, keyHelp: "在 APIMart 控制台创建 API Key；国内用户选「国内」，海外用户选「海外」。" },
   { id: "meta", label: "秘塔 MiniMax", desc: "MiniMax 视频模型，通过秘塔接入", keyHelp: "在秘塔 MiniMax 页面创建 API Key。" },
   { id: "agnes", label: "Agnes AI", desc: "同一个 Key 使用 Agnes Image 2.5 Flash 出图和参考图编辑（1K–4K），以及 Video 2.5 Flash 文生视频（720P、4–12 秒）。视频本地参考素材上传尚未接通。", keyHelp: "在 Agnes AI 开放平台创建 API Key，图片与视频共用。" },

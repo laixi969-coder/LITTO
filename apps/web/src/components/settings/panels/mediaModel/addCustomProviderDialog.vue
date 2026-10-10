@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="mode === 'builtin' ? '添加媒体供应商' : '添加自定义媒体供应商'"
+    :title="mode === 'custom' ? '导入供应商适配器' : '添加媒体供应商'"
     :width="mode === 'builtin' ? 'min(860px, 94vw)' : 'min(760px, 94vw)'"
     alignCenter
     appendToBody
@@ -9,7 +9,28 @@
     :closeOnClickModal="false"
     :closeOnPressEscape="!saving"
     :showClose="!saving">
-    <div v-if="mode === 'builtin'" class="providerPicker">
+    <el-form v-if="mode === 'connection'" ref="connectionForm" class="connectionForm" :model="connection" :rules="connectionRules" labelPosition="top" :disabled="saving" @submit.prevent="addProvider">
+      <el-form-item label="供应商名称" prop="label">
+        <el-input v-model="connection.label" :disabled="!!addedProvider" maxlength="100" placeholder="例如 我的模型服务" aria-label="供应商名称" />
+      </el-form-item>
+      <el-form-item label="供应商 ID（可自动生成）" prop="id">
+        <el-input v-model="connection.id" :disabled="!!addedProvider" maxlength="96" placeholder="留空自动生成，例如 myProvider" aria-label="供应商 ID" />
+      </el-form-item>
+      <el-form-item label="Base URL" prop="baseUrl">
+        <el-input v-model="connection.baseUrl" dir="ltr" placeholder="服务商提供的 API 基础地址" aria-label="Base URL" />
+      </el-form-item>
+      <el-form-item label="API Key" prop="apiKey">
+        <el-input v-model="connection.apiKey" type="password" showPassword autocomplete="off" aria-label="API Key" />
+      </el-form-item>
+      <el-form-item label="接口类型" prop="templateId">
+        <el-select v-model="connection.templateId" :disabled="!!addedProvider" placeholder="选择服务商兼容的接口" aria-label="接口类型">
+          <el-option v-for="item in connectionTemplates" :key="item.id" :value="item.id" :label="`${item.label} 兼容`" />
+        </el-select>
+      </el-form-item>
+      <el-text type="info" size="small">图片、视频接口各不相同，按服务商文档选择接口类型。模型会沿用该接口的已适配列表，无需填写代码。</el-text>
+      <el-alert v-if="formError" :title="formError" type="error" :closable="false" showIcon />
+    </el-form>
+    <div v-else-if="mode === 'builtin'" class="providerPicker">
       <aside class="providerSidebar" aria-label="选择厂商">
         <button
           v-for="item in mediaProviders"
@@ -81,17 +102,17 @@
     </el-scrollbar>
     <template #footer>
       <el-button :disabled="saving" @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" :disabled="!source.trim()" @click="addProvider">确定添加供应商</el-button>
+      <el-button type="primary" :loading="saving" :disabled="mode !== 'connection' && !source.trim()" @click="addProvider">{{ mode === "connection" ? "保存并连接" : "确定添加供应商" }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import axios from "axios";
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, reactive, ref, shallowRef, watch } from "vue";
 import formCreate, { formCreateForm, type Api, type Options } from "../../formCreate";
 import { IconFileCode, IconCode, IconFolderOpen, IconCopy } from "@tabler/icons-vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { mediaProviders } from "@toonflow/providers";
 import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";
@@ -102,6 +123,7 @@ import agnesSource from "@toonflow/providers/media/agnes?raw";
 import volcengineSource from "@toonflow/providers/media/volcengine?raw";
 import bailianSource from "@toonflow/providers/media/bailian?raw";
 import klingSource from "@toonflow/providers/media/kling?raw";
+import viduSource from "@toonflow/providers/media/vidu?raw";
 import atlasCloudSource from "@toonflow/providers/media/atlasCloud?raw";
 import easyRouterSource from "@toonflow/providers/media/easyRouter?raw";
 import qwenSpeechSource from "@toonflow/providers/media/qwenSpeech?raw";
@@ -111,10 +133,10 @@ import { providerPrompt } from "./providerPrompt";
 import { saveSettings } from "@/stores/settings";
 import { writeClipboardText } from "@/lib/clipboard";
 
-const { mode = "custom" } = defineProps<{ mode?: "builtin" | "custom" }>();
+const { mode = "connection" } = defineProps<{ mode?: "connection" | "builtin" | "custom" }>();
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ added: [provider: MediaProvider] }>();
-const providerSources: Record<string, string> = { apiMart: apiMartSource, meta: metaSource, agnes: agnesSource, volcengine: volcengineSource, bailian: bailianSource, kling: klingSource, atlasCloud: atlasCloudSource, easyRouter: easyRouterSource, qwenSpeech: qwenSpeechSource, museTalk: museTalkSource };
+const providerSources: Record<string, string> = { apiMart: apiMartSource, meta: metaSource, agnes: agnesSource, volcengine: volcengineSource, bailian: bailianSource, kling: klingSource, vidu: viduSource, atlasCloud: atlasCloudSource, easyRouter: easyRouterSource, qwenSpeech: qwenSpeechSource, museTalk: museTalkSource };
 const selectedProvider = ref<string>(mediaProviders[0]?.id ?? "");
 const activeProvider = computed(() => mediaProviders.find(provider => provider.id === selectedProvider.value));
 const models = computed<MediaProvider["models"]>(() => activeProvider.value?.models ?? []);
@@ -136,6 +158,22 @@ const saving = ref(false);
 const formError = ref("");
 const formApi = shallowRef<Api>();
 const addedProvider = shallowRef<MediaProvider>();
+const connectionForm = ref<FormInstance>();
+const connection = reactive({ id: "", label: "", baseUrl: "", apiKey: "", templateId: "" });
+const connectionTemplates = mediaProviders.filter(provider => ["apiKey", "baseUrl"].every(field => provider.rules.some(rule => rule.field === field)));
+const connectionRules: FormRules = {
+  label: [{ required: true, whitespace: true, message: "请输入供应商名称", trigger: "blur" }],
+  id: [{ pattern: /^[a-z][a-zA-Z0-9]*$/, message: "请以小写字母开头，仅使用字母和数字", trigger: "blur" }],
+  apiKey: [{ required: true, whitespace: true, message: "请输入 API Key", trigger: "blur" }, { max: 8192, message: "API Key 过长", trigger: "blur" }],
+  templateId: [{ required: true, message: "请选择服务商兼容的接口类型", trigger: "change" }],
+  baseUrl: [{ validator: (_rule, value, callback) => {
+    try {
+      const url = new URL(value);
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || value.length > 2048) throw new Error();
+      callback();
+    } catch { callback(new Error("请输入不含账号、查询参数的 HTTP API 基础地址")); }
+  }, trigger: "blur" }],
+};
 const formOptions = computed<Options>(() => ({ form: { labelPosition: "top", disabled: saving.value }, submitBtn: false, resetBtn: false }));
 const providerRules = computed(() => formCreate.copyRules([...(activeProvider.value?.rules ?? [])]));
 const source = computed(() => mode === "builtin" ? providerSources[selectedProvider.value] ?? "" : activeTab.value === "file" ? fileSource.value : code.value);
@@ -147,6 +185,7 @@ watch([activeTab, selectedProvider], () => {
 
 watch(visible, value => {
   if (!value) return;
+  Object.assign(connection, { id: "", label: "", baseUrl: "", apiKey: "", templateId: "" });
   selectedProvider.value = mediaProviders[0]?.id ?? "";
   activeTab.value = "file";
   promptExpanded.value = false;
@@ -172,6 +211,7 @@ async function readSourceFile(event: Event) {
 }
 
 async function addProvider() {
+  if (mode === "connection") return addConnection();
   if (saving.value || !source.value.trim()) return;
   if (mode === "builtin" && !formApi.value) return;
   saving.value = true;
@@ -212,6 +252,47 @@ async function addProvider() {
   } finally {
     saving.value = false;
   }
+}
+
+async function addConnection() {
+  if (saving.value) return;
+  formError.value = "";
+  connection.id = connection.id.trim() || `provider${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
+  if (!(await connectionForm.value?.validate().catch(() => false))) return;
+  saving.value = true;
+  try {
+    if (!addedProvider.value) {
+      const { data } = await axios.post<{ data: MediaProvider }>("/api/providers/media/add", { connection: { id: connection.id, label: connection.label.trim(), templateId: connection.templateId } });
+      addedProvider.value = data.data;
+      emit("added", data.data);
+    }
+    const provider = addedProvider.value;
+    // ACT: 安装已成功时重试只保存连接，不重复创建、不覆盖其他供应商。
+    await saveSettings(current => {
+      const configs = current.mediaProviderConfigs;
+      if (configs !== undefined && (!configs || typeof configs !== "object" || Array.isArray(configs))) throw new Error("媒体供应商配置格式无效");
+      const values = configs as Record<string, Record<string, unknown>> | undefined;
+      return { mediaProviderConfigs: { ...values, [provider.id]: { ...values?.[provider.id], baseUrl: connection.baseUrl.trim().replace(/\/+$/, ""), apiKey: connection.apiKey.trim() } } };
+    });
+    connection.apiKey = "";
+    if (provider.canSyncModels) {
+      try {
+        const { data: catalogue } = await axios.post<{ data: MediaProvider }>("/api/providers/media/models", { fileName: provider.fileName, revision: provider.revision, apply: false }, { timeout: 65000 });
+        const { data: saved } = await axios.put<{ data: MediaProvider }>("/api/providers/media/save", { fileName: provider.fileName, revision: provider.revision, models: catalogue.data.models });
+        emit("added", saved.data);
+      } catch (error) {
+        const message = axios.isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "获取失败";
+        ElMessage.warning(`连接已保存，模型列表未同步：${message}。已保留接口自带的模型，可在供应商列表重试同步。`);
+      }
+    }
+    invalidateNodeModels("media");
+    window.dispatchEvent(new CustomEvent("toonflow:plugin-installed", { detail: { type: "provider", name: provider.id } }));
+    ElMessage.success(`${provider.label} 已保存，密钥与模型权限将在实际调用时验证`);
+    visible.value = false;
+  } catch (error) {
+    const message = axios.isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "保存失败";
+    formError.value = addedProvider.value ? `供应商已创建，连接配置未保存：${message}。可直接重试。` : message;
+  } finally { saving.value = false; }
 }
 
 async function copyPrompt() {

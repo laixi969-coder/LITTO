@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { storyActionSchema, storyDecisionSchema, storyProjectSchema, newStoryProject, storyStale, storyPreviewKey, storyBoard, validateStoryDraft, type StoryAction, type StoryProject, type StorySource } from "@toonflow/tool-scene-list/storyProject";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
+import { cloud } from "@/lib/cloud";
 import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
 
 const fileName = "storyProject.json";
@@ -82,6 +83,8 @@ export async function requestStoryDecision(directory: string, toolCallId: string
     case "chooseDirection": {
       if (!project.directions.length) fail("请先保存候选方向");
       title = "选择故事方向";
+      const selected = project.directions.find(item => item.id === project.directionId);
+      if (selected && !decision.reconsider) return { title, applied: true, selectedId: selected.id, answer: `已采用「${selected.title}」，无需重复选择` };
       content = project.directions.map((item, index) => `${index + 1}. ${item.title}${item.id === project.directionId ? "（当前方向）" : ""}\n${item.premise}\n观众为什么在意：${item.audienceReason}\n代表性场面：${item.signatureScene}\n制作难点：${item.risk}`).join("\n\n");
       choices = project.directions.map((item, index) => ({ label: `选择 ${index + 1}：${item.title}`, action: { type: "chooseDirection", id: item.id } }));
       break;
@@ -96,6 +99,17 @@ export async function requestStoryDecision(directory: string, toolCallId: string
       choices = [{ label: "按此理由保留", action: decision }];
       break;
     }
+    case "release": {
+      const existing = project.releases.find(item => item.id === decision.value.id);
+      if (existing && JSON.stringify(existing) === JSON.stringify(decision.value)) return { title: "发布反馈已保存", applied: true, answer: "这份反馈已保存，无需重复确认" };
+      if (existing) fail("同一发布记录已有其他数据，请保留旧记录并新增观测");
+      const revision = project.revisions.find(item => item.id === decision.value.revisionId) ?? fail("故事版本不存在");
+      title = `确认《${revision.title}》发布反馈`;
+      const value = decision.value;
+      content = `平台：${value.channel}\n链接：${value.url}\n发布时间：${value.publishedAt}\n受众：${value.audience}\n分发方式：${value.distribution}\n版本：${value.variant}\n花费：${value.spend ?? "未知"} ${value.currency}\n曝光：${value.impressions ?? "未知"}\n开始观看：${value.starts ?? "未知"}\n完整观看：${value.completions ?? "未知"}\n分享：${value.shares ?? "未知"}\n关注：${value.follows ?? "未知"}\n点击：${value.clicks ?? "未知"}\n转化：${value.conversions ?? "未知"}\n观测窗口：${value.observationWindow}\n统计口径：${value.metricDefinitions}\n数据依据：${value.evidence}\n备注：${value.notes}\n\n只保存以上反馈，不会执行对外发布。`;
+      choices = [{ label: "确认并保存反馈", action: decision }];
+      break;
+    }
   }
   const request = { title, question: content, options: [...choices.map(item => item.label), "暂不决定"] };
   const response = await question.ask(toolCallId, request, signal);
@@ -107,12 +121,17 @@ export async function requestStoryDecision(directory: string, toolCallId: string
 }
 export async function applyStoryAction(directory: string, expectedVersion: number, input: unknown, human = false) {
   if (currentTenant()?.role === "VIEWER") fail("只读成员不能修改故事项目", 403);
+  const tenant = currentTenant();
+  if (tenant) {
+    const member = cloud()?.dbGet("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", tenant.workspaceId, tenant.userId);
+    if (!member || member.role === "VIEWER") fail("故事项目编辑权限已失效", 403);
+  }
   const parsed = storyActionSchema.safeParse(input);
   if (!parsed.success) fail(parsed.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("；"));
   const action = parsed.data;
   if (!human && ["confirmSource", "chooseDirection", "decideIssue", "approve", "release"].includes(action.type)) {
     const tool = action.type === "approve" ? "requestStoryApproval" : "requestStoryDecision";
-    fail(action.type === "release" ? "发布反馈须由用户在故事工作台录入" : `请调用 ${tool}，在聊天中展示具体内容并等待用户决定`, 403);
+    fail(`请调用 ${tool}，在聊天中展示具体内容并等待用户决定`, 403);
   }
   const { path } = await resolveWorkspacePath(directory, fileName);
   const release = lockWorkspaceFiles([path]);
@@ -148,13 +167,16 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
         const source = project.sources.find(item => item.id === action.id) ?? fail("资料不存在");
         if (!source.coverage.trim()) fail("请先说明读取覆盖范围和未知项");
         await checkSources(directory, [source]);
+        if (source.confirmed) return project;
         source.confirmed = true; break;
       }
       case "directions":
         if (new Set(action.values.map(item => item.id)).size !== action.values.length) fail("创意方向 ID 重复");
-        project.directions = action.values; project.directionId = undefined; break;
+        if (JSON.stringify(project.directions.find(item => item.id === project.directionId)) !== JSON.stringify(action.values.find(item => item.id === project.directionId))) project.directionId = undefined;
+        project.directions = action.values; break;
       case "chooseDirection":
         if (!project.directions.some(item => item.id === action.id)) fail("创意方向不存在");
+        if (project.directionId === action.id) return project;
         project.directionId = action.id; break;
       case "draft": await addDraft(action.value, action.parentId); break;
       case "rewrite": {
@@ -177,10 +199,12 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
       case "decideIssue": {
         const review = project.reviews.find(item => item.id === action.reviewId) ?? fail("审稿记录不存在");
         if (!review.issues.some(item => item.id === action.issueId)) fail("问题不存在");
+        if (review.decisions[action.issueId]?.reason === action.reason) return project;
         review.decisions[action.issueId] = { reason: action.reason, at: now }; break;
       }
       case "approve": {
         const revision = await validateApproval(directory, project, action.id);
+        if (project.approvedId === revision.id) return project;
         project.approvedId = revision.id; project.approvals.push({ revisionId: revision.id, at: now, reason: action.reason }); break;
       }
       case "board": {
@@ -204,7 +228,9 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
         if (action.value.media) await readSource(directory, action.value.media.path, 250 * 1024 * 1024);
         if (!action.value.media && !action.value.previewId && !action.value.url) fail("请关联实际发布视频、预演或发布链接");
         if (action.value.completions !== null && action.value.starts !== null && action.value.completions > action.value.starts) fail("完整观看数不能大于开始观看数，请核对统计口径");
-        if (project.releases.some(item => item.id === action.value.id)) fail("发布反馈已保存；补充观测请新增记录，保留旧数据");
+        const existing = project.releases.find(item => item.id === action.value.id);
+        if (existing && JSON.stringify(existing) === JSON.stringify(action.value)) return project;
+        if (existing) fail("发布反馈已保存；补充观测请新增记录，保留旧数据");
         project.releases.push(action.value); break;
       }
       case "learning":

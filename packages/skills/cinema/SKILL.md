@@ -11,7 +11,7 @@ metadata:
 
 目标是让每个镜头在表演、摄影、空间和剪辑上属于同一部影片。好莱坞质感是创作目标，不能靠提示词里的「大片、8K、cinematic」或单纯增加运镜来保证。
 
-本技能落实产品 PRD 中 World / Look、ShotSpec、Realism Stack 和深度 Skills 的创作规则。账号模式优先使用 `productionSpec` 保存真实领域对象，并在工作区「镜头制作」面板编辑与验收。若运行环境未提供该工具，说明仅能交付方案，不把文本节点称为已持久化的制片规格。
+本技能落实产品 PRD 中 World / Look、ShotSpec、Realism Stack 和深度 Skills 的创作规则。账号模式优先使用 `productionSpec` 保存真实领域对象。提供 `requestKeyframeApproval` 时，主关键帧在聊天中展示并确认采用，多镜头合并一次确认，不要求用户再到「镜头制作」面板重复选择；面板仍可用于编辑与复核。若运行环境未提供规格工具，说明仅能交付方案，不把文本节点称为已持久化的制片规格。
 
 ## 分工与执行边界
 
@@ -100,7 +100,7 @@ Approved 资产、关键帧和 Take 默认锁定。更改建立新版本，写�
 
 生成前核对参考顺序、配置和提示词，说明对象、数量、模型、规格与费用性质，按用户已授权范围执行。创作方向的确认不自动授权付费生成；不反复请求用户已经给过的同一授权，不擅自自动重试。
 
-执行顺序：`listMediaModels` → `productionSpec(binding)` 绑定实际已上传的参考 ID → `productionSpec(compile)`，其 data 包含 `shotId`、`kind`、`request`（实际 providerId/modelId/prompt 与模式、画幅、时长等）→ 阅读返回的 warnings/degradations → `generateImage/generateVideo` 传入同一请求、`shotId` 和返回的 `fingerprint` 作为 `productionFingerprint`。服务端用领域编译结果替代自由 Prompt。参考不支持时不能声称发送或锁定；LOCK 参考无法发送时更换模式。生成视频需用户在面板实际检查并选定 Hero，AI 不可自行填人工检查记录。
+执行顺序：`listMediaModels` → `productionSpec(binding)` 绑定实际已上传的参考 ID → `productionSpec(compile)`，其 data 包含 `shotId`、`kind`、`request`（实际 providerId/modelId/prompt 与模式、画幅、时长等）→ 阅读返回的 warnings/degradations → `generateImage/generateVideo` 传入同一请求、`shotId` 和返回的 `fingerprint` 作为 `productionFingerprint`。服务端用领域编译结果替代自由 Prompt。参考不支持时不能声称发送或锁定；LOCK 参考无法发送时更换模式。生成视频前通过 requestKeyframeApproval 在聊天实际检查并选定 Hero；Take 和其他制作选择通过 requestProductionDecision 在聊天完成，AI 不可自行填人工检查记录，不强制跳转面板。
 
 ## 7. 质检与修复
 

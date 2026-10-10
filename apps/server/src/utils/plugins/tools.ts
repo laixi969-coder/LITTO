@@ -20,6 +20,7 @@ Bun.plugin({
 });
 
 export const toolsDirectory = resolve(dirname(conf.path), "tools");
+const loadedRevisions = new Map<string, string>();
 
 export function parseTool(source: string, name: string) {
   let metadata: zod.infer<typeof toolMetadataSchema>;
@@ -87,12 +88,14 @@ export async function listTools() {
 }
 
 export async function loadTool(name: string, directory = toolsDirectory) {
-  const { path, metadata } = await readTool(name, directory);
-  // ACT: 工具是可信的服务端代码，不是沙箱；安装成功后由安装器清除模块缓存。
+  const { path, metadata, revision } = await readTool(name, directory);
+  // ACT: 每轮按内容版本失效，覆盖开发同步和启动升级；不能只依赖安装接口清缓存。
+  if (loadedRevisions.get(path) !== revision) delete require.cache[path];
   const { default: plugin } = await import(pathToFileURL(path).href) as { default: ToolPlugin };
   if (typeof plugin?.createTools !== "function" || typeof plugin.validateConfig !== "function") {
     throw Object.assign(new Error(t`${metadata.displayName} 未导出有效的工具插件`), { status: 400 });
   }
+  loadedRevisions.set(path, revision);
   return { plugin, metadata };
 }
 

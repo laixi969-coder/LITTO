@@ -62,6 +62,7 @@ export function promoteHero(s: Scope, keyframeId: string, actor: string) {
     const media = kf.mediaId ? s.get("media", kf.mediaId) : undefined;
     if (!shot || shot.projectId !== kf.projectId || !media?.mime.startsWith("image/") || media.projectId !== kf.projectId) throw bad("关键帧的镜头或媒体已失效");
     requireReviewed(s, "keyframe", kf);
+    if (shot.heroKeyframeId === keyframeId && kf.status === "hero") return kf;
     return tx(() => {
         // Previous Hero is preserved (status superseded), never deleted.
         for (const k of s.list("keyframes", { shotId: shot.id, status: "hero" })) s.update("keyframes", k.id, { status: "superseded" });
@@ -111,6 +112,7 @@ export function approveTake(s: Scope, takeId: string, actor: string, override?: 
     const evidence = requireReviewed(s, "take", take);
     if (!evidence.observedStateDelta) throw conflict("请记录视频结束时实际观察到的资产状态", "result_state_required");
     const shot = s.get("shots", take.shotId)!;
+    if (shot.approvedTakeId === takeId && take.status === "approved" && JSON.stringify(take.meta?.observedStateDelta) === JSON.stringify(evidence.observedStateDelta)) return take;
     checkSequence(s, shot.sequenceId);
     const high = openHighIssues(s, shot.id);
     if (high.length && !override?.reason) throw conflict(`${high.length} high-severity continuity issue(s) block approval`, "continuity_blocked", high.map((h: any) => ({ id: h.id, category: h.category, message: h.message })));

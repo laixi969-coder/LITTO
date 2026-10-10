@@ -17,6 +17,9 @@ import { currentTenant } from "@/utils/tenant";
 import { workspaceProject, prepareShot } from "@/utils/media/jobs";
 import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
 import { readStoryProject, applyStoryAction, checkSources, requestStoryApproval, requestStoryDecision } from "@/utils/story";
+import { requestKeyframeApproval } from "@/utils/media/keyframeApproval";
+import { requestProductionDecision } from "@/utils/media/productionDecision";
+import { readVoiceProject } from "@/utils/media/voiceDecision";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
@@ -62,9 +65,13 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       await withWritePaths([path], async ([target]) => { await writeWorkspaceFile(target, content, exclusive); });
       if (/\.(md|markdown|txt)$/i.test(path)) await publishFile(relative(cwd, await resolvePath(path)).split("\\").join("/"));
     },
-    mkdir: (path, recursive = false) => withWritePaths([path], async ([target]) => {
-      await mkdir(target, { recursive });
-    }),
+    async mkdir(path, recursive = false) {
+      const target = await resolvePath(path);
+      const info = recursive ? await lstat(target).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; return null; }) : null;
+      // SDK 写文件前会确保父目录存在；已有目录无需加锁，否则会撞上目录内正在运行的对话锁。
+      if (info?.isDirectory()) return;
+      await withWritePaths([path], async ([target]) => { await mkdir(target, { recursive }); });
+    },
     rename: (path, target) => withWritePaths([path, target], async ([source, destination]) => {
       protectWorkspaceRoot(cwd, source);
       protectWorkspaceRoot(cwd, destination);
@@ -91,10 +98,27 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     cwd, config, files, resolvePath, writeFile: files.writeFile, canvas, question, skills: createSkillContext(cwd),
     ffmpeg: signal => createWorkspaceFfmpeg(cwd, signal),
     media: {
+      requestProductionDecision: question ? (toolCallId, input, signal) => requestProductionDecision(cwd, toolCallId, input, question, mediaSignal(signal)) : undefined,
+      requestKeyframeApproval: question ? (toolCallId, keyframeIds, signal) => requestKeyframeApproval(cwd, toolCallId, keyframeIds, question, mediaSignal(signal)) : undefined,
       async production(operation, data, signal) {
         signal?.throwIfAborted();
+        if (operation === "readVoice") return (await readVoiceProject(cwd)).project;
         const api = cloud(), tenant = currentTenant();
         if (!api || !tenant || tenant.role === "VIEWER") throw new Error("制片工具需要已登录且有编辑权限的工作区");
+        const scope = api.scoped(tenant.workspaceId), projectId = workspaceProject(cwd)!;
+        if (operation === "inspectFinal") {
+          if (typeof data.renderId !== "string" || scope.get("renders", data.renderId)?.projectId !== projectId) throw new Error("成片不属于当前项目");
+          return api.inspectFinalQuality(scope, data.renderId);
+        }
+        if (operation === "readEdit" || operation === "render") {
+          if (typeof data.sequenceId !== "string" || scope.get("sequences", data.sequenceId)?.projectId !== projectId) throw new Error("序列不属于当前项目");
+          if (operation === "readEdit") return api.editView(scope, api.getEdit(scope, data.sequenceId, true));
+          const options = api.renderOptionsSchema.parse(data.options ?? {});
+          api.getEdit(scope, data.sequenceId, true);
+          const fingerprint = api.sequenceFingerprint(scope, data.sequenceId);
+          const existing = scope.list("renders", { sequenceId: data.sequenceId }, "created_at DESC").find(render => ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.sourceFingerprint === fingerprint && JSON.stringify(render.manifest?.options) === JSON.stringify(options));
+          return existing ?? api.startRender(tenant.workspaceId, projectId, data.sequenceId, tenant.userId, options);
+        }
         if (operation === "compile") {
           if (data.kind !== "image" && data.kind !== "video" || typeof data.shotId !== "string") throw new Error("须提供 kind 和 shotId");
           const schema = data.kind === "image" ? imageGenerationSchema : videoGenerationSchema;
@@ -138,5 +162,5 @@ export async function createAgentTools(cwd: string, canvas?: CanvasContext, ques
       });
     }
   }
-  return tools.filter(tool => !["requestStoryApproval", "requestStoryDecision"].includes(tool.name) || names.has("askUser"));
+  return tools.filter(tool => !["requestStoryApproval", "requestStoryDecision", "requestKeyframeApproval", "requestProductionDecision"].includes(tool.name) || names.has("askUser"));
 }

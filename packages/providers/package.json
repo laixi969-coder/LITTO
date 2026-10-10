@@ -18,6 +18,7 @@
     "./media/volcengine": "./src/media/volcengine.ts",
     "./media/bailian": "./src/media/bailian.ts",
     "./media/kling": "./src/media/kling.ts",
+    "./media/vidu": "./src/media/vidu.ts",
     "./media/atlasCloud": "./src/media/atlasCloud.ts",
     "./media/easyRouter": "./src/media/easyRouter.ts",
     "./media/qwenSpeech": "./src/media/qwenSpeech.ts",

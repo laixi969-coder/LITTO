@@ -9,6 +9,7 @@ import agnes from "./src/media/agnes";
 import volcengine from "./src/media/volcengine";
 import bailian from "./src/media/bailian";
 import kling from "./src/media/kling";
+import vidu from "./src/media/vidu";
 import atlasCloud from "./src/media/atlasCloud";
 import easyRouter from "./src/media/easyRouter";
 import qwenSpeech from "./src/media/qwenSpeech";
@@ -22,4 +23,4 @@ export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
 export const languageProviders = [deepSeek, atlasCloudText, easyRouterText] as const;
-export const mediaProviders = [apiMart, meta, agnes, volcengine, bailian, kling, atlasCloud, easyRouter, qwenSpeech, museTalk, gen3c] as const;
+export const mediaProviders = [apiMart, meta, agnes, volcengine, bailian, kling, vidu, atlasCloud, easyRouter, qwenSpeech, museTalk, gen3c] as const;

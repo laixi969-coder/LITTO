@@ -150,6 +150,8 @@ export interface GeneratedMedia {
 
 export interface MediaContext {
   production?(operation: string, data: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>;
+  requestKeyframeApproval?(toolCallId: string, keyframeIds: string[], signal?: AbortSignal): Promise<unknown>;
+  requestProductionDecision?(toolCallId: string, input: { operation: string; data: Record<string, unknown>; reconsider?: boolean }, signal?: AbortSignal): Promise<unknown>;
   listModels(): Promise<MediaModel[]>;
   generateImage(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
   generateVideo(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
@@ -161,6 +163,7 @@ export interface QuestionField {
   title: string;
   type: "input" | "textarea" | "radio" | "checkbox" | "select" | "inputNumber" | "switch";
   required?: boolean;
+  minSelected?: number;
   options?: string[];
   placeholder?: string;
 }
@@ -168,6 +171,8 @@ export interface QuestionField {
 export interface QuestionRequest {
   title: string;
   question: string;
+  images?: { id: string; title: string; url: string }[];
+  media?: { id: string; title: string; url: string; kind: "video" | "audio" }[];
   options?: string[];
   fields?: QuestionField[];
 }

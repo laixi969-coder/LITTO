@@ -4,6 +4,7 @@ import { lstat, mkdir, readFile, readdir, unlink } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
 import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/providers";
+import { mediaProviders } from "@toonflow/providers";
 import { parse, parseExpression } from "@babel/parser";
 import { z } from "zod";
 import conf from "@/utils/conf";
@@ -248,6 +249,28 @@ export async function addMediaProvider(source: string) {
   }
   finally { release(); }
   return result;
+}
+
+export async function addMediaProviderConnection(input: { templateId: string; id: string; label: string }) {
+  if (!providerIdSchema.safeParse(input.id).success) invalid("供应商 ID 须以小写字母开头，仅包含字母和数字");
+  const label = input.label.trim();
+  if (!label || label.length > 100) invalid("供应商名称须为 1–100 个字符");
+  const template = mediaProviders.find(provider => provider.id === input.templateId);
+  if (!template || !["apiKey", "baseUrl"].every(field => template.rules.some(rule => rule.field === field))) invalid("请选择支持自定义地址与 API Key 的接口类型");
+  if (mediaProviders.some(provider => provider.id.toLowerCase() === input.id.toLowerCase())) invalid("此 ID 已由内置供应商使用，请填写新的供应商 ID", 409);
+  if ((await listMediaProviders()).some(provider => provider.id.toLowerCase() === input.id.toLowerCase())) invalid("供应商 ID 已存在，请使用其他 ID", 409);
+  const installed = await getMediaProvider(input.templateId);
+  const entries = properties(parseProvider(installed.source).object);
+  let source = installed.source;
+  // ACT: 复用现有协议实现，只替换导出对象的身份字段；不把名称或密钥拼成可执行代码。
+  const replacements = [["id", input.id], ["label", label]] as const;
+  const edits = replacements.map(([name, value]) => {
+    const property = entries.get(name);
+    if (property?.type !== "ObjectProperty") return invalid("接口模板缺少供应商信息");
+    return { start: property.value.start!, end: property.value.end!, value: JSON.stringify(value) };
+  }).sort((left, right) => right.start - left.start);
+  for (const edit of edits) source = source.slice(0, edit.start) + edit.value + source.slice(edit.end);
+  return addMediaProvider(source);
 }
 
 export async function saveMediaProvider(fileName: string, models: z.infer<typeof mediaModelsSchema>, revision: string, expectedApiKey?: string) {

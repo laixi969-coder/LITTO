@@ -51,7 +51,7 @@ export async function runSubAgent(options: SubAgentModel & {
         signal.throwIfAborted();
         // ACT: SDK 在整批工具结束后才停轮；提出问题后不再执行本批后续操作。
         if (inputRequired?.()) throw new Error("任务正在等待调用方补充输入，不能继续执行工具");
-        if (!["askUser", "requestStoryApproval", "requestStoryDecision"].includes(tool.name) || !onTool) return tool.execute(...args);
+        if (!["askUser", "requestStoryApproval", "requestStoryDecision", "requestKeyframeApproval", "requestProductionDecision"].includes(tool.name) || !onTool) return tool.execute(...args);
         // 子会话的模型调用 ID 可能重复，提问卡片与回答通道使用独立 ID。
         const id = crypto.randomUUID();
         onTool({ id, name: tool.name, args: args[1] as Record<string, unknown>, status: "running" });

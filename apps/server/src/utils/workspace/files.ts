@@ -8,7 +8,7 @@ export async function writeWorkspaceFile(path: string, content: string | Uint8Ar
   await writeAtomic(path, content, { exclusive });
 }
 function protectStoryProject(path: string) {
-  if (basename(path).toLowerCase() === "storyproject.json") throw Object.assign(new Error("故事项目请通过故事工作台更新，以保留版本与采用记录"), { status: 403 });
+  if (basename(path).toLowerCase() === "storyproject.json") throw Object.assign(new Error("故事项目请通过故事工具更新，选择与采用可在聊天中完成，以保留版本与采用记录"), { status: 403 });
 }
 
 export async function renameWorkspaceFile(source: string, target: string) {

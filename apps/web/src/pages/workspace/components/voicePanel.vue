@@ -131,7 +131,7 @@ async function refreshStory() {
 async function importStory() {
   await refreshStory();
   const revision = storyRevision.value;
-  if (!revision) throw new Error("请先在故事工作台采用当前有效剧本");
+  if (!revision) throw new Error("请先采用当前有效剧本，可直接在聊天中确认");
   const lines = revision.scenes.flatMap(scene => {
     const previous = project.value.lines.filter(line => line.storySource?.sceneId === scene.sceneId);
     if (previous.length && previous.every(line => !storySourceStale(line))) return previous;

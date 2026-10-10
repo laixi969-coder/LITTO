@@ -18,6 +18,7 @@ const mediaProviders: Record<string, { label: string; customUrl?: boolean; verif
   volcengine: { label: "火山方舟" },
   bailian: { label: "阿里百炼" },
   kling: { label: "可灵" },
+  vidu: { label: "Vidu", customUrl: true },
   atlasCloud: { label: "Atlas Cloud" },
   easyRouter: { label: "EasyRouter", customUrl: true, verifyUrl: (_region, baseUrl) => `${(baseUrl?.trim() || "https://easyrouter.io/v1").replace(/\/+$/, "")}/models` },
 };

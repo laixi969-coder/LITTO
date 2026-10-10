@@ -13,8 +13,24 @@
       </details>
     </template>
     <p v-else-if="question" class="questionText" :tabindex="storyDecision ? 0 : undefined">{{ question }}</p>
-    <div v-if="waiting && storyDecision" class="questionActions">
-      <el-button v-for="(option, index) in options" :key="option" :type="index < options.length - 1 ? 'primary' : 'default'" :disabled="!directory || submitting" @click="submitAnswer(false, option)">{{ option }}</el-button>
+    <div v-if="images.length" class="questionImages">
+      <figure v-for="item in images" :key="item.id">
+        <a :href="item.url" target="_blank" rel="noopener noreferrer" :aria-label="`查看${item.title}原图`">
+          <img :src="item.url" :alt="item.title" @load="loadedImages.add(item.url)" @error="loadedImages.delete(item.url)" />
+        </a>
+        <figcaption>{{ item.title }}</figcaption>
+      </figure>
+    </div>
+    <p v-if="waiting && images.length && !imagesReady" class="questionText" role="status">等待图片加载完成后即可采用；图片未显示时可点击图片区域查看原图，或暂不采用。</p>
+    <div v-if="media.length" class="questionMedia">
+      <figure v-for="item in media" :key="item.id">
+        <video v-if="item.kind === 'video'" :src="item.url" :aria-label="item.title" controls preload="metadata" />
+        <audio v-else :src="item.url" :aria-label="item.title" controls preload="metadata" />
+        <figcaption>{{ item.title }}</figcaption>
+      </figure>
+    </div>
+    <div v-if="waiting && storyDecision && !formRules.length" class="questionActions">
+      <el-button v-for="(option, index) in options" :key="option" :type="index < options.length - 1 ? 'primary' : 'default'" :disabled="!directory || submitting || (index < options.length - 1 && !imagesReady)" @click="submitAnswer(false, option)">{{ option }}</el-button>
     </div>
     <template v-else-if="waiting">
       <form-create v-if="formRules.length" v-model="formValues" v-model:api="formApi" :rule="formRules" :option="formOptions" />
@@ -34,8 +50,8 @@
         <el-text v-if="draftAnswer.length > 8000" type="danger">回答（含选项）不能超过 8000 字</el-text>
       </template>
       <div class="questionActions">
-        <el-button type="primary" :loading="submitting" :disabled="!directory || (formRules.length ? !formApi : !draftAnswer || draftAnswer.length > 8000)" @click="submitAnswer(false)">
-          提交回答
+        <el-button type="primary" :loading="submitting" :disabled="!directory || !imagesReady || (formRules.length ? !formApi : !draftAnswer || draftAnswer.length > 8000)" @click="submitAnswer(false)">
+          {{ storyDecision ? '保存决定' : '提交回答' }}
         </el-button>
         <el-button :disabled="!directory || submitting" @click="submitAnswer(true)">跳过</el-button>
       </div>
@@ -74,7 +90,7 @@ import "element-plus/es/components/checkbox-group/style/css";
 import "element-plus/es/components/radio/style/css";
 import "element-plus/es/components/radio-group/style/css";
 import { IconMessageQuestion } from "@tabler/icons-vue";
-import type { ToolCall } from "@toonflow/tools-scaffold/runtime";
+import type { QuestionRequest, ToolCall } from "@toonflow/tools-scaffold/runtime";
 
 for (const component of [
   ElForm, ElFormItem, ElRow, ElCol, ElInput, ElInputNumber, ElSwitch,
@@ -84,15 +100,19 @@ for (const component of [
 
 <script setup lang="ts">
 const props = defineProps<{ tool: ToolCall; directory?: string }>();
-const storyApproval = computed(() => props.tool.name === "requestStoryApproval");
-const storyDecision = computed(() => storyApproval.value || props.tool.name === "requestStoryDecision");
-const title = computed(() => props.tool.question?.title || toolResult.value?.title || (typeof props.tool.args?.title === "string" ? props.tool.args.title.trim() : "") || (storyApproval.value ? "确认采用故事" : "请确认"));
+const storyApproval = computed(() => ["requestStoryApproval", "requestKeyframeApproval"].includes(props.tool.name));
+const storyDecision = computed(() => storyApproval.value || ["requestStoryDecision", "requestProductionDecision"].includes(props.tool.name));
+const title = computed(() => props.tool.question?.title || toolResult.value?.title || (typeof props.tool.args?.title === "string" ? props.tool.args.title.trim() : "") || (props.tool.name === "requestKeyframeApproval" ? "确认采用主关键帧" : storyApproval.value ? "确认采用故事" : "请确认"));
 const selected = ref("");
 const text = ref("");
 const submitting = ref(false);
 const submitError = ref("");
 const submittedAnswer = ref("");
 const submittedSkipped = ref(false);
+const loadedImages = ref(new Set<string>());
+const images = computed(() => props.tool.question?.images ?? toolResult.value?.images ?? []);
+const media = computed(() => props.tool.question?.media ?? toolResult.value?.media ?? []);
+const imagesReady = computed(() => images.value.every(item => loadedImages.value.has(item.url)));
 const formApi = shallowRef<Api>();
 const formValues = ref<Record<string, unknown>>({});
 const formOptions = computed<Options>(() => ({ form: { labelPosition: "top", disabled: submitting.value }, submitBtn: false, resetBtn: false }));
@@ -112,7 +132,7 @@ const formRules = computed<Rule[]>(() => (props.tool.question?.fields ?? []).map
     required: true,
     type: field.type === "checkbox" ? "array" : field.type === "inputNumber" ? "number" : field.type === "switch" ? "boolean" : "string",
     message: `请填写${field.title}`,
-    ...(field.type === "checkbox" ? { min: 1 } : {}),
+    ...(field.type === "checkbox" ? { min: field.minSelected ?? 1 } : {}),
     ...(["input", "textarea"].includes(field.type) ? { whitespace: true } : {}),
   }] : [],
 })));
@@ -124,7 +144,7 @@ const options = computed(() => {
 const toolResult = computed(() => {
   if (props.tool.status !== "success" || !props.tool.result) return;
   try {
-    return JSON.parse(props.tool.result) as { answer?: unknown; skipped?: boolean; title?: string; question?: string; options?: string[]; approved?: boolean; applied?: boolean };
+    return JSON.parse(props.tool.result) as Partial<QuestionRequest> & { answer?: unknown; skipped?: boolean; approved?: boolean; applied?: boolean };
   } catch { return; }
 });
 const skipped = computed(() => submittedSkipped.value || toolResult.value?.skipped === true);
@@ -150,6 +170,7 @@ async function submitAnswer(skip: boolean, choice?: string) {
   const callId = props.tool.question?.callId;
   const value = choice ?? draftAnswer.value;
   if (!waiting.value || submitting.value || !props.directory || !callId) return;
+  if (!skip && !imagesReady.value && (formRules.value.length || choice === options.value[0])) return;
   if (!skip && !formRules.value.length && (!value || value.length > 8000)) return;
   submitting.value = true;
   submitError.value = "";
@@ -174,7 +195,24 @@ async function submitAnswer(skip: boolean, choice?: string) {
 
 <style scoped lang="scss">
 .questionCard {
+  .questionMedia {
+    figure { margin: 12px 0; video, audio { display: block; width: 100%; max-height: 360px; } figcaption { margin-top: 6px; overflow-wrap: anywhere; } }
+  }
   &.decisionCard .questionText { max-height: min(40vh, 360px); overflow: auto; overscroll-behavior: contain; }
+  .questionImages {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: 12px;
+    figure {
+      min-width: 0;
+      margin: 0;
+      a {
+        display: block;
+        img { display: block; width: 100%; height: 180px; object-fit: contain; background: var(--el-fill-color-light); }
+      }
+      figcaption { margin-top: 6px; overflow-wrap: anywhere; }
+    }
+  }
   .questionHeader {
     display: flex;
     align-items: center;

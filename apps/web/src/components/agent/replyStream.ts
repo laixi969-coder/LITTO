@@ -62,7 +62,7 @@ export function createReplyStream(reply: AgentMessage) {
     if (event.type === "question") {
       const part = parts.find(part => part.type === "tool" && part.tool.id === event.toolCallId);
       if (part?.type !== "tool") throw new Error("提问缺少对应的工具调用");
-      part.tool.question = { callId: event.callId, title: event.title, question: event.question, options: event.options, fields: event.fields };
+      part.tool.question = { callId: event.callId, title: event.title, question: event.question, options: event.options, fields: event.fields, images: event.images, media: event.media };
       return;
     }
     if (event.type === "tool") {

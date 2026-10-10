@@ -129,7 +129,7 @@ const plugin: ToolPlugin = {
     });
     if (story?.requestDecision) tools.push({
       name: "requestStoryDecision", label: "确认故事创作选择", executionMode: "sequential",
-      description: "在聊天中请用户确认资料理解、比较并选择已保存的故事方向，或按展示的理由保留审稿问题。confirmSource 传资料 id；chooseDirection 展示全部候选，不代用户选定；decideIssue 传 reviewId、issueId、reason，理由须展示给用户确认。返回 applied: true 才表示决定已保存；跳过或暂不决定时等待，不循环追问。已有明确决定不重复询问。采用定稿用 requestStoryApproval。",
+      description: "在聊天中请用户确认资料理解、比较并选择已保存的故事方向，或按展示的理由保留审稿问题。confirmSource 传资料 id；chooseDirection 展示全部候选，不代用户选定；已有方向直接返回，仅用户明确改选时传 reconsider:true；release 传 value 展示并保存用户提供的发布反馈，不执行对外发布；decideIssue 传 reviewId、issueId、reason，理由须展示给用户确认。返回 applied: true 才表示决定已保存；跳过或暂不决定时等待，不循环追问。已有明确决定不重复询问。采用定稿用 requestStoryApproval。",
       parameters: z.toJSONSchema(storyDecisionSchema, { target: "draft-07", io: "input" }),
       async execute(id, params, signal) { return json(await story.requestDecision!(id, storyDecisionSchema.parse(params), signal)); },
     });

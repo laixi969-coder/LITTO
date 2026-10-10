@@ -1,9 +1,6 @@
 <template>
   <div v-if="loaded" class="providerList">
     <p>这里管理供应商接入。实际使用的平台与模型请在左侧“默认模型”中选择；安装供应商不代表默认使用它。</p>
-    <el-alert class="easyConnect" style="margin-bottom: 12px" type="info" showIcon :closable="false" title="只想快速接入自己的模型？">
-      <el-button link type="primary" @click="openConnectModel('media')">简易接入 →</el-button>
-    </el-alert>
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">
@@ -32,8 +29,8 @@
       </el-card>
     </div>
     <div class="providerActions">
-      <el-button class="addButton" :icon="IconPlus" @click="openAdd('builtin')">添加供应商</el-button>
-      <el-button class="addButton" :icon="IconSettings" @click="openAdd('custom')">添加自定义供应商</el-button>
+      <el-button class="addButton" type="primary" :icon="IconPlus" @click="openAdd('connection')">添加供应商</el-button>
+      <el-button @click="openConnectModel('media')">选择已知供应商</el-button>
     </div>
     <component :is="mediaProviderDialog" v-model="providerDialogVisible" :mode="addMode" @added="saveProviderItem" />
     <component :is="editProviderDialog" v-model="editorVisible" :provider="editingProvider" :syncOnOpen="syncOnOpen" @saved="saveProviderItem" />
@@ -45,7 +42,7 @@ import { openConnectModel } from "@/components/connectModel/state";
 import axios from "axios";
 import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, shallowRef, type Component } from "vue";
 import { ElMessage } from "element-plus";
-import { IconPlus, IconSettings, IconEdit, IconTrash, IconDownload } from "@tabler/icons-vue";
+import { IconPlus, IconEdit, IconTrash, IconDownload } from "@tabler/icons-vue";
 import type { MediaProvider } from "./types";
 import { saveSettings, reenableProvider } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
@@ -58,7 +55,7 @@ const sortedProviders = computed(() => providers.value);
 const loaded = ref(false);
 const providerDialogVisible = ref(false);
 const editorVisible = ref(false);
-const addMode = ref<"builtin" | "custom">("builtin");
+const addMode = ref<"connection" | "builtin" | "custom">("connection");
 const editingProvider = ref<MediaProvider>();
 const deletingFile = ref("");
 const syncOnOpen = ref(false);
@@ -88,7 +85,7 @@ async function loadProviders() {
   }
 }
 
-function openAdd(mode: "builtin" | "custom") {
+function openAdd(mode: "connection" | "builtin" | "custom") {
   mediaProviderDialog.value ??= defineAsyncComponent(() => import("./addCustomProviderDialog.vue"));
   addMode.value = mode;
   providerDialogVisible.value = true;
