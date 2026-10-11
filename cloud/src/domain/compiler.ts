@@ -279,6 +279,30 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             frameContinuity, action, timeline, motionTiming, shotDesign, ...context,
         };
     }
+    const externalModelId = model.limits.workspaceExecution ? JSON.parse(model.externalModelId)[1] : model.externalModelId;
+    if (kind === "video" && externalModelId === "viduq4-preview") {
+        // ACT: Q4 接收自然语言；保留显式规格，把通用教学段落留在导演层，不让其淹没执行节拍。
+        // 这只是投喂整理，不表示 Q4 支持逐秒硬控制或 Seedance 的专用声音语法。
+        sections = {
+            duration: `${shot.generationDuration ?? shot.duration} seconds`,
+            action: sections.action,
+            timeline: sections.timeline,
+            startingFrame: extra.startFrameMediaId ? extra.startFrameAsReference
+                ? "参考图用于人物外貌与构图；动作起点按本镜规格执行。"
+                : "从首帧正在发生的动作继续，保持画内人物、兵器和空间关系。" : "",
+            subjects: J([sections.subject, sections.assetDetails]),
+            staging: J([sections.blocking, sections.state, sections.observedState, sections.shotDesign, sections.view]),
+            performance: sections.performance,
+            camera: J([sections.camera, !musicVideo && cam.design?.timing && `Action timing: ${cam.design.timing}`]),
+            appearance: J([sections.world, sections.lighting, sections.look, sections.realism, sections.opticalTexture]),
+            references: J([sections.referenceIntent, sections.references]),
+            audio: sections.audio,
+            constraints: J([sections.constraints, sections.lock, sections.forbiddenChanges, sections.repair,
+                "保持人物身份与兵器形状；按时间线执行接触、反应和镜头变化，未指定速度时使用实时速度。",
+                "起始状态随明确动作变化；未安排变化的身份、服装、材质和场景保持一致。"]),
+            variations: J([...(shot.freedomMap?.CONTROL ?? []), sections.allow, sections.random]),
+        };
+    }
     const prompt = renderCompiledPrompt(sections);
     for (const key of ["surface", "imaging", "world", "cinematic", ...(kind === "video" ? ["motion"] : [])]) {
         if (!shot.realism?.[key]?.trim()) warnings.push(`未填写真实感规格：${key}`);

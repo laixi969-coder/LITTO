@@ -20,6 +20,8 @@
 
 修改声明：LITTO 将上述方法归纳、删减并重新组织为 manjuActionDirection.md，接入 cinema 与 workflow 的按需读取流程。删除固定模型、强制 15 秒/宫格数量、招式配额、强制破坏/血腥、禁用静止与慢镜等绝对规则；不沿用完播率预测或未经本项目验证的模型效果结论。改用现有 ShotSpec 字段、用户已选媒体规格、模型能力查询和实际结果验收。没有执行或移植上游脚本，也没有安装其全套工作流。上游作者不为本项目修改背书。
 
+2026-10-11 再核验主分支仍为上述提交。增补查阅 SKILL.md、asset-first-pipeline.md、segment-splicing.md、model-adapters.md、dialogue-speed-check.md、★ prompt-feeding-checklist.md、quality-gate-review.md，将资产实际投喂、具体接续状态、投喂精简和未验证示范标记补入本地专项。Q4 自然语言编译适配为 LITTO 自有实现，上游没有 Q4 专用分支；未移植其脚本、效果保证、确认门禁或模型专用语法。
+
 MIT License
 
 Copyright (c) 2026 Short-Drama Director Suite contributors
