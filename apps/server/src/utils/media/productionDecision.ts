@@ -7,6 +7,7 @@ import { z } from "zod";
 import conf from "@/utils/conf";
 import { listMediaModels } from "@/utils/media/generation";
 import { modelSelectionSchema, selectedModel } from "@/utils/modelSelection";
+import { requestMediaQuality } from "@/utils/media/quality";
 
 async function requestModelDecision(toolCallId: string, input: { data: Record<string, unknown>; reconsider?: boolean }, question: QuestionContext, signal?: AbortSignal) {
   const data = z.strictObject({ kind: z.enum(["image", "video", "audio"]), providerId: z.string().min(1).optional(), modelId: z.string().min(1).optional() })
@@ -48,6 +49,7 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
 
 export async function requestProductionDecision(directory: string, toolCallId: string, input: { operation: string; data: Record<string, unknown>; reconsider?: boolean }, question: QuestionContext, signal?: AbortSignal) {
   signal?.throwIfAborted();
+  if (input.operation === "selectQuality") return requestMediaQuality(directory, toolCallId, input, question, signal);
   if (input.operation === "selectModel") return requestModelDecision(toolCallId, input, question, signal);
   if (input.operation === "selectVoice" || input.operation === "configureVoice") return requestVoiceDecision(directory, toolCallId, input, question, signal);
   const api = cloud(), tenant = currentTenant();

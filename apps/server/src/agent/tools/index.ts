@@ -1,5 +1,6 @@
 import { t } from "@/lib/i18n";
-import { listMediaModels, generateMedia } from "@/utils/media/generation";
+import { listMediaModels, generateMedia, readReference } from "@/utils/media/generation";
+import { z } from "zod";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { access, constants, copyFile, lstat, mkdir, readFile, readdir, rm, rmdir, stat, withFileAccess } from "@toonflow/file";
@@ -20,6 +21,7 @@ import { readStoryProject, applyStoryAction, checkSources, requestStoryApproval,
 import { requestKeyframeApproval } from "@/utils/media/keyframeApproval";
 import { requestProductionDecision } from "@/utils/media/productionDecision";
 import { readVoiceProject } from "@/utils/media/voiceDecision";
+import { readMediaQuality, saveMediaQuality } from "@/utils/media/quality";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
@@ -103,9 +105,18 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       async production(operation, data, signal) {
         signal?.throwIfAborted();
         if (operation === "readVoice") return (await readVoiceProject(cwd)).project;
+        if (operation === "readQuality") return (await readMediaQuality(cwd)).preferences;
+        if (operation === "setQuality") return saveMediaQuality(cwd, data, undefined, signal);
         const api = cloud(), tenant = currentTenant();
         if (!api || !tenant || tenant.role === "VIEWER") throw new Error("制片工具需要已登录且有编辑权限的工作区");
         const scope = api.scoped(tenant.workspaceId), projectId = workspaceProject(cwd)!;
+        if (operation === "importKeyframe") {
+          const input = z.strictObject({ shotId: z.string().min(1), path: z.string().min(1).max(2048) }).parse(data);
+          if (scope.get("shots", input.shotId)?.projectId !== projectId) throw new Error("镜头不属于当前项目");
+          const image = await readReference(cwd, { path: input.path, mimeType: "image/png" }, "image", signal);
+          signal?.throwIfAborted();
+          return api.importWorkspaceKeyframe(scope, projectId, input.shotId, Buffer.from(image.data, "base64"), input.path);
+        }
         if (operation === "inspectFinal") {
           if (typeof data.renderId !== "string" || scope.get("renders", data.renderId)?.projectId !== projectId) throw new Error("成片不属于当前项目");
           return api.inspectFinalQuality(scope, data.renderId);

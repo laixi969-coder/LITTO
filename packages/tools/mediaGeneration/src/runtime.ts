@@ -29,6 +29,7 @@ const referenceMode = z.templateLiteral([z.enum(["image", "video", "audio"]), "R
 export const listMediaModelsSchema = z.strictObject({ all: z.boolean().optional().describe("列出可供用户选择的全部已配置媒体模型；不代表已授权切换") });
 export const imageGenerationSchema = z.strictObject({
   ...sharedFields,
+  purpose: z.enum(["asset", "standalone", "storyboard"]).optional().describe("storyboard 仅用于用户明确要求的多格分镜总览；须继承已有镜头规格和资产参考，拆格后用 importKeyframe 登记各镜候选，不能将整张宫格当作单镜主帧。"),
   size: z.string().trim().min(1).max(64).optional(),
 });
 export const videoGenerationSchema = z.strictObject({

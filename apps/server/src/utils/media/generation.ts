@@ -11,6 +11,7 @@ import { modelAccess } from "@/utils/modelAvailability";
 import { assertModelSelection, isSelectedModel } from "@/utils/modelSelection";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
+import { applyMediaQuality } from "@/utils/media/quality";
 
 const maxMediaSize = 100 * 1024 * 1024;
 const cameraSessions = new Set<string>();
@@ -267,7 +268,14 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
   const { cloud } = await import("@/lib/cloud");
   const { currentTenant } = await import("@/utils/tenant");
   const api = cloud();
-  if (!api || !currentTenant() || mediaType === "audio") return generateMediaDirect(cwd, mediaType, request, signal);
+  if (!api || !currentTenant() || mediaType === "audio") {
+    if (mediaType !== "audio") {
+      const model = (await listMediaModels()).find(model => model.type === mediaType && model.providerId === request.providerId && model.modelId === request.modelId);
+      if (!model) invalid("所选媒体模型不存在或类型不匹配");
+      request = await applyMediaQuality(cwd, mediaType, request, model);
+    }
+    return generateMediaDirect(cwd, mediaType, request, signal);
+  }
   signal?.throwIfAborted();
   const { enqueueMedia } = await import("@/utils/media/jobs");
   const job = await enqueueMedia(cwd, mediaType, request, crypto.randomUUID());

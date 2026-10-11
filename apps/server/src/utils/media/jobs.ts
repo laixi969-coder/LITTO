@@ -9,6 +9,7 @@ import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { generateMediaDirect, listMediaModels, validateCameraRequest } from "@/utils/media/generation";
 import { assertModelSelection } from "@/utils/modelSelection";
+import { applyMediaQuality } from "@/utils/media/quality";
 
 export function workspaceProject(directory: string) {
   const tenant = currentTenant();
@@ -26,15 +27,16 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
   const models = await listMediaModels();
-  if (!models.some((model) => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind))
-    throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
+  const model = models.find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
+  if (!model) throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
+  request = await applyMediaQuality(directory, kind, request, model);
   const projectId = workspaceProject(directory)!;
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
   if (production && request.productionFingerprint !== production.fingerprint) throw Object.assign(new Error("镜头规格须先预览；请重新编译后提交"), { status: 409 });
   // 负面词与种子走独立字段，不拼进提示词正文：拼接后模型只会当作要绘制的文字内容。
   const compiled = production?.compiled;
   const merged = {
-    ...request,
+    ...(production?.request ?? request),
     ...(production ? { prompt: compiled!.prompt } : {}),
     ...(compiled?.negativePrompt ? { negativePrompt: compiled!.negativePrompt } : {}),
   };
@@ -123,6 +125,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权制作镜头"), { status: 403 });
   const model = (await listMediaModels()).find(item => item.providerId === request.providerId && item.modelId === request.modelId && item.type === kind);
   if (!model) throw Object.assign(new Error("模型不存在"), { status: 400 });
+  request = await applyMediaQuality(directory, kind, request, model);
   validateCameraRequest(model, request, kind);
   if (kind === "video") {
     // 模式可能是字符串或一组参考上限；按完整候选比较，不能接受客户端自报能力。
@@ -141,5 +144,5 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
-  return result;
+  return { ...result, request };
 }

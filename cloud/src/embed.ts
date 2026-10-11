@@ -19,7 +19,7 @@ export { configureWorkspaceMedia, linkWorkspaceProject, enqueueWorkspaceMedia, p
 export { cancelJob, jobView } from "./jobs.ts";
 export type { GenRequest, GenResult } from "./providers/adapter.ts";
 export { encrypt, decrypt } from "./crypto.ts";
-export { workspaceProduction } from "./domain/workspaceProduction.ts";
+export { workspaceProduction, importWorkspaceKeyframe } from "./domain/workspaceProduction.ts";
 export { prepareKeyframeApproval, approveKeyframes } from "./domain/keyframeApproval.ts";
 export { prepareProductionDecision, applyProductionDecision } from "./domain/productionDecision.ts";
 export { inspectFinalQuality, sequenceFingerprint } from "./domain/finalQuality.ts";

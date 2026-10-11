@@ -3,9 +3,26 @@ import type { Scope } from "../db.ts";
 import { assetInput, bindingInput, shotInput, worldSchema, lookSchema } from "./schema.ts";
 import { createAsset } from "./assets.ts";
 import { bindReference, createShot, updateShot, shotPartial } from "./shots.ts";
-import { bad, conflict, notFound } from "../util.ts";
+import { bad, conflict, notFound, sha256 } from "../util.ts";
 import { finalQualityView } from "./finalQuality.ts";
-import { mediaView } from "../storage.ts";
+import { mediaView, saveMedia, sniff } from "../storage.ts";
+
+/** 拆格或用户上传的干净单帧进入候选，采用仍复用聊天中的真实检查。 */
+export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string) {
+  const shot = s.get("shots", shotId);
+  if (!shot || shot.projectId !== projectId) throw notFound("project shot");
+  if (!sniff(bytes)?.mime.startsWith("image/")) throw bad("关键帧须为可识别的图片");
+  const hash = sha256(bytes);
+  let media = s.list("media", { projectId, hash })[0];
+  if (!media) media = await saveMedia(s.workspaceId, projectId, bytes, { source: "storyboard" });
+  // 存储期间镜头可能被删除；再次核对，不能把候选挂到失效镜头。
+  if (s.get("shots", shotId)?.projectId !== projectId) throw notFound("project shot");
+  const existing = s.list("keyframes", { projectId, shotId, mediaId: media.id })[0];
+  if (existing) return existing;
+  const frame = s.insert("keyframes", { project_id: projectId, shot_id: shotId, media_id: media.id, status: "variant", meta: { source: "storyboard", workspacePath: path, hash } });
+  if (s.get("shots", shotId)?.status === "planned") s.update("shots", shotId, { status: "keyframing" });
+  return frame;
+}
 
 /** 草稿可直接保存；采用与变更确认通过聊天决定卡片写入，和制作面板复用领域规则。 */
 export function workspaceProduction(s: Scope, projectId: string, operation: string, data: Record<string, unknown>) {
