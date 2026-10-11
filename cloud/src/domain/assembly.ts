@@ -151,12 +151,14 @@ export function startRender(workspaceId: string, projectId: string, sequenceId: 
     return r;
 }
 
-export function assembleApprovedSequence(s: Scope, sequenceId: string, actor: string) {
+export function assembleApprovedSequence(s: Scope, sequenceId: string, actor: string, includeWorkingVersion = false) {
     const sequence = s.get("sequences", sequenceId);
     if (!sequence) throw notFound("sequence");
     const shots = s.list("shots", { sequenceId });
-    if (!shots.length || shots.some(shot => !shot.approvedTakeId)) return null;
-    getEdit(s, sequenceId, true);
+    if (!shots.length) return null;
+    const edit = getEdit(s, sequenceId, true);
+    if (shots.some(shot => !shot.approvedTakeId && !(includeWorkingVersion && edit.clips.some(clip => clip.shotId === shot.id
+        && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video" && clip.mediaId && s.get("media", clip.mediaId)?.mime.startsWith("video/"))))) return null;
     const timeline = buildTimeline(s, sequenceId);
     if (!timeline.clips.length || timeline.missing.length) return null;
     const fingerprint = sequenceFingerprint(s, sequenceId);

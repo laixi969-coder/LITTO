@@ -65,8 +65,7 @@ export async function requestProductionDecision(directory: string, toolCallId: s
   if (!member || member.role === "VIEWER") throw new Error("制作选择的编辑权限已失效");
   if (workspaceProject(directory) !== projectId) throw new Error("工作目录关联项目已改变，请重新确认");
   const result = api.applyProductionDecision(scope, projectId, prepared, response, tenant.userId);
+  if ("feedback" in result) return { ...prepared.request, ...result };
   let answer = result.applied ? "决定已保存，可继续已授权的后续工作" : "本次未采用，已保留候选";
-  if (result.applied && input.operation === "reviewOutput") answer = "检查记录已保存；存在问题的素材须修复或复核后采用";
-  if (result.applied && input.operation === "reviewFinal") answer = (result.result as { status: string }).status === "pass" ? "最终声画验收已通过" : "验收记录已保存，成片尚未通过最终验收";
   return { ...prepared.request, ...result, answer };
 }

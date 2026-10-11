@@ -8,12 +8,12 @@ import { assetInput, worldSchema, lookSchema } from "./schema.ts";
 import { approveAsset, assetVersions, event, newAssetVersion, rollbackAsset, updateAsset } from "./assets.ts";
 import { createBatch, promoteCandidate, registerCandidates } from "./candidates.ts";
 import { importFromLibrary, publishToLibrary, updateLibraryReference } from "./library.ts";
-import { approveTake, promoteHero, takeView } from "./lifecycle.ts";
-import { runQc, OBSERVATION_KINDS } from "./qc.ts";
+import { promoteHero } from "./lifecycle.ts";
+import { runQc } from "./qc.ts";
 import { requireReviewed, shotFingerprint } from "./realism.ts";
 import { shotPartial, updateShot } from "./shots.ts";
-import { applyOps, editView, getEdit, opSchema } from "./nle.ts";
-import { finalQualityView, reviewFinalQuality, sequenceFingerprint } from "./finalQuality.ts";
+import { applyOps, editView, getEdit, opSchema, selectWorkingTake } from "./nle.ts";
+import { finalQualityView, sequenceFingerprint } from "./finalQuality.ts";
 import { assembleApprovedSequence } from "./assembly.ts";
 
 const id = z.string().min(1).max(128);
@@ -37,8 +37,7 @@ const decisionSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("reviewFinal"), data: z.object({ renderId: id }) }),
 ]);
 
-const checkLabels = { surface: "材质与人物细节", imaging: "曝光与成像", world: "空间与接触关系", motion: "运动与表演", cinematic: "电影感与构图" };
-const finalLabels = { surface: "材质与人物细节", motion: "动作与表演", lighting: "光线与成像", continuity: "镜头连续性", sound: "声音与接缝" };
+const feedbackOptions = ["满意，继续", "想改一下", "我拿不准，帮我检查", "暂不决定"];
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item)).digest("hex");
 const fieldLabels: Record<string, string> = {
   era: "年代", locationLogic: "地点关系", architecture: "建筑", culture: "文化", weather: "天气", time: "时间", material: "材质", physics: "物理规则", realism: "真实感", environmentalConstraints: "环境约束",
@@ -141,28 +140,15 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       if (items.some(item => item.shotId !== items[0]!.shotId)) throw bad("一次比较同一镜头的候选");
       const contexts = items.map(item => outputContext(type, item));
       const shot = contexts[0]!.shot;
+      if (action.operation === "approveTake") records.push(getEdit(s, shot.sequenceId, true));
       request.media!.forEach((item, index) => { item.title = `候选 ${index + 1} · ${shot.title}`; });
-      request.title = `${action.operation === "approveTake" ? "采用视频" : "记录画面检查"}：${shot.title}`;
-      request.question = "请直接查看下方素材，填写实际观察。尚未检查的项目不要勾选。";
+      request.title = "这个画面怎么样：" + shot.title;
+      request.question = "看看下方画面，按你的感受选择就好。不需要懂专业术语；哪里不喜欢可以直接说，例如‘人物不像了’‘动作不够有力’。具体检查和修复由助手处理。";
       request.options = undefined;
       request.fields = [];
-      if (items.length > 1) request.fields.push({ field: "selection", title: "采用哪个版本", type: "radio", required: true, options: items.map((_item, index) => `候选 ${index + 1}`) });
-      if (type === "take") request.fields.push({ field: "fullPlayback", title: "已完整播放并试听所选视频", type: "checkbox", required: true, options: ["已完整播放并试听"] });
-      request.fields.push({ field: "reviewed", title: action.operation === "approveTake" ? "采用前须完成全部画面检查" : "已实际检查的项目", type: "checkbox", required: true, minSelected: action.operation === "approveTake" ? 5 : 1, options: Object.entries(checkLabels).filter(([key]) => type === "take" || key !== "motion").map(([, label]) => label) });
-      const findings = contexts.flatMap(({ report }) => report?.findings ?? []).filter(item => !item.kind.startsWith("continuity:"));
-      if (findings.length) {
-        request.question += "\n\n已有告警：\n" + findings.map(item => `${item.kind}：${item.cause} ${item.note || ""}`).join("\n");
-        request.fields.push({ field: "dismissedKinds", title: "复核后确认不成立的旧告警（没有则留空）", type: "checkbox", options: [...new Set<string>(findings.map(item => item.kind))] });
-      }
-      request.fields.push({ field: "observations", title: "仍需修复的问题（没有则留空）", type: "checkbox", options: OBSERVATION_KINDS });
-      request.fields.push({ field: "note", title: "实际问题、时间码或排除告警的依据", type: "textarea" });
-      if (type === "take") {
-        const assets = (shot.assetIds as string[]).map(assetId => record("assets", assetId));
-        request.question += "\n请填写人物/道具在视频结束时的实际状态，下一镜会沿用这些观察。";
-        assets.forEach((asset, index) => request.fields!.push({ field: `state${index}`, title: `${asset.name}：实际结束状态`, type: "textarea", required: true }));
-        if (action.operation === "approveTake" && action.data.overrideReason) request.question += `\n\n本次提议保留连续性问题的理由：${action.data.overrideReason}`;
-      }
-      request.fields.push({ field: "decision", title: "本次决定", type: "radio", required: true, options: [action.operation === "approveTake" ? "采用所选视频" : "保存检查记录", "暂不决定"] });
+      if (items.length > 1) request.fields.push({ field: "selection", title: "你更喜欢哪个版本", type: "radio", required: true, options: items.map((_item, index) => "候选 " + (index + 1)) });
+      request.fields.push({ field: "decision", title: "你的感受", type: "radio", required: true, options: feedbackOptions });
+      request.fields.push({ field: "note", title: "想怎么改？用自己的话说就好（选填，不知道也可以不填）", type: "textarea" });
       if (action.operation === "approveTake") {
         const selected = items.find(item => item.id === shot.approvedTakeId && item.status === "approved");
         if (selected) {
@@ -263,17 +249,13 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       const quality = finalQualityView(s, render); records.push(quality, sequenceFingerprint(s, render.sequenceId));
       if (!quality.analysisId || quality.status === "stale") throw conflict("请先通过 productionSpec inspectFinal 检测当前成片", "review_required");
       preview(render.mediaId, "最终成片");
-      request.title = "最终声画验收";
-      request.question = "请完整观看并试听下方成片，记录各项实际结论。";
+      request.title = "成片符合你的期待吗";
+      request.question = "直接播放下方成片。喜欢就选满意；想改哪里可以随口描述，拿不准也可以交给助手检查。无需填写专业验收表。";
       request.options = undefined;
-      request.fields = [{ field: "fullPlayback", title: "已完整播放并试听此成片", type: "checkbox", required: true, options: ["已完整播放并试听"] },
-        ...Object.entries(finalLabels).map(([field, title]) => ({ field, title, type: "radio" as const, required: true, options: ["已检查通过", "需要返修", "未验证"] })),
-        { field: "note", title: "时间码、观察证据与结论（至少 10 字）", type: "textarea", required: true }];
-      for (const [index, finding] of quality.findings.entries()) {
-        request.question += `\n${finding.message}`;
-        if (finding.severity !== "block") request.fields.push({ field: `reason${index}`, title: `${finding.message}：复查依据（通过时至少 10 字）`, type: "textarea" });
-      }
-      request.fields.push({ field: "decision", title: "本次决定", type: "radio", required: true, options: ["保存最终验收", "暂不决定"] });
+      request.fields = [
+        { field: "decision", title: "你的感受", type: "radio", required: true, options: feedbackOptions },
+        { field: "note", title: "想怎么改？例如‘节奏再快点’‘声音太大’（选填）", type: "textarea" },
+      ];
       completed = quality.status === "pass";
       break;
     }
@@ -291,7 +273,43 @@ export function applyProductionDecision(s: Scope, projectId: string, prepared: R
   if (current.fingerprint !== prepared.fingerprint) throw conflict("展示的素材、规格或检查记录已改变，请重新核对；本次未覆盖", "stale");
   const { action, request } = prepared;
   const values = response.values ?? {};
-  if (response.skipped || (request.fields?.length ? !["采用所选视频", "保存检查记录", "保存最终验收"].includes(String(values.decision)) : !request.options?.slice(0, -1).includes(response.answer))) return { applied: false };
+  const feedbackDecision = request.fields?.find(field => field.field === "decision")?.options?.includes("满意，继续");
+  if (feedbackDecision) {
+    const decision = z.enum(["满意，继续", "想改一下", "我拿不准，帮我检查", "暂不决定"]).parse(values.decision ?? "暂不决定");
+    if (response.skipped || decision === "暂不决定") return { applied: false };
+    const note = z.string().trim().max(4000).parse(values.note ?? "");
+    const targets = action.operation === "approveTake" ? action.data.takeIds : action.operation === "reviewOutput" ? [action.data.targetId] : action.operation === "reviewFinal" ? [action.data.renderId] : [];
+    const selection = targets.length === 1 ? 0 : request.fields!.find(field => field.field === "selection")!.options!.indexOf(String(values.selection));
+    if (selection < 0 || !targets[selection]) throw bad("请选择一个版本");
+    const targetId = targets[selection]!;
+    const feedbackResult = tx(() => {
+      // 用户表达喜好不等于完成技术质检；不补写检查项、完整试听或角色末态。
+      event(s, projectId, "production_feedback", targetId, decision === "满意，继续" ? "accept" : "revise", actor, JSON.stringify({ decision, note, operation: action.operation }));
+      let selected = false;
+      let reviewRequired = false;
+      if (decision === "满意，继续" && action.operation === "approveTake") {
+        const report = s.list("qc_reports", { targetType: "take", targetId }, "created_at DESC, rowid DESC")[0];
+        reviewRequired = !!report?.findings?.some((finding: Row) => finding.severity === "high");
+        if (!reviewRequired) { selectWorkingTake(s, targetId); selected = true; }
+      }
+      if (decision === "满意，继续") {
+        const after = prepareProductionDecision(s, projectId, action, true);
+        event(s, projectId, "production_decision", prepared.key, "apply", actor, after.fingerprint);
+      }
+      return { applied: decision === "满意，继续", selected, targetId, feedback: { decision, note }, reviewRequired,
+        answer: decision !== "满意，继续" ? "已记下你的想法，接下来由助手检查并提出具体修改，不需要你判断专业问题。"
+          : reviewRequired ? "已记住你选择的版本。助手会先处理检测到的问题，不会再让你填写质检表。"
+          : "已保存你的选择，继续后续制作；技术检查由助手处理，不需要重复确认。" };
+    });
+    let autoRender: unknown;
+    let autoRenderError: string | undefined;
+    if (feedbackResult.selected) {
+      try { autoRender = assembleApprovedSequence(s, s.get("shots", s.get("takes", targetId)!.shotId)!.sequenceId, actor, true); }
+      catch (error) { autoRenderError = "选择已保存，自动合成未启动：" + (error instanceof Error ? error.message : String(error)); }
+    }
+    return { ...feedbackResult, autoRender, autoRenderError };
+  }
+  if (response.skipped || !request.options?.slice(0, -1).includes(response.answer)) return { applied: false };
   const result = tx(() => {
     let result: unknown;
     switch (action.operation) {
@@ -321,36 +339,6 @@ export function applyProductionDecision(s: Scope, projectId: string, prepared: R
         }
         break;
       }
-      case "approveTake":
-      case "reviewOutput": {
-        const type = action.operation === "approveTake" ? "take" : action.data.targetType;
-        const ids = action.operation === "approveTake" ? action.data.takeIds : [action.data.targetId];
-        const selection = ids.length === 1 ? 0 : request.fields!.find(field => field.field === "selection")!.options!.indexOf(String(values.selection));
-        if (selection < 0) throw bad("请选择实际候选");
-        const item = s.get(type === "take" ? "takes" : "keyframes", ids[selection]!)!;
-        const shot = s.get("shots", item.shotId)!;
-        const labels = z.array(z.string()).parse(values.reviewed);
-        const reviewed = Object.entries(checkLabels).filter(([, label]) => labels.includes(label)).map(([key]) => key);
-        const fullPlayback = Array.isArray(values.fullPlayback) && values.fullPlayback.includes("已完整播放并试听");
-        const note = z.string().max(4000).parse(values.note ?? "");
-        const observations = z.array(z.string()).parse(values.observations ?? []).map(kind => ({ kind, note }));
-        if (observations.length && !note.trim()) throw bad("请写明实际看到的问题");
-        let observedStateDelta: Record<string, unknown> | undefined;
-        if (type === "take") {
-          // ACT: 用户文字观察按资产保存，不用计划状态冒充视频实际末态；精细字段可在后续反馈中补充。
-          observedStateDelta = {};
-          for (const [index, assetId] of (shot.assetIds ?? []).entries()) {
-            const observed = z.string().trim().min(1).max(8000).parse(values[`state${index}`]);
-            const asset = s.get("assets", assetId)!;
-            const kind = ({ Character: "characters", Creature: "characters", Wardrobe: "wardrobe", Environment: "environment" } as Record<string, string>)[asset.type] ?? "props";
-            (observedStateDelta[kind] ??= {} as Record<string, unknown>);
-            (observedStateDelta[kind] as Record<string, unknown>)[assetId] = { note: observed };
-          }
-        }
-        result = runQc(s, shot.id, { type, id: item.id }, observations, { reviewed, note, actor, fullPlayback, observedStateDelta, dismissedKinds: z.array(z.string()).parse(values.dismissedKinds ?? []) });
-        if (action.operation === "approveTake") result = takeView(approveTake(s, item.id, actor, action.data.overrideReason ? { reason: action.data.overrideReason } : undefined));
-        break;
-      }
       case "world":
       case "look": {
         const table = action.operation === "world" ? "worlds" : "looks";
@@ -366,25 +354,10 @@ export function applyProductionDecision(s: Scope, projectId: string, prepared: R
       case "importAsset": result = importFromLibrary(s, action.data.libraryId, projectId, actor); break;
       case "libraryReference": result = updateLibraryReference(s, action.data.libraryId, action.data.mediaId, actor); break;
       case "editTimeline": result = editView(s, applyOps(s, action.data.sequenceId, action.data.ops, getEdit(s, action.data.sequenceId, false).version)); break;
-      case "reviewFinal": {
-        const render = s.get("renders", action.data.renderId)!;
-        const quality = finalQualityView(s, render);
-        const statuses: Record<string, string> = { "已检查通过": "pass", "需要返修": "fail", "未验证": "unverified" };
-        result = reviewFinalQuality(s, render.id, { analysisId: quality.analysisId, fullPlayback: Array.isArray(values.fullPlayback) && values.fullPlayback.includes("已完整播放并试听"),
-          checks: Object.fromEntries(Object.keys(finalLabels).map(key => [key, statuses[String(values[key])]])), note: values.note,
-          acknowledgements: quality.findings.flatMap((finding: Row, index: number) => values[`reason${index}`] ? [{ id: finding.id, reason: values[`reason${index}`] }] : []),
-        }, actor); break;
-      }
     }
     const after = prepareProductionDecision(s, projectId, action, true);
     event(s, projectId, "production_decision", prepared.key, "apply", actor, after.fingerprint);
     return result;
   });
-  let autoRender: unknown;
-  let autoRenderError: string | undefined;
-  if (action.operation === "approveTake") {
-    try { const take = s.get("takes", (result as Row).id)!; autoRender = assembleApprovedSequence(s, s.get("shots", take.shotId)!.sequenceId, actor); }
-    catch (error) { autoRenderError = `视频已采用，自动合成未启动：${error instanceof Error ? error.message : String(error)}`; }
-  }
-  return { applied: true, result, autoRender, autoRenderError };
+  return { applied: true, result };
 }

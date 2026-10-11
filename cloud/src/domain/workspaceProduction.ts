@@ -8,7 +8,7 @@ import { finalQualityView } from "./finalQuality.ts";
 import { mediaView, saveMedia, sniff } from "../storage.ts";
 import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
-import { applyOps, getEdit } from "./nle.ts";
+import { selectWorkingTake } from "./nle.ts";
 import { realismChecks } from "./realism.ts";
 
 /** 拆格或用户上传的干净单帧进入候选，采用仍复用聊天中的真实检查。 */
@@ -56,17 +56,8 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       });
       if (review.report.findings.some(finding => finding.severity === "high")) return { selected: false, review, reason: "存在严重问题，已保留检查记录，未采用" };
       if (input.targetType === "keyframe") promoteHero(s, item.id, `agent:${actor}`);
-      else {
-        // 工作版复用显式媒体剪辑；不伪造人工完整播放、实际末态或 approvedTakeId。
-        const edit = getEdit(s, shot.sequenceId, true);
-        const clip = edit.clips.find(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video");
-        if (!clip) throw bad("镜头没有可替换的剪辑片段");
-        if (clip.mediaId !== media.id && (clip.audioDetached || edit.clips.some(audio => audio.linkedClipId === clip.id))) throw bad("该镜头已有独立声音剪辑，请通过剪辑操作替换素材，保留声音接点");
-        if (clip.mediaId !== media.id) applyOps(s, shot.sequenceId, [
-          { type: "delete_clip", id: clip.id, ripple: false },
-          { type: "add_clip", clip: { trackId: clip.trackId, type: "shot", shotId: shot.id, mediaId: media.id, start: clip.start, duration: clip.duration, in: clip.in, speed: clip.speed, transition: clip.transition, gainDb: clip.gainDb, fadeIn: clip.fadeIn, fadeOut: clip.fadeOut, label: clip.label } },
-        ], edit.version);
-      }
+      else selectWorkingTake(s, item.id);
+
       return { selected: true, status: "workingVersion", finalReviewRequired: true, review, answer: "代理检查已记录并选入工作版；未声明用户已完整播放或最终声画验收通过" };
     });
   }

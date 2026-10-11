@@ -420,3 +420,20 @@ export function editView(s: Scope, row: EditRow) {
         clips: row.clips.map((c) => { const r = resolveClip(s, c); const sh = c.shotId ? s.get("shots", c.shotId) : null; return { ...c, out: r3(c.in + c.duration * c.speed), source: { kind: r.kind, mediaId: r.mediaId, mime: r.mime, srcDuration: r.srcDuration, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null }, shotOrder: sh?.ord ?? null, subtitle: sh?.subtitle ?? "", grade: sh?.grade ?? null }; }) };
 }
 void all; void get; void forbidden;
+
+/** 显式选入工作版，不把创作选择冒充完整技术验收。 */
+export function selectWorkingTake(s: Scope, takeId: string) {
+  const take = s.get("takes", takeId);
+  const shot = take && s.get("shots", take.shotId);
+  const media = take && s.get("media", take.mediaId);
+  if (!take || !shot || !media || take.projectId !== shot.projectId || media.projectId !== shot.projectId || !media.mime.startsWith("video/")) throw bad("视频不属于当前镜头");
+  const edit = getEdit(s, shot.sequenceId, true);
+  const clip = edit.clips.find(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video");
+  if (!clip) throw bad("镜头没有可替换的剪辑片段");
+  if (clip.mediaId === media.id) return edit;
+  if (clip.audioDetached || edit.clips.some(audio => audio.linkedClipId === clip.id)) throw bad("该镜头已有独立声音剪辑，请通过剪辑操作替换素材，保留声音接点");
+  return applyOps(s, shot.sequenceId, [
+    { type: "delete_clip", id: clip.id, ripple: false },
+    { type: "add_clip", clip: { trackId: clip.trackId, type: "shot", shotId: shot.id, mediaId: media.id, start: clip.start, duration: clip.duration, in: clip.in, speed: clip.speed, transition: clip.transition, gainDb: clip.gainDb, fadeIn: clip.fadeIn, fadeOut: clip.fadeOut, label: clip.label } },
+  ], edit.version);
+}
