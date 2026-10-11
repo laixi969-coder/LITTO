@@ -32,9 +32,18 @@ const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "l
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
-    // 仅同步原先逐字镜像 action 的路径；独立编排的走位或本次显式相机修改保持原意。
-    if (patch.action !== undefined && patch.camera === undefined && shot.camera?.design?.subjectPath === shot.action) {
-        patch = { ...patch, camera: { ...shot.camera, design: { ...shot.camera.design, subjectPath: patch.action } } };
+    const actionChanged = patch.action !== undefined && patch.action !== shot.action;
+    const timelineChanged = patch.musicVideo !== undefined && JSON.stringify(patch.musicVideo?.timeline) !== JSON.stringify(shot.musicVideo?.timeline);
+    if (actionChanged || timelineChanged) {
+        // ACT: 不用关键词猜测动作矛盾；要求调用方同次复核依赖字段，语义一致性仍由导演检查最终编译文本。
+        const missing = [
+            shot.camera?.design && patch.camera === undefined && "camera（起止状态、主体路径、运镜与节拍）",
+            shot.musicVideo && patch.musicVideo === undefined && "musicVideo（逐秒动作与声音）",
+            shot.constraints?.length && patch.constraints === undefined && "constraints（镜数、速度与保持项）",
+            Object.values(shot.performance ?? {}).some(value => typeof value === "string" && value.trim()) && patch.performance === undefined && "performance（表演节拍）",
+            Object.values(shot.realism ?? {}).some(value => typeof value === "string" && value.trim()) && patch.realism === undefined && "realism（运动与当前状态）",
+        ].filter(Boolean);
+        if (missing.length) throw bad(`动作或时间线已修改，请由助手复核并在同一次 updateShot 中提交 ${missing.join("、")}，避免继承旧动作；仍适用的内容可原样提交。这是规格一致性修正，不需要让用户逐项填写或再次确认。`);
     }
     validateMusicVideoTiming({ ...shot, ...patch } as ShotInput);
     if (patch.sequenceId !== undefined && patch.sequenceId !== shot.sequenceId) throw bad("use the sequence workflow to move a shot");

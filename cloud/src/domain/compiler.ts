@@ -173,6 +173,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     if (kind === "video" && extra.startFrameMediaId && !inputs.some((i) => i.role === "START_FRAME")) inputs.unshift({ referenceId: "hero", mediaId: extra.startFrameMediaId, role: "START_FRAME", weight: 1, lockLevel: "LOCK", sent: true });
 
     const cam = shot.camera ?? {}, lt = shot.lighting ?? {};
+    const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
     const lock: string[] = [...(shot.freedomMap?.LOCK ?? [])];
     for (const a of assets) {
         if (a.approvalStatus === "approved") lock.push(...(a.invariants ?? []).map((i: string) => `${a.name}: ${i}`));
@@ -181,12 +182,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : [] };
 
     let sections: Record<string, string> = {
-        shotDesign: cam.design ? `${kind === "image" ? "Render only the single start state; end, paths and timing are continuity context, not multiple panels. " : ""}${JSON.stringify(cam.design)}` : "",
-        motionTiming: kind === "video" ? J([
-            cam.design?.timing && `Action timing: ${cam.design.timing}`,
-            shot.performance?.timing && `Performance timing: ${shot.performance.timing}`,
-            "Follow the specified action beats and playback speed. Cinematic scale and heavy mass do not imply slow motion. Do not stretch one brief contact or pose across the entire requested duration. Preserve the specified preparation, contact, reaction and follow-through; camera movement must not replace subject movement. Slow motion, freeze frames and internal cuts require explicit direction. A planned edit is not an instruction to cut inside this generated shot",
-        ]) : "",
+        shotDesign: kind === "image" && cam.design ? `Render only the single start state; end, paths and timing are continuity context, not multiple panels. ${JSON.stringify(cam.design)}` : "",
         subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
         assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
         narrative: shot.narrativeFunction,
@@ -224,13 +220,30 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             : "Continue the actual start frame, including action already in progress; do not rewind to repeat an earlier action. World and identity descriptions are context, not instructions to put every mentioned subject on screen. Keep off-screen subjects off screen unless the shot action explicitly calls for their entrance. Preserve the established subject scale relative to buildings and other subjects; do not invent miniature background versions or duplicates." : "",
         repair: extra.repair?.note ?? "",
     };
+    if (kind === "video") {
+        // ACT: 时间线是执行节拍的唯一来源；验收标准、备用方案和跨镜剪点留在规格中，不发给生成模型执行。
+        sections.shotDesign = cam.design ? J([
+            cam.design.start && `Starting state: ${cam.design.start}`,
+            cam.design.end && `Ending state: ${cam.design.end}`,
+            cam.design.subjectPath !== shot.action && cam.design.subjectPath && `Subject path: ${cam.design.subjectPath}`,
+            cam.design.cameraPath && `Camera path: ${cam.design.cameraPath}`,
+            cam.design.invariants?.length && `Invariants: ${cam.design.invariants.join("; ")}`,
+        ]) : "";
+        sections.motionTiming = J([
+            musicVideo && "The execution timeline defines the action order, timing and explicitly timed camera changes. Apply untimed path and camera descriptions only where compatible; never introduce an extra action, cut or pause from background context.",
+            !musicVideo && cam.design?.timing && `Action timing: ${cam.design.timing}`,
+            "Use the specified playback speed; otherwise use real-time motion. Heavy mass is not slow motion. Continue action already underway without repeating its preparation. Contact causes the visible reaction; do not stretch brief contact into a held pose. Camera motion must not substitute for subject motion. Internal cuts occur only when explicitly directed in the execution beats; neighbouring-shot edit notes are not internal cuts.",
+        ]);
+        sections.narrative = "";
+        sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
+        sections.renderingStandard = "Respect the selected photographic or stylized medium. Preserve material-specific roughness, coherent light, contact shadows, stable exposure and scale-appropriate detail. Use natural motion blur at the specified speed; keep contact and reactions readable. Do not add slow motion, artificial sharpening, grain, damage or uniformly glossy surfaces to imply cinematic quality.";
+    }
     let negativePrompt = J(shotAvoid(freedom));
-    const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
     if (kind === "video" && musicVideo) {
         const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}】${item.description}`).join("\n");
         const audio = J([
             musicVideo.audioMode === "sourceTrack" && `原曲从 ${musicVideo.sourceStart}s 起对应本段 0s；最终剪辑沿用同一原曲，不在切镜处重启或重作歌曲`,
-            musicVideo.audioMode === "generated" && "按已确认的音乐方案生成本段声音；跨段曲目与声音身份须实际试听核对",
+            musicVideo.audioMode === "generated" && "按以下声音设计生成本段声音；未要求音乐时不要自行配乐",
             musicVideo.audioMode === "silent" && "本段不生成声音",
             musicVideo.audioDirection,
         ]);
@@ -258,6 +271,13 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             sections.audio = audio;
             sections.duration = `${shot.generationDuration ?? shot.duration} seconds`;
         }
+    }
+    if (kind === "video" && !("Objective" in sections)) {
+        const { action, timeline, motionTiming, frameContinuity, shotDesign, ...context } = sections;
+        sections = {
+            duration: `${shot.generationDuration ?? shot.duration} seconds`,
+            frameContinuity, action, timeline, motionTiming, shotDesign, ...context,
+        };
     }
     const prompt = renderCompiledPrompt(sections);
     for (const key of ["surface", "imaging", "world", "cinematic", ...(kind === "video" ? ["motion"] : [])]) {
