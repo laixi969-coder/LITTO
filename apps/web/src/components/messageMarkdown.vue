@@ -1,8 +1,9 @@
 <template>
   <div class="messageMarkdown">
+    <!-- ACT: 流式结束时重建末块，清除解析器遗留的未闭合链接状态；逐字更新仍复用实例。 -->
     <markdown
       v-for="(chunk, index) in chunks"
-      :key="index + '-' + !!definitions"
+      :key="index + '-' + !!definitions + '-' + (streaming && index === chunks.length - 1 ? 'streaming' : 'static')"
       v-memo="[chunk, streaming && index === chunks.length - 1, codeOptions, directory, markdownLocale]"
       class="markdownChunk"
       :content="chunk"
