@@ -10,6 +10,7 @@ import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake } from "./nle.ts";
 import { realismChecks } from "./realism.ts";
+import { creativeReviewSchema } from "./creativeDirection.ts";
 
 /** 拆格或用户上传的干净单帧进入候选，采用仍复用聊天中的真实检查。 */
 export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string) {
@@ -37,6 +38,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       targetType: z.enum(["keyframe", "take"]), targetId: z.string().min(1),
       authorization: z.string().trim().min(8).max(2000), note: z.string().trim().min(10).max(8000),
       frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
+      creativeReview: creativeReviewSchema.optional(),
       observations: z.array(z.strictObject({ kind: z.string(), note: z.string().min(1) })).max(40).default([]),
     }).parse(data);
     const item = s.get(input.targetType === "keyframe" ? "keyframes" : "takes", input.targetId);
@@ -44,6 +46,8 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     const media = item && s.get("media", item.mediaId);
     if (!item || !shot || !media || [item, shot, media].some(row => row.projectId !== projectId)) throw notFound("project output");
     if (!media.mime.startsWith(input.targetType === "take" ? "video/" : "image/")) throw bad("审阅目标的媒体类型不符");
+    if (shot.creativeBrief && !input.creativeReview) throw bad("请由助手对照 creativeBrief 和实际输出填写 creativeReview：verdict 为 pass 或 revise，styling 说明妆发服装与视觉目标是否相符，staging 说明动作起点/实际攻防是否相符。无变形不等于造型与编排合格，不要求用户填写。");
+    if (input.creativeReview?.verdict === "revise") input.observations.push({ kind: "creativeMismatch", note: `${input.creativeReview.styling}；${input.creativeReview.staging}` });
     if (input.targetType === "take" && (!media.duration || input.frameTimes.length < 2
       || input.frameTimes.some((time, index) => time >= media.duration || index > 0 && time <= input.frameTimes[index - 1]!))) {
       throw bad("视频工作版须记录至少两个递增且位于素材时长内的实际抽帧时间");
@@ -52,7 +56,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       const review = runQc(s, shot.id, { type: input.targetType, id: item.id }, input.observations, {
         actor: `agent:${actor}`, note: input.note,
         reviewed: input.targetType === "keyframe" ? realismChecks.filter(key => key !== "motion") : [],
-        vision: { source: "delegatedAgent", authorization: input.authorization, frameTimes: input.frameTimes, audioReview: "notVerified", status: "workingVersion" },
+        vision: { source: "delegatedAgent", authorization: input.authorization, frameTimes: input.frameTimes, creativeReview: input.creativeReview, audioReview: "notVerified", status: "workingVersion" },
       });
       if (review.report.findings.some(finding => finding.severity === "high")) return { selected: false, review, reason: "存在严重问题，已保留检查记录，未采用" };
       if (input.targetType === "keyframe") promoteHero(s, item.id, `agent:${actor}`);

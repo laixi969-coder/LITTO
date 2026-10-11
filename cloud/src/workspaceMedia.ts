@@ -154,5 +154,6 @@ export function prepareWorkspaceShot(input: {
   }).join("; ");
   compiled.sections["Objective" in compiled.sections ? "Reference binding" : "reference plan"] = referencePlan;
   compiled.prompt = renderCompiledPrompt(compiled.sections);
-  return { shotId: shot.id, keyframeId: keyframe?.id, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: shot.musicVideo?.audioMode as string | undefined };
+  const nativeDialogue = shot.creativeBrief?.dialogue?.mode === "native" && shot.creativeBrief.dialogue.lines.length > 0;
+  return { shotId: shot.id, keyframeId: keyframe?.id, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
 }

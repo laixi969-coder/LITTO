@@ -7,6 +7,7 @@ import { ensureCropMedia, viewOf } from "./panorama.ts";
 import { ensureReferenceCrop } from "./referenceCrop.ts";
 import { lookSchema, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
+import { creativeDirectionIssues } from "./creativeDirection.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -107,6 +108,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const caps = model.capabilities;
     const { start } = statesOf(s, shotId);
     const warnings: string[] = [];
+    warnings.push(...creativeDirectionIssues(shot as ShotInput, assets).map(issue => `创作准备未完成：${issue}`));
+    if (kind === "video" && shot.creativeBrief?.dialogue.mode === "native" && shot.creativeBrief.dialogue.lines.length
+        && !model.limits.workspaceExecution && !caps.nativeAudio) warnings.push("创作准备未完成：当前模型没有原生音频能力，不能静默丢弃对白；请选择支持的模型或明确后期配音对口型路径");
     const clean = (t: string, where: string) => {
         const r = stripFluff(t);
         if (r.removed.length) warnings.push(`removed non-actionable terms from ${where}: ${r.removed.join(", ")}`);
@@ -180,8 +184,15 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }
     lock.push(...(extra.repair?.addLock ?? []));
     const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : [] };
+    const brief = shot.creativeBrief as ShotInput["creativeBrief"];
+    const assetName = (id: string) => assets.find(asset => asset.id === id)?.name ?? id;
 
     let sections: Record<string, string> = {
+        creativeIntent: shot.creativeBrief ? J([shot.creativeBrief.intent, shot.creativeBrief.visualPayoff]) : "",
+        combatDesign: kind === "video" && brief?.combat ? J([brief.combat.dramaticTurn, brief.combat.signature,
+            ...brief.combat.beats.map(beat => `${assetName(beat.attackerId)}对${assetName(beat.defenderId)}：${beat.action} → ${beat.reaction} → ${beat.endState}；其他人物：${beat.supportingAction}`)]) : "",
+        dialogue: kind === "video" && brief?.dialogue.lines.length
+            ? `${brief.dialogue.mode === "native" ? "生成以下原文对白及声音，并按要求同步人物口型" : "后期配音及口型处理计划，当前素材不代表声画同步已完成"}：\n${brief.dialogue.lines.map(line => `${musicTimecode(line.start)}–${musicTimecode(line.end)} ${assetName(line.speakerId)}说：${JSON.stringify(line.text)}；${line.delivery}；${line.lipSync === "visible" ? "可见嘴部与此句逐字同步" : "画外音，不要求画内人物说此句"}；${line.framing}`).join("\n")}` : "",
         shotDesign: kind === "image" && cam.design ? `Render only the single start state; end, paths and timing are continuity context, not multiple panels. ${JSON.stringify(cam.design)}` : "",
         subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
         assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
@@ -276,6 +287,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         const { action, timeline, motionTiming, frameContinuity, shotDesign, ...context } = sections;
         sections = {
             duration: `${shot.generationDuration ?? shot.duration} seconds`,
+            creativeIntent: sections.creativeIntent,
+            combatDesign: sections.combatDesign,
+            dialogue: sections.dialogue,
             frameContinuity, action, timeline, motionTiming, shotDesign, ...context,
         };
     }
@@ -285,6 +299,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         // 这只是投喂整理，不表示 Q4 支持逐秒硬控制或 Seedance 的专用声音语法。
         sections = {
             duration: `${shot.generationDuration ?? shot.duration} seconds`,
+            creativeIntent: sections.creativeIntent,
+            combatDesign: sections.combatDesign,
+            dialogue: sections.dialogue,
             action: sections.action,
             timeline: sections.timeline,
             startingFrame: extra.startFrameMediaId ? extra.startFrameAsReference
@@ -315,6 +332,6 @@ export type { Policy };
 
 export function requireCompiledInputs(compiled: Compiled) {
     if (compiled.inputs.some(ref => !ref.sent && ref.lockLevel === "LOCK")) throw bad("当前模型无法发送锁定参考，请更换模式或模型");
-    const missing = compiled.warnings.filter(warning => warning.startsWith("未填写真实感规格"));
+    const missing = compiled.warnings.filter(warning => warning.startsWith("未填写真实感规格") || warning.startsWith("创作准备未完成："));
     if (missing.length) throw bad(missing.join("；"));
 }

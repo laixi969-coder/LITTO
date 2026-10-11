@@ -115,6 +115,31 @@ export const musicVideoSchema = z.object({
     });
 });
 
+const directionText = z.string().trim().min(1).max(2000);
+export const creativeBriefSchema = z.object({
+    kind: z.enum(["combat", "performance", "establishing"]),
+    intent: directionText,
+    visualPayoff: directionText,
+    combat: z.object({
+        dramaticTurn: directionText,
+        signature: directionText,
+        coverage: directionText,
+        beats: z.array(z.object({
+            attackerId: directionText, defenderId: directionText,
+            action: directionText, reaction: directionText, endState: directionText,
+            supportingAction: directionText,
+        }).strict()).min(1).max(12),
+    }).strict().optional(),
+    dialogue: z.object({
+        mode: z.enum(["native", "post"]),
+        lines: z.array(z.object({
+            speakerId: directionText, text: directionText,
+            start: z.number().finite().nonnegative(), end: z.number().finite().positive(),
+            delivery: directionText, lipSync: z.enum(["visible", "offscreen"]), framing: directionText,
+        }).strict()).max(40),
+    }).strict(),
+}).strict();
+
 export const shotInput = z.object({
     sequenceId: z.string(), sceneId: z.string().optional(), order: z.number().int().optional(),
     title: z.string().default(""),
@@ -128,6 +153,7 @@ export const shotInput = z.object({
     duration: z.number().finite().positive().max(3600).default(4),
     generationDuration: z.number().finite().positive().max(3600).optional(),
     musicVideo: musicVideoSchema.nullable().optional(),
+    creativeBrief: creativeBriefSchema.optional(),
     inspectionRegion: referenceCropSchema.nullable().optional(),
     subtitle: z.string().default(""),
     modelOverride: z.any().optional(),

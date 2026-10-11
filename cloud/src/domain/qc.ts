@@ -8,6 +8,7 @@ import { bad } from "../util.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
 const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string; penalty: number; severity: "high" | "medium" | "low" }> = {
+    creativeMismatch: { cause: "造型或动作未达到本镜创作目标", action: "directionRevise", detail: "先对照创作目标修订妆造资产或攻防编排，再检查新候选；不把无变形、身份一致或生成成功当作创作质量通过", penalty: 25, severity: "high" },
     anatomy_failure: { cause: "肢体增减、身体结构或遮挡关系错误", action: "motion_regenerate", detail: "定位多肢、消失或穿透的时间段，拒绝该候选；保持身份，简化为一次完整动作并重新生成，完整播放复核", penalty: 40, severity: "high" },
     wardrobe_drift: { cause: "服装或商品形状与锁定参考不一致", action: "geometry_lock", detail: "核对实际商品参考、裤长、腰头、缝线与服装状态；更换不一致镜头，不用转场掩盖", penalty: 30, severity: "high" },
     plastic_surface: { cause: "皮肤或材质呈塑料感、统一磨皮", action: "material_reference", detail: "核对材质与光照参考，修正表面粗糙度、局部纹理与高光响应；保留身份后另出关键帧，不靠叠加锐化补救", penalty: 25, severity: "high" },
@@ -79,6 +80,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
 export function applyRepair(s: Scope, repairId: string, actor: string) {
     const r = s.get("repair_actions", repairId);
     if (!r) throw notFound("repair action");
+    if (r.action === "directionRevise") return { applied: false, manual: true, message: "由助手先修订创作目标对应的妆造或攻防规格，并复核实际参考；未改方案前不自动付费重生成", repairActionId: r.id };
     const qc = s.get("qc_reports", r.qcReportId);
     const video = qc?.targetType === "take";
     const lock = ["identity_drift", "reference_replace"].includes(r.action) ? ["IDENTITY at weight 1.0 — do not alter facial geometry"] : r.action === "geometry_lock" || r.action === "environment_lock" ? ["geometry of environment and key props — do not alter layout"] : [];

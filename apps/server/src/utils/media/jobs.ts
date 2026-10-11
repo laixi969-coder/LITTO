@@ -136,7 +136,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true });
   if (kind === "video" && result.audioMode === "generated" && (!model.audio || request.generateAudio === false || (model.audio === "optional" && request.generateAudio !== true))) {
-    throw Object.assign(new Error("MV 方案需要生成声音，请选用支持音频的模型并开启 generateAudio"), { status: 400 });
+    throw Object.assign(new Error("本镜对白或声音方案需要生成声音，请选用支持音频的模型并开启 generateAudio；不能删除台词或改成静音绕过"), { status: 400 });
   }
   if (kind === "video" && result.audioMode === "silent" && (model.audio === true || request.generateAudio === true || (model.audio === "optional" && request.generateAudio !== false))) {
     throw Object.assign(new Error("MV 方案要求无声素材，请关闭 generateAudio 或更换支持无声输出的模型"), { status: 400 });

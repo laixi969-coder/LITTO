@@ -28,7 +28,7 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo"] as const;
+const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "creativeBrief"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
@@ -39,6 +39,7 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
         const missing = [
             shot.camera?.design && patch.camera === undefined && "camera（起止状态、主体路径、运镜与节拍）",
             shot.musicVideo && patch.musicVideo === undefined && "musicVideo（逐秒动作与声音）",
+            shot.creativeBrief && patch.creativeBrief === undefined && "creativeBrief（创作目标、攻防与对白口型）",
             shot.constraints?.length && patch.constraints === undefined && "constraints（镜数、速度与保持项）",
             Object.values(shot.performance ?? {}).some(value => typeof value === "string" && value.trim()) && patch.performance === undefined && "performance（表演节拍）",
             Object.values(shot.realism ?? {}).some(value => typeof value === "string" && value.trim()) && patch.realism === undefined && "realism（运动与当前状态）",

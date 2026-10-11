@@ -11,8 +11,11 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
   if (!shot) throw notFound("shot");
   const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
   const previousTake = previous?.approvedTakeId ? s.get("takes", previous.approvedTakeId) : null;
+  const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
   const data = {
-    shot: shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined }),
+    shot: { ...shotData, ...(creativeBrief ? { creativeBrief: type === "keyframe"
+      ? { kind: creativeBrief.kind, intent: creativeBrief.intent, visualPayoff: creativeBrief.visualPayoff }
+      : creativeBrief } : {}) },
     world: s.list("worlds", { projectId: shot.projectId }),
     looks: s.list("looks", { projectId: shot.projectId }),
     assets: (shot.assetIds ?? []).map((id: string) => s.get("assets", id)),
