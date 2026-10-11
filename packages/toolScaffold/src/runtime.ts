@@ -152,7 +152,7 @@ export interface MediaContext {
   production?(operation: string, data: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>;
   requestKeyframeApproval?(toolCallId: string, keyframeIds: string[], signal?: AbortSignal): Promise<unknown>;
   requestProductionDecision?(toolCallId: string, input: { operation: string; data: Record<string, unknown>; reconsider?: boolean }, signal?: AbortSignal): Promise<unknown>;
-  listModels(): Promise<MediaModel[]>;
+  listModels(all?: boolean): Promise<MediaModel[]>;
   generateImage(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
   generateVideo(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
   generateAudio(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;

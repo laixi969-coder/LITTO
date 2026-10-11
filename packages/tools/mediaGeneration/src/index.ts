@@ -21,12 +21,12 @@ const plugin: ToolPlugin = {
     const listTool: ToolDefinition = {
       name: "listMediaModels",
       label: "查询媒体模型",
-      description: "查询用户在默认模型设置中选定且当前可用的媒体模型，返回 providerId、modelId、类型、cameraTrajectory（原生数值轨迹）、promptControl（文字控制限制）、模式及支持的画幅、时长、分辨率或音色。生成前先查询；某类型没有结果时，请用户设置默认模型，禁止自行选平台、猜模型或回退。",
+      description: "查询当前选定且可用的媒体模型；all:true 可列出供用户在聊天中选择的全部已配置模型，返回 providerId、modelId、类型、cameraTrajectory（原生数值轨迹）、promptControl（文字控制限制）、模式及支持的画幅、时长、分辨率或音色。生成前先查询；没有默认值或用户要换模型时，用 requestProductionDecision(selectModel) 在聊天中选择并保存，不要求用户前往设置页。all:true 的列表不授权自行切换模型。",
       parameters: z.toJSONSchema(listMediaModelsSchema, { io: "input", target: "draft-07" }),
       async execute(_id, params, signal) {
-        listMediaModelsSchema.parse(params);
+        const { all } = listMediaModelsSchema.parse(params);
         signal?.throwIfAborted();
-        const result = (await media.listModels()).filter(model => generationTools.some(operation => operation.mediaType === model.type));
+        const result = (await media.listModels(all)).filter(model => generationTools.some(operation => operation.mediaType === model.type));
         return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
       },
     };
@@ -43,11 +43,11 @@ const plugin: ToolPlugin = {
       },
     }] : [];
     if (media.requestProductionDecision) {
-      const schema = z.strictObject({ operation: z.enum(["approveAssets", "selectReference", "selectCandidate", "approveTake", "reviewOutput", "world", "look", "updateShot", "updateAsset", "rollbackAsset", "removeBinding", "publishAsset", "importAsset", "libraryReference", "editTimeline", "reviewFinal", "selectVoice", "configureVoice"]), data: z.record(z.string(), z.json()), reconsider: z.boolean().optional() });
+      const schema = z.strictObject({ operation: z.enum(["selectModel", "approveAssets", "selectReference", "selectCandidate", "approveTake", "reviewOutput", "world", "look", "updateShot", "updateAsset", "rollbackAsset", "removeBinding", "publishAsset", "importAsset", "libraryReference", "editTimeline", "reviewFinal", "selectVoice", "configureVoice"]), data: z.record(z.string(), z.json()), reconsider: z.boolean().optional() });
       productionTools.push({
         name: "requestProductionDecision", label: "确认制作选择", executionMode: "sequential",
         promptSnippet: "editTimeline 的 ops 每项含 type：set_cut{leftId,rightId,sourceOut,sourceIn,leftMediaId?,rightMediaId?}；bridge_audio{leftId,rightId,mode:jCut|lCut|crossfade|none,duration}；map_segments{mediaId,segments:[{shotId,in,out}]}；add_clip{clip:{trackId,type:shot|media,shotId?,mediaId?,start,duration?,in?,speed?,label?}}；move_clip{id,start?,trackId?}；trim_clip{id,in?,out?,start?,duration?,ripple?}；split_clip{id,at}；delete_clip{id,ripple?}；set_transition{id,transition:{type:cut|dissolve|fade_black,duration}}；set_gain{id,gainDb?,fadeIn?,fadeOut?}；set_speed{id,speed}；add_track{kind:video|audio,name?,role:dialogue|music|sfx}；update_track{id,name?,role?,muted?,locked?,gainDb?}；add_marker{t,label}；remove_marker{id}；reorder{shotIdA,shotIdB}；set_duck{duck:null|{underRole:dialogue|music|sfx,amountDb}}；set_sequence_grade{grade:null|{lift?,gamma?,gain?,saturation?,contrast?,temperature?,exposureStops?,lutCube?}}，颜色 lift/gamma/gain 是三个 -1 至 1 的数。时间单位为秒，所有 ID 来自 read/readEdit。",
-        description: "所有制作选择在聊天里展示、确认并保存，不让用户跳到面板。先 productionSpec read 获取真实记录。approveAssets{assetIds}；selectReference{assetId,mediaIds} 比较当前项目图片并同时采用资产设定与定妆，无需预建候选池；selectCandidate{candidateIds,asHero?} 比较同一资产的定妆图；approveTake{takeIds,overrideReason?} 比较同镜头的视频并由用户填写检查和实际末态；reviewOutput{targetType:keyframe|take,targetId} 在聊天记录问题或排除旧告警；world/look{变更字段}；updateShot{shotId,patch}；updateAsset{assetId,patch}；rollbackAsset{assetId,version}；removeBinding{bindingId}；publishAsset{assetId}；importAsset{libraryId}；libraryReference{libraryId,mediaId}；editTimeline{sequenceId,ops} 先 readEdit，ops 沿用剪辑操作；reviewFinal{renderId} 先 inspectFinal；selectVoice{lineId,takeIds} 先 readVoice；configureVoice{project} 提交完整配音方案供确认。已生效的决定直接返回 applied:true，不重复询问；仅用户明确要求改选或重新验收时传 reconsider:true。跳过和暂不决定不授权后续，不循环追问。不要先 askUser 再调用本工具重复确认。",
+        description: "所有制作选择在聊天里展示、确认并保存，不让用户跳到面板。selectModel{kind:image|video|audio,providerId?,modelId?} 列出可用模型并保存用户选择；指定模型时直接展示该模型的选择卡，不先 askUser 再重复确认。其他操作先 productionSpec read 获取真实记录。approveAssets{assetIds}；selectReference{assetId,mediaIds} 比较当前项目图片并同时采用资产设定与定妆，无需预建候选池；selectCandidate{candidateIds,asHero?} 比较同一资产的定妆图；approveTake{takeIds,overrideReason?} 比较同镜头的视频并由用户填写检查和实际末态；reviewOutput{targetType:keyframe|take,targetId} 在聊天记录问题或排除旧告警；world/look{变更字段}；updateShot{shotId,patch}；updateAsset{assetId,patch}；rollbackAsset{assetId,version}；removeBinding{bindingId}；publishAsset{assetId}；importAsset{libraryId}；libraryReference{libraryId,mediaId}；editTimeline{sequenceId,ops} 先 readEdit，ops 沿用剪辑操作；reviewFinal{renderId} 先 inspectFinal；selectVoice{lineId,takeIds} 先 readVoice；configureVoice{project} 提交完整配音方案供确认。已生效的决定直接返回 applied:true，不重复询问；仅用户明确要求改选或重新验收时传 reconsider:true。跳过和暂不决定不授权后续，不循环追问。不要先 askUser 再调用本工具重复确认。",
         parameters: z.toJSONSchema(schema, { io: "input", target: "draft-07" }),
         async execute(id, params, signal) {
           const result = await media.requestProductionDecision!(id, schema.parse(params), signal);

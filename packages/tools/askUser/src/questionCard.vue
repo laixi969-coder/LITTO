@@ -16,17 +16,19 @@
     <div v-if="images.length" class="questionImages">
       <figure v-for="item in images" :key="item.id">
         <a :href="item.url" target="_blank" rel="noopener noreferrer" :aria-label="`查看${item.title}原图`">
-          <img :src="item.url" :alt="item.title" @load="loadedImages.add(item.url)" @error="loadedImages.delete(item.url)" />
+          <img :key="previewAttempts.get(item.url) ?? 0" :src="item.url" :alt="item.title" @load="loadedImages.add(item.url); previewFailures.delete(item.url)" @error="loadedImages.delete(item.url); previewFailures.add(item.url)" />
         </a>
         <figcaption>{{ item.title }}</figcaption>
+        <p v-if="previewFailures.has(item.url)" role="alert">图片加载失败 <el-button size="small" @click="retryPreview(item.url)">重新加载</el-button></p>
       </figure>
     </div>
-    <p v-if="waiting && images.length && !imagesReady" class="questionText" role="status">等待图片加载完成后即可采用；图片未显示时可点击图片区域查看原图，或暂不采用。</p>
+    <p v-if="waiting && images.length && !imagesReady" class="questionText" role="status">图片完整显示后即可采用；加载失败可原地重试，已填写内容会保留，也可以暂不采用。</p>
     <div v-if="media.length" class="questionMedia">
       <figure v-for="item in media" :key="item.id">
-        <video v-if="item.kind === 'video'" :src="item.url" :aria-label="item.title" controls preload="metadata" />
-        <audio v-else :src="item.url" :aria-label="item.title" controls preload="metadata" />
+        <video v-if="item.kind === 'video'" :key="previewAttempts.get(item.url) ?? 0" :src="item.url" :aria-label="item.title" controls preload="metadata" @error="previewFailures.add(item.url)" @loadedmetadata="previewFailures.delete(item.url)" />
+        <audio v-else :key="previewAttempts.get(item.url) ?? 0" :src="item.url" :aria-label="item.title" controls preload="metadata" @error="previewFailures.add(item.url)" @loadedmetadata="previewFailures.delete(item.url)" />
         <figcaption>{{ item.title }}</figcaption>
+        <p v-if="previewFailures.has(item.url)" role="alert">预览加载失败 <el-button size="small" @click="retryPreview(item.url)">重新加载</el-button></p>
       </figure>
     </div>
     <div v-if="waiting && storyDecision && !formRules.length" class="questionActions">
@@ -110,6 +112,13 @@ const submitError = ref("");
 const submittedAnswer = ref("");
 const submittedSkipped = ref(false);
 const loadedImages = ref(new Set<string>());
+const previewFailures = ref(new Set<string>());
+const previewAttempts = ref(new Map<string, number>());
+function retryPreview(url: string) {
+  loadedImages.value.delete(url);
+  previewFailures.value.delete(url);
+  previewAttempts.value.set(url, (previewAttempts.value.get(url) ?? 0) + 1);
+}
 const images = computed(() => props.tool.question?.images ?? toolResult.value?.images ?? []);
 const media = computed(() => props.tool.question?.media ?? toolResult.value?.media ?? []);
 const imagesReady = computed(() => images.value.every(item => loadedImages.value.has(item.url)));

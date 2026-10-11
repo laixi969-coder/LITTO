@@ -26,7 +26,7 @@ const sharedFields = {
 const referenceMode = z.templateLiteral([z.enum(["image", "video", "audio"]), "Reference:", z.number()])
   .refine(value => /Reference:(?:[1-9]\d?|1\d{2}|2[0-4]\d|25[0-6])$/.test(value), "参考数量必须在 1 到 256 之间");
 
-export const listMediaModelsSchema = z.strictObject({});
+export const listMediaModelsSchema = z.strictObject({ all: z.boolean().optional().describe("列出可供用户选择的全部已配置媒体模型；不代表已授权切换") });
 export const imageGenerationSchema = z.strictObject({
   ...sharedFields,
   size: z.string().trim().min(1).max(64).optional(),

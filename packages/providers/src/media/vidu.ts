@@ -40,14 +40,16 @@ function wait(signal: AbortSignal) {
 }
 
 export default {
-  id: "vidu", label: "Vidu", version: "1.1.0", rules,
+  id: "vidu", label: "Vidu", version: "1.1.1", rules,
   readme: "Vidu Q4 Preview 支持图生视频和参考生视频。图生视频使用一张首帧，画幅跟随首帧；参考生视频使用 1–15 张图片，可附加 0–3 段 MP3 参考音频（每段 3–12 秒），画幅可选 16:9、9:16、1:1、4:3、3:4。两种模式均支持 3–16 秒、540P / 720P / 1080P / 2K / 4K，可选音画同出。提示词可按输入顺序使用“参考图1”“参考音频1”指定素材。只需填写 API Key，API 地址默认使用官方地址；中转须兼容 Vidu 协议。\n\n[图生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) · [参考生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video)",
   models: [
     { id: "viduq4-preview", label: "Vidu Q4 Preview", type: "video", mode: ["singleImage", ["imageReference:15", "audioReference:3"]], audio: "optional", durationResolutionMap: [{ duration: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], resolution: ["540P", "720P", "1080P", "2K", "4K"] }] },
   ] satisfies ProviderModel[],
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
     if (request.model !== "viduq4-preview") throw new Error("当前 Vidu 接入支持 viduq4-preview");
-    if (request.prompt.length > 20000) throw new Error("Vidu 提示词不能超过 20000 字");
+    // Vidu 没有独立负面词字段；保留编译约束，以文本排除要求随正文发送。
+    const prompt = [request.prompt, request.negativePrompt?.trim() ? `Avoid the following: ${request.negativePrompt.trim()}` : ""].filter(Boolean).join("\n\n");
+    if (prompt.length > 20000) throw new Error("Vidu 提示词（含排除要求）不能超过 20000 字");
     const referenceMode = Array.isArray(request.mode) || (request.mode === undefined && !!request.images?.length);
     if (Array.isArray(request.mode)) {
       if (!request.mode.includes("imageReference:15") || request.mode.some(mode => !["imageReference:15", "audioReference:3"].includes(mode))) throw new Error("不支持此 Vidu 参考模式");
@@ -61,7 +63,7 @@ export default {
       if (!request.firstFrame) throw new Error("请选择视频首帧");
       if (request.images?.length || request.audios?.length) throw new Error("图生视频只接受一张首帧，多图或音频请使用参考生视频模式");
     }
-    if (request.negativePrompt || request.cameraTrajectory) throw new Error("Vidu 当前接口不支持负面提示词或相机轨迹");
+    if (request.cameraTrajectory) throw new Error("Vidu 当前接口不支持数值相机轨迹");
     const duration = request.duration ?? 5;
     if (!Number.isInteger(duration) || duration < 3 || duration > 16) throw new Error("Vidu 视频时长须为 3–16 秒的整数");
     const resolution = (request.resolution ?? "720P").toUpperCase();
@@ -70,7 +72,7 @@ export default {
     const ratio = request.ratio ?? "16:9";
     if (referenceMode && !["16:9", "9:16", "1:1", "4:3", "3:4"].includes(ratio)) throw new Error("不支持此 Vidu 参考生视频画幅");
     const body = JSON.stringify({
-      model: request.model, prompt: request.prompt,
+      model: request.model, prompt,
       images: (referenceMode ? request.images! : [request.firstFrame!]).map(input => mediaValue(input, "image")),
       duration, resolution: resolution.endsWith("P") ? resolution.toLowerCase() : resolution,
       audio: request.generateAudio ?? true, watermark: request.watermark ?? false,

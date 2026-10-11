@@ -146,9 +146,29 @@ export async function loadSettings() {
   await loadAvailableModels();
 }
 
+async function syncModelSelection() {
+  const { data } = await axios.get("/api/settings/get", { timeout: 15000, headers: { "Cache-Control": "no-cache", "x-toonflow-workspace": "1" } });
+  if (data.code !== 200 || !data.data || typeof data.data !== "object") throw new Error("读取最新模型选择失败，未覆盖设置");
+  const selection = data.data.modelSelection ?? {};
+  if (JSON.stringify(settings.value.modelSelection ?? {}) === JSON.stringify(selection)) return;
+  applyingSettings = true;
+  try { settings.value = { ...settings.value, modelSelection: selection }; }
+  finally { applyingSettings = false; }
+  invalidateNodeModels("media");
+  invalidateNodeModels("language");
+}
+
+export function refreshModelSelection() {
+  const refreshing = saveQueue.then(syncModelSelection);
+  saveQueue = refreshing.then(() => {}, () => {});
+  return refreshing;
+}
+
 export function saveSettings(update?: (current: Record<string, unknown>) => Record<string, unknown> | undefined) {
   // ACT: 队列内读取最新配置再计算变更，确认成功后发布；仅协调当前页面的保存。
   const saving = saveQueue.then(async () => {
+    // 聊天也可选模型；完整保存其他设置前读取此字段，避免旧页面把已确认的选择改回去。
+    await syncModelSelection();
     const patch = update?.(settings.value);
     if (update && !patch) return false;
     const { data } = await axios.put("/api/settings/save", { settings: { ...settings.value, ...patch } }, { headers: { "x-toonflow-workspace": "1" } });

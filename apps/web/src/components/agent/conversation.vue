@@ -109,9 +109,9 @@
       <teleport v-for="target in draftMentionTargets" :key="target.key" :to="target.element"><mentionThumbnail v-bind="mentionThumbnailProps(target.mention)" :directory="directory"><icon-photo :size="14" /></mentionThumbnail></teleport>
       <mentionContent ref="draftMentionPreview" :mentions="draftMentions" :directory="directory" removable @remove="removeDraftMention" />
       <div class="senderActions">
-        <input ref="imageInput" type="file" accept="image/*" multiple hidden :disabled="locked || !directory" @change="selectImages" />
-        <el-button text :disabled="locked || !directory" @click="imageInput?.click()"><icon-photo :size="16" />上传图片</el-button>
-        <modelPopover v-model="selectedModel" v-model:reasoningEffort="reasoningEffort" :active="active" :disabled="disabled" />
+        <input ref="attachmentInput" type="file" accept="image/*,video/*,audio/mpeg,.mp3,.txt,.lrc,.srt" multiple hidden :disabled="locked || !directory" @change="selectAttachments" />
+        <el-button text :disabled="locked || !directory" title="图片、视频、MP3、TXT、LRC 或 SRT" @click="attachmentInput?.click()"><icon-photo :size="16" />上传素材</el-button>
+        <modelPopover v-model="selectedModel" v-model:reasoningEffort="reasoningEffort" :active="active" :disabled="locked || remoteRunning" @saving="modelSaving = $event" />
         <mentionMenu ref="mentionMenuRef" :directory="directory" :active="active" :disabled="locked || !directory" :query="mentionQuery" :editor="senderElement" :currentCanvasId="createCanvasContext?.()?.id" @open="captureMentionPosition" @select="insertMentions" @dismiss="mentionQuery = undefined" />
         <skillMenu ref="skillMenuRef" :directory="directory" :active="active" :disabled="locked || !directory" :query="skillQuery" :editor="senderElement" @select="selectSkill" @dismiss="skillQuery = undefined" />
         <el-popover
@@ -146,7 +146,7 @@
             </div>
           </div>
         </el-popover>
-        <el-button class="sendButton" type="primary" circle :disabled="locked" :aria-label="editingId ? '重发消息' : '发送消息'" :title="editingId ? '重发消息' : '发送消息'" @click="submitMessage()">
+        <el-button class="sendButton" type="primary" circle :disabled="locked || modelSaving" :aria-label="editingId ? '重发消息' : '发送消息'" :title="editingId ? '重发消息' : '发送消息'" @click="submitMessage()">
           <icon-arrow-up :size="16" />
         </el-button>
       </div>
@@ -178,7 +178,7 @@ import { createPastedTextFile, readTextAttachment } from "./textAttachments";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { writeClipboardText } from "@/lib/clipboard";
 import anonymousData from "@/lib/anonymousData";
-import { modelChoices, loadAvailableModels } from "@/stores/settings";
+import { modelChoices, loadAvailableModels, refreshModelSelection } from "@/stores/settings";
 import { useWorkspaceStore } from "@/stores/workspace";
 import type { AgentAttachment, AgentConversation, AgentMessage } from "./types";
 import { registerStorySources } from "@/lib/storySources";
@@ -198,7 +198,7 @@ const emit = defineEmits<{ session: [file: string]; sent: [prompt: string]; even
 const workspaceStore = useWorkspaceStore();
 const directory = workspaceStore.project?.directory;
 const draftAttachments = ref<AgentAttachment[]>([]);
-const imageInput = ref<HTMLInputElement>();
+const attachmentInput = ref<HTMLInputElement>();
 const createCanvasContext = inject<(() => CanvasContext | undefined) | undefined>("canvas", undefined);
 const messages = ref<AgentMessage[]>((props.initialSession?.messages ?? []).map(message => ({ ...message })));
 const stream = createConversationStream(messages);
@@ -206,6 +206,7 @@ const remoteRunning = ref(props.initialSession?.running ?? false);
 const stats = ref(props.initialSession?.stats);
 const contextUsage = ref(props.initialSession?.contextUsage);
 const busy = ref(false);
+const modelSaving = ref(false);
 const compacting = ref(false);
 const pendingQuestions = computed(() => messages.value.flatMap((item, index) => (item.parts ?? []).flatMap(part =>
   part.type === "tool" && part.tool.status === "running" && part.tool.question ? [{ index, toolId: part.tool.id }] : [])));
@@ -322,6 +323,9 @@ watch(() => props.active, active => {
 });
 
 function applyEvent(event: AgentEvent) {
+  if (event.type === "tool" && event.tool.status === "success" && event.tool.name === "requestProductionDecision" && event.tool.args?.operation === "selectModel") {
+    void refreshModelSelection().catch(() => ElMessage.error("模型选择已处理，界面同步失败；保存其他设置前将再次同步"));
+  }
   if (event.type === "done" || event.type === "error") void loadAvailableModels();
   switch (event.type) {
     case "subAgent":
@@ -594,13 +598,14 @@ async function sendMessage(source?: AgentMessage) {
   const resendIndex = source ? messages.value.findIndex(item => item.id === source.id) : -1;
   if (source && (source.role !== "user" || resendIndex < 0)) return;
   const resendFrom = source ? source.entryId ?? messages.value.slice(resendIndex + 1).find(item => item.role === "user" && item.entryId)?.entryId : undefined;
-  if (locked.value || !instance || (!prompt && !attachments.length)) return;
+  if (locked.value || modelSaving.value || !instance || (!prompt && !attachments.length)) return;
   const model = selectedModelChoice.value;
   if (!directory) return ElMessage.warning("请先打开项目");
   if (!model) return ElMessage.warning("请先选择模型");
 
   const requestController = new AbortController();
   const canvasContext = createCanvasContext?.();
+  const draftModel = !source ? instance.getModel() : undefined;
   controller = requestController;
   busy.value = true;
   compacting.value = false;
@@ -616,6 +621,7 @@ async function sendMessage(source?: AgentMessage) {
     draftMentions.value = [];
   }
   let accepted = false;
+  let requestStarted = false;
   if (ownsStream) stream.begin(reply);
   const handledCanvasCalls = new Set<string>();
   const pendingQuestions = new Map<string, string>();
@@ -625,6 +631,8 @@ async function sendMessage(source?: AgentMessage) {
     if (!source) await instance.reset();
     requestController.signal.throwIfAborted();
     await uploadAttachments(attachments, directory, requestController.signal);
+    requestController.signal.throwIfAborted();
+    requestStarted = true;
     const response = await fetch("/api/agent", {
       method: "POST",
       headers: { "Accept-Language": locale.value, "Content-Type": "application/json", "x-toonflow-workspace": "1" },
@@ -688,7 +696,15 @@ async function sendMessage(source?: AgentMessage) {
     finishStats(requestController.signal.aborted ? "cancelled" : "failed");
     const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
     const message = requestController.signal.aborted ? "已停止生成" : responseMessage || (error instanceof Error ? error.message : "发送失败，请重试");
-    if ((source && !accepted) || !ownsStream) { userMessage.error = message; ElMessage.error(message); }
+    if (!source && !requestStarted) {
+      // 仅在尚未发出生成请求时还原草稿；网络结果不明时不自动重发，避免重复生成。
+      messages.value = messages.value.filter(item => item !== userMessage && item !== reply);
+      draftAttachments.value = attachments;
+      draftMentions.value = mentions;
+      await instance.reset({ chatNode: draftModel });
+      ElMessage.error(`${message}；文字和附件已还原，可修改后重新发送`);
+    }
+    else if ((source && !accepted) || !ownsStream) { userMessage.error = message; ElMessage.error(message); }
     else reply.error = message;
     if (ownsStream && props.initialSession?.parentFile && props.sessionFile) {
       emit("event", { type: "subAgentEvent", file: props.sessionFile, event: { type: "error", message } });
@@ -733,7 +749,7 @@ function renameAttachment(index: number, name: string) {
   draftAttachments.value[index] = { ...attachment, name: name.trim() || attachment.file?.name || attachment.name };
 }
 
-function selectImages(event: Event) {
+function selectAttachments(event: Event) {
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files ?? []);
   input.value = "";

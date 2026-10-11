@@ -21,7 +21,7 @@
       </template>
       <el-form class="modelOptions" labelPosition="top">
         <el-form-item label="模型">
-          <el-select v-model="selectedModel" filterable :disabled="disabled" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="请先在设置 → 默认模型中选择可用的对话模型">
+          <el-select :modelValue="selectedModel" filterable :loading="loading || saving" :disabled="disabled || loading || saving" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="暂无可用模型，请先添加供应商并配置 API Key" @change="selectModel">
             <template #prefix><modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="18" /></template>
             <el-option-group v-for="provider in modelGroups" :key="provider.id" :label="provider.label">
               <el-option v-for="model in provider.models" :key="model.id" :label="model.label" :value="JSON.stringify([provider.id, model.id])">
@@ -33,6 +33,8 @@
             </el-option-group>
           </el-select>
         </el-form-item>
+        <el-alert v-if="error" :title="error" type="error" :closable="false" />
+        <el-button v-if="error" text :disabled="loading || saving" @click="pendingChoice ? selectModel(pendingChoice) : loadModels()">{{ pendingChoice ? "重试保存选择" : "重新加载模型" }}</el-button>
         <el-form-item label="推理等级">
           <el-segmented v-model="reasoningEffort" :options="reasoningOptions" :disabled="disabled" block aria-label="推理等级" />
         </el-form-item>
@@ -43,13 +45,16 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import axios from "axios";
+import { ElMessage } from "element-plus";
 import { IconChevronDown } from "@tabler/icons-vue";
 import { modelIcon } from "@toonflow/model-icons";
-import { languageProviders, modelChoices, loadAvailableModels } from "@/stores/settings";
+import { modelChoices, loadAvailableModels, saveSettings } from "@/stores/settings";
 
 const selectedModel = defineModel<string>({ default: "" });
 const reasoningEffort = defineModel<string>("reasoningEffort", { default: "" });
 const props = withDefaults(defineProps<{ active?: boolean; disabled?: boolean }>(), { active: true, disabled: false });
+const emit = defineEmits<{ saving: [value: boolean] }>();
 const visible = ref(false);
 const reasoningOptions = [
   { label: "默认", value: "" },
@@ -57,11 +62,49 @@ const reasoningOptions = [
   { label: "中", value: "medium" },
   { label: "高", value: "high" },
 ];
-const modelGroups = computed(() => languageProviders.value);
+const catalogue = ref<{ providerId: string; providerLabel: string; modelId: string; label: string }[]>([]);
+const loading = ref(false);
+const saving = ref(false);
+watch(saving, value => emit("saving", value), { flush: "sync" });
+const error = ref("");
+const pendingChoice = ref("");
+const modelGroups = computed(() => [...new Set(catalogue.value.map(model => model.providerId))].map(id => ({
+  id, label: catalogue.value.find(model => model.providerId === id)!.providerLabel,
+  models: catalogue.value.filter(model => model.providerId === id).map(model => ({ id: model.modelId, label: model.label })),
+})));
+async function loadModels() {
+  if (loading.value || saving.value) return;
+  loading.value = true;
+  error.value = pendingChoice.value = "";
+  try {
+    const { data } = await axios.get("/api/ai/models?all=true", { timeout: 15000 });
+    if (data.code !== 200 || !Array.isArray(data.data)) throw new Error("读取可用模型失败");
+    catalogue.value = data.data;
+  } catch (cause) {
+    catalogue.value = [];
+    error.value = axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : cause instanceof Error ? cause.message : "读取可用模型失败";
+  } finally { loading.value = false; }
+}
+async function selectModel(value: string) {
+  if (saving.value || props.disabled) return;
+  const chosen = catalogue.value.find(model => JSON.stringify([model.providerId, model.modelId]) === value);
+  if (!chosen) return;
+  pendingChoice.value = value;
+  saving.value = true;
+  error.value = "";
+  try {
+    await saveSettings(current => ({ modelSelection: { ...current.modelSelection as Record<string, unknown>, text: { providerId: chosen.providerId, modelId: chosen.modelId } } }));
+    selectedModel.value = value;
+    pendingChoice.value = "";
+    ElMessage.success(`已选用 ${chosen.label}`);
+  } catch (cause) {
+    error.value = axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : cause instanceof Error ? cause.message : "保存失败，原模型保持不变";
+  } finally { saving.value = false; }
+}
 const selectedModelChoice = computed(() => modelChoices.value.find(item => item.value === selectedModel.value));
 const reasoningLabel = computed(() => reasoningOptions.find(item => item.value === reasoningEffort.value)?.label ?? "默认");
 watch(selectedModel, () => { reasoningEffort.value = ""; });
-watch(visible, open => { if (open) void loadAvailableModels(); });
+watch(visible, open => { if (open) { void loadAvailableModels(); void loadModels(); } });
 watch([modelChoices, selectedModel], ([items]) => {
   if (!items.some(item => item.value === selectedModel.value)) selectedModel.value = items[0]?.value ?? "";
 }, { immediate: true });

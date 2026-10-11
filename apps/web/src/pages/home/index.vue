@@ -87,12 +87,13 @@
                     v-model="selectedModel"
                     v-model:reasoningEffort="reasoningEffort"
                     class="modelSelect"
-                    :disabled="creating || opening" />
+                    :disabled="creating || opening"
+                    @saving="modelSaving = $event" />
                   <el-button
                     type="primary"
                     :icon="canSend ? IconArrowUp : IconFolder"
                     :loading="creating"
-                    :disabled="creating || opening || (canSend && !prompt.trim() && !promptAttachments.length)"
+                    :disabled="creating || opening || modelSaving || (canSend && !prompt.trim() && !promptAttachments.length)"
                     @click="canSend ? createProject() : promptWorkspacePicker?.chooseDirectory()">
                     {{ canSend ? "开始创作" : "选择工作目录" }}
                   </el-button>
@@ -371,6 +372,7 @@ const workspaceDirectory = ref(project.value?.directory ?? "");
 const promptPlaceholder = "描述你的故事、产品或镜头想法…";
 
 const selectedModel = ref("");
+const modelSaving = ref(false);
 const reasoningEffort = ref("");
 const sortDescending = ref(true);
 const viewMode = ref("grid");
@@ -463,6 +465,7 @@ async function renameProject(project: Project) {
 // message 默认取首页输入框；通道弹窗传入带技能指令的消息，不能写回输入框，否则用户会看到内部指令。
 const mediaPreferencesValue = ref({ imageRatio: "", imageSize: "", videoRatio: "", videoResolution: "" });
 async function createProject(fromPrompt = true, message = prompt.value, attachments = promptAttachments.value, storyBrief?: StoryProject["brief"]) {
+  if (modelSaving.value) return;
   if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
   // Sending an idea without a text model would just fail: take the person to the one-minute wizard instead.
   if (fromPrompt && message.trim() && !hasTextModel.value) {
