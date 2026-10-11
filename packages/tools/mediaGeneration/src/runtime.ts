@@ -46,7 +46,16 @@ export const videoGenerationSchema = z.strictObject({
   mode: z.union([
     z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text"]),
     z.array(referenceMode).min(1).max(3),
-  ]).optional(),
+    // 部分工具调用模型会把联合类型中的数组编码为 JSON 字符串；规范化后仍逐项校验，不接受任意模式。
+    z.string().max(256).startsWith("[").endsWith("]").transform((value, ctx) => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        ctx.addIssue({ code: "custom", message: "多参考模式必须是有效的 JSON 数组" });
+        return z.NEVER;
+      }
+    }).pipe(z.array(referenceMode).min(1).max(3)),
+  ]).optional().describe("单图等模式传枚举字符串；多参考模式优先传真实数组，如 [\"imageReference:15\",\"audioReference:3\"]，也兼容该数组的 JSON 字符串。具体值须与 listMediaModels 一致。"),
 });
 export const audioGenerationSchema = z.strictObject({
   providerId: sharedFields.providerId,
