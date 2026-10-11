@@ -297,9 +297,10 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             appearance: J([sections.world, sections.lighting, sections.look, sections.realism, sections.opticalTexture]),
             references: J([sections.referenceIntent, sections.references]),
             audio: sections.audio,
-            constraints: J([sections.constraints, sections.lock, sections.forbiddenChanges, sections.repair,
+            constraints: J([sections.constraints, sections.lock, sections.repair,
                 "保持人物身份与兵器形状；按时间线执行接触、反应和镜头变化，未指定速度时使用实时速度。",
                 "起始状态随明确动作变化；未安排变化的身份、服装、材质和场景保持一致。"]),
+            forbiddenChanges: sections.forbiddenChanges,
             variations: J([...(shot.freedomMap?.CONTROL ?? []), sections.allow, sections.random]),
         };
     }
