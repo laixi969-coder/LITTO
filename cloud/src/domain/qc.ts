@@ -22,6 +22,8 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
     scene_structure: { cause: "Space/layout structure broke", action: "geometry_lock", detail: "Lock the Environment geometry (ENVIRONMENT + GEOMETRY references) and regenerate", penalty: 25, severity: "high" },
     color_shift: { cause: "Minor colour/exposure mismatch", action: "look_normalization", detail: "Normalise the look in post; no regeneration needed", penalty: 5, severity: "low" },
     capability_mismatch: { cause: "Model lacks a capability the shot needs", action: "switch_model", detail: "Switch provider/model to one that supports the missing capability", penalty: 20, severity: "medium" },
+    deliveryResolution: { cause: "供应商返回的实际分辨率低于请求档位", action: "inspectDelivery", detail: "保留原片并注明实际尺寸；导出放大不能称为原生高分辨率，不自动触发付费重试", penalty: 10, severity: "medium" },
+    deliveryUnverified: { cause: "缺少源视频实际尺寸，尚未核验交付档位", action: "inspectDelivery", detail: "用媒体探测读取源视频真实尺寸；不能只按请求中的档位宣称已达到精度，也不自动付费重试", penalty: 0, severity: "medium" },
     logo_distortion: { cause: "Logo/product detail distorted", action: "geometry_lock", detail: "Bind the product GEOMETRY reference at LOCK and regenerate", penalty: 25, severity: "high" },
 };
 export const OBSERVATION_KINDS = Object.keys(DIAGNOSIS);
@@ -36,7 +38,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (target.type === "take" && reviewed.length && review.fullPlayback !== true) throw bad("视频检查须确认已完整播放当前版本");
     const fingerprint = shotFingerprint(s, shotId, target.type);
     const previous = s.list("qc_reports", { targetType: target.type, targetId: target.id }, "created_at DESC, rowid DESC")[0];
-    const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind]) : [];
+    const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind] && item.kind !== "deliveryUnverified") : [];
     const dismissed = review.dismissedKinds ?? [];
     if (dismissed.length && (!review.actor || !review.note?.trim() || !reviewed.length || dismissed.some(kind => !prior.some((item: any) => item.kind === kind)))) throw bad("排除旧告警须逐项选择，并记录复核依据");
     // 重新提交空观察不能抹除同一素材的缺陷；规格变更也不能修复已经生成的视频。
@@ -44,6 +46,15 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     // 观察说明只在标了问题时必填（由检查接口校验）；"看过、没问题"的确认不要求逐条写字。
     if (reviewed.length && (!review.actor || reviewed.some(key => !realismChecks.includes(key as any)))) throw bad("人工检查须记录检查项和检查者");
     const findings: any[] = [];
+    const media = obj.mediaId ? s.get("media", obj.mediaId) : undefined;
+    const requestedResolution = obj.meta?.parameters?.request?.resolution ?? obj.meta?.parameters?.resolution;
+    const requestedSide = typeof requestedResolution === "string" ? Number(/^(\d+)p$/i.exec(requestedResolution)?.[1]) : 0;
+    if (target.type === "take" && requestedSide && (!media?.width || !media?.height)) {
+        findings.push({ kind: "deliveryUnverified", ...DIAGNOSIS.deliveryUnverified, note: `请求 ${requestedResolution}，实际尺寸未知` });
+    }
+    if (target.type === "take" && !observations.some(item => item.kind === "deliveryResolution") && requestedSide && media && media.width > 0 && media.height > 0 && Math.min(media.width, media.height) < requestedSide) {
+        findings.push({ kind: "deliveryResolution", ...DIAGNOSIS.deliveryResolution, note: `请求 ${requestedResolution}，实际 ${media.width}×${media.height}；导出尺寸与源片尺寸须分别说明` });
+    }
     // 1. human / vision observations → diagnosis.
     for (const o of observations) {
         const d = DIAGNOSIS[o.kind];

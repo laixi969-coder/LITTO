@@ -32,6 +32,10 @@ const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "l
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
+    // 仅同步原先逐字镜像 action 的路径；独立编排的走位或本次显式相机修改保持原意。
+    if (patch.action !== undefined && patch.camera === undefined && shot.camera?.design?.subjectPath === shot.action) {
+        patch = { ...patch, camera: { ...shot.camera, design: { ...shot.camera.design, subjectPath: patch.action } } };
+    }
     validateMusicVideoTiming({ ...shot, ...patch } as ShotInput);
     if (patch.sequenceId !== undefined && patch.sequenceId !== shot.sequenceId) throw bad("use the sequence workflow to move a shot");
     if (patch.sceneId && s.get("scenes", patch.sceneId)?.sequenceId !== shot.sequenceId) throw bad("scene does not belong to sequence");
