@@ -1,6 +1,6 @@
 import { readFile, stat, writeAtomic } from "@toonflow/file";
 import { createHash, randomUUID } from "node:crypto";
-import { storyActionSchema, storyDecisionSchema, storyProjectSchema, newStoryProject, storyStale, storyPreviewKey, storyBoard, validateStoryDraft, type StoryAction, type StoryProject, type StorySource } from "@toonflow/tool-scene-list/storyProject";
+import { storyActionSchema, storyDecisionSchema, storyProjectSchema, newStoryProject, storyStale, storyImpact, storyPreviewKey, storyBoard, validateStoryDraft, type StoryAction, type StoryProject, type StorySource } from "@toonflow/tool-scene-list/storyProject";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
@@ -147,14 +147,18 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
       const parent = parentId ? getRevision(parentId) : undefined;
       const revision = { ...value, id: randomUUID(), createdAt: now, parentId, brief: structuredClone(project.brief), directionId: project.directionId, direction: structuredClone(project.directions.find(item => item.id === project.directionId)), sourceFingerprints: Object.fromEntries(project.sources.map(source => [source.id, source.fingerprint])) };
       project.revisions.push(revision);
+      const impact = parent ? storyImpact(parent, revision) : undefined;
+      const reusable = parent && !storyStale(project, parent);
       if (parent) project.boards[revision.id] = value.scenes.map(scene => {
         const previous = parent.scenes.find(item => item.sceneId === scene.sceneId);
         const board = storyBoard(project, parent.id).find(item => item.sceneId === scene.sceneId);
-        // ACT: 整场未变才复用预演素材；变动场清空，旧版本的图与声音仍保留。
-        return previous && board && JSON.stringify(previous) === JSON.stringify(scene) ? structuredClone(board) : { sceneId: scene.sceneId, duration: scene.duration };
+        // ACT: 依据变化或因果上游改变时，未改正文的下游场也需要重新预演；旧版素材保留。
+        return reusable && previous && board && !impact!.changed.includes(scene.sceneId) && !impact!.dependent.includes(scene.sceneId) ? structuredClone(board) : { sceneId: scene.sceneId, duration: scene.duration };
       });
     };
     switch (action.type) {
+      case "visualBoard":
+        project.visualBoard = action.values; break;
       case "brief": project.brief = action.value; break;
       case "source": {
         const fingerprint = await sourceFingerprint(directory, action.value);

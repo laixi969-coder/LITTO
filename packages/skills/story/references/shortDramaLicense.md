@@ -29,3 +29,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+## 2026-10-11：Short-Drama Factory v4.3
+
+来源：https://github.com/lixiaoxiao9888-create/short-drama-factory，固定提交 0949e02b48cfee757e06edd4750a01ad4f56fa9a。
+
+采用 emotion-flow-roundtrip、continuity-ledger、webnovel-adaptation、inner-monologue-vo、script-doctor-protocol 和 protective-counterexamples 的单元、改编、状态、通道与审读方法，改写为 shortDramaFactory.md 和工作台短剧写作指引。取消固定篇幅、硬性回合/反转配额、独立台账、默认付费墙、平台效果宣称及脚本执行要求，衔接现有 canon/threads、版本和范围限制。未移植样例剧情、Python 脚本或合规结论；上游作者不为这些改动背书。
+
+MIT License
+
+Copyright (c) 2026 lixiaoxiao9888-create (老李)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

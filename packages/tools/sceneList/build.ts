@@ -1,5 +1,5 @@
 import { createToolConfig } from "@toonflow/tools-scaffold";
-import { musicFilmWritingGuide } from "./src/storyProject";
+import { musicFilmWritingGuide, shortDramaWritingGuide } from "./src/storyProject";
 
 await createToolConfig({
   name: "sceneList",
@@ -10,6 +10,8 @@ await createToolConfig({
 saveSceneList 必须引用正式采用的 storyRevisionId，保留其 sceneId 与顺序，再 saveBreakdown。局部改写生成新版本，核对依赖场次，旧镜头、配音和预演不覆盖。
 异常开场、反转、开放结尾、人物变化都是可选方法，服从用户的作品目标。不同类型分开评价：故事的理解和继续观看、广告的卖点和行动、品牌片的记忆、剧情 MV 的行动因果及音画关系。不给爆款概率，不把模型审读当作观众实验。
 ${musicFilmWritingGuide}
+${shortDramaWritingGuide}
+探索视觉方向用 readVisualReferences。readStoryProject 和 readSceneList 的 visualReferences 提供本项目收藏的构图、光线或色彩方法；依照具体用途落实到当前 Look 和镜头，不自动复制参考片剧情、人物或场景。文字画像匹配不代表看过图片，电影画面收藏不等于生成素材授权。用户明确选定后通过 updateStoryProject 的 visualBoard 保存 frameId、purpose、note，不能编造 ID 或替用户采用。
 场次表和拆解清单必须通过 saveSceneList、saveBreakdown 保存，不要在回复里写 JSON 代码块代替保存。
 校验失败会返回逐条问题，按问题修正后重新调用，不要让用户处理技术错误。
 给用户看的仍是可读的剧本正文和清单表格；工具保存的是结构化底稿。`,

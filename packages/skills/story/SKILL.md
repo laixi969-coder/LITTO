@@ -2,7 +2,7 @@
 name: story
 description: 从想法或已有素材发展故事与剧本，比较少量创意方向，保存人物事实、因果与伏笔、版本和证据审稿；采用后衔接场次表、分镜预演和制作。支持电影、剧集、短剧分集、局部改写与续作；按作品选择编剧方法。广告用 adfilm，已有定稿只做制作提取时不重写。
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   displayName: 故事与剧本
   author: LITTO
   basedOn: hiccai-story 2.3.0

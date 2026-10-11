@@ -2,7 +2,7 @@
 name: workflow
 description: 在 LITTO 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.14.0"
+  version: "2.15.0"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -53,6 +53,8 @@ metadata:
 资料用于补足当前 action、performance、blocking、camera 和剪辑计划，不改变已确认的媒介风格、模型、故事与生成授权。纯文字方案完成不等于已出图、已生成视频或已验收。
 
 参考角色、服装、空间、影调和运动的用途分开记录。原生首尾帧、音频或多参考不受支持时说明实际降级和影响；不能仅在文字里标记已发送。已采用版本默认保留，更改另建候选并写清下游影响。
+
+用户探索视觉方向时可用 readVisualReferences 查询精选导演画像与电影画面来源；readStoryProject 的 visualReferences 返回本项目收藏、用途和具体借鉴说明。按 composition/lighting/palette 转为当前 Look 与摄影方案，不把参考片剧情或身份搬进作品。文字评分不代表已经分析图片，电影画面不自动成为可投喂生成的资产；只有用户具备适用授权且模型支持时才实际绑定。收藏更新不静默覆盖已经采用的资产或镜头。
 
 ## 在画布上推进
 

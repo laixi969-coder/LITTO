@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { musicSceneFields } from "./schema";
+import { visualBoardSchema } from "./visualReference";
 
 const text = (max = 2000) => z.string().trim().max(max);
 const id = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/);
@@ -46,6 +47,7 @@ const review = storyReviewSchema.extend({ id, createdAt: z.string(), decisions: 
 const learningSchema = z.strictObject({ releaseIds: z.array(id).min(1).max(50), observation: text(3000).min(1), limitations: text(2000).min(1), hypothesis: text(2000).min(1), nextExperiment: text(2000).min(1) });
 export const storyProjectSchema = z.strictObject({
   littoStory: z.literal(1), version: z.number().int().nonnegative(), brief: storyBriefSchema,
+  visualBoard: visualBoardSchema.default([]),
   sources: z.array(source).max(100), directions: z.array(storyDirectionSchema).max(3), directionId: id.optional(),
   revisions: z.array(revision).max(200), approvedId: id.optional(), reviews: z.array(review).max(300),
   boards: z.record(z.string(), z.array(storyBoardSchema).max(100)),
@@ -60,6 +62,7 @@ export type StorySource = z.infer<typeof storySourceSchema>;
 export type StoryRevision = StoryProject["revisions"][number];
 
 export const storyActionSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("visualBoard"), values: visualBoardSchema }),
   z.strictObject({ type: z.literal("brief"), value: storyBriefSchema }),
   z.strictObject({ type: z.literal("source"), value: storySourceSchema }),
   z.strictObject({ type: z.literal("confirmSource"), id }),
@@ -86,7 +89,7 @@ export function storyActionParameters(type: StoryAction["type"]) {
   return z.toJSONSchema(storyActionSchema.options.find(option => option.shape.type.value === type)!, { io: "input", target: "draft-07" });
 }
 export function newStoryProject(): StoryProject {
-  return { littoStory: 1, version: 0, brief: { kind: "story", idea: "", audience: "", channel: "", intent: "", genre: "", tone: "", ending: "", duration: 60, constraints: "" }, sources: [], directions: [], revisions: [], reviews: [], boards: {}, previews: [], releases: [], learnings: [], approvals: [] };
+  return { littoStory: 1, version: 0, visualBoard: [], brief: { kind: "story", idea: "", audience: "", channel: "", intent: "", genre: "", tone: "", ending: "", duration: 60, constraints: "" }, sources: [], directions: [], revisions: [], reviews: [], boards: {}, previews: [], releases: [], learnings: [], approvals: [] };
 }
 export function storyBoard(project: StoryProject, revisionId: string) {
   const revision = project.revisions.find(item => item.id === revisionId);
@@ -101,6 +104,10 @@ export function storyStale(project: StoryProject, revision: StoryRevision) {
 }
 export function storyImpact(previous: StoryRevision, next: StoryRevision) {
   const changed = new Set([...previous.scenes, ...next.scenes].filter(scene => JSON.stringify(previous.scenes.find(item => item.sceneId === scene.sceneId)) !== JSON.stringify(next.scenes.find(item => item.sceneId === scene.sceneId))).map(scene => scene.sceneId));
+  // ACT: 事实/线索尚无完整的逐场使用映射，变化时保守重做全版预演；未来可按实体依赖缩小范围。
+  if (JSON.stringify([previous.canon, previous.threads]) !== JSON.stringify([next.canon, next.threads])) {
+    for (const scene of [...previous.scenes, ...next.scenes]) changed.add(scene.sceneId);
+  }
   const dependent = new Set<string>();
   next.scenes.forEach((scene, index) => { if (previous.scenes[index]?.sceneId !== scene.sceneId) changed.add(scene.sceneId); });
   let more = true;
@@ -124,9 +131,15 @@ export function validateStoryDraft(draft: StoryDraft) {
   for (const thread of draft.threads) {
     if (!ids.has(thread.setupSceneId) || thread.payoffSceneId && !ids.has(thread.payoffSceneId)) throw new Error(`线索 ${thread.id} 引用了不存在的场次`);
     if (thread.status === "paid" && !thread.payoffSceneId || thread.status === "abandoned" && !thread.reason) throw new Error("已兑现线索须有落点，放弃线索须有理由");
+    if (thread.status !== "paid" && thread.payoffSceneId) throw new Error("未兑现或放弃的线索不能同时登记已兑现场次");
   }
   for (const items of [draft.canon, draft.threads]) if (new Set(items.map(item => item.id)).size !== items.length) throw new Error("事实与线索各自的 ID 不能重复");
 }
+
+export const shortDramaWritingGuide = `仅对连载短剧（brief.kind=serial）应用：沿用已定集数、单集时长和当前写作范围，不能默认扩成百集或加付费墙。先确定观众持续期待的情绪或信息，再把故事组织成可收束的单元；后续矛盾来自前一单元的后果，不靠复位关系、反复误会或突然增加反派拖长。
+网文改编区分原文事实与改编提案：记录保留/合并/删去的事件及章集对应；把心理描写转成可见选择、动作或明确标注的内心独白，不能把独白当场内人物听见的对白。正文区分对白、内心独白和旁白；speech 只保留实际朗读内容，通道标记和说明放在正文，不送入朗读。
+每集发展人物目标、信息、关系或代价，下一集先接住前集末态。人物状态、知情、持物者和世界规则复用 canon；伏笔与兑现复用 threads。阅读当前集相关的近期状态时，仍须核对会重新出现的旧线索，不把摘要当原文。sceneId 在当前版本唯一且稳定；集次写入场次标题。单个版本最多100场，超出时明确本次范围，全集规划保存为工作区文档，不截断或伪称已入库。
+反转、钩子、物证和断章是按故事选择的方法；变化必须有依据，宁静场与直说也可以有效。不硬凑字数、场数、反转次数或对白占比，实际时长按对白、行动和停留估计。审稿给原文、依据与最小改法，事实矛盾/理解风险/审美建议分开；不把模板检查或自评分当成平台合规、真实片长或爆款证明。`;
 
 export const musicFilmWritingGuide = `仅对 MV（brief.kind 为 musicFilm）应用以下规则：
 先沿用用户已选的剧情、混合、纯演唱或抽象方向；未指定时发展有故事演绎的 MV。剧情与混合型先完成故事，再映射歌曲段落，最后拆镜。已有定稿保留，不为补流程重写。纯演唱和抽象段落按音乐、表演与意象组织，不硬填人物冲突或虚构因果。

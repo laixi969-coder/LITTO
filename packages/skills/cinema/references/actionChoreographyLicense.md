@@ -296,3 +296,11 @@ Apache License
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+
+## 2026-10-11：写实与玄幻专项评估
+
+- real-combat-director：https://github.com/lixiaoxiao9888-create/real-combat-director，提交 ed3e262e092b6bf13f8a733c7757325c4db84f1d。
+- xuanhuan-combat-director：https://github.com/lixiaoxiao9888-create/xuanhuan-combat-director，提交 7a0567886d1137f2f54b6431793e3e36ccbbe948。
+
+上述快照未提供明确 LICENSE。LITTO 仅评估其能力范围，自行编写 combatDesign.md，以通用动作、摄影和空间设计原则补充现有流程；未复制两仓库正文、具体招式/角色/场景库、数值参数或脚本，也不将同源仓库的 MIT 许可推定适用于它们。

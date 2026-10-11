@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { ToolDefinition, ToolFiles, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 import { breakdownSchema, sceneListSchema, validateBreakdown, validateSceneList, type SceneList } from "./schema";
-import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale } from "./storyProject";
+import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject } from "./storyProject";
+import { visualDirectors, visualFrames, resolveVisualBoard } from "./visualReference";
 
 const sceneListPath = "场次表.json";
 const historyDirectory = "场次表历史";
@@ -30,7 +31,10 @@ const plugin: ToolPlugin = {
     async function checkStory(value: SceneList) {
       if (!story) return;
       const project = storyProjectSchema.parse(await story.read());
-      if (!project.version) return;
+      // 版本用于并发控制；仅收藏视觉参考不代表已经进入故事采用流程。
+      if (!project.revisions.length && !project.sources.length && !project.directions.length && JSON.stringify(project.brief) === JSON.stringify(newStoryProject().brief)) {
+        return { approved: undefined, visualReferences: resolveVisualBoard(project.visualBoard) };
+      }
       await story.validateSources?.();
       const approved = project.revisions.find(item => item.id === project.approvedId);
       if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先调用 requestStoryApproval 在聊天中确认采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
@@ -44,9 +48,20 @@ const plugin: ToolPlugin = {
           }
         }
       }
-      return approved;
+      return { approved, visualReferences: resolveVisualBoard(project.visualBoard) };
     }
     const tools: ToolDefinition[] = [
+      {
+        name: "readVisualReferences", label: "读取视觉参考",
+        description: "读取精选电影视觉参考库或某导演的画面来源。画像用于构图、光线与色彩探索；文字检索不代表已看图，参考片剧情不能成为当前故事事实。收藏通过 updateStoryProject 的 visualBoard 保存 frameId、purpose 和具体采用方法。",
+        parameters: z.toJSONSchema(z.strictObject({ directorId: z.enum(visualDirectors.map(item => item.id)).optional() }), { io: "input", target: "draft-07" }),
+        async execute(_id, params) {
+          const input = z.strictObject({ directorId: z.enum(visualDirectors.map(item => item.id)).optional() }).parse(params);
+          return json({ directors: input.directorId ? visualDirectors.filter(item => item.id === input.directorId) : visualDirectors,
+            frames: input.directorId ? visualFrames.filter(item => item.director === input.directorId) : undefined,
+            note: "电影图片为外部来源，收藏不等于生成素材授权。" });
+        },
+      },
       {
         name: "saveSceneList",
         label: "保存场次表",
@@ -78,13 +93,14 @@ const plugin: ToolPlugin = {
           const saved = await readSaved(files);
           if (saved) {
             try {
-              const approved = await checkStory(saved);
-              if (approved) return json({
+              const context = await checkStory(saved);
+              if (context?.approved) return json({
                 ...saved,
-                storyContext: { revisionId: approved.id, title: approved.title, outline: approved.outline, canon: approved.canon, threads: approved.threads },
+                storyContext: { revisionId: context.approved.id, title: context.approved.title, outline: context.approved.outline, canon: context.approved.canon, threads: context.approved.threads, visualReferences: context.visualReferences },
                 // ACT: 从采用版本即时关联正文，不在场次表再存一份可能过期的故事。
-                scenes: saved.scenes.map((scene, index) => ({ ...scene, story: approved.scenes[index] })),
+                scenes: saved.scenes.map((scene, index) => ({ ...scene, story: context.approved.scenes[index] })),
               });
+              return json({ ...saved, visualReferences: context?.visualReferences });
             }
             catch (cause) { return json({ ...saved, needsUpdate: true, reason: cause instanceof Error ? cause.message : "故事版本已改变" }); }
           }
@@ -111,7 +127,7 @@ const plugin: ToolPlugin = {
     ];
     if (story) tools.push({
       name: "readStoryProject", label: "读取故事工作台", description: "恢复创作简报、资料理解、方向、故事版本、已采用版本的事实/线索、审稿与预演、真实发布反馈。继续创作前先读。", parameters: z.toJSONSchema(z.object({})),
-      async execute() { return json(await story.read()); },
+      async execute() { const project = storyProjectSchema.parse(await story.read()); return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) }); },
     }, {
       name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
       description: "按 readStoryProject 的 version 保存资料理解、创意方向、剧本候选、精确引句审稿或单场改写。采用故事版本请调用 requestStoryApproval，在聊天中显示确认卡片。不得代用户确认资料、采用方向/定稿、处置问题或录入观众反馈。旧版本保留。",
