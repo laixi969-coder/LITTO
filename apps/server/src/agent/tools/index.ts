@@ -136,7 +136,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const request = schema.parse(data.request);
           return prepareShot(cwd, data.kind, data.shotId, request);
         }
-        return api.workspaceProduction(api.scoped(tenant.workspaceId), workspaceProject(cwd)!, operation, data);
+        return api.workspaceProduction(api.scoped(tenant.workspaceId), workspaceProject(cwd)!, operation, data, tenant.userId);
       },
       listModels: listMediaModels,
       generateImage: (request, signal) => generateAndPublish("image", request, signal),
