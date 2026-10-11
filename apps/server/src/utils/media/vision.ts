@@ -4,7 +4,7 @@ import { tenantStore } from "@/utils/tenant";
 import { assertConfiguredUpstream, getConfiguredModel, streamAi } from "@/utils/ai";
 import { recordTextUsage } from "@/utils/usage";
 
-export async function inspectFrames(input: { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[] }) {
+export async function inspectFrames(input: { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[]; label?: string; signal?: AbortSignal }) {
   const api = cloud()!;
   const member = api.dbGet("SELECT u.id,u.email,u.is_admin,m.role FROM users u JOIN workspace_members m ON m.user_id=u.id WHERE u.id=? AND m.workspace_id=? AND u.status='active' AND u.deleted_at IS NULL", input.actor, input.workspaceId);
   const scope = api.scoped(input.workspaceId);
@@ -13,14 +13,15 @@ export async function inspectFrames(input: { workspaceId: string; projectId: str
     const configured = getConfiguredModel(input.providerId, input.modelId);
     await assertConfiguredUpstream(configured);
     const job = scope.insert("generation_jobs", { project_id: input.projectId, kind: "text", provider_id: "workspaceMedia", model_id: input.modelId,
-      model_version: input.modelId, compiled_prompt: input.prompt, parameters: { label: "qc.observe", providerId: input.providerId, frameCount: input.frames.length }, input_refs: [],
+      model_version: input.modelId, compiled_prompt: input.prompt, parameters: { label: input.label ?? "qc.observe", providerId: input.providerId, frameCount: input.frames.length }, input_refs: [],
       status: "RUNNING", attempts: 1, max_attempts: 1, run_after: new Date().toISOString(), estimated_cost: null, held: 0, created_by: input.actor, started_at: new Date().toISOString() });
     const started = Date.now();
     try {
       const context: Context = { systemPrompt: input.system, messages: [{ role: "user", timestamp: Date.now(), content: [
         { type: "text", text: input.prompt }, ...input.frames.map(frame => ({ type: "image" as const, mimeType: frame.mime, data: frame.data.toString("base64") })),
       ] }] };
-      const stream = streamAi(configured, context, AbortSignal.timeout(180000));
+      const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(180000)]) : AbortSignal.timeout(180000);
+      const stream = streamAi(configured, context, signal);
       for await (const _event of stream) { /* consume the existing SDK stream */ }
       const result = await stream.result();
       recordTextUsage({ ...result, provider: configured.providerId });

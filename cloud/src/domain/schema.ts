@@ -117,7 +117,7 @@ export const musicVideoSchema = z.object({
 
 const directionText = z.string().trim().min(1).max(2000);
 export const creativeBriefSchema = z.object({
-    kind: z.enum(["combat", "performance", "establishing"]),
+    kind: z.enum(["combat", "performance", "establishing", "product"]),
     intent: directionText,
     visualPayoff: directionText,
     combat: z.object({
@@ -140,6 +140,11 @@ export const creativeBriefSchema = z.object({
     }).strict(),
 }).strict();
 
+export const advertisingSchema = z.object({
+    beatId: directionText, productRead: directionText, cutToNext: directionText, sound: directionText,
+    pilotKey: z.string().trim().min(1).max(100).optional(),
+}).strict();
+
 export const shotInput = z.object({
     sequenceId: z.string(), sceneId: z.string().optional(), order: z.number().int().optional(),
     title: z.string().default(""),
@@ -154,6 +159,7 @@ export const shotInput = z.object({
     generationDuration: z.number().finite().positive().max(3600).optional(),
     musicVideo: musicVideoSchema.nullable().optional(),
     creativeBrief: creativeBriefSchema.optional(),
+    advertising: advertisingSchema.optional(),
     inspectionRegion: referenceCropSchema.nullable().optional(),
     subtitle: z.string().default(""),
     modelOverride: z.any().optional(),

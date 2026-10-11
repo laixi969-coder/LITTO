@@ -9,9 +9,9 @@ const stylingSchema = z.object({
 // ACT: 这里只校验设计是否可执行，不用关键词、分数或服饰繁简冒充审美判断。
 export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; name: string; type: string; attributes?: Record<string, unknown> }[]) {
   const characters = assets.filter(asset => asset.type === "Character");
-  if (!shot.creativeBrief && !characters.length) return [];
+  if (!shot.creativeBrief && !characters.length && !assets.some(asset => asset.type === "Product") && !shot.advertising) return [];
   const parsed = creativeBriefSchema.safeParse(shot.creativeBrief);
-  if (!parsed.success) return ["请由导演补充 creativeBrief：创作目标、可见视觉设计、攻防编排（如适用）和对白计划；不要让用户填写技术表单"];
+  if (!parsed.success) return ["请由导演补充 creativeBrief：创作目标、可见视觉设计、产品展示或攻防编排（如适用）和对白计划；不要让用户填写技术表单"];
   const issues: string[] = [];
   for (const asset of characters) {
     if (!stylingSchema.safeParse(asset.attributes?.styling).success) issues.push(`${asset.name} 缺少 attributes.styling 的 makeup、hair、costume、accessories 设计；可明确自然妆或无配饰及其理由，不默认素衣或华服`);

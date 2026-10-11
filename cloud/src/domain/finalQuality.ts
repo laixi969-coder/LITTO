@@ -8,6 +8,7 @@ import { storage } from "../storage.ts";
 import { probeFile, runCmd } from "../media-tools.ts";
 import { bad, conflict, notFound, now } from "../util.ts";
 import { getEdit, resolveClip } from "./nle.ts";
+import { adContext, adReadiness, isAdSequence } from "./adDirection.ts";
 
 function sourceReviews(s: Scope, mediaId: string | null) {
   if (!mediaId) return [];
@@ -22,7 +23,8 @@ export function sequenceFingerprint(s: Scope, sequenceId: string) {
   });
   const projectId = s.get("sequences", sequenceId)?.projectId;
   const context = projectId ? ["worlds", "looks", "assets", "reference_bindings"].map(table => s.list(table, { projectId })) : [];
-  return createHash("sha256").update(JSON.stringify({ edit, sources, context })).digest("hex");
+  const sequence = s.get("sequences", sequenceId);
+  return createHash("sha256").update(JSON.stringify({ edit, sources, context, ...(sequence && isAdSequence(sequence) ? { advertising: adContext(s, { sequenceId, projectId }) } : {}) })).digest("hex");
 }
 
 function renderMedia(s: Scope, id: string) {
@@ -37,7 +39,9 @@ export function finalQualityView(s: Scope, render: Record<string, any>) {
   const quality = render.manifest?.quality;
   if (!quality) return { status: "unverified" };
   const stale = !render.manifest?.sourceFingerprint || render.manifest.sourceFingerprint !== sequenceFingerprint(s, render.sequenceId) || quality.mediaId !== render.mediaId;
-  return { ...quality, status: stale ? "stale" : quality.status };
+  const sequence = s.get("sequences", render.sequenceId);
+  const pilotReviewRequired = sequence && isAdSequence(sequence) && !adReadiness(s, sequence.id).ready;
+  return { ...quality, status: stale ? "stale" : pilotReviewRequired && quality.status === "pass" ? "unverified" : quality.status };
 }
 
 export const finalReviewSchema = z.object({
@@ -49,6 +53,11 @@ export const finalReviewSchema = z.object({
     lighting: z.enum(["pass", "fail", "unverified"]),
     continuity: z.enum(["pass", "fail", "unverified"]),
     sound: z.enum(["pass", "fail", "unverified"]),
+    emotion: z.enum(["pass", "fail", "unverified"]).optional(),
+    product: z.enum(["pass", "fail", "unverified"]).optional(),
+    composition: z.enum(["pass", "fail", "unverified"]).optional(),
+    color: z.enum(["pass", "fail", "unverified"]).optional(),
+    editing: z.enum(["pass", "fail", "unverified"]).optional(),
   }),
   note: z.string().trim().min(10).max(4000),
   acknowledgements: z.array(z.object({ id: z.string(), reason: z.string().trim().min(10).max(1000) })).max(300).default([]),
@@ -121,8 +130,14 @@ export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: 
   const quality = finalQualityView(s, render);
   if (!quality.analysisId || quality.analysisId !== review.analysisId || quality.status === "stale") throw conflict("检测记录已过期，请重新导出或检测", "stale");
   const passing = Object.values(review.checks).every(value => value === "pass");
+  const sequence = s.get("sequences", render.sequenceId)!;
+  if (passing && isAdSequence(sequence)) {
+    if (!["emotion", "product", "composition", "color", "editing"].every(key => review.checks[key as keyof typeof review.checks] === "pass")) throw bad("广告成片须检查情绪表达、产品识别、构图、整片色调与剪辑节奏");
+    if (!quality.advertising || quality.advertising.fingerprint !== sequenceFingerprint(s, render.sequenceId)) throw bad("请先 inspectAdFilm 对实际导出文件完成广告表达审片");
+    if (!adReadiness(s, render.sequenceId).ready) throw bad("视觉样镜已过期或未定标，请先复核样镜");
+  }
   if (passing && quality.findings.some((item: Finding) => item.severity === "block")) throw conflict("最终文件或源素材存在阻断问题", "qc_blocked");
-  if (passing && quality.findings.some((item: Finding) => !review.acknowledgements.some(ack => ack.id === item.id))) throw bad("请逐项填写声音/时长告警的复核依据；尚未解决则标记返修");
+  if (passing && quality.findings.some((item: Finding) => !review.acknowledgements.some(ack => ack.id === item.id))) throw bad("请逐项填写声音、时长或广告表达告警的复核依据；尚未解决则标记返修");
   const status = passing ? "pass" : Object.values(review.checks).includes("fail") ? "fail" : "unverified";
   const next = { ...quality, status, review: { ...review, actor, reviewedAt: now() } };
   s.update("renders", id, { manifest: { ...render.manifest, quality: next } });

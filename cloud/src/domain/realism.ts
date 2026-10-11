@@ -3,16 +3,19 @@ import type { Scope } from "../db.ts";
 import { shotInput } from "./schema.ts";
 import { conflict, notFound } from "../util.ts";
 import { statesOf } from "./state.ts";
+import { adContext } from "./adDirection.ts";
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
-export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "take" = "take") {
+export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "take" = "take"): string {
   const shot = s.get("shots", shotId);
   if (!shot) throw notFound("shot");
   const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
   const previousTake = previous?.approvedTakeId ? s.get("takes", previous.approvedTakeId) : null;
   const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
+  const advertising = adContext(s, shot);
   const data = {
+    ...(advertising ? { advertising } : {}),
     shot: { ...shotData, ...(creativeBrief ? { creativeBrief: type === "keyframe"
       ? { kind: creativeBrief.kind, intent: creativeBrief.intent, visualPayoff: creativeBrief.visualPayoff }
       : creativeBrief } : {}) },

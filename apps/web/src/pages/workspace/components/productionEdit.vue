@@ -10,6 +10,38 @@
         <button type="button" :disabled="!edit?.futureDepth" @click="run(() => history('redo'))">重做</button>
       </div>
       <template v-if="edit">
+        <details v-if="adPlan?.readiness.required" class="adPlan">
+          <summary>整片创意与视觉定标 · {{ adPlan.readiness.ready ? '样镜已定标' : '等待样镜检查与采用' }}</summary>
+          <template v-if="adPlan.sequence.adDirection">
+            <p>{{ adPlan.sequence.adDirection.concept }}</p>
+            <p>观众感受：{{ adPlan.sequence.adDirection.audienceFeeling }} · 产品作用：{{ adPlan.sequence.adDirection.productRole }}</p>
+            <p>结尾记忆：{{ adPlan.sequence.adDirection.brandRecall }}</p>
+            <ol><li v-for="beat in adPlan.sequence.adDirection.emotionalArc" :key="beat.id">{{ beat.emotion }}：{{ beat.visibleAction }}；{{ beat.productBeat }}</li></ol>
+            <p v-for="(value, key) in adPlan.sequence.adDirection.visualRules" :key="key">{{ visualLabels[key] || key }}：{{ value }}</p>
+            <p>剪辑：{{ adPlan.sequence.adDirection.editRhythm }}</p>
+            <p>声音：{{ adPlan.sequence.adDirection.soundDesign }}</p>
+            <ul><li v-for="pilot in adPlan.readiness.pilots" :key="pilot.key">{{ pilot.purpose }}：{{ pilot.reason }}</li></ul>
+          </template>
+          <p v-else>请在对话中确定广告创意，助手会保存方案并安排先行样镜。</p>
+          <details v-for="(study, id) in adPlan.sequence.referenceStudies" :key="id">
+            <summary>{{ references.find(item => item.id === id)?.name || '参考片观察' }} · {{ study.timestamps.length }} 个样本</summary>
+            <p>仅分析所列画面，未试听声音。</p>
+            <p v-for="(observation, index) in study.observations" :key="index">{{ study.timestamps[observation.frameIndex] }} 秒：{{ observation.composition }}；{{ observation.color }}；{{ observation.light }}；{{ observation.action }}；{{ observation.product }}；{{ observation.cut }}</p>
+            <p>可借鉴：{{ study.borrow.join('；') }}</p><p>不照搬：{{ study.avoidCopying.join('；') }}</p>
+            <p>未确认：{{ study.unknowns.join('；') }}</p>
+          </details>
+        </details>
+        <details>
+          <summary>整片调色</summary>
+          <div class="editFields">
+            <label>曝光（档）<input v-model.number="grade.exposureStops" type="number" min="-4" max="4" step="0.1" /></label>
+            <label>色温偏移<input v-model.number="grade.temperature" type="number" min="-100" max="100" step="1" /></label>
+            <label>饱和度<input v-model.number="grade.saturation" type="number" min="0" max="3" step="0.05" /></label>
+            <label>对比度<input v-model.number="grade.contrast" type="number" min="0.5" max="2" step="0.05" /></label>
+            <button type="button" @click="run(saveGrade)">保存调色并用于下次导出</button>
+          </div>
+          <p>对照样镜检查产品本色、肤色和邻镜光色。保存后重新导出，使用下方真实文件比较；素材播放器显示原片。</p>
+        </details>
         <h3>素材使用区间</h3>
         <p>入出点为原素材秒数。保留首尾余量可用于动作匹配和声音桥，编辑不改变已采用源文件。</p>
         <div class="clipList">
@@ -96,10 +128,15 @@
             </div>
             <p v-if="publishErrors[item.id]" role="alert">{{ publishErrors[item.id] }}（文件已导出，可直接下载或重试放到画布）</p>
             <button type="button" @click="run(() => analyzeQuality(item.id))">检测最终文件与声音接缝</button>
+            <details v-if="item.quality?.advertising">
+              <summary>广告表达抽帧审片</summary>
+              <p>覆盖 {{ item.quality.advertising.timestamps.length }} 个样本；{{ item.quality.advertising.omittedCuts }} 个切点未专项采样。声音需完整试听。</p>
+              <p v-for="field in adQualityFields" :key="field[0]">{{ field[1] }}：{{ item.quality.advertising[field[0]].evidence.map((evidence: any) => `${item.quality.advertising.timestamps[evidence.frameIndex]} 秒：${evidence.observation}`).join('；') }}。{{ item.quality.advertising[field[0]].repair }}</p>
+            </details>
             <details v-if="qualityDrafts[item.id] && item.quality?.analysisId">
               <summary>最终声画验收</summary>
               <p>每项记录实际观察；有意静默或声音进入需解释告警，未解决则选返修。剪辑或素材改变后须重新导出。</p>
-              <label v-for="field in qualityFields" :key="field[0]">{{ field[1] }}<select v-model="qualityDrafts[item.id].checks[field[0]]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
+              <label v-for="field in reviewFields" :key="field[0]">{{ field[1] }}<select v-model="qualityDrafts[item.id].checks[field[0]]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
               <label><input v-model="qualityDrafts[item.id].fullPlayback" type="checkbox" />已完整播放并试听此导出文件</label>
               <label>时间码、观察证据与复查结论<textarea v-model="qualityDrafts[item.id].note" rows="3" /></label>
               <div v-for="finding in item.quality.findings" :key="finding.id">
@@ -131,6 +168,11 @@ const audioMediaId = ref(""), audioRole = ref("sfx"), audioStart = ref(0), audio
 const segmentMediaId = ref(""), segments = ref<{ shotId: string; in: number; out: number }[]>([]);
 const exportSize = ref("source"), renders = ref<any[]>([]);
 const qualityFields = [["surface", "皮肤、头发与商品材质"], ["motion", "肢体、动作受力与手物接触"], ["lighting", "场景光源、曝光与光色"], ["continuity", "人物、服装、场景与剪点连续"], ["sound", "对白、环境声、音画同步与接缝"]];
+const adQualityFields = [["emotion", "情绪与创意表达"], ["product", "产品识别与结尾品牌记忆"], ["composition", "构图与视觉主次"], ["color", "整片色调、肤色与产品本色"], ["editing", "节奏、留白与邻镜连接"]];
+const adPlan = ref<any>(null);
+const reviewFields = computed(() => adPlan.value?.readiness.required ? [...qualityFields, ...adQualityFields] : qualityFields);
+const visualLabels: Record<string, string> = { palette: "色彩", light: "用光", materials: "材质", composition: "构图", motion: "运动" };
+const grade = ref({ exposureStops: 0, temperature: 0, saturation: 1, contrast: 1 });
 const qualityLabels: Record<string, string> = { unverified: "未验收", fail: "需要返修", pass: "人工验收通过", stale: "版本已改变，须重新导出验收" };
 const qualityDrafts = ref<Record<string, { analysisId: string; checks: Record<string, string>; fullPlayback: boolean; note: string; reasons: Record<string, string> }>>({});
 let disposed = false;
@@ -163,20 +205,25 @@ async function run(action: () => Promise<unknown>) {
 }
 function accept(value: any) {
   edit.value = value; candidates.value = []; suggestionNote.value = ""; preview.value = null;
+  grade.value = { exposureStops: value.grade?.exposureStops ?? 0, temperature: value.grade?.temperature ?? 0, saturation: value.grade?.saturation ?? 1, contrast: value.grade?.contrast ?? 1 };
   ranges.value = Object.fromEntries(value.clips.map((clip: any) => [clip.id, { in: clip.in, out: clip.out }]));
   if (!value.clips.some((clip: any) => clip.id === rightId.value)) rightId.value = "";
 }
 async function load() {
   const id = sequenceId.value;
   if (!id) return;
-  const value = await props.request(`/sequences/${id}/edit`);
-  if (!disposed && id === sequenceId.value) accept(value);
+  const [value, direction] = await Promise.all([props.request(`/sequences/${id}/edit`), props.request(`/sequences/${id}/adDirection`)]);
+  if (!disposed && id === sequenceId.value) { accept(value); adPlan.value = direction; }
   await loadRenders();
 }
 async function ops(operations: any[]) { accept(await props.request(`${path()}/ops`, "POST", { expectedVersion: edit.value.version, ops: operations })); }
+async function saveGrade() {
+  await props.request(`/sequences/${sequenceId.value}/grade`, "PUT", { grade: { ...edit.value.grade, ...grade.value, lutCube: undefined }, keepLut: true, expectedVersion: edit.value.version });
+  await load(); message.value = "整片调色已保存，请重新导出并比较实际文件";
+}
 async function history(direction: string) { accept(await props.request(`${path()}/${direction}`, "POST", {})); }
 watch(() => props.sequences, values => { if (!sequenceId.value && values.length) sequenceId.value = values[0].id; }, { immediate: true });
-watch(sequenceId, () => { edit.value = null; renders.value = []; clearTimeout(renderTimer); void load().catch(cause => { if (!disposed) error.value = String(cause); }); }, { immediate: true });
+watch(sequenceId, () => { edit.value = null; adPlan.value = null; renders.value = []; clearTimeout(renderTimer); void load().catch(cause => { if (!disposed) error.value = String(cause); }); }, { immediate: true });
 watch(() => props.shots.map(shot => shot.approvedTakeId).join(","), () => { void loadRenders().catch(cause => { if (!disposed) error.value = String(cause); }); });
 watch(rightId, () => { candidates.value = []; suggestionNote.value = ""; preview.value = null; transition.value = pair.value?.right.transition.type ?? "cut"; });
 async function trim(clip: any) {
@@ -233,7 +280,7 @@ async function loadRenders() {
     if (disposed || id !== sequenceId.value) return;
     renders.value = values;
     for (const item of values) if (item.quality?.analysisId && qualityDrafts.value[item.id]?.analysisId !== item.quality.analysisId) {
-      qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(qualityFields.map(field => [field[0], "unverified"])), fullPlayback: false, note: "", reasons: {} };
+      qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(reviewFields.value.map(field => [field[0], "unverified"])), fullPlayback: false, note: "", reasons: {} };
     }
     const latest = values.find((item: any) => item.status === "SUCCEEDED" && item.media);
     if (latest && !published.value.has(latest.id) && !publishErrors.value[latest.id]) {

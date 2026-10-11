@@ -9,9 +9,18 @@ import { join } from "node:path";
 import { z } from "zod";
 import { referenceCropSchema } from "./schema.ts";
 
-type VisionRequest = { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[] };
+type VisionRequest = { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[]; label?: string; signal?: AbortSignal };
 let workspaceVision: ((input: VisionRequest) => Promise<{ text: string; modelId: string; jobId: string }>) | undefined;
 export function configureWorkspaceVision(execute: NonNullable<typeof workspaceVision>) { workspaceVision = execute; }
+
+export async function inspectVision(input: Omit<VisionRequest, "providerId" | "modelId">, model?: { providerId: string; modelId: string }) {
+  input.signal?.throwIfAborted();
+  if (model && !workspaceVision) throw new Error("当前服务未连接工作区视觉模型");
+  const result = model ? await workspaceVision!({ ...input, ...model }) : await runText({ ...input, json: true, label: input.label ?? "ad.inspect" });
+  input.signal?.throwIfAborted();
+  if (!result) throw new Error("未配置可用的视觉模型，检查未完成");
+  return result;
+}
 
 // ACT: 短片约每秒四帧、最多 48 帧辅助发现多肢与漂移；长片为均匀抽样，不证明完整动作或音画同步。
 export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "take", id: string, actor: string, model?: { providerId: string; modelId: string }) {

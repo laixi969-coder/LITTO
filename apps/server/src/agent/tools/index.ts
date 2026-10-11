@@ -22,6 +22,7 @@ import { requestKeyframeApproval } from "@/utils/media/keyframeApproval";
 import { requestProductionDecision } from "@/utils/media/productionDecision";
 import { readVoiceProject } from "@/utils/media/voiceDecision";
 import { readMediaQuality, saveMediaQuality } from "@/utils/media/quality";
+import { listAiModels } from "@/utils/ai";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
@@ -110,6 +111,18 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         const api = cloud(), tenant = currentTenant();
         if (!api || !tenant || tenant.role === "VIEWER") throw new Error("制片工具需要已登录且有编辑权限的工作区");
         const scope = api.scoped(tenant.workspaceId), projectId = workspaceProject(cwd)!;
+        if (operation === "readVisionModels") return { models: listAiModels(), note: "已选语言模型；图片输入能力以实际供应商响应为准，检查失败不视为通过" };
+        if (operation === "analyzeReference" || operation === "inspectAdPilot" || operation === "inspectAdFilm") {
+          const models = listAiModels();
+          if (!data.model && models.length > 1) throw new Error("当前有多个已选语言模型，请先 readVisionModels 并传 model 指定用于视觉检查的模型");
+          const model = data.model ?? (models.length === 1 ? { providerId: models[0]!.providerId, modelId: models[0]!.modelId } : undefined);
+          return api.inspectAd(scope, projectId, operation, { ...data, model }, tenant.userId, mediaSignal(signal));
+        }
+        if (operation === "sequence") {
+          const story = await readStoryProject(cwd);
+          const revision = story.revisions.find(item => item.id === story.approvedId);
+          return api.workspaceProduction(scope, projectId, operation, { ...data, kind: data.kind ?? revision?.brief.kind ?? story.brief.kind, storyRevisionId: revision?.id }, tenant.userId);
+        }
         if (operation === "importKeyframe") {
           const input = z.strictObject({ shotId: z.string().min(1), path: z.string().min(1).max(2048) }).parse(data);
           if (scope.get("shots", input.shotId)?.projectId !== projectId) throw new Error("镜头不属于当前项目");

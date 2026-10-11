@@ -15,10 +15,12 @@ import { shotPartial, updateShot } from "./shots.ts";
 import { applyOps, editView, getEdit, opSchema, selectWorkingTake } from "./nle.ts";
 import { finalQualityView, sequenceFingerprint } from "./finalQuality.ts";
 import { assembleApprovedSequence } from "./assembly.ts";
+import { adDirectionSchema, saveAdDirection } from "./adDirection.ts";
 
 const id = z.string().min(1).max(128);
 const ids = z.array(id).min(1).max(60).refine(value => new Set(value).size === value.length, "候选不能重复");
 const decisionSchema = z.discriminatedUnion("operation", [
+  z.object({ operation: z.literal("adDirection"), data: z.object({ sequenceId: id, direction: adDirectionSchema }) }),
   z.object({ operation: z.literal("approveAssets"), data: z.object({ assetIds: ids }) }),
   z.object({ operation: z.literal("selectCandidate"), data: z.object({ candidateIds: ids, asHero: z.boolean().default(false) }) }),
   z.object({ operation: z.literal("selectReference"), data: z.object({ assetId: id, mediaIds: ids }) }),
@@ -40,6 +42,7 @@ const decisionSchema = z.discriminatedUnion("operation", [
 const feedbackOptions = ["满意，继续", "想改一下", "我拿不准，帮我检查", "暂不决定"];
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item)).digest("hex");
 const fieldLabels: Record<string, string> = {
+  concept: "整片创意", audienceFeeling: "观众感受", productRole: "产品作用", brandRecall: "结尾记忆", emotionalArc: "情绪推进", visualRules: "视觉设计", motifs: "贯穿意象", avoid: "避免内容", editRhythm: "剪辑节奏", soundDesign: "声音设计", pilots: "先行样镜", purpose: "验证目标", emotion: "情绪", visibleAction: "可见动作", productBeat: "产品参与", sound: "声音", light: "用光", materials: "材质", composition: "构图", motion: "运动", productRead: "产品展示", cutToNext: "下一镜连接",
   era: "年代", locationLogic: "地点关系", architecture: "建筑", culture: "文化", weather: "天气", time: "时间", material: "材质", physics: "物理规则", realism: "真实感", environmentalConstraints: "环境约束",
   contrast: "对比度", saturation: "饱和度", palette: "色彩", skinTone: "肤色", blackLevel: "黑位", highlightRolloff: "高光过渡", shadowBehavior: "暗部", grain: "颗粒", halation: "光晕", bloom: "泛光", lensCharacter: "镜头质感", texture: "纹理", sharpnessPhilosophy: "锐度", colorReferenceIds: "色彩参考",
   name: "名称", type: "类型", description: "说明", attributes: "设定", references: "参考", invariants: "固定特征", allowedVariations: "允许变化", forbiddenChanges: "禁止变化", personaTags: "气质标签",
@@ -90,6 +93,14 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
     return { shot, report };
   };
   switch (action.operation) {
+    case "adDirection": {
+      const sequence = record("sequences", action.data.sequenceId);
+      records.push(s.list("shots", { sequenceId: sequence.id }));
+      completed = hash(sequence.adDirection ?? null) === hash(action.data.direction);
+      request.title = "修改整片广告导演方案";
+      request.question = `当前方案：\n${describe(sequence.adDirection)}\n\n拟修改为：\n${describe(action.data.direction)}\n\n采用后，受影响的样镜与成片须重新检查。`;
+      break;
+    }
     case "approveAssets": {
       const assets = action.data.assetIds.map(assetId => record("assets", assetId));
       completed = assets.every(asset => asset.approvalStatus === "approved" && asset.approvedVersion === asset.version);
@@ -313,6 +324,7 @@ export function applyProductionDecision(s: Scope, projectId: string, prepared: R
   const result = tx(() => {
     let result: unknown;
     switch (action.operation) {
+      case "adDirection": result = saveAdDirection(s, projectId, action.data.sequenceId, action.data.direction, true); break;
       case "approveAssets": result = action.data.assetIds.map(id => { const asset = s.get("assets", id)!; return asset.approvalStatus === "approved" && asset.approvedVersion === asset.version ? asset : approveAsset(s, id, actor); }); break;
       case "selectReference": {
         const mediaId = action.data.mediaIds[request.options!.indexOf(response.answer)]!;

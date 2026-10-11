@@ -8,9 +8,16 @@ import { notFound } from "../util.ts";
 import { authOf } from "../auth.ts";
 import { previewCut, soundBridge, suggestCuts } from "../domain/cutEditing.ts";
 import { inspectFinalQuality, reviewFinalQuality, finalReviewSchema } from "../domain/finalQuality.ts";
+import { adReadiness } from "../domain/adDirection.ts";
 
 /** Advanced NLE + colour + sound endpoints. Everything is workspace-scoped through ctx(); mutations need EDITOR. */
 export const nle = new Hono();
+nle.get("/sequences/:id/adDirection", c => {
+    const { s } = ctx(c);
+    const sequence = s.get("sequences", c.req.param("id"));
+    if (!sequence) throw notFound("sequence");
+    return c.json({ sequence, readiness: adReadiness(s, sequence.id) });
+});
 nle.post("/renders/:id/quality/analyze", async c => {
     const { s } = ctx(c, "EDITOR");
     return c.json(await inspectFinalQuality(s, c.req.param("id")));

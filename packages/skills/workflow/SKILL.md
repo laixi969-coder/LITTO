@@ -2,7 +2,7 @@
 name: workflow
 description: 在 LITTO 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.13.3"
+  version: "2.14.0"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -21,6 +21,8 @@ metadata:
 先读现场模型和节点能力，再决定执行方案。用户未指定模型时提出基于真实能力的选择，不强制 Seedance、竖屏或固定时长。只问影响结果且未知的缺项；已有模型和参数不重复询问。
 
 ## 通用制片与模型规则
+
+广告与品牌片在生成前读取 [adfilm](../adfilm/SKILL.md) 的真实导演方案流程：保存序列类型和 `adDirection`，参考片用 `analyzeReference` 实际分析，每镜关联 `advertising`，先检查并采用指定视觉样镜再量产。`readAdDirection` 返回是否已定标；产品独立镜头也须有 `creativeBrief`。成片先做 `inspectFinal`，再用 `inspectAdFilm` 比较整片表达、产品和邻镜光色。用户已授权的范围直接继续，不为这些内部步骤要求重复确认。
 
 电影、短片、广告、MV 与独立视频共用同一套视觉设计入口：初次制定或修改视觉方案时，有场景就读取[视觉设计](references/methods/visualDesign.md)，确定配色或布光就读取[色彩与用光](references/methods/colorAndLight.md)，有人物妆发服饰就读取[妆造设计](references/methods/characterStyling.md)；已有适用方案直接继承。广告另外使用 [adfilm](../adfilm/SKILL.md) 的产品展示方法。按本次对象读取，不因不是 MV 就跳过，也不为无人产品图增加人物造型。
 

@@ -11,6 +11,7 @@ import { promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake } from "./nle.ts";
 import { realismChecks } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
+import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
 
 /** 拆格或用户上传的干净单帧进入候选，采用仍复用聊天中的真实检查。 */
 export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string) {
@@ -32,6 +33,12 @@ export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotI
 /** 草稿可直接保存；采用与变更确认通过聊天决定卡片写入，和制作面板复用领域规则。 */
 export function workspaceProduction(s: Scope, projectId: string, operation: string, data: Record<string, unknown>, actor?: string) {
   if (!s.get("projects", projectId)) throw notFound("project");
+  if (operation === "adDirection" || operation === "readAdDirection") {
+    const sequenceId = z.string().min(1).parse(data.sequenceId);
+    if (s.get("sequences", sequenceId)?.projectId !== projectId) throw notFound("project sequence");
+    if (operation === "adDirection") return saveAdDirection(s, projectId, sequenceId, data.direction);
+    return { sequence: s.get("sequences", sequenceId), readiness: adReadiness(s, sequenceId) };
+  }
   if (operation === "agentReview") {
     if (!actor) throw bad("代理审阅须有已认证的操作人");
     const input = z.strictObject({
@@ -100,8 +107,8 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       ?? s.insert("refs", { project_id: projectId, kind, name: name ?? null, media_id: mediaId, source: media.source ?? "upload" });
   }
   if (operation === "sequence") {
-    const parsed = z.object({ name: z.string().min(1).max(120), script: z.string().max(100000).default("") }).parse(data);
-    return s.insert("sequences", { project_id: projectId, ...parsed, ord: s.list("sequences", { projectId }).length, data: {} });
+    const { kind, storyRevisionId, ...parsed } = z.object({ name: z.string().min(1).max(120), script: z.string().max(100000).default(""), kind: sequenceKindSchema.default("story"), storyRevisionId: z.string().min(1).optional() }).parse(data);
+    return s.insert("sequences", { project_id: projectId, ...parsed, ord: s.list("sequences", { projectId }).length, data: { kind, storyRevisionId } });
   }
   if (operation === "shot") return createShot(s, projectId, shotInput.parse(data));
   const shot = typeof data.shotId === "string" && s.get("shots", data.shotId);

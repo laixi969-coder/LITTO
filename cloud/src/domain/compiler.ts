@@ -8,6 +8,7 @@ import { ensureReferenceCrop } from "./referenceCrop.ts";
 import { lookSchema, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
 import { creativeDirectionIssues } from "./creativeDirection.ts";
+import { adContext, adShotIssues } from "./adDirection.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -109,6 +110,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const { start } = statesOf(s, shotId);
     const warnings: string[] = [];
     warnings.push(...creativeDirectionIssues(shot as ShotInput, assets).map(issue => `创作准备未完成：${issue}`));
+    warnings.push(...adShotIssues(s, shot).map(issue => `创作准备未完成：${issue}`));
+    const advertising = adContext(s, shot);
     if (kind === "video" && shot.creativeBrief?.dialogue.mode === "native" && shot.creativeBrief.dialogue.lines.length
         && !model.limits.workspaceExecution && !caps.nativeAudio) warnings.push("创作准备未完成：当前模型没有原生音频能力，不能静默丢弃对白；请选择支持的模型或明确后期配音对口型路径");
     const clean = (t: string, where: string) => {
@@ -136,6 +139,14 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         inputs.push({ referenceId: `asset:${asset.id}`, mediaId, role, weight: 1, lockLevel: "LOCK", sent });
         if (sent) used++;
         else degradations.push({ role, strategy: `${asset.name}: 当前模型或输入容量无法发送权威参考图` });
+    }
+    // 已定样镜实际进入静帧生成；视频从已检查的本镜主帧继承影调，避免挤占单首帧模型。
+    if (kind === "image") for (const pilot of advertising?.pilots ?? []) {
+        if (!pilot.mediaId || inputs.some(input => input.mediaId === pilot.mediaId)) continue;
+        const sent = !!caps.multiReference && used < maxInputs;
+        inputs.push({ referenceId: `pilot:${pilot.shotId}`, mediaId: pilot.mediaId, role: "LOOK", weight: 0.8, lockLevel: "LOCK", sent });
+        if (sent) used++;
+        else degradations.push({ role: "LOOK", strategy: "当前模型无法发送已定视觉样镜，请选择支持多参考的模型" });
     }
     const sorted = [...bindings].sort((a, b) => b.weight - a.weight);
     const textFallback: string[] = [];
@@ -321,6 +332,13 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             variations: J([...(shot.freedomMap?.CONTROL ?? []), sections.allow, sections.random]),
         };
     }
+    // 在模型专用重排之后加入，所有模型都保留整片导演意图。
+    if (advertising) sections.adDirection = JSON.stringify({
+        direction: advertising.direction, shot: shot.advertising,
+        referencePrinciples: advertising.studies,
+        beat: advertising.direction?.emotionalArc?.find((beat: { id: string }) => beat.id === shot.advertising?.beatId),
+        referenceUse: "样镜只校准色彩、光线、材质与构图密度；按本镜地点、动作与产品角色执行，不照搬样镜场景。声音为后期与生成计划，图片不代表声音已完成。",
+    });
     const prompt = renderCompiledPrompt(sections);
     for (const key of ["surface", "imaging", "world", "cinematic", ...(kind === "video" ? ["motion"] : [])]) {
         if (!shot.realism?.[key]?.trim()) warnings.push(`未填写真实感规格：${key}`);
