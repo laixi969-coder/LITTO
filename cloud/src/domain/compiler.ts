@@ -95,7 +95,7 @@ function musicTimecode(seconds: number) {
  * Prompt is NOT source data. It is compiled from ShotSpec + Skills output + Provider capabilities.
  * Unsupported reference roles degrade to text (explicitly reported), never silently disappear.
  */
-export function compileShot(s: Scope, shotId: string, kind: "image" | "video", modelId: string, extra: { startFrameMediaId?: string; repair?: { addLock?: string[]; note?: string } } = {}): Compiled {
+export function compileShot(s: Scope, shotId: string, kind: "image" | "video", modelId: string, extra: { startFrameMediaId?: string; startFrameAsReference?: boolean; repair?: { addLock?: string[]; note?: string } } = {}): Compiled {
     const shot = s.get("shots", shotId)!;
     validateMusicVideoTiming(shot as ShotInput);
     const proj = shot.projectId;
@@ -182,6 +182,11 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
 
     let sections: Record<string, string> = {
         shotDesign: cam.design ? `${kind === "image" ? "Render only the single start state; end, paths and timing are continuity context, not multiple panels. " : ""}${JSON.stringify(cam.design)}` : "",
+        motionTiming: kind === "video" ? J([
+            cam.design?.timing && `Action timing: ${cam.design.timing}`,
+            shot.performance?.timing && `Performance timing: ${shot.performance.timing}`,
+            "Follow the specified action beats and playback speed. Cinematic scale and heavy mass do not imply slow motion. Do not stretch one brief contact or pose across the entire requested duration. Preserve the specified preparation, contact, reaction and follow-through; camera movement must not replace subject movement. Slow motion, freeze frames and internal cuts require explicit direction. A planned edit is not an instruction to cut inside this generated shot",
+        ]) : "",
         subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
         assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
         narrative: shot.narrativeFunction,
@@ -214,7 +219,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         forbiddenChanges: J(assets.flatMap(a => (a.forbiddenChanges ?? []).map((value: string) => `${a.name}: ${value}`))),
         assetCondition: "Preserve the condition specified by the story and approved references. When unspecified, use intact, normally maintained surfaces and clean clothing; texture and realism do not imply dirt, wear, rust, damage or poverty. Preserve age-appropriate anatomy and natural torso-to-leg proportions; do not compress limbs to fit the composition.",
         constraintPriority: "Preserve identity and explicit invariants. Current starting continuity state takes precedence over baseline mutable appearance; apply only explicitly planned changes at their action or timeline beat and preserve unaffected details. Allow natural performance without changing identity. Forbidden changes override allowed variations; optional variation must not alter specified action, lighting or continuity.",
-        frameContinuity: kind === "video" && extra.startFrameMediaId ? "Continue the actual start frame, including action already in progress; do not rewind to repeat an earlier action. World and identity descriptions are context, not instructions to put every mentioned subject on screen. Keep off-screen subjects off screen unless the shot action explicitly calls for their entrance. Preserve the established subject scale relative to buildings and other subjects; do not invent miniature background versions or duplicates." : "",
+        frameContinuity: kind === "video" && extra.startFrameMediaId ? extra.startFrameAsReference
+            ? "These are appearance and composition references, not a native locked first frame. Follow the specified action starting state and timing; do not freeze the subjects in the reference poses. Preserve identities, scale and established scene landmarks; references do not imply additional copies of subjects or buildings."
+            : "Continue the actual start frame, including action already in progress; do not rewind to repeat an earlier action. World and identity descriptions are context, not instructions to put every mentioned subject on screen. Keep off-screen subjects off screen unless the shot action explicitly calls for their entrance. Preserve the established subject scale relative to buildings and other subjects; do not invent miniature background versions or duplicates." : "",
         repair: extra.repair?.note ?? "",
     };
     let negativePrompt = J(shotAvoid(freedom));

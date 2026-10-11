@@ -125,7 +125,7 @@ export function prepareWorkspaceShot(input: {
     requireReviewed(s, "keyframe", keyframe);
     if (!capabilities.image2video) throw bad("当前模式不能接收主关键帧，请选择图生视频模式");
   }
-  const compiled = compileShot(s, shot.id, input.kind, modelId, { startFrameMediaId: keyframe?.mediaId });
+  const compiled = compileShot(s, shot.id, input.kind, modelId, { startFrameMediaId: keyframe?.mediaId, startFrameAsReference: input.kind === "video" && !firstFrame });
   // ACT: 主帧必占一个输入槽；不得为了多参考丢掉已批准主帧。
   if (compiled.inputs.filter(ref => ref.sent).length > capabilities.maxInputs) throw bad("参考数量超出当前模式容量，请减少参考或更换模式");
   if (mode === "startEndRequired" && !compiled.inputs.some(ref => ref.role === "END_FRAME" && ref.sent)) throw bad("此模式须绑定尾帧");
