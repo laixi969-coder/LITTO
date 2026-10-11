@@ -87,6 +87,7 @@ declare module 'vue' {
     LanguageModel: typeof import('./../components/settings/panels/languageModel/index.vue')['default']
     LanguageSelect: typeof import('./../components/languageSelect.vue')['default']
     MarkdownImage: typeof import('./../components/markdownImage.vue')['default']
+    MarkdownVideoLink: typeof import('./../components/markdownVideoLink.vue')['default']
     Mcp: typeof import('./../components/settings/panels/mcp/index.vue')['default']
     MediaModel: typeof import('./../components/settings/panels/mediaModel/index.vue')['default']
     MediaPreferences: typeof import('./../components/mediaPreferences.vue')['default']
