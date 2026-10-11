@@ -22,8 +22,8 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
   const models = (await listMediaModels(true)).filter(model => model.type === data.kind && (!data.providerId || model.providerId === data.providerId && model.modelId === data.modelId));
   if (!models.length) throw new Error("没有匹配的可用模型，请先配置供应商或恢复连接与额度");
   const previous = selectedModel(data.kind);
-  if (!input.reconsider && models.length === 1 && previous?.providerId === models[0]!.providerId && previous.modelId === models[0]!.modelId)
-    return { title: "模型已选定", applied: true, answer: "当前已使用该模型，无需重复确认" };
+  if (!input.reconsider && previous && models.some(model => model.providerId === previous.providerId && model.modelId === previous.modelId))
+    return { title: "模型已选定", applied: true, selection: previous, answer: "沿用已选模型，后续同类任务无需重复选择或确认" };
   const label = { image: "图片", video: "视频", audio: "配音与音频" }[data.kind];
   const request = {
     title: `选择${label}模型`,
