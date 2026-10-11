@@ -34,7 +34,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (observations.some(o => !DIAGNOSIS[o.kind])) throw bad("未知的质检问题类型");
     const reviewed = [...new Set(review.reviewed ?? [])];
     if (target.type === "take" && reviewed.length && review.fullPlayback !== true) throw bad("视频检查须确认已完整播放当前版本");
-    const fingerprint = shotFingerprint(s, shotId);
+    const fingerprint = shotFingerprint(s, shotId, target.type);
     const previous = s.list("qc_reports", { targetType: target.type, targetId: target.id }, "created_at DESC, rowid DESC")[0];
     const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind]) : [];
     const dismissed = review.dismissedKinds ?? [];

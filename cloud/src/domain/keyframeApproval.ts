@@ -29,7 +29,7 @@ export function prepareKeyframeApproval(s: Scope, projectId: string, input: unkn
     }
     return {
       id, shotId: shot.id as string, title: String(shot.title), mediaId: String(media.id),
-      fingerprint: shotFingerprint(s, shot.id), heroKeyframeId: shot.heroKeyframeId ?? null,
+      fingerprint: shotFingerprint(s, shot.id, "keyframe"), heroKeyframeId: shot.heroKeyframeId ?? null,
       reportId: report?.id ?? null, approved, media: keyframeView(keyframe).media,
     };
   });

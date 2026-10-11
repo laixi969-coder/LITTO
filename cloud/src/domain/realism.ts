@@ -6,7 +6,7 @@ import { statesOf } from "./state.ts";
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
-export function shotFingerprint(s: Scope, shotId: string) {
+export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "take" = "take") {
   const shot = s.get("shots", shotId);
   if (!shot) throw notFound("shot");
   const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
@@ -20,6 +20,11 @@ export function shotFingerprint(s: Scope, shotId: string) {
     inheritedState: statesOf(s, shotId).start,
     previousTake: previousTake ? { id: previousTake.id, mediaId: previousTake.mediaId, observedStateDelta: previousTake.meta?.observedStateDelta } : null,
   };
+  if (type === "keyframe") {
+    // 静帧编译不使用视频音轨/时间线；前镜采用只按实际继承状态影响静帧，不按 Take ID 使其失效。
+    delete data.shot.musicVideo;
+    data.previousTake = null;
+  }
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
 }
 
@@ -27,7 +32,9 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
   const latest = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
   const evidence = latest?.evidence;
   const required = realismChecks.filter(key => type === "take" || key !== "motion");
-  if (!evidence || evidence.mediaId !== item.mediaId || evidence.fingerprint !== shotFingerprint(s, item.shotId)
+  const matches = evidence && (evidence.fingerprint === shotFingerprint(s, item.shotId, type)
+    || type === "keyframe" && evidence.fingerprint === shotFingerprint(s, item.shotId));
+  if (!evidence || evidence.mediaId !== item.mediaId || !matches
     || !required.every(key => evidence.reviewed?.includes(key)) || (type === "take" && evidence.fullPlayback !== true)) {
     throw conflict("请先查看实际输出并完成真实感检查；规格改变后须重新检查", "review_required");
   }
