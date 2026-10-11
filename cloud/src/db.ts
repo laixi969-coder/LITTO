@@ -5,7 +5,7 @@ import { publishChange, TRACKED } from "./events.ts";
 
 export type Row = Record<string, any>;
 
-const MIGRATIONS: { id: string; sql: string }[] = [
+const MIGRATIONS: { id: string; sql: string | (() => string) }[] = [
     {
         id: "0001_platform",
         sql: `
@@ -116,6 +116,13 @@ CREATE TABLE library_assets(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, sou
 CREATE INDEX idx_library_type ON library_assets(workspace_id, type);
 `,
     },
+    {
+        id: "0010_librarySoftDelete",
+        // 早期 0009 已执行的数据库缺少此列；新建数据库已包含，升级时保留两种历史结构。
+        sql: () => (db.prepare("PRAGMA table_info(library_assets)").all() as Row[]).some(column => column.name === "deleted_at")
+            ? ""
+            : "ALTER TABLE library_assets ADD COLUMN deleted_at TEXT;",
+    },
 ];
 
 export const db = await openSqlite(config.dbFile);
@@ -128,7 +135,8 @@ export function migrate() {
         if (done.has(m.id)) continue;
         db.exec("BEGIN");
         try {
-            db.exec(m.sql);
+            const sql = typeof m.sql === "function" ? m.sql() : m.sql;
+            if (sql) db.exec(sql);
             db.prepare("INSERT INTO schema_migrations VALUES(?,?)").run(m.id, now());
             db.exec("COMMIT");
         } catch (e) {

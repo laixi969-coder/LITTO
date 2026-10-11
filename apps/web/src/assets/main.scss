@@ -111,6 +111,12 @@ button, a, input, textarea, [tabindex] {
   &:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 3px; }
 }
 
+// Element Plus 已在输入组件边界显示焦点，内部原生控件不再叠加第二个方框。
+.el-input__inner:focus-visible,
+.el-textarea__inner:focus-visible {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
