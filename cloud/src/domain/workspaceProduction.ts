@@ -44,7 +44,8 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     const current = s.list(table, { projectId }).find(item => operation === "world" || item.scope === "project");
     if (!current) throw notFound(table);
     const schema = operation === "world" ? worldSchema : lookSchema;
-    return s.update(table, current.id, { data: schema.parse({ ...current, ...data }) });
+    const patch = schema.partial().strict().parse(data);
+    return s.update(table, current.id, { data: schema.parse({ ...current, ...patch }) });
   }
   if (operation === "asset") {
     const parsed = assetInput.parse(data);
