@@ -25,7 +25,7 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
       ? { kind: creativeBrief.kind, intent: creativeBrief.intent, visualPayoff: creativeBrief.visualPayoff }
       : creativeBrief } : {}) },
     world: s.list("worlds", { projectId: shot.projectId }),
-    looks: s.list("looks", { projectId: shot.projectId }),
+    looks: s.list("looks", { projectId: shot.projectId }).filter(look => look.scope === "project" || look.scope === "sequence" && look.scopeId === shot.sequenceId || look.scope === "shot" && look.scopeId === shotId),
     assets: (shot.assetIds ?? []).map((id: string) => s.get("assets", id)),
     bindings: s.list("reference_bindings", { projectId: shot.projectId }).filter(binding => binding.targetType === "shot" ? binding.targetId === shotId : shot.assetIds.includes(binding.targetId)),
     inheritedState: statesOf(s, shotId).start,

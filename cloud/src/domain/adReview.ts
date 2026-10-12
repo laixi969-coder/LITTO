@@ -107,7 +107,7 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
       clips: render?.manifest?.clips, coverage: "sampledFramesOnly", sound: "notAuditioned",
       responseShape: operation === "analyzeReference" ? { observations: [{ frameIndex: 0, composition: "可见构图", color: "色彩关系", light: "光源与高光", action: "可见动作", product: "产品角色/未入镜", cut: "与相邻样本的关系及不确定性" }], borrow: ["可迁移原则"], avoidCopying: ["不照搬内容"], unknowns: ["采样未覆盖的内容"] }
         : Object.fromEntries(creativeKeys.map(key => [key, { verdict: "pass|revise|unverified", evidence: [{ frameIndex: 0, observation: "具体可见证据" }], repair: "修正建议或通过依据；不虚构未见内容" }])) }),
-  }, input.model);
+  }, input.model, text => (operation === "analyzeReference" ? referenceSchema : creativeSchema).parse(parseJson(text)));
   const parsed = operation === "analyzeReference" ? referenceSchema.parse(parseJson(result.text)) : creativeSchema.parse(parseJson(result.text));
   signal?.throwIfAborted();
   const latest = s.get("sequences", sequence.id);
@@ -119,11 +119,14 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
     if (s.get("refs", reference!.id)?.mediaId !== mediaId) throw conflict("参考已改变", "stale");
     updateSequenceData(s, sequence.id, { referenceStudies: { ...latest.referenceStudies, [reference!.id]: record } });
     return record;
+    if (latest.referenceStudies?.[reference!.id]?.jobId === result.jobId && latest.referenceStudies[reference!.id].fingerprint === fingerprint) return latest.referenceStudies[reference!.id];
   }
   if (operation === "inspectAdPilot") {
     if (s.get("keyframes", frame!.id)?.mediaId !== mediaId) throw conflict("样镜已改变", "stale");
     const checks = creativeSchema.parse(parsed);
     const verdict = Object.values(checks).every(check => check.verdict === "pass") ? "pass" : "revise";
+    const previous = latest.adPilotReviews?.[shot!.id];
+    if (previous?.jobId === result.jobId && previous.fingerprint === fingerprint && previous.keyframeId === frame!.id) return { review: previous, readiness: adReadiness(s, sequence.id), adoptionRequired: true };
     const review = { ...record, keyframeId: frame!.id, verdict };
     updateSequenceData(s, sequence.id, { adPilotReviews: { ...latest.adPilotReviews, [shot!.id]: review } });
     return { review, readiness: adReadiness(s, sequence.id), adoptionRequired: true };
@@ -132,6 +135,7 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
   if (current?.mediaId !== mediaId || current?.manifest?.quality?.analysisId !== render!.manifest.quality.analysisId) throw conflict("成片检测已改变", "stale");
   const checks = creativeSchema.parse(parsed);
   const findings = current.manifest.quality.findings.filter((finding: any) => !String(finding.id).startsWith("adReview:"));
+  if (current.manifest.quality.advertising?.jobId === result.jobId && current.manifest.quality.advertising.fingerprint === fingerprint) return finalQualityView(s, current);
   for (const key of creativeKeys) if (checks[key].verdict !== "pass") findings.push({ id: `adReview:${key}`, severity: "review", seconds: sampled.timestamps[checks[key].evidence[0]!.frameIndex], message: `${key}：${checks[key].evidence.map(item => item.observation).join("；")}；${checks[key].repair}` });
   s.update("renders", current.id, { manifest: { ...current.manifest, quality: { ...current.manifest.quality, status: findings.some((finding: any) => finding.severity === "block") ? "fail" : "unverified", review: undefined, advertising: record, findings } } });
   return finalQualityView(s, s.get("renders", current.id)!);

@@ -9,18 +9,42 @@ import { join } from "node:path";
 import { z } from "zod";
 import { referenceCropSchema } from "./schema.ts";
 import { sampleVideoFrames } from "./mediaInspection.ts";
+import { createHash } from "node:crypto";
 
 type VisionRequest = { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[]; label?: string; signal?: AbortSignal };
 let workspaceVision: ((input: VisionRequest) => Promise<{ text: string; modelId: string; jobId: string }>) | undefined;
-export function configureWorkspaceVision(execute: NonNullable<typeof workspaceVision>) { workspaceVision = execute; }
+const visionResults = new Map<string, { text: string; modelId: string; jobId: string }>();
+const pendingVision = new Map<string, { signal?: AbortSignal; task: Promise<{ text: string; modelId: string; jobId: string }> }>();
+export function configureWorkspaceVision(execute: NonNullable<typeof workspaceVision>) { workspaceVision = execute; visionResults.clear(); pendingVision.clear(); }
 
-export async function inspectVision(input: Omit<VisionRequest, "providerId" | "modelId">, model?: { providerId: string; modelId: string }) {
+export async function inspectVision(input: Omit<VisionRequest, "providerId" | "modelId">, model?: { providerId: string; modelId: string }, validate?: (text: string) => unknown) {
   input.signal?.throwIfAborted();
   if (model && !workspaceVision) throw new Error("当前服务未连接工作区视觉模型");
-  const result = model ? await workspaceVision!({ ...input, ...model }) : await runText({ ...input, json: true, label: input.label ?? "ad.inspect" });
-  input.signal?.throwIfAborted();
-  if (!result) throw new Error("未配置可用的视觉模型，检查未完成");
-  return result;
+  // ACT: 仅缓存当前进程最近 32 次已校验结果，不缓存图片；未指定模型的动态路由不猜测模型身份。
+  const key = model && validate ? createHash("sha256").update(JSON.stringify([
+    input.workspaceId, input.projectId, input.actor, model.providerId, model.modelId, input.label, input.system, input.prompt,
+    input.frames.map(frame => [frame.mime, createHash("sha256").update(frame.data).digest("hex")]),
+  ])).digest("hex") : undefined;
+  const cached = key ? visionResults.get(key) : undefined;
+  if (cached) { validate!(cached.text); return { ...cached }; }
+  const pending = key ? pendingVision.get(key) : undefined;
+  // 不合并不同取消信号的请求，避免一个用户停止检查影响另一个请求。
+  if (pending && pending.signal === input.signal) { const result = await pending.task; validate?.(result.text); return { ...result }; }
+  const executor = workspaceVision;
+  const task = (async () => {
+    const result = model ? await executor!({ ...input, ...model }) : await runText({ ...input, json: true, label: input.label ?? "ad.inspect" });
+    input.signal?.throwIfAborted();
+    if (!result) throw new Error("未配置可用的视觉模型，检查未完成");
+    validate?.(result.text);
+    if (key && executor === workspaceVision) {
+      visionResults.set(key, { ...result });
+      if (visionResults.size > 32) visionResults.delete(visionResults.keys().next().value!);
+    }
+    return result;
+  })();
+  if (key) pendingVision.set(key, { signal: input.signal, task });
+  try { return await task; }
+  finally { if (key && pendingVision.get(key)?.task === task) pendingVision.delete(key); }
 }
 
 // ACT: 短片约每秒四帧、最多 48 帧辅助发现多肢与漂移；长片为均匀抽样，不证明完整动作或音画同步。
@@ -90,10 +114,12 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     input.frames.push({ data: await storage.get(media.storageKey), mime: media.mime });
   }
   if (model && !workspaceVision) return { used: false, reason: "当前服务未连接工作区视觉模型" };
-  const result = model ? await workspaceVision!({ ...input, ...model }) : await runText(input);
-  if (!result) return { used: false, reason: "未配置可用的视觉模型，须人工检查" };
+  const observationSchema = z.object({ observations: z.array(z.object({ kind: z.string().refine(kind => kinds.includes(kind)), note: z.string().min(1).max(4000) })).max(40) });
+  let result;
   try {
-    const parsed = z.object({ observations: z.array(z.object({ kind: z.string().refine(kind => kinds.includes(kind)), note: z.string().min(1).max(4000) })).max(40) }).parse(parseJson(result.text));
+    result = model ? await inspectVision(input, model, text => observationSchema.parse(parseJson(text))) : await runText(input);
+    if (!result) return { used: false, reason: "未配置可用的视觉模型，须人工检查" };
+    const parsed = observationSchema.parse(parseJson(result.text));
     return { used: true, model: result.modelId, jobId: result.jobId, coverage: timestamps.length ? "sampledFrames" : "stillImage", timestamps, regions, observations: parsed.observations };
-  } catch { return { used: false, model: result.modelId, reason: "视觉模型返回格式无效，不能作为通过依据" }; }
+  } catch (error) { return { used: false, model: result?.modelId, reason: `视觉检查未完成，不能作为通过依据：${error instanceof Error ? error.message : String(error)}` }; }
 }

@@ -86,7 +86,7 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
   };
   const outputContext = (type: "keyframe" | "take", item: Row) => {
     const shot = record("shots", item.shotId);
-    records.push(shotFingerprint(s, shot.id));
+    records.push(shotFingerprint(s, shot.id, type));
     const report = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
     records.push(report ?? null);
     preview(item.mediaId, `${shot.title} · 候选 ${item.id.slice(-5)}`);
@@ -151,7 +151,8 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       if (items.some(item => item.shotId !== items[0]!.shotId)) throw bad("一次比较同一镜头的候选");
       const contexts = items.map(item => outputContext(type, item));
       const shot = contexts[0]!.shot;
-      if (action.operation === "approveTake") records.push(getEdit(s, shot.sequenceId, true));
+      // ACT: 选片只绑定本镜在剪辑中的素材选择；其他镜头或本镜裁切不改变已确认的候选偏好。
+      if (action.operation === "approveTake") records.push(getEdit(s, shot.sequenceId, true).clips.filter(clip => clip.shotId === shot.id).map(clip => ({ id: clip.id, mediaId: clip.mediaId })));
       request.media!.forEach((item, index) => { item.title = `候选 ${index + 1} · ${shot.title}`; });
       request.title = "这个画面怎么样：" + shot.title;
       request.question = "看看下方画面，按你的感受选择就好。不需要懂专业术语；哪里不喜欢可以直接说，例如‘人物不像了’‘动作不够有力’。具体检查和修复由助手处理。";

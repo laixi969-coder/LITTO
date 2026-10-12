@@ -71,6 +71,16 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     const complete = realismChecks.filter(key => target.type === "take" || key !== "motion").every(key => reviewed.includes(key));
     const score = complete ? Math.max(0, 100 - findings.reduce((a, f) => a + f.penalty, 0)) : null;
     const evidence = { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? null, observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, dismissedKinds: dismissed, previousReportId: previous?.id };
+    const { previousReportId: _previousReportId, ...priorEvidence } = previous?.evidence ?? {};
+    const { previousReportId: _currentReportId, ...currentEvidence } = evidence;
+    const automaticOnly = !reviewed.length && !review.note && !review.observedStateDelta && !review.fullPlayback && !dismissed.length;
+    // ACT: 相同结论不重建报告/修复单；纯自动复查不能清空仍有效的人工看听记录。
+    if (previous?.evidence?.mediaId === obj.mediaId && previous.evidence.fingerprint === fingerprint
+        && JSON.stringify(previous.findings) === JSON.stringify(findings)
+        && (automaticOnly || JSON.stringify(priorEvidence) === JSON.stringify(currentEvidence))) {
+        const actions = s.list("repair_actions", { qcReportId: previous.id });
+        return { report: { id: previous.id, score: previous.score, findings, evidence: previous.evidence }, repairActions: actions.map(a => ({ id: a.id, action: a.action, cause: a.cause, detail: a.detail, status: a.status })) };
+    }
     const report = s.insert("qc_reports", { project_id: shot.projectId, shot_id: shotId, target_type: target.type, target_id: target.id, score, findings, evidence });
     const actions = findings.map((f) => s.insert("repair_actions", { project_id: shot.projectId, qc_report_id: report.id, shot_id: shotId, action: f.action, cause: f.cause, detail: f.detail, status: "suggested" }));
     return { report: { id: report.id, score, findings, evidence }, repairActions: actions.map((a) => ({ id: a.id, action: a.action, cause: a.cause, detail: a.detail, status: a.status })) };
