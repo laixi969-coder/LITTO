@@ -187,7 +187,8 @@ async function saveText() {
     const { data } = await axios.post<{ data: TestResult }>("/api/providers/test", { kind: "text", apiUrl, apiKey, protocol: preset.protocol, probeModel: preset.probeModel || undefined }, { timeout: 60000 });
     textResult.value = data.data;
     if (!data.data.ok) return;
-    let models = (data.data.models ?? []).filter(item => !nonChatModel.test(item.id));
+    // OpenRouter 已按官方输入/输出模态筛选，名称含 audio/video 的文字理解模型仍可用。
+    let models = (data.data.models ?? []).filter(item => new URL(apiUrl).origin === "https://openrouter.ai" || !nonChatModel.test(item.id));
     if (!models.length) models = data.data.models ?? [];
     // A sensible default goes first: the picker preselects the first model.
     const first = [preset.defaultModel, preset.probeModel].find(id => id && models.some(item => item.id === id));

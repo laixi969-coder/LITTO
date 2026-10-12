@@ -11,6 +11,7 @@ export const textPresets: TextPreset[] = [
   { id: "glm", label: "智谱 GLM", apiUrl: "https://open.bigmodel.cn/api/paas/v4", protocol: "openai-completions", probeModel: "glm-4-flash", defaultModel: "glm-4-plus", keyHelp: "登录智谱开放平台，在「API Keys」里创建一个 Key。" },
   { id: "atlasCloud", label: "Atlas Cloud", apiUrl: "https://api.atlascloud.ai/v1", protocol: "openai-completions", probeModel: "deepseek-ai/deepseek-v3.2", defaultModel: "deepseek-ai/deepseek-v3.2", keyHelp: "在 Atlas Cloud 控制台创建 API Key。模型目录为公开列表，密钥和模型调用权限在首次生成时确认。" },
   { id: "easyRouter", label: "EasyRouter", apiUrl: "https://easyrouter.io/v1", protocol: "openai-completions", probeModel: "gpt-5.4-nano", defaultModel: "gpt-5.4-nano", keyHelp: "在 EasyRouter 控制台创建 API Key，文字模型按 Key 可用列表获取。" },
+  { id: "openRouter", label: "OpenRouter", apiUrl: "https://openrouter.ai/api/v1", protocol: "openai-completions", probeModel: "", defaultModel: "openai/gpt-4o-mini", keyHelp: "在 openrouter.ai/settings/keys 创建 API Key；验证密钥后自动获取文字模型，调用费用由 OpenRouter 账户结算。" },
   { id: "custom", label: "其他（OpenAI 兼容）", apiUrl: "", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "填写服务商给你的 API 地址和 Key；只要它兼容 OpenAI 的接口就能用。", custom: true },
 ];
 

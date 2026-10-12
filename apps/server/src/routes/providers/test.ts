@@ -51,6 +51,8 @@ async function textTest({ apiUrl, apiKey, protocol, probeModel }: { apiUrl: stri
     const publicCatalog = new URL(apiUrl).hostname === "api.atlascloud.ai";
     if (publicCatalog && apiKey.trim().length < 8) return failure("Key 看起来太短了，请确认复制完整");
     const models = await u.ai.fetchProviderModels({ apiUrl, protocol, apiKey });
+    if (new URL(apiUrl).origin === "https://openrouter.ai" && models.length) return { ok: true, verified: true,
+      message: `OpenRouter 密钥有效，已获取 ${models.length} 个文字模型；具体模型权限和可用额度以实际调用为准。`, models };
     if (publicCatalog && models.length) return { ok: true, verified: false, message: `已获取 ${models.length} 个文字模型；目录为公开列表，密钥和调用权限在首次生成时确认。`, models };
     if (models.length) return { ok: true, verified: true, message: `连接成功，找到 ${models.length} 个模型`, models };
     if (!probeModel) return failure("连上了，但服务商没有返回任何模型。");
