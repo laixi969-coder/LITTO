@@ -185,16 +185,25 @@ async function generateMediaUnrecorded(
   if (typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
-  const references = async (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => readReference(directory, item, type, signal))) : undefined;
-  const images = await references(request.images, "image");
-  const videos = mediaType === "video" ? await references(request.videos, "video") : undefined;
-  const audios = mediaType === "video" ? await references(request.audios, "audio") : undefined;
-  const firstFrame = mediaType === "video" && request.firstFrame ? await readReference(directory, request.firstFrame, "image", signal) : undefined;
-  const lastFrame = mediaType === "video" && request.lastFrame ? await readReference(directory, request.lastFrame, "image", signal) : undefined;
+  // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
+  const referenceReads = new Map<string, ReturnType<typeof readReference>>();
+  const reference = (item: MediaReference, type: string) => {
+    const key = JSON.stringify([item.path, item.mimeType, type]);
+    if (!referenceReads.has(key)) referenceReads.set(key, readReference(directory, item, type, signal));
+    return referenceReads.get(key)!;
+  };
+  const references = (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => reference(item, type))) : undefined;
+  const [images, videos, audios, firstFrame, lastFrame] = await Promise.all([
+    references(request.images, "image"),
+    mediaType === "video" ? references(request.videos, "video") : undefined,
+    mediaType !== "image" ? references(request.audios, "audio") : undefined,
+    mediaType === "video" && request.firstFrame ? reference(request.firstFrame, "image") : undefined,
+    mediaType === "video" && request.lastFrame ? reference(request.lastFrame, "image") : undefined,
+  ]);
   signal?.throwIfAborted();
   const assets = await (async () => mediaType === "audio"
     ? await provider.generateAudio!({
-      model: request.modelId, text: request.prompt, audios: await references(request.audios, "audio"),
+      model: request.modelId, text: request.prompt, audios,
       voice: request.voice, instructions: request.instructions, speed: request.speed, volume: request.volume, format: request.format, sampleRate: request.sampleRate,
     })
     : mediaType === "image"

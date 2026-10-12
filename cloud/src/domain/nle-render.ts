@@ -52,6 +52,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     // ---- inputs
     const inputs: string[][] = [];
     const info: { hasAudio: boolean; image: boolean }[] = [];
+    const preparedMedia = new Map<string, { file: string; probe: NonNullable<Awaited<ReturnType<typeof probeFile>>> }>();
     let lut = 0;
     const addInput = async (c: EClip, needVideoOnly = false) => {
         const r = resolveClip(s, c);
@@ -61,10 +62,18 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         if (!isVideo && !isImage && !(needVideoOnly === false && r.mime?.startsWith("audio/")))
             throw new Error(`clip for ${sh ? `shot #${sh.ord + 1}` : `"${c.label || c.id}"`} is not an approved video Take (${r.kind}, ${r.mime ?? "no media"}); render needs real video for every shot`);
         const m = s.get("media", r.mediaId)!;
-        const file = join(dir, `in${inputs.length}.${ext(m.mime)}`);
-        writeFileSync(file, await storage.get(m.storageKey));
-        const p = await probeFile(file);
-        if (!p) throw new Error(`media ${m.id} could not be read by ffprobe (${m.mime})`);
+        // ACT: 同次导出重复片段复用文件与探测，仍为每段建立独立输入以保留裁切、变速和音画滤镜。
+        const key = JSON.stringify([m.id, m.storageKey, m.mime]);
+        let prepared = preparedMedia.get(key);
+        if (!prepared) {
+            const file = join(dir, `in${inputs.length}.${ext(m.mime)}`);
+            writeFileSync(file, await storage.get(m.storageKey));
+            const probe = await probeFile(file);
+            if (!probe) throw new Error(`media ${m.id} could not be read by ffprobe (${m.mime})`);
+            prepared = { file, probe };
+            preparedMedia.set(key, prepared);
+        }
+        const { file, probe: p } = prepared;
         if ((isVideo) && !p.hasVideo) throw new Error(`media ${m.id} has no video stream`);
         if (!width && c.id === main[0].id) {
             if (!p.width || !p.height) throw bad("无法读取主轨素材尺寸，请指定导出宽高");

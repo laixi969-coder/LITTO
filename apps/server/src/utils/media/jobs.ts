@@ -26,13 +26,15 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
-  const models = await listMediaModels();
-  const model = models.find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
-  if (!model) throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
-  request = await applyMediaQuality(directory, kind, request, model);
-  const projectId = workspaceProject(directory)!;
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
+  if (production) request = production.request;
+  else {
+    const model = (await listMediaModels()).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
+    if (!model) throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
+    request = await applyMediaQuality(directory, kind, request, model);
+  }
   if (production && request.productionFingerprint !== production.fingerprint) throw Object.assign(new Error("镜头规格须先预览；请重新编译后提交"), { status: 409 });
+  const projectId = workspaceProject(directory)!;
   // 负面词与种子走独立字段，不拼进提示词正文：拼接后模型只会当作要绘制的文字内容。
   const compiled = production?.compiled;
   const merged = {
