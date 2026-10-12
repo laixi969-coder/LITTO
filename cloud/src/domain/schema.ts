@@ -70,7 +70,7 @@ export const cameraSchema = z.object({
         technique: z.string().max(200), purpose: z.string().max(2000),
         start: z.string().max(2000), end: z.string().max(2000),
         subjectPath: z.string().max(2000), cameraPath: z.string().max(2000),
-        timing: z.string().max(2000), cut: z.string().max(2000),
+        timing: z.string().max(2000).describe("本镜局部秒数，从0到本镜duration；不使用整段全局秒数。与action、performance及combat节拍一致，跨镜动作从前镜真实末态接续"), cut: z.string().max(2000),
         invariants: z.array(z.string().max(500)).max(30),
         acceptance: z.array(z.string().max(500)).max(30),
         fallback: z.string().max(2000),
@@ -145,6 +145,13 @@ export const advertisingSchema = z.object({
     pilotKey: z.string().trim().min(1).max(100).optional(),
 }).strict();
 
+const assetStateDelta = z.record(z.record(z.any()).nullable());
+const stateDeltaSchema = z.object({
+    characters: assetStateDelta.optional(), wardrobe: assetStateDelta.optional(), props: assetStateDelta.optional(),
+    environment: z.record(z.any()).optional(), lighting: z.record(z.any()).optional(),
+    motion: z.record(z.any()).optional(), emotional: z.record(z.any()).optional(),
+}).strict();
+
 export const shotInput = z.object({
     sequenceId: z.string(), sceneId: z.string().optional(), order: z.number().int().optional(),
     title: z.string().default(""),
@@ -153,7 +160,7 @@ export const shotInput = z.object({
     action: z.string().default(""), performance: z.object({ emotion: z.string().default(""), intensity: z.number().default(0.5), eyeline: z.string().default(""), lookTarget: z.string().default(""), gesture: z.string().default(""), timing: z.string().default("") }).default({}),
     blocking: z.object({ foreground: z.string().default(""), midground: z.string().default(""), background: z.string().default("") }).default({}),
     camera: cameraSchema.default({}), lighting: lightingSchema.default({}),
-    intendedStateDelta: z.record(z.any()).default({}),
+    intendedStateDelta: stateDeltaSchema.default({}).describe("只记录镜尾变化，按 characters/wardrobe/props/environment/lighting/motion/emotional 分组；人物或持物变化为 {characters:{真实资产ID:{position:位置}},props:{真实资产ID:{heldBy:角色ID,present:true}}}，不把资产ID直接放在根层，不用字符串替代状态对象；null 删除该资产状态"),
     freedomMap: freedomMapSchema.optional(), constraints: z.array(z.string()).default([]),
     duration: z.number().finite().positive().max(3600).default(4),
     generationDuration: z.number().finite().positive().max(3600).optional(),

@@ -116,6 +116,17 @@ export function getConfiguredModel(providerId: string, modelId: string) {
   return { providerId, provider, model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens }, baseUrl: baseUrl.href.replace(/\/+$/, "") };
 }
 
+export function prepareModelPayload(configured: Pick<ReturnType<typeof getConfiguredModel>, "baseUrl" | "model">, payload: unknown, thinkingLevel = "off") {
+  if (!["https://open.bigmodel.cn", "https://api.z.ai"].includes(new URL(configured.baseUrl).origin)
+    || !/^glm-5\.3(?:-flashx?)?$/i.test(configured.model.id) || !payload || typeof payload !== "object") return payload;
+  const body = payload as Record<string, unknown>;
+  // GLM 5.3 不能关闭思考，缺省强度为 max；普通创作用最低支持档，显式高档选择继续保留。
+  // https://docs.z.ai/api-reference/llm/chat-completion
+  const effort = body.reasoning_effort ?? thinkingLevel;
+  return { ...body, thinking: { ...(body.thinking as object | undefined), type: "enabled" },
+    reasoning_effort: effort === "max" || effort === "xhigh" ? "max" : effort === "medium" || effort === "high" ? "high" : "low" };
+}
+
 /** Full check including DNS resolution, for the async call sites right before a request is made. */
 export async function assertConfiguredUpstream(configured: ReturnType<typeof getConfiguredModel>) {
   await assertPublicHttpUrl(configured.baseUrl, { strictDns: false });
@@ -214,20 +225,21 @@ export function streamAi(
     fetch: modelFetch,
     apiKey: provider.apiKey,
     signal,
-    onPayload: references.length ? (payload) => {
+    onPayload: (payload) => {
+      if (!references.length) return prepareModelPayload(configured, payload);
       const body = payload as Record<string, unknown>;
       const field = provider.protocol === "openai-responses" ? "input" : "messages";
       const messages = body[field] as { role: string; content: unknown }[];
       // ACT: 后续 Anthropic 工具结果也使用 user 角色，附件只补充到最初的输入。
       const firstUser = messages.findIndex(message => message.role === "user");
       const attachmentContent = referenceContent(provider.protocol, "", references).slice(1);
-      return { ...body, [field]: messages.map((message, index) => index === firstUser
+      return prepareModelPayload(configured, { ...body, [field]: messages.map((message, index) => index === firstUser
         ? { ...message, content: [
           ...(Array.isArray(message.content) ? message.content : referenceContent(provider.protocol, String(message.content ?? ""), [])),
           ...attachmentContent,
         ] }
-        : message) };
-    } : undefined,
+        : message) });
+    },
   });
   void stream.result().then(result => { if (result.stopReason === "error") access?.failed(result.errorMessage); }).catch(() => {});
   return stream;

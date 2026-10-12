@@ -1,7 +1,7 @@
 import { all, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
 import { SCHEMA_VERSION, shotInput, cameraSchema, lightingSchema, validateMusicVideoTiming, type ShotInput } from "./schema.ts";
-import { recomputeStates } from "./state.ts";
+import { recomputeStates, validateStateDelta } from "./state.ts";
 import type { ShotDraft } from "./skills.ts";
 import type { z } from "zod";
 
@@ -14,6 +14,7 @@ const dataOf = (i: ShotInput) => {
 
 export function createShot(s: Scope, projectId: string, input: ShotInput) {
     validateMusicVideoTiming(input);
+    validateStateDelta(s, projectId, input.intendedStateDelta);
     const seq = s.get("sequences", input.sequenceId);
     if (!seq || seq.projectId !== projectId) throw notFound("sequence");
     if (input.sceneId && s.get("scenes", input.sceneId)?.sequenceId !== input.sequenceId) throw bad("scene does not belong to sequence");
@@ -32,6 +33,7 @@ const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "l
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
+    if (patch.intendedStateDelta !== undefined) validateStateDelta(s, shot.projectId, patch.intendedStateDelta);
     const actionChanged = patch.action !== undefined && patch.action !== shot.action;
     const timelineChanged = patch.musicVideo !== undefined && JSON.stringify(patch.musicVideo?.timeline) !== JSON.stringify(shot.musicVideo?.timeline);
     if (actionChanged || timelineChanged) {

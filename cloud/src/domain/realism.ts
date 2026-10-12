@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import type { Scope } from "../db.ts";
 import { shotInput } from "./schema.ts";
-import { conflict, notFound } from "../util.ts";
-import { statesOf } from "./state.ts";
+import { conflict, notFound, HttpError } from "../util.ts";
+import { statesOf, validateStateDelta } from "./state.ts";
 import { adContext } from "./adDirection.ts";
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
@@ -10,6 +10,11 @@ export const realismChecks = ["surface", "imaging", "world", "motion", "cinemati
 export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "take" = "take"): string {
   const shot = s.get("shots", shotId);
   if (!shot) throw notFound("shot");
+  try { validateStateDelta(s, shot.projectId, shot.intendedStateDelta); }
+  catch (cause) {
+    if (!(cause instanceof HttpError) || cause.status !== 400) throw cause;
+    throw conflict("镜头计划状态格式或资产引用无效，请通过 updateShot 修正 intendedStateDelta 后再检查或采用；原记录未修改", "invalid_state_delta", { shotId });
+  }
   const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
   const previousTake = previous?.approvedTakeId ? s.get("takes", previous.approvedTakeId) : null;
   const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });

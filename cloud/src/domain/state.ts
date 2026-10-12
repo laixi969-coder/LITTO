@@ -1,5 +1,6 @@
 import { all, run, type Scope } from "../db.ts";
 import { bad, j } from "../util.ts";
+import { shotInput } from "./schema.ts";
 
 export type State = { characters: Record<string, any>; wardrobe: Record<string, any>; props: Record<string, any>; environment: Record<string, any>; lighting: Record<string, any>; motion: Record<string, any>; emotional: Record<string, any> };
 export const emptyState = (): State => ({ characters: {}, wardrobe: {}, props: {}, environment: {}, lighting: {}, motion: {}, emotional: {} });
@@ -17,6 +18,20 @@ export function applyDelta<T>(base: T, delta: any): T {
 }
 
 const KIND_BY_TYPE: Record<string, keyof State> = { Character: "characters", Wardrobe: "wardrobe", Environment: "environment", Prop: "props", Product: "props", Vehicle: "props", Creature: "characters", Custom: "props" };
+
+export function validateStateDelta(s: Scope, projectId: string, delta: unknown) {
+    const parsed = shotInput.shape.intendedStateDelta.safeParse(delta);
+    if (!parsed.success) throw bad("计划状态变化须按 characters/wardrobe/props/environment/lighting/motion/emotional 分组，资产状态须为对象或 null", parsed.error.issues);
+    for (const group of ["characters", "wardrobe", "props"] as const) {
+        for (const [id, value] of Object.entries(parsed.data[group] ?? {})) {
+            // ACT: 允许 null 清理旧状态，包括已经删除的资产；新增或变更状态必须有本项目真实资产。
+            if (value === null) continue;
+            const asset = s.get("assets", id);
+            if (!asset || asset.projectId !== projectId || KIND_BY_TYPE[asset.type] !== group) throw bad(`状态 ${group}.${id} 须引用本项目对应类型的真实资产`);
+        }
+    }
+    return parsed.data;
+}
 
 /** Seed entries for assets that first appear in this shot (their baseline is the asset itself, not a guess). */
 function seed(state: State, shot: any, assets: Map<string, any>, newScene: boolean): State {

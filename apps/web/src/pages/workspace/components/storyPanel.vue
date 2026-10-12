@@ -133,6 +133,10 @@ async function refresh(keepEdits = true) {
   if (loaded.value && keepEdits) await flushEdits();
   const [saved, available] = await Promise.all([readStory(directory), ai.getModels(controller?.signal)]);
   project.value = saved; brief.value = JSON.parse(JSON.stringify(saved.brief)); models.value = available; loaded.value = true;
+  // 模型接口只返回当前已选模型；恢复这项选择，不让工作台再次要求选择同一个模型。
+  if (!available.some(item => JSON.stringify([item.providerId, item.modelId]) === modelKey.value)) {
+    modelKey.value = available.length === 1 ? JSON.stringify([available[0]!.providerId, available[0]!.modelId]) : "";
+  }
   if (!keepEdits) { section.value = "sources"; sourceEdit.value = undefined; }
   revisionId.value = saved.revisions.some(item => item.id === revisionId.value) ? revisionId.value : saved.approvedId ?? saved.revisions.at(-1)?.id ?? "";
   loadDraft();

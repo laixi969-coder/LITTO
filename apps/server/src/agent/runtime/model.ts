@@ -1,6 +1,6 @@
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { assertConfiguredUpstream, getConfiguredModel } from "@/utils/ai";
+import { assertConfiguredUpstream, getConfiguredModel, prepareModelPayload } from "@/utils/ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import modelFetch from "@/utils/ai/modelFetch";
 
@@ -14,8 +14,10 @@ export async function createAgentModel(providerId: string, modelId: string, thin
   runtime.registerProvider(providerId, {
     api: provider.protocol,
     baseUrl,
-    streamSimple: provider.protocol === "openai-completions" && new URL(baseUrl).origin === "https://api.deepseek.com"
-      ? (model, context, options) => openAICompletionsApi().streamSimple({ ...model, api: "openai-completions" }, context, { ...options, fetch: modelFetch })
+    streamSimple: provider.protocol === "openai-completions" && ["https://api.deepseek.com", "https://open.bigmodel.cn", "https://api.z.ai"].includes(new URL(baseUrl).origin)
+      ? (model, context, options) => openAICompletionsApi().streamSimple({ ...model, api: "openai-completions" }, context, { ...options, fetch: modelFetch,
+        onPayload: async (payload, requestModel) => prepareModelPayload(configured, await options?.onPayload?.(payload, requestModel) ?? payload, thinkingLevel),
+      })
       : undefined,
     models: [{
       id: model.id, name: model.label, reasoning: thinkingLevel !== "off",

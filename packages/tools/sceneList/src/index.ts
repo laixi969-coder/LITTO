@@ -66,7 +66,7 @@ const plugin: ToolPlugin = {
         name: "saveSceneList",
         label: "保存场次表",
         executionMode: "sequential",
-        description: "保存剧本的结构化场次表。人物、场景、道具、服装各自给固定 id，场次只引用 id；服务端校验 id 唯一、引用存在、场次连续编号和体量上限。保存为新版本，旧版本移入历史。",
+        description: "保存剧本的结构化场次表。有故事项目时只依据 approvedId 对应的已采用正文、canon 和 threads，不从旧候选或旧审稿补回已删除的剧情、道具状态和光源。人物、场景、道具、服装各自给固定 id，场次只引用 id；服务端校验 id 唯一、引用存在、场次连续编号和体量上限。保存为新版本，旧版本移入历史。",
         parameters: z.toJSONSchema(sceneListSchema, { io: "input", target: "draft-07" }),
         async execute(_id, params, signal) {
           signal?.throwIfAborted();
@@ -111,7 +111,7 @@ const plugin: ToolPlugin = {
         name: "saveBreakdown",
         label: "保存拆解清单",
         executionMode: "sequential",
-        description: "保存剧本拆解清单。每项资产用 entityId 引用场次表实体，出场场次自动从场次表推导；场次表里的每个实体都必须拆成资产或在 skipped 写明理由。",
+        description: "按 readSceneList 的最新场次表、storyContext 及逐场 story 正文保存拆解清单，不从旧故事候选补回已删除的内容；造型等待制作设计明确为提案，不能冒充剧本事实。每项资产用 entityId 引用场次表实体，出场场次自动从场次表推导；场次表里的每个实体都必须拆成资产或在 skipped 写明理由。",
         parameters: z.toJSONSchema(breakdownSchema, { io: "input", target: "draft-07" }),
         async execute(_id, params, signal) {
           signal?.throwIfAborted();
