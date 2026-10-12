@@ -36,7 +36,15 @@ export async function makeDerivatives(media: { id: string; workspaceId: string; 
 }
 
 export type Probe = { duration: number | null; width: number | null; height: number | null; hasVideo: boolean; hasAudio: boolean };
-const run2 = (cmd: string, args: string[]) => new Promise<{ code: number; out: string; err: string }>((res) => { const p = spawn(cmd, args); let out = "", err = ""; p.stdout.on("data", (d) => (out += d)); p.stderr.on("data", (d) => (err += d)); p.on("error", () => res({ code: -1, out, err })); p.on("exit", (code) => res({ code: code ?? -1, out, err })); });
+const run2 = (cmd: string, args: string[], signal?: AbortSignal) => new Promise<{ code: number; out: string; err: string }>((resolve) => {
+  const process = spawn(cmd, args, { signal });
+  let out = "", err = "", failed = false;
+  process.stdout.on("data", data => (out += data));
+  process.stderr.on("data", data => (err += data));
+  process.on("error", error => { failed = true; err += error.message; });
+  // 等待管道关闭后再返回，避免丢失末尾检测统计或在取消的进程退出前清理临时目录。
+  process.on("close", code => resolve({ code: failed ? -1 : code ?? -1, out, err }));
+});
 
 /** ffprobe a file on disk; null when ffprobe is unavailable or the file is unreadable. */
 export async function probeFile(path: string): Promise<Probe | null> {

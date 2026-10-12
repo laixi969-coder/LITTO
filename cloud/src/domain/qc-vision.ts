@@ -2,12 +2,13 @@ import type { Scope } from "../db.ts";
 import { parseJson, runText } from "../llm.ts";
 import { OBSERVATION_KINDS } from "./qc.ts";
 import { storage } from "../storage.ts";
-import { probeFile, runCmd } from "../media-tools.ts";
+import { probeFile, runCmd, type Probe } from "../media-tools.ts";
 import { mkdtemp, readFile, rm, writeFile } from "@toonflow/file";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { referenceCropSchema } from "./schema.ts";
+import { sampleVideoFrames } from "./mediaInspection.ts";
 
 type VisionRequest = { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[]; label?: string; signal?: AbortSignal };
 let workspaceVision: ((input: VisionRequest) => Promise<{ text: string; modelId: string; jobId: string }>) | undefined;
@@ -36,10 +37,9 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
   const cropFilter = region ? region.unit === "normalized"
     ? `crop=iw*${region.width}:ih*${region.height}:iw*${region.x}:ih*${region.y}:exact=1`
     : `crop=${region.width}:${region.height}:${region.x}:${region.y}:exact=1` : "";
-  const addRegion = async (source: string, directory: string, seek: string[], seconds: number | null, tail = false) => {
+  const addRegion = async (source: string, directory: string, probe: Probe | null, seek: string[], seconds: number | null, tail = false) => {
     if (!region) return;
     const output = join(directory, `region${regions.length}.png`);
-    const probe = await probeFile(source);
     const regionWidth = region.width * (region.unit === "normalized" ? probe?.width ?? 0 : 1);
     const regionHeight = region.height * (region.unit === "normalized" ? probe?.height ?? 0 : 1);
     if (regionWidth < 1 || regionHeight < 1 || regionWidth > 2048 || regionHeight > 2048) throw new Error("请将原尺寸检查区域限定在 1–2048 像素宽高内");
@@ -54,7 +54,7 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     frames.push({ data, mime: media.mime });
     if (region) {
       const directory = await mkdtemp(join(tmpdir(), "littoRegion"));
-      try { const source = join(directory, "source"); await writeFile(source, data); await addRegion(source, directory, [], null); }
+      try { const source = join(directory, "source"); await writeFile(source, data); await addRegion(source, directory, await probeFile(source), [], null); }
       finally { await rm(directory, { recursive: true, force: true }); }
     }
   }
@@ -66,19 +66,11 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
       const probe = await probeFile(source);
       if (!probe?.duration || !probe.hasVideo) return { used: false, reason: "无法读取视频时长或缺少 ffprobe，请人工播放检查" };
       const sampleCount = Math.min(48, Math.max(8, Math.ceil(probe.duration * 4) + 1));
-      for (let index = 0; index < sampleCount; index++) {
-        const seconds = probe.duration * index / (sampleCount - 1);
-        const frame = join(directory, `frame${index}.jpg`);
-        // ACT: 尾部最多解码一秒，缩放后倒序取得真实末帧；末帧时间以片尾边界标记。
-        const seek = index === sampleCount - 1 ? ["-sseof", String(-Math.min(1, probe.duration))] : ["-ss", String(seconds)];
-        const filter = "scale=w='min(960,iw)':h=-2" + (index === sampleCount - 1 ? ",reverse" : "");
-        const result = await runCmd("ffmpeg", ["-v", "error", ...seek, "-i", source, "-frames:v", "1", "-vf", filter, frame]);
-        if (result.code !== 0) return { used: false, reason: "视频抽帧失败，请人工播放检查" };
-        frames.push({ data: await readFile(frame), mime: "image/jpeg" });
-        timestamps.push(Number(seconds.toFixed(3)));
-      }
-      await addRegion(source, directory, ["-ss", String(probe.duration / 2)], probe.duration / 2);
-      await addRegion(source, directory, ["-sseof", String(-Math.min(1, probe.duration))], probe.duration, true);
+      const sampleTimes = Array.from({ length: sampleCount }, (_, index) => probe.duration! * index / (sampleCount - 1));
+      frames.push(...await sampleVideoFrames(source, directory, sampleTimes, probe.duration));
+      timestamps.push(...sampleTimes.map(seconds => Number(seconds.toFixed(3))));
+      await addRegion(source, directory, probe, ["-ss", String(probe.duration / 2)], probe.duration / 2);
+      await addRegion(source, directory, probe, ["-sseof", String(-Math.min(1, probe.duration))], probe.duration, true);
     } catch (cause) {
       return { used: false, reason: `视频抽帧不可用：${cause instanceof Error ? cause.message : String(cause)}；请人工播放检查` };
     } finally { await rm(directory, { recursive: true, force: true }); }

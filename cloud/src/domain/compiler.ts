@@ -1,6 +1,6 @@
-import { bad } from "../util.ts";
+import { bad, notFound } from "../util.ts";
 import { all, get, type Scope } from "../db.ts";
-import { statesOf } from "./state.ts";
+import { statesOf, validateStateDelta } from "./state.ts";
 import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
@@ -9,6 +9,7 @@ import { lookSchema, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
 import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
+import { checkPair } from "./continuity.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -98,17 +99,30 @@ function musicTimecode(seconds: number) {
  * Unsupported reference roles degrade to text (explicitly reported), never silently disappear.
  */
 export function compileShot(s: Scope, shotId: string, kind: "image" | "video", modelId: string, extra: { startFrameMediaId?: string; startFrameAsReference?: boolean; repair?: { addLock?: string[]; note?: string } } = {}): Compiled {
-    const shot = s.get("shots", shotId)!;
+    const shot = s.get("shots", shotId);
+    if (!shot) throw notFound("shot");
+    if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
+    validateStateDelta(s, shot.projectId, shot.intendedStateDelta);
     validateMusicVideoTiming(shot as ShotInput);
     const proj = shot.projectId;
     const world = s.list("worlds", { projectId: proj })[0] as any;
     const look = effectiveLook(s, proj, shot.sequenceId, shotId);
-    const assets = (shot.assetIds as string[]).map((id) => s.get("assets", id)).filter(Boolean) as any[];
+    const projectAssets = new Map(s.list("assets", { projectId: proj }).map(asset => [asset.id, asset]));
+    const missingAssets = (shot.assetIds as string[]).filter(id => !projectAssets.has(id));
+    if (missingAssets.length) throw bad(`镜头资产不存在或不属于当前项目：${missingAssets.join("、")}；请在生成前修正资产引用`);
+    const assets = (shot.assetIds as string[]).map(id => projectAssets.get(id)!) as any[];
     const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId }) as any[];
     const model = modelView(get("SELECT * FROM models WHERE id=?", modelId)!);
     const caps = model.capabilities;
-    const { start } = statesOf(s, shotId);
+    const state = statesOf(s, shotId);
+    const { start } = state;
     const warnings: string[] = [];
+    const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
+    const overrides = s.list("continuity_issues", { shotId, status: "overridden" });
+    // ACT: 复用后验规则提前提醒，不写质检记录、不把计划当实测；越轴等启发式不作为新增硬门禁。
+    const continuity = checkPair(previous ?? null, { ...shot, bindings }, previous ? statesOf(s, previous.id) : null, state, projectAssets);
+    warnings.push(...continuity.filter(issue => !overrides.some(item => item.category === issue.category && item.message === issue.message))
+        .map(issue => `生成前连续性提醒（${issue.severity}）：${issue.message}；${issue.repair.detail}`));
     warnings.push(...creativeDirectionIssues(shot as ShotInput, assets).map(issue => `创作准备未完成：${issue}`));
     warnings.push(...adShotIssues(s, shot).map(issue => `创作准备未完成：${issue}`));
     const advertising = adContext(s, shot);
@@ -349,7 +363,7 @@ void all; void route;
 export type { Policy };
 
 export function requireCompiledInputs(compiled: Compiled) {
-    if (compiled.inputs.some(ref => !ref.sent && ref.lockLevel === "LOCK")) throw bad("当前模型无法发送锁定参考，请更换模式或模型");
     const missing = compiled.warnings.filter(warning => warning.startsWith("未填写真实感规格") || warning.startsWith("创作准备未完成："));
-    if (missing.length) throw bad(missing.join("；"));
+    if (compiled.inputs.some(ref => !ref.sent && ref.lockLevel === "LOCK")) missing.push("当前模型无法发送锁定参考，请更换模式或模型");
+    if (missing.length) throw bad([...new Set(missing)].join("；"));
 }

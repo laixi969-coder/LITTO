@@ -37,6 +37,10 @@ if (action === "start") {
   if (!node) throw new Error("未找到 Node.js，请先安装前端所需的运行时。");
   const nodePath = await realpath(node);
   const bunPath = await realpath(process.execPath);
+  const mediaPaths = ["ffmpeg", "ffprobe"].flatMap(name => {
+    const path = Bun.which(name);
+    return path ? [dirname(path)] : [];
+  });
   await mkdir(agentDirectory, { recursive: true });
   await mkdir(logDirectory, { recursive: true, mode: 0o700 });
   // ACT: 直接使用 macOS 托管进程，不在应用内另建守护进程；两项服务固定对应本仓库。
@@ -50,7 +54,7 @@ if (action === "start") {
     const args = service.name === "littoServer"
       ? [bunPath, "--watch", "src/index.ts"]
       : [nodePath, join(root, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(service.port), "--strictPort"];
-    const environment = { NODE_ENV: "dev", TOONFLOW_DATA_DIR: join(root, "data"), PATH: [dirname(bunPath), dirname(nodePath), "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(":") };
+    const environment = { NODE_ENV: "dev", TOONFLOW_DATA_DIR: join(root, "data"), PATH: [...new Set([dirname(bunPath), dirname(nodePath), ...mediaPaths, "/usr/bin", "/bin", "/usr/sbin", "/sbin"])].join(":") };
     const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>

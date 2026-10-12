@@ -1,16 +1,17 @@
 import { z } from "zod";
-import { mkdtemp, readFile, rm, writeFile } from "@toonflow/file";
+import { mkdtemp, rm, writeFile } from "@toonflow/file";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Scope } from "../db.ts";
 import { storage } from "../storage.ts";
-import { probeFile, runCmd } from "../media-tools.ts";
+import { probeFile } from "../media-tools.ts";
 import { parseJson } from "../llm.ts";
 import { bad, conflict, notFound, now, sha256 } from "../util.ts";
 import { inspectVision } from "./qc-vision.ts";
 import { adDirectionFingerprint, adDirectionSchema, adReadiness, updateSequenceData } from "./adDirection.ts";
 import { shotFingerprint } from "./realism.ts";
 import { finalQualityView, sequenceFingerprint } from "./finalQuality.ts";
+import { sampleVideoFrames } from "./mediaInspection.ts";
 
 export const adInspectionSchema = z.object({
   sequenceId: z.string().min(1), referenceId: z.string().min(1).optional(),
@@ -42,16 +43,7 @@ export async function sampleAdMedia(s: Scope, mediaId: string, cuts: number[] = 
       ...Array.from({ length: count }, (_, index) => duration * index / (count - 1)),
       ...selectedCuts.flatMap(time => [Math.max(0, time - 0.08), Math.min(duration - 0.04, time + 0.08)]),
     ].map(time => Number(Math.max(0, time).toFixed(3))))].sort((a, b) => a - b);
-    const frames: { data: Buffer; mime: string }[] = [];
-    for (const [index, time] of timestamps.entries()) {
-      signal?.throwIfAborted();
-      const path = join(directory, `frame${index}.jpg`);
-      const tail = index === timestamps.length - 1;
-      const seek = tail ? ["-sseof", String(-Math.min(1, duration))] : ["-ss", String(time)];
-      const result = await runCmd("ffmpeg", ["-v", "error", ...seek, "-i", source, "-vf", "scale=w='min(960,iw)':h=-2" + (tail ? ",reverse" : ""), "-frames:v", "1", path]);
-      if (result.code) throw bad("参考视频抽帧失败，未生成观察结论");
-      frames.push({ data: await readFile(path), mime: "image/jpeg" });
-    }
+    const frames = await sampleVideoFrames(source, directory, timestamps, duration, signal);
     return { frames, timestamps, duration, hasAudio: probe.hasAudio, hash, omittedCuts: boundaries.length - selectedCuts.length };
   } finally { await rm(directory, { recursive: true, force: true }); }
 }

@@ -102,7 +102,6 @@ export function prepareWorkspaceShot(input: {
   const s = scoped(input.workspaceId);
   const shot = s.get("shots", input.shotId);
   if (!shot || shot.projectId !== input.projectId) throw notFound("shot");
-  if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
   const mode = input.mode;
   const imageModes = Array.isArray(mode) ? mode : [mode];
   const imageLimit = imageModes.includes("multiReference") ? 64 : imageModes.includes("singleImage") ? 1 : 0;
