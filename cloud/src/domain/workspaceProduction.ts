@@ -9,7 +9,7 @@ import { mediaView, saveMedia, sniff } from "../storage.ts";
 import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake } from "./nle.ts";
-import { realismChecks } from "./realism.ts";
+import { realismChecks, shotFingerprint } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
 import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
 
@@ -60,6 +60,19 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       throw bad("视频工作版须记录至少两个递增且位于素材时长内的实际抽帧时间");
     }
     return tx(() => {
+      const previous = s.list("qc_reports", { targetType: input.targetType, targetId: item.id }, "created_at DESC, rowid DESC")[0];
+      // ACT: 同一静帧和规格的有效代理检查只做一次；有新缺陷或要求修改时仍记录新结论。
+      if (input.targetType === "keyframe" && !input.observations.length && input.creativeReview?.verdict !== "revise"
+        && previous?.evidence?.mediaId === item.mediaId && previous.evidence.fingerprint === shotFingerprint(s, shot.id, "keyframe")
+        && previous.evidence.vision?.source === "delegatedAgent"
+        && realismChecks.filter(key => key !== "motion").every(key => previous.evidence.reviewed?.includes(key))) {
+        const review = { report: previous, repairActions: s.list("repair_actions", { qcReportId: previous.id }) };
+        if (previous.findings.some((finding: { severity: string }) => finding.severity === "high")) {
+          return { selected: false, reused: true, review, reason: "已有严重问题记录。重复检查不能消除缺陷；请报告阻塞，不自动重生成" };
+        }
+        if (shot.heroKeyframeId !== item.id) promoteHero(s, item.id, `agent:${actor}`);
+        return { selected: true, reused: true, status: "workingVersion", finalReviewRequired: true, review };
+      }
       const review = runQc(s, shot.id, { type: input.targetType, id: item.id }, input.observations, {
         actor: `agent:${actor}`, note: input.note,
         reviewed: input.targetType === "keyframe" ? realismChecks.filter(key => key !== "motion") : [],

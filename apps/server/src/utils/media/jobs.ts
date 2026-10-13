@@ -22,13 +22,13 @@ export function workspaceProject(directory: string) {
 }
 
 export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string) {
+  if (!request.shotId && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
   assertModelSelection(kind, request.providerId, request.modelId);
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
-  if (production && request.prompt !== production.compiled.prompt) throw Object.assign(new Error("生成提示词与镜头编译结果不一致。请使用 compile 返回的 request；若需修改画面，先更新镜头规格再编译，不能仅修改自由 prompt。"), { status: 409 });
-  if (production?.compiled.negativePrompt && request.negativePrompt !== undefined && request.negativePrompt !== production.compiled.negativePrompt) throw Object.assign(new Error("负面提示词与镜头编译结果不一致。请先更新镜头约束再编译，并复用 compile 返回的 request。"), { status: 409 });
+  // ACT: 正式镜头以当前规格和指纹为准，提示词由服务端编译，避免模型逐字复制长文本。
   if (production) request = production.request;
   else {
     const model = (await listMediaModels()).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);

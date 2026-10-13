@@ -17,7 +17,7 @@ const sharedFields = {
   regenerationId: z.string().uuid().optional().describe("仅明确授权重做或新增候选时创建 UUID；同一次重做始终复用该 ID。默认复用已有镜头任务，失败不自动重发。不能为绕过复用而自动创建新 ID。"),
   providerId: z.string().regex(/^[a-z][a-zA-Z0-9]{0,95}$/),
   modelId: z.string().trim().min(1).max(256),
-  prompt: z.string().trim().min(1).max(100000),
+  prompt: z.string().trim().max(100000).default("").describe("独立素材须填写提示词；正式镜头可省略，由服务端按 shotId 和 productionFingerprint 编译，不复制长提示词。"),
   negativePrompt: z.string().max(100000).optional(),
   seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
   outputDirectory: relativePath.optional(),
@@ -28,6 +28,18 @@ const referenceMode = z.templateLiteral([z.enum(["image", "video", "audio"]), "R
   .refine(value => /Reference:(?:[1-9]\d?|1\d{2}|2[0-4]\d|25[0-6])$/.test(value), "参考数量必须在 1 到 256 之间");
 
 export const listMediaModelsSchema = z.strictObject({ all: z.boolean().optional().describe("列出可供用户选择的全部已配置媒体模型；不代表已授权切换") });
+export const agentReviewSchema = z.strictObject({
+  targetType: z.enum(["keyframe", "take"]),
+  targetId: z.string().min(1),
+  authorization: z.string().trim().min(8).max(2000),
+  note: z.string().trim().min(10).max(8000),
+  frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
+  creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional(),
+  observations: z.array(z.strictObject({
+    kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),
+    note: z.string().min(1),
+  })).max(40).default([]).describe("仅记录实际缺陷，无缺陷传 []，正常表现写入 note。严重缺陷会阻止采用，重复提交不能消除旧缺陷。"),
+});
 export const imageGenerationSchema = z.strictObject({
   ...sharedFields,
   purpose: z.enum(["asset", "standalone", "storyboard"]).optional().describe("storyboard 仅用于用户明确要求的多格分镜总览；须继承已有镜头规格和资产参考，拆格后用 importKeyframe 登记各镜候选，不能将整张宫格当作单镜主帧。"),
@@ -61,7 +73,7 @@ export const videoGenerationSchema = z.strictObject({
 export const audioGenerationSchema = z.strictObject({
   providerId: sharedFields.providerId,
   modelId: sharedFields.modelId,
-  prompt: sharedFields.prompt,
+  prompt: z.string().trim().min(1).max(100000),
   outputDirectory: sharedFields.outputDirectory,
   audios: z.array(audioReference).max(64).optional(),
   instructions: z.string().trim().max(2000).optional(),

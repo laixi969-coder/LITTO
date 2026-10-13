@@ -19,10 +19,24 @@ export async function runDelegatedAgent(options: {
   const child = await createAgentConversation(cwd, { parentFile, name, task, providerId, modelId, thinkingLevel });
   const agent = { file: child.file, parentFile, name, task, providerId, modelId, thinkingLevel, status: "running" as const };
   await updateSubAgent(cwd, parentFile, agent);
+  // 先通知父界面创建子会话，再转发流式事件，避免首批进度因目标尚不存在而丢失。
+  options.send({ type: "subAgent", agent });
+  let summary = "";
   const send = (event: AgentEvent) => {
     trackAgentEvent(cwd, child.file, event);
     options.send({ type: "subAgentEvent", file: child.file, event });
-    if (event.type === "tool" && event.tool.status === "running") onProgress?.(`正在调用 ${event.tool.name}`);
+    if (event.type === "thinking" && !event.delta && !event.done) onProgress?.(`${summary}\n正在思考下一步`.trim());
+    if (event.type === "text" && event.content?.trim() && event.done) {
+      summary = event.content.slice(-600);
+      onProgress?.(summary);
+    }
+    if (event.type === "tool") {
+      let progress: string | undefined;
+      try { progress = JSON.parse(event.tool.result ?? "null")?.progress; } catch {}
+      const operation = event.tool.args?.operation ?? event.tool.args?.name;
+      onProgress?.(`${summary}\n${progress || `${event.tool.status === "running" ? "正在执行" : event.tool.status === "error" ? "执行失败" : "已返回"} ${event.tool.name}${operation ? ` · ${operation}` : ""}`}`.trim());
+    }
+    if (event.type === "error") onProgress?.(`执行出错：${event.message}`);
   };
   const controller = new AbortController();
   const childSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;

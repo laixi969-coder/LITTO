@@ -1,4 +1,12 @@
 <template>
+  <div v-if="subAgentTasks.length" class="subAgentProgress" role="status" aria-live="polite">
+    <strong>子任务 {{ subAgentTasks.filter(task => task.status !== 'running').length }}/{{ subAgentTasks.length }} 已返回</strong>
+    <div v-for="(task, index) in subAgentTasks" :key="index" class="subAgentTask">
+      <span class="taskTitle">{{ task.name }} · {{ subAgentStatusLabels[task.status] ?? task.status }}</span>
+      <span class="taskProgress">{{ task.result }}</span>
+    </div>
+  </div>
+  <div v-else-if="tool.status === 'running' && generationProgress" class="generationProgress" role="status">{{ generationProgress }}</div>
   <section v-if="renderer" class="toolInteraction" :class="{ awaiting: tool.status === 'running' && !!tool.question }" :data-tool-id="tool.id" tabindex="-1">
     <div v-if="tool.status === 'running' && tool.question" class="attentionHeader"><icon-message-question :size="16" /><strong>需要你确认</strong><el-button link @click="collapsed = false">查看提出此问题的步骤</el-button></div>
     <component :is="renderer" :tool="tool" :directory="directory" @copy="emit('copy', $event)" />
@@ -9,7 +17,7 @@
       <span class="toolHeader" :data-status="tool.status">
         <icon-tool :size="14" />
         <span class="toolName" :title="tool.name">{{ toolLabel }}</span>
-        <span class="toolState">{{ tool.name === 'subAgent' && tool.status === 'success' ? '调用已返回' : toolStatusLabels[tool.status] }}</span>
+        <span class="toolState">{{ tool.name === 'subAgent' ? (tool.status === 'running' ? '子任务执行中' : tool.status === 'success' ? '调用已返回' : toolStatusLabels[tool.status]) : toolStatusLabels[tool.status] }}</span>
         <span v-if="duration !== undefined" class="toolDuration">{{ duration.toFixed(1) }} 秒</span>
       </span>
       <span v-if="targetPath" class="toolTarget" :title="targetPath">{{ targetPath }}</span>
@@ -75,6 +83,20 @@ const targetPath = computed(() => {
 const toolCodeOptions = { maxHeight: 240, lineNumbers: false };
 const args = computed(() => formatToolData(tool.args));
 const result = computed(() => formatToolData(tool.result));
+const subAgentStatusLabels: Record<string, string> = { running: "执行中", completed: "已完成", error: "失败", cancelled: "已停止", limited: "达到限制", inputRequired: "等待补充" };
+const progressData = computed(() => {
+  try { return typeof tool.result === "string" ? JSON.parse(tool.result) : tool.result; } catch { return undefined; }
+});
+const subAgentTasks = computed<{ name: string; status: string; result: string }[]>(() => {
+  if (tool.name !== "subAgent") return [];
+  const tasks = progressData.value?.tasks;
+  if (!Array.isArray(tasks)) return [];
+  return tasks.filter(task => task && typeof task.name === "string" && typeof task.status === "string" && typeof task.result === "string");
+});
+const generationProgress = computed(() => {
+  const data = progressData.value;
+  return typeof data?.progress === "string" ? `${data.progress}${typeof data.elapsedSeconds === "number" ? ` · 已等待 ${data.elapsedSeconds} 秒` : ""}` : "";
+});
 
 function formatToolData(value: unknown) {
   if (value === undefined) return;
@@ -89,6 +111,19 @@ function formatToolData(value: unknown) {
 </script>
 
 <style scoped lang="scss">
+.subAgentProgress {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  font-size: 12px;
+  .subAgentTask {
+    display: grid;
+    gap: 4px;
+    .taskTitle { font-weight: 600; }
+    .taskProgress { color: var(--studioMuted); white-space: pre-wrap; overflow-wrap: anywhere; }
+  }
+}
+.generationProgress { padding: 8px 0; font-size: 12px; color: var(--studioMuted); }
 .rendererError { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; }
 .toolInteraction {
   &.awaiting { padding: 12px; margin: 8px 0; border: 1px solid var(--studioAttention); border-radius: var(--ui-radius); background: var(--studioAttentionSoft); }
