@@ -90,7 +90,17 @@ export default {
       request.mode ?? (frames.length ? "startFrameOptional" : videos.length || audios.length ? [] : images.length ? "singleImage" : "text");
     const isFrames = mode === "startEndRequired" || mode === "endFrameOptional" || mode === "startFrameOptional";
 
-    const content: Record<string, unknown>[] = [{ type: "text", text: request.prompt }];
+    let prompt = request.prompt;
+    if (prompt.length > 10000) {
+      // ACT: 只压缩编译器的两段通用说明，保留镜头动作、节拍、资产与锁定约束；仍超限则本地报错，不截断剧情。
+      prompt = prompt
+        .replace(/^VISUALDEFAULTS: Default to clean, intact, clearly readable imagery[^\n]*$/m,
+          "VISUALDEFAULTS: 默认整洁、完好、主体清楚，服装、妆发、道具与环境符合时代和用途。不得以真实感或情绪为由增添污渍、锈蚀、破损、伤病、疲态、压暗、死黑、噪点、颗粒或模糊。例外仅按明确要求或已采用剧情限定对象、属性与时段，不扩散到其他元素；风格参考不授权复制脏损暗噪。保持接戏和明确变化。夜景保留夜色及合理光源，关键人物动作可读。清楚不等于平光、全景同锐、磨皮或消除年龄；保留媒介、自然纹理、妆容与景深。")
+        .replace(/^REFERENCEUSE: Use every reference only for its declared role[^\n]*$/m,
+          "REFERENCEUSE: 参考只执行声明角色与允许变化。IDENTITY保持脸型、年龄、肤色；只有全身参考才约束身体比例，脸部裁剪不确定身高或躯干腿长。未指定体态的新成年人物默认高挑匀称、自然长腿，头躯干髋膝踝连贯可信，不夸张拉伸，不为构图放大头、拉长躯干或缩腿；明确身高、体型、年龄、已采用全身参考或非人解剖优先，不强制固定头身比。WARDROBE约束衣服；角色LOOK可改变妆发但不改脸。摄影、光线、构图参考只约束相关摄影关系，不复制模特身份或未要求造型。表情与反应由当前动作决定；同一人物跨服装镜头绑定自身采用身份，不合并候选或服装。文字描述不是传入图像，不能保证身份。 ");
+    }
+    if (prompt.length > 10000) throw new Error(`视频提示词仍超过 10000 字符（${prompt.length}），请精简镜头规格后提交`);
+    const content: Record<string, unknown>[] = [{ type: "text", text: prompt }];
     if (Array.isArray(mode)) {
       images.forEach((url) => content.push({ role: "reference_image", type: "image_url", image_url: { url } }));
       videos.forEach((url) => content.push({ role: "reference_video", type: "video_url", video_url: { url } }));
