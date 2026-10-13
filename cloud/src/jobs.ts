@@ -26,7 +26,13 @@ export function estimate(modelId: string, kind: string, params: Record<string, a
 export function enqueue(spec: JobSpec) {
     if (spec.idempotencyKey) {
         const ex = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", spec.workspaceId, spec.idempotencyKey);
-        if (ex) return JSON.parse(ex.response);
+        if (ex) {
+            const receipt = JSON.parse(ex.response);
+            if (receipt.cancelled) throw conflict("生成请求已取消，不会重新提交", "cancelled");
+            const previous = scoped(spec.workspaceId).get("generation_jobs", receipt.id);
+            if (!previous) throw conflict("原生成任务已不存在，请核查后重试", "missing_job");
+            return { ...jobView(previous), reused: true };
+        }
     }
     const model = get("SELECT * FROM models m WHERE id=?", spec.modelId);
     if (!model || model.status !== "active") throw bad("model unavailable");
@@ -265,6 +271,6 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     if (!o) throw bad("job not found");
     if (["QUEUED", "RUNNING"].includes(o.status)) throw conflict("job still active");
     const { negativePrompt, label, ...rest } = o.parameters ?? {};
-    return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label });
+    return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label, idempotencyKey: `retry:${o.id}` });
 }
 void setting; void conflict;

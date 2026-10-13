@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 import { get, run, scoped, tx } from "./db.ts";
 import { createProject } from "./routes/platform.ts";
-import { enqueue } from "./jobs.ts";
+import { enqueue, jobView } from "./jobs.ts";
 import { ADAPTERS, upsertModel, upsertProvider } from "./providers/registry.ts";
 import { ProviderError, type GenRequest, type GenResult } from "./providers/adapter.ts";
 import { compileShot, compileWorkspacePrompt, requireCompiledInputs, renderCompiledPrompt } from "./domain/compiler.ts";
 import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
-import { bad, conflict, notFound } from "./util.ts";
+import { bad, conflict, notFound, now } from "./util.ts";
 
 /** Host-only execution bridge. Tenant identity comes from the stored job, never its parameters. */
 export function configureWorkspaceMedia(execute: (request: GenRequest) => Promise<GenResult>) {
@@ -62,6 +62,15 @@ export function enqueueWorkspaceMedia(input: {
     requestId: string;
     production?: ReturnType<typeof prepareWorkspaceShot>;
 }) {
+  const idempotencyKey = "workspaceMedia:" + input.requestId;
+  const receipt = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", input.workspaceId, idempotencyKey);
+  if (receipt) {
+    const saved = JSON.parse(receipt.response);
+    if (saved.cancelled) throw conflict("生成请求已取消，不会重新提交", "cancelled");
+    const previous = scoped(input.workspaceId).get("generation_jobs", saved.id);
+    if (!previous || previous.projectId !== input.projectId || previous.parameters?.directory !== input.directory || previous.kind !== input.kind) throw conflict("请求 ID 与原生成任务不一致", "request_conflict");
+    return { ...jobView(previous), reused: true };
+  }
   const modelId =
     "workspace" +
     createHash("sha256")
@@ -77,6 +86,21 @@ export function enqueueWorkspaceMedia(input: {
     capabilities: input.production?.capabilities ?? {},
   });
   const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt);
+  if (input.production) {
+    const scope = scoped(input.workspaceId);
+    const negativePrompt = input.negativePrompt ?? input.request.negativePrompt;
+    const signature = generationSignature({ ...input.request, seed: input.seed ?? input.request.seed }, prompt, negativePrompt, input.production.compiled.inputs, input.candidateBatchId);
+    // ACT: 单进程同步查找与入队之间没有 await；按镜头扫描历史以兼容已有任务，规模增长后改为索引列。
+    const matches = scope.list("generation_jobs", { projectId: input.projectId, targetType: "shot", targetId: input.production.shotId, kind: input.kind }, "created_at DESC")
+      .filter(job => job.providerId === "workspaceMedia" && job.parameters?.directory === input.directory && job.parameters?.fingerprint === input.production!.fingerprint
+        && generationSignature(job.parameters.request ?? {}, job.compiledPrompt, job.parameters.negativePrompt, job.inputRefs, job.parameters.candidateBatchId) === signature);
+    const previous = matches.find(job => job.status === "SUCCEEDED") ?? matches.find(job => ["QUEUED", "RUNNING"].includes(job.status)) ?? matches[0];
+    if (previous) {
+      const reused = { ...jobView(previous), reused: true };
+      run("INSERT INTO idempotency_keys VALUES(?,?,?,?)", idempotencyKey, input.workspaceId, JSON.stringify(reused), now());
+      return reused;
+    }
+  }
   return enqueue({
     workspaceId: input.workspaceId,
     createdBy: input.userId,
@@ -87,12 +111,19 @@ export function enqueueWorkspaceMedia(input: {
     modelId,
     compiledPrompt: prompt,
     negativePrompt: input.negativePrompt ?? input.request.negativePrompt,
-    parameters: { directory: input.directory, request: { ...input.request, prompt }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
+    parameters: { directory: input.directory, request: { ...input.request, prompt, seed: input.seed ?? input.request.seed }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
     seed: input.seed ?? input.request.seed,
     inputRefs: input.production?.compiled.inputs ?? [],
     fallbackAllowed: false,
-    idempotencyKey: "workspaceMedia:" + input.requestId,
+    idempotencyKey,
   });
+}
+
+function generationSignature(request: Record<string, unknown>, prompt: string, negativePrompt: unknown, inputs: unknown, candidateBatchId: unknown) {
+  const { prompt: ignoredPrompt, productionFingerprint, outputDirectory, shotId, images, videos, audios, firstFrame, lastFrame, negativePrompt: ignoredNegative, ...parameters } = request;
+  return JSON.stringify([parameters, prompt, negativePrompt || null, inputs, candidateBatchId ?? null], (_key, value) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) : value);
 }
 
 export function prepareWorkspaceShot(input: {

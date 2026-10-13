@@ -74,6 +74,7 @@ const plugin: ToolPlugin = {
       description: `${operation.description}providerId 和 modelId 必须来自 listMediaModels。引用素材的 path 及 outputDirectory 均为工作区相对路径；省略输出目录使用默认媒体目录。等待生成完成后返回已保存的文件路径，不返回 Base64。`,
       promptSnippet: "生成媒体前先查询 listMediaModels 和 productionSpec(readQuality)。用户已指定的精度用 setQuality 保存；尚未选择时用 selectQuality 在聊天中选择。已有有效选择沿用，不自动采用最低档或最高档。compile 返回 request 为实际规格快照，generate 复用该 request。用户要求多格分镜时先读 cinema 的 storyboardGrid 资料，使用 purpose=storyboard 生成总览，复用 FFmpeg 拆格与 importKeyframe 登记，再逐镜生成和剪辑交付。复用实际模型和工作区参考素材。正式分镜先保存 productionSpec 并 compile，生成传 shotId/productionFingerprint；不可用独立文生图绕过同批 Look 与角色/场景参考。写实约束同时覆盖人和环境的材质、光源、曝光、接触与空间层次；整洁、精神好不等于磨皮或去龄。参考须真实发送且按用途说明，文本描述不能冒充已传图片。",
       parameters: z.toJSONSchema(operation.parameters, { io: "input", target: "draft-07" }),
+      promptGuidelines: ["正式镜头 compile 返回的 request.prompt 是实际生成提示词，generate 必须原样复用 request 并传 fingerprint。修改画面须先更新镜头规格再编译，不能改自由 prompt 试错。相同规格默认复用已有任务和素材，跨会话继续也不重新出图。失败时停止重复调用并核查原因；仅明确授权重做或新增候选时使用新的 regenerationId，同一次重做始终复用该 UUID。"],
       // ACT: 图片和视频交给持久队列限流；音频仍走直连，保留串行。
       executionMode: operation.mediaType === "audio" ? "sequential" : "parallel",
       async execute(_id, params, signal) {

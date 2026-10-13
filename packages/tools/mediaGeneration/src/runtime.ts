@@ -14,6 +14,7 @@ const sharedFields = {
   purpose: z.enum(["asset", "standalone"]).optional().describe("仅无 shotId 时使用：asset 为基础资产，standalone 为用户明确要求的独立画面。已有镜头项目的正式分镜必须使用 shotId，不能标为独立图绕过规格。"),
   shotId: z.string().min(1).max(128).optional(),
   productionFingerprint: z.string().length(64).optional(),
+  regenerationId: z.string().uuid().optional().describe("仅明确授权重做或新增候选时创建 UUID；同一次重做始终复用该 ID。默认复用已有镜头任务，失败不自动重发。不能为绕过复用而自动创建新 ID。"),
   providerId: z.string().regex(/^[a-z][a-zA-Z0-9]{0,95}$/),
   modelId: z.string().trim().min(1).max(256),
   prompt: z.string().trim().min(1).max(100000),

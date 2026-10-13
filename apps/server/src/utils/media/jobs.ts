@@ -27,6 +27,8 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
+  if (production && request.prompt !== production.compiled.prompt) throw Object.assign(new Error("生成提示词与镜头编译结果不一致。请使用 compile 返回的 request；若需修改画面，先更新镜头规格再编译，不能仅修改自由 prompt。"), { status: 409 });
+  if (production?.compiled.negativePrompt && request.negativePrompt !== undefined && request.negativePrompt !== production.compiled.negativePrompt) throw Object.assign(new Error("负面提示词与镜头编译结果不一致。请先更新镜头约束再编译，并复用 compile 返回的 request。"), { status: 409 });
   if (production) request = production.request;
   else {
     const model = (await listMediaModels()).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
@@ -146,5 +148,5 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
-  return { ...result, request };
+  return { ...result, request: { ...request, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
 }

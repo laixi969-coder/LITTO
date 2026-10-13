@@ -114,6 +114,7 @@ export interface MediaGenerationRequest {
   imageAndCameraOnly?: boolean;
   shotId?: string;
   productionFingerprint?: string;
+  regenerationId?: string;
   providerId: string;
   modelId: string;
   prompt: string;

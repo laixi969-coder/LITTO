@@ -293,7 +293,7 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
       signal?.throwIfAborted();
       const state = api.jobView(api.scoped(currentTenant()!.workspaceId).get("generation_jobs", job.id, true));
       if (state.status === "SUCCEEDED") return state.files;
-      if (["FAILED", "CANCELLED", "TIMEOUT"].includes(state.status)) throw new Error(state.error || "媒体生成已停止");
+      if (["FAILED", "CANCELLED", "TIMEOUT"].includes(state.status)) throw new Error(`${state.error || "媒体生成已停止"}。任务 ${job.id} 已停止。${request.shotId ? "相同镜头请求不会自动重发。确认需要重做后使用新的 regenerationId，同一次重做须复用该 ID。" : "请核查失败原因后再决定是否重试。"}`);
       await new Promise<void>((resolve, reject) => {
         const cancel = () => { clearTimeout(timer); reject(signal?.reason); };
         const timer = setTimeout(() => { signal?.removeEventListener("abort", cancel); resolve(); }, 500);
@@ -301,7 +301,7 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
       });
     }
   } catch (error) {
-    if (signal?.aborted && signal.reason?.code !== "observerDisconnected") {
+    if (!("reused" in job && job.reused) && signal?.aborted && signal.reason?.code !== "observerDisconnected") {
       const state = api.scoped(currentTenant()!.workspaceId).get("generation_jobs", job.id, true);
       if (state && ["QUEUED", "RUNNING"].includes(state.status)) api.cancelJob(state.workspaceId, job.id, currentTenant()!.userId);
     }
