@@ -560,8 +560,10 @@ watch(
     removeEdges((edges) =>
       edges.filter(
         (edge) =>
-          (edge.source === nodeId && !props.handles.some((item) => item.type === "source" && item.id === edge.sourceHandle)) ||
-          (edge.target === nodeId && !props.handles.some((item) => item.type === "target" && item.id === edge.targetHandle))
+          !edge.data?.lineageKind && (
+            (edge.source === nodeId && !props.handles.some((item) => item.type === "source" && item.id === edge.sourceHandle)) ||
+            (edge.target === nodeId && !props.handles.some((item) => item.type === "target" && item.id === edge.targetHandle))
+          )
       )
     );
     updateNodeInternals([nodeId]);

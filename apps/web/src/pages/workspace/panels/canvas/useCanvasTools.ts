@@ -1,10 +1,11 @@
-import { nextTick, watch, type Ref } from "vue";
+import { nextTick, onScopeDispose, watch, type Ref } from "vue";
 import { useVueFlow, type XYPosition } from "@vue-flow/core";
 import { useNodeEvent, useNodeToolsContext, validateConnection } from "@toonflow/nodes-scaffold/runtime";
 import { canvasSchemas, type CanvasContext, type CanvasToolCall } from "@toonflow/tool-canvas/runtime";
 import { arrangeCanvas } from "./arrangeCanvas";
 import { canvasEdgeSummary, canvasNodeSummary, createCanvasQueries, isCanvasRead } from "./canvasQueries";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
+import { restoreOpenCanvasLineage, startCanvasLineage } from "./canvasLineage";
 
 export function useCanvasTools(options: {
   availableNodes: Ref<{ type: string; label: string }[]>;
@@ -19,6 +20,7 @@ export function useCanvasTools(options: {
   resolveCanvasContext?(id: string): CanvasContext | undefined;
 }) {
   const flow = useVueFlow();
+  onScopeDispose(startCanvasLineage(flow));
   const getNodeTools = useNodeToolsContext();
   const files = useWorkspaceFiles();
   let nodeRevision = 0;
@@ -283,4 +285,10 @@ export function useCanvasTools(options: {
       default: throw new Error(`未知画布操作：${request.name}`);
     }
   }
+}
+
+if (import.meta.hot) {
+  // 开发热更新只补来源线，保留正在运行的画布实例、工具调用和取消通道。
+  import.meta.hot.accept();
+  queueMicrotask(restoreOpenCanvasLineage);
 }
