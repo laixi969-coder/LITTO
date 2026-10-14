@@ -9,7 +9,7 @@ import { mediaView, saveMedia, sniff } from "../storage.ts";
 import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake } from "./nle.ts";
-import { realismChecks, shotFingerprint } from "./realism.ts";
+import { audioReviewSchema, realismChecks, shotFingerprint } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
 import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
 
@@ -30,6 +30,25 @@ export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotI
   return frame;
 }
 
+export async function importWorkspaceSpeechTake(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string, audioBytes: Buffer, audioPath: string, speechSync: Record<string, unknown>) {
+  const shot = s.get("shots", shotId);
+  if (!shot || shot.projectId !== projectId) throw notFound("project shot");
+  if (!sniff(bytes)?.mime.startsWith("video/") || !sniff(audioBytes)?.mime.startsWith("audio/")) throw bad("口型候选需要实际视频与声音参考");
+  let media = s.list("media", { projectId, hash: sha256(bytes) })[0];
+  if (!media) media = await saveMedia(s.workspaceId, projectId, bytes, { source: "lipSync" });
+  let audio = s.list("media", { projectId, hash: sha256(audioBytes) })[0];
+  if (!audio) audio = await saveMedia(s.workspaceId, projectId, audioBytes, { source: "speechReference" });
+  if (s.get("shots", shotId)?.projectId !== projectId) throw notFound("project shot");
+  const existing = s.list("takes", { projectId, shotId, mediaId: media.id })[0];
+  if (existing) {
+    if (existing.meta?.speechSync?.inspectionKey !== speechSync.inspectionKey) throw conflict("这个视频已关联另一声音版本，不能覆盖原检查记录", "speech_review_stale");
+    return existing;
+  }
+  // 对口型只新增候选，不替换原片，不自动批准人物、动作、接戏或最终同步。
+  return s.insert("takes", { project_id: projectId, shot_id: shotId, keyframe_id: shot.heroKeyframeId, media_id: media.id, status: "candidate",
+    meta: { source: "lipSync", workspacePath: path, speechSync: { ...speechSync, referenceMediaId: audio.id, audioPath } } });
+}
+
 /** 草稿可直接保存；采用与变更确认通过聊天决定卡片写入，和制作面板复用领域规则。 */
 export function workspaceProduction(s: Scope, projectId: string, operation: string, data: Record<string, unknown>, actor?: string) {
   if (!s.get("projects", projectId)) throw notFound("project");
@@ -43,8 +62,9 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     if (!actor) throw bad("代理审阅须有已认证的操作人");
     const input = z.strictObject({
       targetType: z.enum(["keyframe", "take"]), targetId: z.string().min(1),
-      authorization: z.string().trim().min(8).max(2000), note: z.string().trim().min(10).max(8000),
+      authorization: z.string().trim().min(1).max(2000), note: z.string().trim().min(10).max(8000),
       frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
+      fullPlayback: z.boolean().default(false), audioReview: audioReviewSchema.optional(),
       creativeReview: creativeReviewSchema.optional(),
       observations: z.array(z.strictObject({ kind: z.string(), note: z.string().min(1) })).max(40).default([]),
     }).parse(data);
@@ -75,6 +95,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       }
       const review = runQc(s, shot.id, { type: input.targetType, id: item.id }, input.observations, {
         actor: `agent:${actor}`, note: input.note,
+        fullPlayback: input.fullPlayback, audioReview: input.audioReview,
         reviewed: input.targetType === "keyframe" ? realismChecks.filter(key => key !== "motion") : [],
         vision: { source: "delegatedAgent", authorization: input.authorization, frameTimes: input.frameTimes, creativeReview: input.creativeReview, audioReview: "notVerified", status: "workingVersion" },
       });

@@ -2,6 +2,7 @@ import * as assets from "@/utils/assets";
 import * as desktop from "@/utils/desktop";
 import * as providerDebug from "@/utils/media/debug";
 import * as mediaJobs from "@/utils/media/jobs";
+import * as mediaLipSync from "@/utils/media/lipSync";
 import * as mediaGeneration from "@/utils/media/generation";
 import * as mediaProvider from "@/utils/media/provider";
 import * as transcription from "@/utils/media/transcription";
@@ -32,6 +33,7 @@ export default {
   providerDebug,
   mediaGeneration,
   mediaJobs,
+  mediaLipSync,
   mediaProvider,
   transcription,
   ffmpeg,

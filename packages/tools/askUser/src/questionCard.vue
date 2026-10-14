@@ -15,8 +15,8 @@
     <p v-else-if="question" class="questionText" :tabindex="storyDecision ? 0 : undefined">{{ question }}</p>
     <div v-if="images.length" class="questionImages">
       <figure v-for="item in images" :key="item.id">
-        <a :href="item.url" target="_blank" rel="noopener noreferrer" :aria-label="`查看${item.title}原图`">
-          <img :key="previewAttempts.get(item.url) ?? 0" :src="item.url" :alt="item.title" @load="loadedImages.add(item.url); previewFailures.delete(item.url)" @error="loadedImages.delete(item.url); previewFailures.add(item.url)" />
+        <a :href="previewUrl(item.url)" target="_blank" rel="noopener noreferrer" :aria-label="`查看${item.title}原图`">
+          <img :key="previewAttempts.get(item.url) ?? 0" :src="previewUrl(item.url)" :alt="item.title" @load="loadedImages.add(item.url); previewFailures.delete(item.url)" @error="previewError(item.url)" />
         </a>
         <figcaption>{{ item.title }}</figcaption>
         <p v-if="previewFailures.has(item.url)" role="alert">图片加载失败 <el-button size="small" @click="retryPreview(item.url)">重新加载</el-button></p>
@@ -25,8 +25,8 @@
     <p v-if="waiting && images.length && !imagesReady" class="questionText" role="status">图片完整显示后即可采用；加载失败可原地重试，已填写内容会保留，也可以暂不采用。</p>
     <div v-if="media.length" class="questionMedia">
       <figure v-for="item in media" :key="item.id">
-        <video v-if="item.kind === 'video'" :key="previewAttempts.get(item.url) ?? 0" :src="item.url" :aria-label="item.title" controls preload="metadata" @error="previewFailures.add(item.url)" @loadedmetadata="previewFailures.delete(item.url)" />
-        <audio v-else :key="previewAttempts.get(item.url) ?? 0" :src="item.url" :aria-label="item.title" controls preload="metadata" @error="previewFailures.add(item.url)" @loadedmetadata="previewFailures.delete(item.url)" />
+        <video v-if="item.kind === 'video'" :key="previewAttempts.get(item.url) ?? 0" :src="previewUrl(item.url)" :aria-label="item.title" controls preload="metadata" @error="previewError(item.url)" @loadedmetadata="previewFailures.delete(item.url)" />
+        <audio v-else :key="previewAttempts.get(item.url) ?? 0" :src="previewUrl(item.url)" :aria-label="item.title" controls preload="metadata" @error="previewError(item.url)" @loadedmetadata="previewFailures.delete(item.url)" />
         <figcaption>{{ item.title }}</figcaption>
         <p v-if="previewFailures.has(item.url)" role="alert">预览加载失败 <el-button size="small" @click="retryPreview(item.url)">重新加载</el-button></p>
       </figure>
@@ -114,8 +114,28 @@ const submittedSkipped = ref(false);
 const loadedImages = ref(new Set<string>());
 const previewFailures = ref(new Set<string>());
 const previewAttempts = ref(new Map<string, number>());
-function retryPreview(url: string) {
+const previewUrls = ref(new Map<string, string>());
+const refreshedPreviews = new Set<string>();
+function previewUrl(url: string) { return previewUrls.value.get(url) ?? url; }
+function previewError(url: string) {
   loadedImages.value.delete(url);
+  previewFailures.value.add(url);
+  const exp = new URL(previewUrl(url), window.location.origin).searchParams.get("exp");
+  if (exp && Number(exp) <= Date.now() / 1000 && !refreshedPreviews.has(url)) {
+    refreshedPreviews.add(url);
+    void retryPreview(url);
+  }
+}
+async function retryPreview(url: string) {
+  loadedImages.value.delete(url);
+  const mediaId = /^\/cloud\/media\/([a-zA-Z0-9]+)\/file\?/.exec(url)?.[1];
+  if (mediaId) {
+    try {
+      const { data } = await axios.get<{ url: string }>(`/cloud/media/${mediaId}`);
+      if (typeof data.url !== "string" || !data.url.startsWith(`/media/${mediaId}/file?`)) throw new Error("预览地址无效");
+      previewUrls.value.set(url, `/cloud${data.url}`);
+    } catch { previewFailures.value.add(url); return; }
+  }
   previewFailures.value.delete(url);
   previewAttempts.value.set(url, (previewAttempts.value.get(url) ?? 0) + 1);
 }

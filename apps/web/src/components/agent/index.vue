@@ -36,10 +36,13 @@
       :active="visible && item.key === conversationKey"
       :initialSession="item.session"
       :sessionFile="item.file"
+      :subAgents="item.subAgents"
       :disabled="loading || !initialized"
       @session="setSessionFile(item, $event)"
       @event="receiveAgentEvent"
       @activity="item.activity = $event"
+      @progress="updateChildProgress(item, $event)"
+      @openSubAgent="selectConversation"
       @stopRequest="stopConversation(item)"
       @sent="updateConversationName(item, $event)" />
   </section>
@@ -137,6 +140,11 @@ function receiveAgentEvent(event: AgentEvent) {
     const parent = conversations.value.find(item => item.file === event.parentFile);
     if (parent) deliverEvent(parent, event);
   }
+}
+
+function updateChildProgress(item: OpenConversation, progress: { status: AgentSubAgent["status"]; result: string }) {
+  const agent = conversations.value.find(parent => parent.file === item.parentFile)?.subAgents.find(agent => agent.file === item.file);
+  if (agent) Object.assign(agent, progress);
 }
 
 function backToParent() {

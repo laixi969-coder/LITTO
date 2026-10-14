@@ -1,9 +1,10 @@
 <template>
   <div v-if="subAgentTasks.length" class="subAgentProgress" role="status" aria-live="polite">
-    <strong>子任务 {{ subAgentTasks.filter(task => task.status !== 'running').length }}/{{ subAgentTasks.length }} 已返回</strong>
+    <strong>子任务 {{ subAgentTasks.filter(task => ['completed', 'error', 'cancelled', 'limited'].includes(task.status)).length }}/{{ subAgentTasks.length }} 已返回</strong>
     <div v-for="(task, index) in subAgentTasks" :key="index" class="subAgentTask">
       <span class="taskTitle">{{ task.name }} · {{ subAgentStatusLabels[task.status] ?? task.status }}</span>
       <span class="taskProgress">{{ task.result }}</span>
+      <el-button v-if="task.file" link @click="emit('openSubAgent', task.file)">{{ task.status === 'inputRequired' ? '打开子任务处理确认' : '查看子任务' }}</el-button>
     </div>
   </div>
   <div v-else-if="tool.status === 'running' && generationProgress" class="generationProgress" role="status">{{ generationProgress }}</div>
@@ -42,11 +43,11 @@ import { computed, onErrorCaptured, ref, shallowRef, watch, type Component } fro
 import { loadToolComponent } from "@toonflow/tools-scaffold/client";
 import { IconCopy, IconTool, IconMessageQuestion } from "@tabler/icons-vue";
 import chatReasoning from "@tdesign-vue-next/chat/es/chat-reasoning";
-import type { AgentToolCall } from "@toonflow/server/agent/types";
+import type { AgentToolCall, AgentSubAgent } from "@toonflow/server/agent/types";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 
-const { tool, directory, duration } = defineProps<{ tool: AgentToolCall; directory?: string; duration?: number }>();
-const emit = defineEmits<{ copy: [content: string] }>();
+const { tool, directory, duration, subAgents } = defineProps<{ tool: AgentToolCall; subAgents?: AgentSubAgent[]; directory?: string; duration?: number }>();
+const emit = defineEmits<{ copy: [content: string]; openSubAgent: [file: string] }>();
 const renderer = shallowRef<Component>();
 const rendererError = ref("");
 const rendererRetry = ref(0);
@@ -83,15 +84,19 @@ const targetPath = computed(() => {
 const toolCodeOptions = { maxHeight: 240, lineNumbers: false };
 const args = computed(() => formatToolData(tool.args));
 const result = computed(() => formatToolData(tool.result));
-const subAgentStatusLabels: Record<string, string> = { running: "执行中", completed: "已完成", error: "失败", cancelled: "已停止", limited: "达到限制", inputRequired: "等待补充" };
+const subAgentStatusLabels: Record<string, string> = { running: "执行中", completed: "已完成", error: "失败", cancelled: "已停止", limited: "达到限制", inputRequired: "等待你确认或补充", unknown: "连接已结束，需查看结果" };
 const progressData = computed(() => {
   try { return typeof tool.result === "string" ? JSON.parse(tool.result) : tool.result; } catch { return undefined; }
 });
-const subAgentTasks = computed<{ name: string; status: string; result: string }[]>(() => {
+const subAgentTasks = computed<{ name: string; status: string; result: string; file?: string }[]>(() => {
   if (tool.name !== "subAgent") return [];
   const tasks = progressData.value?.tasks;
   if (!Array.isArray(tasks)) return [];
-  return tasks.filter(task => task && typeof task.name === "string" && typeof task.status === "string" && typeof task.result === "string");
+  return tasks.filter(task => task && typeof task.name === "string" && typeof task.status === "string" && typeof task.result === "string").map(task => {
+    const live = subAgents?.find(agent => task.file ? agent.file === task.file : tool.status === "running" && agent.name === task.name);
+    if (live) return { ...task, ...live, result: live.result ?? task.result };
+    return task.status === "running" && tool.status !== "running" ? { ...task, status: "unknown", result: "委派连接已结束，请查看子任务或已保存结果。" } : task;
+  });
 });
 const generationProgress = computed(() => {
   const data = progressData.value;

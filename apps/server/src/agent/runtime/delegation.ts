@@ -13,7 +13,7 @@ import { translateError, translateMessage } from "@/lib/i18n";
 export async function runDelegatedAgent(options: {
   cwd: string; parentFile: string; name: string; task: string;
   providerId: string; modelId: string; thinkingLevel: "off" | "low" | "medium" | "high";
-  canvas?: CanvasContext; signal?: AbortSignal; send: (event: AgentEvent) => void; onProgress?: (text: string) => void;
+  canvas?: CanvasContext; signal?: AbortSignal; send: (event: AgentEvent) => void; onProgress?: (text: string, state?: Pick<SubAgentResult, "status" | "file">) => void;
 }) {
   const { cwd, parentFile, name, task, providerId, modelId, thinkingLevel, canvas, signal, onProgress } = options;
   const child = await createAgentConversation(cwd, { parentFile, name, task, providerId, modelId, thinkingLevel });
@@ -22,19 +22,27 @@ export async function runDelegatedAgent(options: {
   // 先通知父界面创建子会话，再转发流式事件，避免首批进度因目标尚不存在而丢失。
   options.send({ type: "subAgent", agent });
   let summary = "";
+  const pendingQuestions = new Set<string>();
+  const progress = (text: string) => onProgress?.(text, { status: pendingQuestions.size ? "inputRequired" : "running", file: child.file });
+  progress("准备执行");
   const send = (event: AgentEvent) => {
     trackAgentEvent(cwd, child.file, event);
     options.send({ type: "subAgentEvent", file: child.file, event });
-    if (event.type === "thinking" && !event.delta && !event.done) onProgress?.(`${summary}\n正在思考下一步`.trim());
+    if (event.type === "question") {
+      pendingQuestions.add(event.toolCallId);
+      progress(`等待你确认：${event.title}\n${event.question}`);
+    }
+    if (event.type === "thinking" && !event.delta && !event.done) progress(`${summary}\n正在思考下一步`.trim());
     if (event.type === "text" && event.content?.trim() && event.done) {
       summary = event.content.slice(-600);
-      onProgress?.(summary);
+      progress(summary);
     }
     if (event.type === "tool") {
+      if (event.tool.status !== "running") pendingQuestions.delete(event.tool.id);
       let progress: string | undefined;
       try { progress = JSON.parse(event.tool.result ?? "null")?.progress; } catch {}
       const operation = event.tool.args?.operation ?? event.tool.args?.name;
-      onProgress?.(`${summary}\n${progress || `${event.tool.status === "running" ? "正在执行" : event.tool.status === "error" ? "执行失败" : "已返回"} ${event.tool.name}${operation ? ` · ${operation}` : ""}`}`.trim());
+      onProgress?.(`${summary}\n${progress || `${event.tool.status === "running" ? "正在执行" : event.tool.status === "error" ? "执行失败" : "已返回"} ${event.tool.name}${operation ? ` · ${operation}` : ""}`}`.trim(), { status: pendingQuestions.size ? "inputRequired" : "running", file: child.file });
     }
     if (event.type === "error") onProgress?.(`执行出错：${event.message}`);
   };
@@ -42,7 +50,7 @@ export async function runDelegatedAgent(options: {
   const childSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   const bridge = canvas ? createCanvasContext(cwd, canvas, send) : undefined;
   const questions = createQuestionContext(cwd, send, () => controller.abort());
-  const result: SubAgentResult = { name, status: "running", result: "准备执行" };
+  const result: SubAgentResult = { name, file: child.file, status: "running", result: "准备执行" };
   try {
     await run({ prompt: task, cwd, sessionFile: child.file, providerId, modelId, thinkingLevel, canvas: bridge?.context, question: questions.context, signal: childSignal, onCancel: () => controller.abort() }, send);
     result.status = childSignal.aborted ? "cancelled" : "completed";

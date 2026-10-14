@@ -164,6 +164,30 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
 }
 
 export async function createAgentTools(cwd: string, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): Promise<ToolDefinition[]> {
+      async generateShots(kind, requests, signal, onProgress) {
+        let completed = 0;
+        return Promise.all(requests.map(async request => {
+          try {
+            mediaSignal(signal)?.throwIfAborted();
+            const parsed = (kind === "image" ? imageGenerationSchema : videoGenerationSchema).parse(request);
+            if (kind === "image") {
+              const api = cloud(), tenant = currentTenant();
+              if (api && tenant) {
+                const scope = api.scoped(tenant.workspaceId);
+                if (scope.get("shots", parsed.shotId!)?.projectId !== workspaceProject(cwd)) throw new Error("镜头不属于当前项目");
+                const frames = scope.list("keyframes", { shotId: parsed.shotId });
+                const jobs = scope.list("generation_jobs", { targetType: "shot", targetId: parsed.shotId, kind: "image" });
+                if (frames.length || jobs.length) throw new Error(`此镜已有关键帧或生成请求，批量补图不会重复生成。请复用已有结果或查看原任务：${jobs.map(job => `${job.id} ${job.status}`).join("、")}`);
+              }
+            }
+            const production = await prepareShot(cwd, kind, parsed.shotId!, parsed);
+            const files = await generateAndPublish(kind, { ...production.request, productionFingerprint: production.fingerprint }, signal);
+            return { shotId: parsed.shotId!, status: "success" as const, files };
+          } catch (error) {
+            return { shotId: request.shotId!, status: "blocked" as const, error: error instanceof Error ? error.message : String(error) };
+          } finally { onProgress?.(`已返回 ${++completed}/${requests.length} 镜；已有任务复用，失败不自动重发`); }
+        }));
+      },
   const tools: ToolDefinition[] = [];
   const names = new Set<string>();
   const context = createAgentToolContext(cwd, {}, canvas, question, parentSignal);

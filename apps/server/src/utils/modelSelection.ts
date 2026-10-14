@@ -1,5 +1,6 @@
 import { z } from "zod";
 import conf from "@/utils/conf";
+import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 
 const choice = z.strictObject({ providerId: z.string().trim().min(1).max(200), modelId: z.string().trim().min(1).max(300) }).nullable().optional();
 export const modelSelectionSchema = z.strictObject({ text: choice, image: choice, video: choice, audio: choice });
@@ -21,4 +22,13 @@ export function assertModelSelection(kind: ModelKind, providerId: string, modelI
   const action = kind === "text" ? "请在对话的模型选择器中选择并保存" : "请通过 requestProductionDecision(selectModel) 在聊天中选择并保存，无需跳转设置页";
   if (!selected) throw Object.assign(new Error(`尚未设置${label}模型。${action}，系统不会自动选择或切换。`), { status: 400, retryable: false });
   if (!isSelectedModel(kind, providerId, modelId)) throw Object.assign(new Error(`用户选定的${label}模型为 ${selected.providerId} / ${selected.modelId}，禁止改用 ${providerId} / ${modelId}。如需更换，${action}。`), { status: 400, retryable: false });
+}
+
+export async function assertMediaModelSelection(kind: "image" | "video" | "audio", request: MediaGenerationRequest, directory: string) {
+  if (kind === "video" && !isSelectedModel(kind, request.providerId, request.modelId)) {
+    const { isVoiceSyncRequest } = await import("@/utils/media/voiceDecision");
+    // 口型选择属于配音方案；仅允许选定声音和原视频的配对请求，不改变正式镜头的默认模型。
+    if (await isVoiceSyncRequest(directory, request)) return;
+  }
+  assertModelSelection(kind, request.providerId, request.modelId);
 }

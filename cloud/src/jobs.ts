@@ -70,6 +70,7 @@ export const jobView = (r: any) => r && {
     compiledPrompt: r.compiledPrompt, parameters: { ...r.parameters, negativePrompt: undefined }, seed: r.seed, estimatedCost: r.estimatedCost, actualCost: r.actualCost, userCharge: r.userCharge, durationMs: r.durationMs,
     error: r.error, parentJobId: r.parentJobId, fallbackChain: r.fallbackChain, createdAt: r.createdAt, finishedAt: r.finishedAt,
     settled: !inflight.has(r.id),
+    inputRefs: r.inputRefs ?? [],
     files: all("SELECT meta FROM generation_outputs WHERE job_id=? ORDER BY idx", r.id).flatMap(o => { const m = JSON.parse(o.meta); return m.workspacePath ? [{ path: m.workspacePath, mimeType: m.mime, mediaType: r.kind }] : []; }),
     outputs: all("SELECT media_id, idx FROM generation_outputs WHERE job_id=? ORDER BY idx", r.id).map((o) => o.media_id),
 };

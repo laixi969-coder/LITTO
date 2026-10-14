@@ -7,8 +7,9 @@ import { mediaProviders, type Provider } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
+import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { modelAccess } from "@/utils/modelAvailability";
-import { assertModelSelection, isSelectedModel } from "@/utils/modelSelection";
+import { assertMediaModelSelection, isSelectedModel } from "@/utils/modelSelection";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { applyMediaQuality } from "@/utils/media/quality";
@@ -168,8 +169,10 @@ async function generateMediaUnrecorded(
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
   if (!request.prompt.trim()) invalid("请输入生成提示词");
-  assertModelSelection(mediaType, request.providerId, request.modelId);
+  await assertMediaModelSelection(mediaType, request, cwd);
   const directory = await realpath(cwd);
+  // 静音是交付约束，先确认能处理，避免供应商忽略开关后已经付费却无法交付。
+  const silentFfmpeg = mediaType === "video" && request.generateAudio === false ? await createWorkspaceFfmpeg(directory, signal) : undefined;
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);
   const providerInfo = await getMediaProvider(request.providerId);
@@ -237,8 +240,26 @@ async function generateMediaUnrecorded(
         const { path } = await resolveWorkspacePath(directory, file);
         signal?.throwIfAborted();
         await writeWorkspaceFile(path, bytes, true);
-        written.push(path);
-        result.push({ path: relative(directory, path).replace(/\\/g, "/"), mimeType, mediaType });
+        let deliveredPath = path;
+        if (silentFfmpeg) {
+          const probe = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => silentFfmpeg.ffprobe(file, (error, data) => error ? reject(error) : resolve(data)));
+          if (probe.streams.some(stream => stream.codec_type === "audio")) {
+            const silentFile = file.replace(/\.[^.]+$/, `Silent.${mediaExtensions[mimeType]}`);
+            const silentPath = (await resolveWorkspacePath(directory, silentFile, true)).path;
+            const command = silentFfmpeg(file).noAudio().videoCodec("copy");
+            const cancel = () => command.kill("SIGKILL");
+            signal?.addEventListener("abort", cancel, { once: true });
+            try {
+              signal?.throwIfAborted();
+              await new Promise<void>((resolve, reject) => command.on("error", reject).on("end", () => resolve()).on("start", () => { if (signal?.aborted) cancel(); }).save(silentFile));
+              deliveredPath = silentPath;
+            } catch (error) {
+              await unlink(silentPath).catch((failure: NodeJS.ErrnoException) => { if (failure.code !== "ENOENT") throw failure; });
+              throw new Error(`原视频已保留：${file}，静音处理失败，仅修复音轨处理，不重新生成视频。${error instanceof Error ? error.message : String(error)}`);
+            } finally { signal?.removeEventListener("abort", cancel); }
+          }
+        } else written.push(path);
+        result.push({ path: relative(directory, deliveredPath).replace(/\\/g, "/"), mimeType, mediaType });
       } finally { release(); }
     }
     signal?.throwIfAborted();

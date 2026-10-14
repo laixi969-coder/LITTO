@@ -19,7 +19,7 @@ const parameters = z.strictObject({
 
 export async function createSubAgentTool({ cwd, tools, canvas, runTask, ...modelOptions }: SubAgentModel & {
   cwd: string; tools: ToolDefinition[]; canvas?: CanvasContext;
-  runTask: (name: string, task: string, signal?: AbortSignal, onProgress?: (text: string) => void) => Promise<{ result: SubAgentResult; usage: ReturnType<typeof emptyUsage> }>;
+  runTask: (name: string, task: string, signal?: AbortSignal, onProgress?: (text: string, state?: Pick<SubAgentResult, "status" | "file">) => void) => Promise<{ result: SubAgentResult; usage: ReturnType<typeof emptyUsage> }>;
 }): Promise<ToolDefinition> {
   if (tools.some(tool => tool.name === "subAgent")) throw new Error("工具名称 subAgent 已被内置子任务工具占用");
   const teams = (await listTeams()).filter(team => team.enabled && !team.loadError);
@@ -43,7 +43,7 @@ export async function createSubAgentTool({ cwd, tools, canvas, runTask, ...model
       const update = () => { if (!signal?.aborted) onUpdate?.({ content: content(), details: {} }); };
       update();
       await Promise.all(tasks.map(async (task, index) => {
-        const onProgress = (text: string) => { results[index]!.result = text; update(); };
+        const onProgress = (text: string, state?: Pick<SubAgentResult, "status" | "file">) => { Object.assign(results[index]!, state, { result: text }); update(); };
         try {
           const remote = task.team && getRemoteTeam(task.team);
           if ((task.taskId || task.contextId) && !remote) throw new Error("只有远端 A2A 团队支持 taskId/contextId");

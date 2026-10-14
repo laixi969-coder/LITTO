@@ -51,7 +51,7 @@
                       </template>
                       <messageMarkdown v-if="!(part.collapsed ?? true)" :content="part.content" :streaming="!!item.streaming" :directory="directory" />
                     </chat-reasoning>
-                    <toolMessage v-else-if="part.type === 'tool'" v-model:collapsed="part.collapsed" :tool="part.tool" :duration="part.duration" :directory="directory" @copy="copyMessage" />
+                    <toolMessage v-else-if="part.type === 'tool'" v-model:collapsed="part.collapsed" :tool="part.tool" :subAgents="subAgents" :duration="part.duration" :directory="directory" @copy="copyMessage" @openSubAgent="emit('openSubAgent', $event)" />
                     <messageMarkdown v-else-if="part.type === 'text' && part.content" :content="part.content" :streaming="!!item.streaming" :directory="directory" />
                   </template>
                   <attachmentList v-if="item.attachments?.length" :attachments="item.attachments" :directory="directory" />
@@ -193,8 +193,8 @@ import "tdesign-vue-next/es/style/index.css";
 import "@tdesign-vue-next/chat/es/style/index.css";
 import "x-sender/lib/XSender.css";
 
-const props = defineProps<{ active: boolean; initialSession: AgentConversation | null; sessionFile?: string; disabled: boolean }>();
-const emit = defineEmits<{ session: [file: string]; sent: [prompt: string]; event: [event: AgentEvent]; activity: [state: string]; stopRequest: [] }>();
+const props = defineProps<{ active: boolean; initialSession: AgentConversation | null; sessionFile?: string; subAgents?: import("@toonflow/server/agent/types").AgentSubAgent[]; disabled: boolean }>();
+const emit = defineEmits<{ session: [file: string]; sent: [prompt: string]; event: [event: AgentEvent]; activity: [state: string]; stopRequest: []; openSubAgent: [file: string]; progress: [progress: { status: import("@toonflow/server/agent/types").AgentSubAgent["status"]; result: string }] }>();
 const workspaceStore = useWorkspaceStore();
 const directory = workspaceStore.project?.directory;
 const draftAttachments = ref<AgentAttachment[]>([]);
@@ -341,6 +341,13 @@ function applyEvent(event: AgentEvent) {
     case "session": emit("session", event.file); break;
     case "stats": stats.value = event.stats; contextUsage.value = event.contextUsage; break;
     default: stream.receive(event);
+  }
+  if (props.initialSession?.parentFile) {
+    const result = event.type === "question" ? `等待你确认：${event.title}\n${event.question}`
+      : event.type === "text" && event.done ? event.content?.slice(-600)
+      : event.type === "tool" ? `${event.tool.status === "running" ? "正在执行" : event.tool.status === "error" ? "执行失败" : "已返回"} ${event.tool.name}`
+      : event.type === "error" ? event.message : undefined;
+    if (result) emit("progress", { status: pendingQuestions.value.length ? "inputRequired" : event.type === "error" ? "error" : "running", result });
   }
 }
 

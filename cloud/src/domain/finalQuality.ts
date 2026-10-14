@@ -9,6 +9,7 @@ import { probeFile, runCmd } from "../media-tools.ts";
 import { bad, conflict, notFound, now } from "../util.ts";
 import { getEdit, resolveClip } from "./nle.ts";
 import { adContext, adReadiness, isAdSequence } from "./adDirection.ts";
+import { needsLipSync } from "./realism.ts";
 
 function sourceReviews(s: Scope, mediaId: string | null) {
   if (!mediaId) return [];
@@ -54,6 +55,7 @@ export const finalReviewSchema = z.object({
     continuity: z.enum(["pass", "fail", "unverified"]),
     sound: z.enum(["pass", "fail", "unverified"]),
     emotion: z.enum(["pass", "fail", "unverified"]).optional(),
+    lipSync: z.enum(["pass", "fail", "unverified"]).optional(),
     product: z.enum(["pass", "fail", "unverified"]).optional(),
     composition: z.enum(["pass", "fail", "unverified"]).optional(),
     color: z.enum(["pass", "fail", "unverified"]).optional(),
@@ -163,6 +165,7 @@ export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: 
   if (!quality.analysisId || quality.analysisId !== review.analysisId || quality.status === "stale") throw conflict("检测记录已过期，请重新导出或检测", "stale");
   const passing = Object.values(review.checks).every(value => value === "pass");
   const sequence = s.get("sequences", render.sequenceId)!;
+  if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(needsLipSync) && review.checks.lipSync !== "pass") throw bad("成片包含画内对白或演唱，须完整看听并确认逐字口型同步；不能只以声音检查替代口型验收");
   if (passing && isAdSequence(sequence)) {
     if (!["emotion", "product", "composition", "color", "editing"].every(key => review.checks[key as keyof typeof review.checks] === "pass")) throw bad("广告成片须检查情绪表达、产品识别、构图、整片色调与剪辑节奏");
     if (!quality.advertising || quality.advertising.fingerprint !== sequenceFingerprint(s, render.sequenceId)) throw bad("请先 inspectAdFilm 对实际导出文件完成广告表达审片");

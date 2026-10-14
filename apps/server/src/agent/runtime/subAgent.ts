@@ -12,6 +12,7 @@ export type SubAgentResult = {
   result: string;
   taskId?: string;
   contextId?: string;
+  file?: string;
 };
 
 export function emptyUsage(): Usage {

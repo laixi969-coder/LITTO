@@ -130,6 +130,11 @@
               <p class="reviewHint">确认前请对照画面看：{{ reviewFields.map(field => field[1]).join("、") }}{{ target.type === "take" ? "；视频请完整播放一遍" : "" }}。</p>
               <label v-for="field in reviewFields" :key="field[0]"><input v-model="reviewedFields" type="checkbox" :value="field[0]" />已检查 {{ field[1] }}</label>
               <label v-if="target.type === 'take'"><input v-model="fullPlayback" type="checkbox" />已完整播放，检查肢体增减、遮挡、手物接触及动作收势</label>
+              <template v-if="target.type === 'take' && speechReviewRequired">
+                <label><input v-model="speechChecked" type="checkbox" />已完整听过，实际对白或歌词与采用声音一致</label>
+                <label v-if="needsLipSync(detail)"><input v-model="lipSyncChecked" type="checkbox" />已核对可见口型与发声逐字匹配</label>
+                <label>声音与口型检查依据<textarea v-model="speechNote" rows="2" /></label>
+              </template>
               <label v-for="finding in priorFindings" :key="finding.kind"><input v-model="dismissedKinds" type="checkbox" :value="finding.kind" />复核后排除此告警：{{ finding.cause }}（须在说明中记录依据）</label>
               <div class="fieldGrid"><label>发现的问题<select v-model="observation"><option value="">没有发现问题</option><option v-for="item in observationKinds" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label></div>
               <label class="fullField">{{ observation ? "看到的具体情况（必填）" : "补充说明（选填）" }}<textarea v-model="reviewNote" rows="2" /></label>
@@ -139,7 +144,7 @@
                 <div class="fieldGrid"><label v-for="item in shotAssets" :key="item.id">{{ item.name }}<textarea v-model="stateNotes[item.id]" rows="2" /></label></div>
               </template>
               <button v-if="observation" type="button" :disabled="!reviewNote.trim()" @click="run(saveReview)">记录问题</button>
-              <button v-else type="button" :disabled="!reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && !fullPlayback)" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "完整看过，批准此 Take" }}</button>
+              <button v-else type="button" :disabled="!reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && (!fullPlayback || speechReviewRequired && (!speechChecked || needsLipSync(detail) && !lipSyncChecked || speechNote.trim().length < 10)))" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "完整看过，批准此 Take" }}</button>
               <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="finding in report.findings" :key="finding.kind">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
             </template>
             <template v-if="candidatePool.length">
@@ -175,6 +180,7 @@ const getCanvas = inject<() => CanvasContext | undefined>("canvas");
 import { ElMessageBox } from "element-plus";
 import type { MediaModel } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema, type CameraTrajectory } from "@toonflow/tools-scaffold/runtime";
+import { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 const visible = defineModel<boolean>({ default: false });
 const props = defineProps<{ projectId?: string; directory: string }>();
 const projectId = props.projectId;
@@ -234,6 +240,8 @@ const stateNotes = ref<Record<string, string>>({});
 const shotAssets = computed(() => assets.value.filter(item => detail.value?.assetIds?.includes(item.id)));
 const targetId = ref(""), reviewNote = ref(""), observation = ref("");
 const reviewedFields = ref<string[]>([]), dismissedKinds = ref<string[]>([]), fullPlayback = ref(false);
+const speechChecked = ref(false), lipSyncChecked = ref(false), speechNote = ref("");
+const speechReviewRequired = computed(() => needsLipSync(detail.value ?? {}) || !!detail.value?.creativeBrief?.dialogue?.lines?.length);
 const keyOf = (model: MediaModel) => JSON.stringify([model.providerId, model.modelId]);
 const availableModels = computed(() => models.value.filter(model => model.type === kind.value));
 const selectedModel = computed(() => availableModels.value.find(model => keyOf(model) === modelKey.value));
@@ -504,6 +512,7 @@ let plannedStates: Record<string, { state: Record<string, unknown> | undefined; 
 function selectVersion(item: any) {
   targetId.value = item.id; reviewNote.value = ""; observation.value = "";
   reviewedFields.value = []; dismissedKinds.value = []; fullPlayback.value = false;
+  speechChecked.value = false; lipSyncChecked.value = false; speechNote.value = "";
   const planned = detail.value?.state?.result ?? {};
   plannedStates = Object.fromEntries(shotAssets.value.map(asset => {
     const state = planned[kindOf(asset.type)]?.[asset.id];
@@ -522,6 +531,7 @@ function reviewPayload(item: any) {
     (observedStateDelta[kindOf(asset.type)] ??= {})[asset.id] = planned && note === planned.note && planned.state ? { ...planned.state, note } : { note };
   }
   return { targetType: item.type, targetId: item.id, reviewed: reviewedFields.value, note: reviewNote.value, fullPlayback: fullPlayback.value, dismissedKinds: dismissedKinds.value,
+    ...(item.type === "take" && speechReviewRequired.value ? { audioReview: { speech: speechChecked.value ? "pass" : "fail", lipSync: needsLipSync(detail.value ?? {}) ? lipSyncChecked.value ? "pass" : "fail" : "notApplicable", note: speechNote.value, ...(item.meta?.speechSync ? { inspectionKey: item.meta.speechSync.inspectionKey, referenceMediaId: item.meta.speechSync.referenceMediaId } : {}) } } : {}),
     ...(item.type === "take" ? { observedStateDelta } : {}), observations: observation.value ? [{ kind: observation.value, note: reviewNote.value }] : [] };
 }
 async function saveReview() {

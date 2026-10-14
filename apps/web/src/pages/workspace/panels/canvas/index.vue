@@ -74,7 +74,7 @@
         :batchHistory="canvasHistory.batch"
         @update:showEdges="edgeDisconnect = undefined" />
       <nodeMenu
-        :key="JSON.stringify([project?.directory, canvasId])"
+        :key="JSON.stringify(['nodeMenu', project?.directory, canvasId])"
         ref="nodeMenuRef"
         :remoteNodes="availableNodes"
         :pasteNode="pasteClipboardNode"
@@ -88,7 +88,7 @@
         @undo="changeHistory('undo')"
         @redo="changeHistory('redo')" />
       <selectionToolbar
-        :key="JSON.stringify([project?.directory, canvasId])"
+        :key="JSON.stringify(['selectionToolbar', project?.directory, canvasId])"
         ref="selectionToolbarRef"
         :batchHistory="canvasHistory.batch"
         :getSignal="getCanvasSignal"
@@ -984,7 +984,7 @@ async function loadRemoteNodes(reloadName?: string) {
 }
 
 const defaultEdgeOptions = markRaw({
-  type: "simple-bezier",
+  type: "default",
   animated: false,
   class: ({ sourceNode, targetNode }: GraphEdge) => {
     if (!sourceNode.selected && !sourceNode.dragging && !targetNode.selected && !targetNode.dragging) return "";

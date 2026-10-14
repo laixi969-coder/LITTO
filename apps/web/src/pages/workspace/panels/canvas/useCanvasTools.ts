@@ -2,7 +2,7 @@ import { nextTick, onScopeDispose, watch, type Ref } from "vue";
 import { useVueFlow, type XYPosition } from "@vue-flow/core";
 import { useNodeEvent, useNodeToolsContext, validateConnection } from "@toonflow/nodes-scaffold/runtime";
 import { canvasSchemas, type CanvasContext, type CanvasToolCall } from "@toonflow/tool-canvas/runtime";
-import { arrangeCanvas } from "./arrangeCanvas";
+import { arrangeCanvas, nextCanvasPosition } from "./arrangeCanvas";
 import { canvasEdgeSummary, canvasNodeSummary, createCanvasQueries, isCanvasRead } from "./canvasQueries";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { restoreOpenCanvasLineage, startCanvasLineage } from "./canvasLineage";
@@ -143,8 +143,8 @@ export function useCanvasTools(options: {
         }
         if (!options.availableNodes.value.some(node => node.type === type)) throw new Error("请先启用对应的素材节点");
         const id = crypto.randomUUID();
-        const right = Math.max(0, ...flow.nodes.value.filter(node => !node.parentNode).map(node => node.position.x + (node.dimensions.width || 400)));
-        flow.addNodes({ id, type, position: { x: right + 80, y: 0 }, data: { label: args.label ?? path.split("/").at(-1), sourcePath: path, ...(text !== undefined ? { textSnapshot: text } : { outputs: { [kind]: { dataType: kind.toUpperCase(), value: { url: path, mimeType } } } }) } });
+        const position = nextCanvasPosition(flow, text === undefined ? 920 : 400);
+        flow.addNodes({ id, type, position: { x: position.x + (text === undefined ? 460 : 0), y: position.y }, data: { label: args.label ?? path.split("/").at(-1), sourcePath: path, ...(text !== undefined ? { textSnapshot: text } : { outputs: { [kind]: { dataType: kind.toUpperCase(), value: { url: path, mimeType } } } }) } });
         await nextTick();
         signal.throwIfAborted();
         await flow.fitView({ nodes: [id], padding: 0.2, duration: 0 });

@@ -8,8 +8,9 @@ import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { generateMediaDirect, listMediaModels, validateCameraRequest } from "@/utils/media/generation";
-import { assertModelSelection } from "@/utils/modelSelection";
+import { assertMediaModelSelection, assertModelSelection } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
+import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 
 export function workspaceProject(directory: string) {
   const tenant = currentTenant();
@@ -23,7 +24,7 @@ export function workspaceProject(directory: string) {
 
 export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string) {
   if (!request.shotId && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
-  assertModelSelection(kind, request.providerId, request.modelId);
+  await assertMediaModelSelection(kind, request, directory);
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
@@ -31,7 +32,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   // ACT: 正式镜头以当前规格和指纹为准，提示词由服务端编译，避免模型逐字复制长文本。
   if (production) request = production.request;
   else {
-    const model = (await listMediaModels()).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
+    const model = (await listMediaModels(true)).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
     if (!model) throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
     request = await applyMediaQuality(directory, kind, request, model);
   }
@@ -139,6 +140,9 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true });
+  if (kind === "video" && request.providerId === "meta" && request.modelId === "MiniMax-H3") {
+    result.compiled.prompt = compactVideoPrompt(result.compiled.prompt);
+  }
   if (kind === "video" && result.audioMode === "generated" && (!model.audio || request.generateAudio === false || (model.audio === "optional" && request.generateAudio !== true))) {
     throw Object.assign(new Error("本镜对白或声音方案需要生成声音，请选用支持音频的模型并开启 generateAudio；不能删除台词或改成静音绕过"), { status: 400 });
   }

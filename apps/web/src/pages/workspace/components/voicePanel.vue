@@ -10,7 +10,7 @@
         <el-button :disabled="busy || !loaded" @click="run(importStory)">同步已采用剧本台词（保留旧方案）</el-button>
         <el-button v-if="operation" :disabled="stopping" @click="stop">停止处理</el-button>
       </div>
-      <p class="hint">先为角色选定音色，再逐句配音和试听。对白可用已确定的配音驱动人物视频，旁白无需对口型。开源模型需先部署并在媒体模型设置中添加 Qwen3-TTS / MuseTalk。</p>
+      <p class="hint">对白或演唱可使用已有声音片段。对口型可选择专用模型，或支持视频与音频参考的原生音画模型；原生模型可能改变画面，生成后须检查人物、动作、原声和逐字嘴型。旁白无需对口型。</p>
       <fieldset :disabled="busy || !loaded">
         <h3>角色与音色</h3>
         <div v-for="role in project.roles" :key="role.id" class="roleRow">
@@ -30,7 +30,7 @@
             <el-button @click="project.lines.splice(index, 1)">移除台词</el-button>
           </div>
           <div class="fieldGrid">
-            <label>类型<select v-model="line.kind"><option value="dialogue">画内对白</option><option value="narration">旁白 / 画外音</option></select></label>
+            <label>类型<select v-model="line.kind"><option value="dialogue">画内对白</option><option value="narration">旁白 / 画外音</option><option value="singing">画内演唱</option></select></label>
             <label>说话人<select v-model="line.roleId"><option value="">选择角色</option><option v-for="role in project.roles" :key="role.id" :value="role.id">{{ role.name || '未命名角色' }}</option></select></label>
             <label class="fullField">台词<textarea v-model="line.text" rows="3" maxlength="10000" /></label>
             <label>情绪<select v-model="line.emotion"><option value="">自然</option><option v-for="emotion in emotions" :key="emotion" :value="emotion">{{ emotion }}</option></select></label>
@@ -40,13 +40,19 @@
           </div>
           <p v-if="lineModel(line) && !lineModel(line)?.speechInstructions" class="hint">此模型未声明支持情绪指令，可生成自然语音；需要表演语气时请选择 Qwen3-TTS 1.7B。</p>
           <div class="toolbar">
-            <el-button :disabled="!line.text.trim() || !line.roleId || line.takes.length >= 100" @click="run(() => generateSpeech(line), true)">生成此句配音</el-button>
+            <el-button :disabled="line.kind === 'singing' || !!line.sourceAudio || !line.text.trim() || !line.roleId || line.takes.length >= 100" @click="run(() => generateSpeech(line), true)">生成此句配音</el-button>
+            <label class="fileLabel">使用已有配音 / 原曲<input type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" @change="uploadAudio(line, $event)" /></label>
             <label v-if="line.takes.length">采用配音版本<select v-model="line.takeId"><option v-for="(take, takeIndex) in line.takes" :key="take.id" :value="take.id">版本 {{ takeIndex + 1 }}</option></select></label>
             <attachmentPreview v-if="selectedTake(line)" :attachment="{ ...selectedTake(line)!.audio, name: '试听配音' }" :directory="directory" />
           </div>
+          <div v-if="line.sourceAudio" class="fieldGrid">
+            <label>音频起点（秒）<input v-model.number="line.sourceAudio.start" type="number" min="0" step="0.01" /></label>
+            <label>本段长度（秒）<input v-model.number="line.sourceAudio.duration" type="number" min="0.01" max="600" step="0.01" /></label>
+            <el-button @click="run(() => prepareAudio(line))">截取并采用这一段声音</el-button>
+          </div>
           <p v-if="selectedTake(line) && stale(line)" class="errorMessage">台词、音色或语气已修改，当前配音是旧版本。请重新生成后再对口型或合成。</p>
           <p v-if="storySourceStale(line)" class="errorMessage">此句来源的剧本场次已改变或移除，请同步已采用剧本后核对台词、表演及人物视频。</p>
-          <template v-if="line.kind === 'dialogue'">
+          <template v-if="line.kind !== 'narration'">
             <div class="toolbar">
               <label class="fileLabel">上传此句人物视频<input type="file" accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm" @change="uploadVideo(line, $event)" /></label>
               <attachmentPreview v-if="line.video" :attachment="{ ...line.video, name: '人物原视频' }" :directory="directory" />
@@ -56,6 +62,18 @@
             <div v-if="selectedTake(line)?.videos.length" class="toolbar">
               <span>口型视频：</span>
               <attachmentPreview v-for="(result, resultIndex) in selectedTake(line)?.videos" :key="result.id" :attachment="{ ...result.video, name: `口型版本 ${resultIndex + 1}${result.sourceVideo.path === line.video?.path ? '' : '（旧原片）'}` }" :directory="directory" />
+            </div>
+            <div v-for="result in selectedTake(line)?.videos" :key="result.id" class="syncReview">
+              <p>声音与口型：{{ result.review && result.inspection?.audioMatches && result.review.inspectionKey === result.inspection.key && result.sourceVideo.path === line.video?.path && !stale(line) ? '当前版本已看听确认' : '待检核，尚未确认同步' }}</p>
+              <el-button @click="run(() => inspectSync(line, result))">检查当前声音与时间偏移</el-button>
+              <p v-if="result.inspection">声音匹配：{{ result.inspection.audioMatches ? '通过' : '未通过' }} · 偏移 {{ result.inspection.offsetMs }} 毫秒。{{ result.inspection.note }}</p>
+              <label><input v-model="syncDraft(result.id).watched" type="checkbox" />已完整播放此版本</label>
+              <label><input v-model="syncDraft(result.id).speech" type="checkbox" />对白或歌词与采用声音一致</label>
+              <label><input v-model="syncDraft(result.id).mouth" type="checkbox" />可见口型与发声逐字匹配</label>
+              <textarea v-model="syncDraft(result.id).note" rows="2" aria-label="同步检查依据" />
+              <el-button :disabled="!result.inspection?.audioMatches || !syncDraft(result.id).watched || !syncDraft(result.id).speech || !syncDraft(result.id).mouth || syncDraft(result.id).note.trim().length < 10 || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => reviewSync(line, result))">保存此版本的同步确认</el-button>
+              <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
+              <el-button v-if="shots.length" :disabled="!line.shotId || !result.review || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => registerSync(line, result))">登记为镜头候选（保留原片）</el-button>
             </div>
           </template>
         </article>
@@ -79,6 +97,7 @@ import { useNodeAi, invalidateNodeModels, type NodeMediaModel, type NodeVideoReq
 import { createBrowserFfmpeg } from "@toonflow/ffmpeg/browser";
 import { speechSourceKey, voiceProjectSchema, type VoiceProject, type VoiceLine, type VoiceRole } from "@toonflow/tool-media-generation/voiceProject";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
+import { useWorkspaceStore } from "@/stores/workspace";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
 import { readStory } from "@/lib/storyClient";
 import { storyStale, type StoryRevision } from "@toonflow/tool-scene-list/storyProject";
@@ -92,12 +111,17 @@ const files = useWorkspaceFiles(directory);
 const ai = useNodeAi();
 const project = ref<VoiceProject>({ littoVoice: 1, roles: [], lines: [], lipSyncProviderId: "", lipSyncModelId: "", mixes: [] });
 const models = ref<NodeMediaModel[]>([]);
+const workspaceStore = useWorkspaceStore();
+const shots = ref<{ id: string; title: string }[]>([]);
 const storyRevision = ref<StoryRevision>();
 const loaded = ref(false);
 const busy = ref(false);
 const stopping = ref(false);
 const error = ref("");
 const message = ref("");
+const syncReviews = ref<Record<string, { watched: boolean; speech: boolean; mouth: boolean; note: string }>>({});
+type SyncVideo = VoiceLine["takes"][number]["videos"][number];
+function syncDraft(id: string) { return syncReviews.value[id] ??= { watched: false, speech: false, mouth: false, note: "" }; }
 const operation = ref<AbortController>();
 const lifetime = new AbortController();
 let activeJob = "";
@@ -107,7 +131,10 @@ const savedSnapshot = ref(JSON.stringify(project.value));
 const emotions = ["开心", "悲伤", "愤怒", "紧张", "惊讶", "克制", "低声耳语", "激动喊叫"];
 const dirty = computed(() => JSON.stringify(project.value) !== savedSnapshot.value);
 const speechModels = computed(() => models.value.filter(model => model.type === "audio"));
-const lipSyncModels = computed(() => models.value.filter(model => model.type === "video" && model.lipSync));
+function syncMode(model: NodeMediaModel) {
+  return model.mode?.find(mode => Array.isArray(mode) && mode.some(item => /^videoReference:[1-9]\d*$/.test(item)) && mode.some(item => /^audioReference:[1-9]\d*$/.test(item))) as NodeVideoRequest["mode"] | undefined;
+}
+const lipSyncModels = computed(() => models.value.filter(model => model.type === "video" && syncMode(model) && (model.lipSync || model.audio)));
 const lipSyncModel = computed(() => lipSyncModels.value.find(model => model.providerId === project.value.lipSyncProviderId && model.modelId === project.value.lipSyncModelId));
 const canMix = computed(() => project.value.lines.length > 0 && project.value.lines.every(line => selectedTake(line) && !stale(line)));
 const mixSourceKey = computed(() => JSON.stringify(project.value.lines.map(line => [line.id, line.takeId, line.pauseAfter, stale(line)])));
@@ -157,7 +184,12 @@ function selectLipSyncModel(key: string) {
   project.value.lipSyncProviderId = model?.providerId ?? ""; project.value.lipSyncModelId = model?.modelId ?? "";
 }
 
-async function refreshModels() { invalidateNodeModels("media"); models.value = await ai.getMediaModels(lifetime.signal); }
+async function refreshModels() {
+  invalidateNodeModels("media");
+  const selected = await ai.getMediaModels(lifetime.signal);
+  const available = await ai.getMediaModels(lifetime.signal, true);
+  models.value = [...selected, ...available.filter(model => model.type === "video" && syncMode(model) && (model.lipSync || model.audio) && !selected.some(item => modelKey(item) === modelKey(model)))];
+}
 async function load() {
   try {
     const content = await files.readText("voiceProject.json");
@@ -170,6 +202,8 @@ async function load() {
   savedSnapshot.value = JSON.stringify(project.value); loaded.value = true;
   await refreshModels();
   await refreshStory();
+  const projectId = workspaceStore.project?.projectId;
+  if (projectId) shots.value = (await axios.get(`/cloud/projects/${encodeURIComponent(projectId)}/shots`, { signal: lifetime.signal })).data;
 }
 
 async function save() {
@@ -205,7 +239,7 @@ async function generateSpeech(line: VoiceLine) {
   const instructions = [line.emotion.trim(), line.delivery.trim()].filter(Boolean).join("；");
   const [audio] = await ai.generateAudio({ directory, providerId: role.providerId, modelId: role.modelId, prompt: line.text.trim(), voice: role.voice, speed: line.speed, instructions, format: "wav", outputDirectory: "assets/speech" }, signal());
   if (!audio || audio.mediaType !== "audio") throw new Error("供应商没有返回配音文件");
-  const take = { id: crypto.randomUUID(), audio: { path: audio.path, mimeType: audio.mimeType }, sourceKey, videos: [] };
+  const take = { id: crypto.randomUUID(), audio: { path: audio.path, mimeType: audio.mimeType }, sourceKey, syncRequests: [], videos: [] };
   line.takes.push(take); line.takeId = take.id;
   await save(); message.value = "配音已生成，请试听后再对口型";
 }
@@ -233,15 +267,100 @@ async function syncLine(line: VoiceLine) {
   await refreshStory();
   const take = selectedTake(line);
   const model = lipSyncModel.value;
-  if (line.kind !== "dialogue" || !take || stale(line) || !line.video || !model) throw new Error("请先确定当前对白配音、人物视频和对口型模型");
+  if (line.kind === "narration" || !take || stale(line) || !line.video || !model) throw new Error("请先确定当前对白或演唱声音、人物视频和对口型模型");
+  const existing = take.videos.find(result => result.sourceVideo.path === line.video!.path && result.providerId === model.providerId && result.modelId === model.modelId);
+  if (existing) { await inspectSync(line, existing); message.value = "已复用现有口型结果，请检查并确认当前版本"; return; }
   if (take.videos.length >= 100) throw new Error("此配音最多保留 100 个口型版本");
   await save();
   const sourceVideo = { ...line.video };
-  pendingVideo = { requestId: crypto.randomUUID(), input: { directory, providerId: model.providerId, modelId: model.modelId, prompt: "使用输入配音同步人物口型，保留人物身份和原有镜头", videos: [sourceVideo], audios: [take.audio], mode: ["videoReference:1", "audioReference:1"], outputDirectory: "assets/speech" } };
+  const input: NodeVideoRequest = { directory, providerId: model.providerId, modelId: model.modelId, prompt: `以视频参考1为画面依据，以音频参考1为唯一声音和节奏依据。保留原人物身份、衣着、场景、机位、动作与镜头运动，${line.kind === "singing" ? "人物演唱" : "人物说话"}的逐字嘴型严格对应音频参考1，声音从第0秒开始。不得改写、重新配音、改变音高或语速，不添加旁白、对白、音乐。${line.text ? `词句：${line.text}` : ""}`, videos: [sourceVideo], audios: [take.audio], mode: syncMode(model), generateAudio: true, outputDirectory: "assets/speech" };
+  if (!model.lipSync) {
+    const ffmpeg = await createBrowserFfmpeg(directory, signal());
+    const metadata = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => ffmpeg.ffprobe(take.audio.path, (error, data) => error ? reject(error) : resolve(data)));
+    const seconds = Number(metadata.format.duration);
+    const formats = model.durationResolutionMap?.flatMap(format => format.duration.map(duration => ({ duration, resolution: format.resolution.includes("768P") ? "768P" : format.resolution[0] }))).filter(format => format.duration >= seconds - 0.02).sort((left, right) => left.duration - right.duration);
+    const format = formats?.[0];
+    if (!Number.isFinite(seconds) || seconds <= 0 || !format?.resolution) throw new Error("当前声音片段超出该模型支持的时长，请选择支持此片段的模型");
+    input.duration = format.duration;
+    input.resolution = format.resolution;
+  }
+  let request = take.syncRequests.find(request => request.sourceVideo.path === sourceVideo.path && request.providerId === model.providerId && request.modelId === model.modelId);
+  if (!request) {
+    if (take.syncRequests.length >= 100) throw new Error("此配音的同步请求已达上限，请查看已有任务");
+    request = { requestId: crypto.randomUUID(), sourceVideo, providerId: model.providerId, modelId: model.modelId };
+    take.syncRequests.push(request);
+    // 提交前持久化幂等ID；关页面、响应丢失或失败后都恢复原任务，不另发付费请求。
+    await save();
+  }
+  pendingVideo = { requestId: request.requestId, input };
   const [video] = await ai.generateVideo(pendingVideo.input, signal(), id => { activeJob = id; }, pendingVideo.requestId);
   if (!video || video.mediaType !== "video") throw new Error("供应商没有返回口型视频");
-  take.videos.push({ id: crypto.randomUUID(), video: { path: video.path, mimeType: video.mimeType }, sourceVideo, providerId: model.providerId, modelId: model.modelId });
-  await save(); message.value = "口型视频已生成，请完整播放检查同步与人物表情";
+  const result = { id: crypto.randomUUID(), video: { path: video.path, mimeType: video.mimeType }, sourceVideo, providerId: model.providerId, modelId: model.modelId };
+  take.videos.push(result);
+  await save();
+  await inspectSync(line, result);
+  message.value = "口型视频已保存，仍须完整看听，确认对白或歌词、口型和人物表情";
+}
+
+async function speechRequest(path: string, body: Record<string, unknown>) {
+  const response = await fetch(`/api/ai/media/${path}`, { method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory, ...body }), signal: signal() });
+  const result = await response.json();
+  if (!response.ok || result.code !== 200) throw new Error(result.message || "声音处理失败");
+  return result.data;
+}
+
+async function uploadAudio(line: VoiceLine, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0]; input.value = "";
+  if (!file) return;
+  await run(async () => {
+    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const types: Record<string, string> = { mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", flac: "audio/flac", ogg: "audio/ogg" };
+    if (!types[extension] || !file.size || file.size > 100 * 1024 * 1024) throw new Error("请选择不超过100MB的MP3、WAV、M4A、FLAC或OGG音频");
+    await ensureSpeechDirectory();
+    const path = `assets/speech/source${crypto.randomUUID()}.${extension}`;
+    await files.write(path, file, true);
+    line.sourceAudio = { path, mimeType: types[extension]!, start: 0, duration: 1 };
+    await save();
+  });
+}
+
+async function prepareAudio(line: VoiceLine) {
+  if (!line.sourceAudio || line.takes.length >= 100) throw new Error("请先选择声音及裁剪范围");
+  const sourceKey = speechSourceKey(line, lineRole(line));
+  const existing = line.takes.find(take => take.sourceKey === sourceKey);
+  if (existing) { line.takeId = existing.id; await save(); return; }
+  const audio = await speechRequest("prepareSpeech", { audio: line.sourceAudio });
+  if (speechSourceKey(line, lineRole(line)) !== sourceKey) throw new Error("音频范围已变化，请采用当前范围");
+  const take = { id: crypto.randomUUID(), audio: { path: audio.path, mimeType: audio.mimeType }, sourceKey, syncRequests: [], videos: [] };
+  line.takes.push(take); line.takeId = take.id;
+  await save();
+}
+
+async function inspectSync(line: VoiceLine, result: SyncVideo) {
+  const take = selectedTake(line);
+  if (!take || stale(line) || !take.videos.some(video => video.id === result.id)) throw new Error("声音版本已变化，请检查当前版本");
+  const inspection = await speechRequest("inspectSpeech", { audioPath: take.audio.path, videoPath: result.video.path, sourceVideoPath: result.sourceVideo.path });
+  if (result.review?.inspectionKey !== inspection.key || !inspection.audioMatches) result.review = undefined;
+  result.inspection = inspection;
+  await save();
+}
+
+async function reviewSync(line: VoiceLine, result: SyncVideo) {
+  const draft = syncDraft(result.id);
+  if (!draft.watched || !draft.speech || !draft.mouth || draft.note.trim().length < 10 || result.sourceVideo.path !== line.video?.path) throw new Error("请完整看听当前视频并记录声音、逐字口型检查依据");
+  const key = result.inspection?.key;
+  await inspectSync(line, result);
+  if (!key || !result.inspection?.audioMatches || key !== result.inspection.key) throw new Error("素材已变化或声音不匹配，请检查当前实际版本，不能沿用旧确认");
+  result.review = { inspectionKey: key, fullPlayback: true, speech: "pass", lipSync: "pass", note: draft.note.trim() };
+  await save();
+}
+
+async function registerSync(line: VoiceLine, result: SyncVideo) {
+  const take = selectedTake(line);
+  if (!line.shotId || !take || stale(line) || !result.review || result.sourceVideo.path !== line.video?.path) throw new Error("请先确认当前版本同步并选择对应镜头");
+  await speechRequest("importSpeech", { shotId: line.shotId, audioPath: take.audio.path, videoPath: result.video.path, sourceVideoPath: result.sourceVideo.path, inspectionKey: result.review.inspectionKey, fullPlayback: result.review.fullPlayback, note: result.review.note });
+  message.value = "口型版本已登记为候选，原片保留；请在镜头检查中确认人物、动作、接戏与声音后采用";
 }
 
 async function mixSpeech() {
@@ -295,7 +414,7 @@ defineExpose({ flushSave });
   textarea { resize: vertical; }
   :is(input, select, textarea):focus-visible { outline: 2px solid var(--studioDone); outline-offset: 2px; }
   .roleRow { display: grid; grid-template-columns: 1fr 2fr 1fr auto; align-items: end; gap: 12px; margin-bottom: 16px; }
-  .speechLine { border-top: 1px solid var(--studioBorder); padding: 12px 0 24px; .fieldGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; .fullField { grid-column: 1 / -1; } } }
+  .speechLine { border-top: 1px solid var(--studioBorder); padding: 12px 0 24px; .syncReview { display: grid; gap: 12px; margin-top: 16px; label { flex-direction: row; align-items: center; input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; padding: 0; flex: none; } } } .fieldGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; .fullField { grid-column: 1 / -1; } } }
   .hint { color: var(--studioMuted); font-size: 13px; line-height: 1.7; }
   .errorMessage { color: var(--studioAttention); overflow-wrap: anywhere; }
   .fileLabel { max-width: 320px; }

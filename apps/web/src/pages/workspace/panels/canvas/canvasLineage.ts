@@ -4,6 +4,7 @@ import axios from "axios";
 import { ElMessage } from "element-plus";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { useWorkspaceStore } from "@/stores/workspace";
+import { nextCanvasPosition } from "./arrangeCanvas";
 
 type Lineage = {
   id: string;
@@ -13,13 +14,13 @@ type Lineage = {
   referencePaths: string[];
   mimeTypes?: Record<string, string>;
 };
-type MediaJob = { id: string; kind: Lineage["kind"]; status: string; parameters?: { directory?: string; fingerprint?: string; request?: Record<string, unknown> }; outputs: string[]; files: { path: string; mimeType: string }[] };
+type MediaJob = { id: string; kind: Lineage["kind"]; status: string; inputRefs?: { sent?: boolean; mediaId?: string }[]; parameters?: { directory?: string; fingerprint?: string; request?: Record<string, unknown> }; outputs: string[]; files: { path: string; mimeType: string }[] };
 type LineageSnapshot = { records: Lineage[]; mediaPaths: Record<string, string> };
 type CanvasFlow = ReturnType<typeof useVueFlow>;
 const active = new Map<string, () => void>();
 
 export function applyCanvasLineage(flow: CanvasFlow, records: Lineage[]) {
-  for (const edge of flow.edges.value) if (edge.data?.lineageKind) edge.type = "default";
+  for (const edge of flow.edges.value) if (edge.data?.lineageKind || edge.type === "simple-bezier") edge.type = "default";
   const pathOf = (node: CanvasFlow["nodes"]["value"][number]) => node.data.sourcePath ?? Object.values(node.data.outputs ?? {}).map((output: any) => output?.value?.url).find(Boolean);
   let addedNodes = 0;
   let addedEdges = 0;
@@ -32,17 +33,17 @@ export function applyCanvasLineage(flow: CanvasFlow, records: Lineage[]) {
       if (!result && !generator && !flow.nodes.value.some(node => pathOf(node) === path)) continue;
       if (!result) {
         const existing = flow.nodes.value.find(node => pathOf(node) === path);
-        const right = Math.max(0, ...flow.nodes.value.map(node => node.position.x + (node.dimensions.width || 400)));
+        const position = nextCanvasPosition(flow);
         const mimeType = record.mimeTypes?.[path] ?? (record.kind === "image" ? "image/png" : record.kind === "video" ? "video/mp4" : "audio/mpeg");
         const id = `result${record.id}${record.outputPaths.indexOf(path)}`;
-        flow.addNodes({ id, type: `remote-${record.kind}Node`, position: { x: existing?.position.x ?? right + 80, y: (existing?.position.y ?? 0) + 260 }, data: { label: path.split("/").at(-1), sourcePath: path, outputs: { [record.kind]: { dataType: record.kind.toUpperCase(), value: { url: path, mimeType } } } } });
+        flow.addNodes({ id, type: `remote-${record.kind}Node`, position: { x: existing?.position.x ?? position.x + 460, y: existing ? existing.position.y + 260 : position.y }, data: { label: path.split("/").at(-1), sourcePath: path, outputs: { [record.kind]: { dataType: record.kind.toUpperCase(), value: { url: path, mimeType } } } } });
         result = flow.findNode(id)!;
         addedNodes++;
       }
       if (!generator) {
         const id = `generation${record.id}`;
         const prompt = typeof record.request.prompt === "string" ? record.request.prompt : "";
-        flow.addNodes({ id, type: `remote-${record.kind}GenerationNode`, position: { x: result.position.x - 460, y: result.position.y - 220 }, data: { ...record.request, label: `生成记录 · ${path.split("/").at(-1)}`, model: JSON.stringify([record.request.providerId, record.request.modelId]), prompt, promptModel: prompt.split("\n").map(text => [{ type: "Write", text }]), generationLineage: record } });
+        flow.addNodes({ id, type: `remote-${record.kind}GenerationNode`, position: { x: result.position.x - 460, y: result.position.y }, data: { ...record.request, label: `生成记录 · ${path.split("/").at(-1)}`, model: JSON.stringify([record.request.providerId, record.request.modelId]), prompt, promptModel: prompt.split("\n").map(text => [{ type: "Write", text }]), generationLineage: record } });
         generator = flow.findNode(id)!;
         addedNodes++;
       }
@@ -92,31 +93,24 @@ export function startCanvasLineage(flow: CanvasFlow) {
         }
         const { data: jobs } = await axios.get<MediaJob[]>("/cloud/generations", { params: { projectId: project.projectId } });
         for (const job of jobs) for (const [index, output] of job.outputs.entries()) if (job.files[index]) snapshot.mediaPaths[output] = job.files[index]!.path;
-        const unknown = jobs.filter(job => job.status === "SUCCEEDED" && job.parameters?.directory === project.directory && job.files.length && !snapshot.records.some(record => record.id === job.id));
-        const compilations = new Map<string, string[]>();
-        if (unknown.some(job => job.parameters?.fingerprint)) {
-          const { entries } = await files.list(".agent/sessions");
-          for (const entry of entries.filter(entry => entry.type === "file" && entry.name.endsWith(".jsonl"))) {
-            for (const line of (await files.readText(entry.path)).split("\n").filter(Boolean)) {
-              const event = JSON.parse(line);
-              if (event.message?.role !== "toolResult" || event.message.toolName !== "productionSpec") continue;
-              for (const part of event.message.content ?? []) {
-                let value;
-                try { value = JSON.parse(part.text ?? ""); } catch { continue; }
-                if (typeof value.fingerprint !== "string" || !Array.isArray(value.compiled?.inputs)) continue;
-                compilations.set(value.fingerprint, value.compiled.inputs.filter((input: any) => input.sent).map((input: any) => snapshot.mediaPaths[input.mediaId]).filter(Boolean));
-              }
-            }
-          }
-        }
-        for (const job of unknown) {
+        const completed = jobs.filter(job => job.status === "SUCCEEDED" && job.parameters?.directory === project.directory && job.files.length);
+        let changed = false;
+        for (const job of completed) {
           const request = job.parameters?.request ?? {};
           const references = [...(request.images as any[] ?? []), ...(request.videos as any[] ?? []), ...(request.audios as any[] ?? []), request.firstFrame, request.lastFrame].filter(Boolean).map((reference: any) => reference.path).filter((path: unknown): path is string => typeof path === "string");
-          snapshot.records.push({ id: job.id, kind: job.kind, request, outputPaths: job.files.map(file => file.path), mimeTypes: Object.fromEntries(job.files.map(file => [file.path, file.mimeType])), referencePaths: [...new Set([...(compilations.get(job.parameters?.fingerprint ?? "") ?? []), ...references])] });
+          const referencePaths = [...new Set([...(job.inputRefs ?? []).filter(input => input.sent && input.mediaId).map(input => snapshot.mediaPaths[input.mediaId!]).filter(Boolean), ...references])];
+          const saved = snapshot.records.find(record => record.id === job.id);
+          if (saved) {
+            const merged = [...new Set([...saved.referencePaths, ...referencePaths])];
+            if (merged.length !== saved.referencePaths.length) { saved.referencePaths = merged; changed = true; }
+          } else {
+            snapshot.records.push({ id: job.id, kind: job.kind, request, outputPaths: job.files.map(file => file.path), mimeTypes: Object.fromEntries(job.files.map(file => [file.path, file.mimeType])), referencePaths });
+            changed = true;
+          }
         }
         if (stopped || workspace.project?.directory !== project.directory) break;
         applyCanvasLineage(flow, snapshot.records);
-        if (unknown.length) await files.writeJson(".agent/canvasLineage.json", snapshot);
+        if (changed) await files.writeJson(".agent/canvasLineage.json", snapshot);
         await nextTick();
       } while (again && !stopped && workspace.project?.directory === project.directory);
     } catch (error) {

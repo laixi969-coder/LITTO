@@ -98,6 +98,7 @@ export const musicVideoSchema = z.object({
     audioMode: z.enum(["sourceTrack", "generated", "silent"]),
     audioDirection: z.string().trim().min(1).max(8000),
     sourceStart: z.number().finite().nonnegative().optional(),
+    lipSyncRequired: z.boolean().optional().describe("画内人物唱歌时为true，旁白或画外歌曲为false；必须对采用声音检查逐字口型"),
     timeline: z.array(z.object({
         start: z.number().finite().nonnegative(),
         end: z.number().finite().positive(),

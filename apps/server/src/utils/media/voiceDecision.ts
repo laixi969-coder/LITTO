@@ -7,11 +7,31 @@ import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
 import { readStoryProject } from "@/utils/story";
 import { storyStale } from "@toonflow/tool-scene-list/storyProject";
+import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 
 export async function readVoiceProject(directory: string) {
   const { path } = await resolveWorkspacePath(directory, "voiceProject.json");
   const content = await readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
   return { path, content, project: content === null ? { littoVoice: 1, roles: [], lines: [], lipSyncProviderId: "", lipSyncModelId: "", mixes: [] } as VoiceProject : voiceProjectSchema.parse(JSON.parse(content)) };
+}
+
+export async function isVoiceSyncRequest(directory: string, request: MediaGenerationRequest) {
+  if (request.shotId || request.productionFingerprint || request.videos?.length !== 1 || request.audios?.length !== 1) return false;
+  const { project } = await readVoiceProject(directory);
+  if (project.lipSyncProviderId !== request.providerId || project.lipSyncModelId !== request.modelId) return false;
+  const line = project.lines.find(line => {
+    const take = line.takes.find(take => take.id === line.takeId);
+    return line.kind !== "narration" && line.video?.path === request.videos![0]!.path && take?.audio.path === request.audios![0]!.path
+      && take.sourceKey === speechSourceKey(line, project.roles.find(role => role.id === line.roleId));
+  });
+  if (!line) return false;
+  if (line.storySource) {
+    const story = await readStoryProject(directory);
+    const approved = story.revisions.find(item => item.id === story.approvedId);
+    const scene = approved?.scenes.find(item => item.sceneId === line.storySource!.sceneId);
+    if (!approved || storyStale(story, approved) || scene?.text !== line.storySource.sceneText || scene.speech !== line.storySource.speech) return false;
+  }
+  return true;
 }
 
 export async function requestVoiceDecision(directory: string, toolCallId: string, input: { operation: string; data: Record<string, unknown>; reconsider?: boolean }, question: QuestionContext, signal?: AbortSignal) {
@@ -61,7 +81,7 @@ export async function requestVoiceDecision(directory: string, toolCallId: string
       if (!updated || line.takes.some(take => !updated.takes.some(item => JSON.stringify(item) === JSON.stringify(take)))) throw new Error("配音方案须保留已有台词与生成版本；另建台词或候选保存修改");
     }
     if (saved.project.mixes.some(mix => !next.mixes.some(item => JSON.stringify(item) === JSON.stringify(mix)))) throw new Error("配音方案须保留已有混音版本");
-    request.question = next.roles.map(role => `角色：${role.name}\n音色：${role.voice}\n配音模型：${role.providerId} / ${role.modelId}`).join("\n\n") + `\n\n口型模型：${next.lipSyncProviderId || "未设置"} / ${next.lipSyncModelId || "未设置"}\n\n` + next.lines.map(line => `${next.roles.find(role => role.id === line.roleId)?.name || "待分配角色"} · ${line.kind === "dialogue" ? "对白" : "旁白"}\n${line.text}\n${line.emotion} ${line.delivery} · 语速 ${line.speed} · 句后停顿 ${line.pauseAfter} 秒`).join("\n\n");
+    request.question = next.roles.map(role => `角色：${role.name}\n音色：${role.voice}\n配音模型：${role.providerId} / ${role.modelId}`).join("\n\n") + `\n\n口型模型：${next.lipSyncProviderId || "未设置"} / ${next.lipSyncModelId || "未设置"}\n\n` + next.lines.map(line => `${next.roles.find(role => role.id === line.roleId)?.name || "待分配角色"} · ${line.kind === "dialogue" ? "对白" : line.kind === "singing" ? "演唱" : "旁白"}\n${line.text}\n${line.emotion} ${line.delivery} · 语速 ${line.speed} · 句后停顿 ${line.pauseAfter} 秒`).join("\n\n");
     for (const line of next.lines) {
       if (line.video) await preview(line.video, `人物视频：${line.text.slice(0, 40)}`);
       for (const take of line.takes) { await preview(take.audio, line.takeId === take.id ? `采用配音：${line.text.slice(0, 40)}` : `保留配音：${line.text.slice(0, 40)}`); for (const video of take.videos) await preview(video.video, "口型视频"); }

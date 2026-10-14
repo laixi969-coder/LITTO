@@ -7,6 +7,7 @@ import { ProviderError, type GenRequest, type GenResult } from "./providers/adap
 import { compileShot, compileWorkspacePrompt, requireCompiledInputs, renderCompiledPrompt } from "./domain/compiler.ts";
 import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
 import { bad, conflict, notFound, now } from "./util.ts";
+import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 
 /** Host-only execution bridge. Tenant identity comes from the stored job, never its parameters. */
 export function configureWorkspaceMedia(execute: (request: GenRequest) => Promise<GenResult>) {
@@ -120,6 +121,8 @@ export function enqueueWorkspaceMedia(input: {
 }
 
 function generationSignature(request: Record<string, unknown>, prompt: string, negativePrompt: unknown, inputs: unknown, candidateBatchId: unknown) {
+  // ACT: 旧记录保存了压缩前说明；按真正发送的提示词比较，升级预览后仍复用已付费结果。
+  if (request.providerId === "meta" && request.modelId === "MiniMax-H3") prompt = compactVideoPrompt(prompt);
   const { prompt: ignoredPrompt, productionFingerprint, outputDirectory, shotId, images, videos, audios, firstFrame, lastFrame, negativePrompt: ignoredNegative, ...parameters } = request;
   return JSON.stringify([parameters, prompt, negativePrompt || null, inputs, candidateBatchId ?? null], (_key, value) =>
     value && typeof value === "object" && !Array.isArray(value)

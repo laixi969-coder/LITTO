@@ -76,6 +76,7 @@ const modelCache = modelCacheHost[modelCacheKey] ??= new Map<string, Promise<unk
 
 export function invalidateNodeModels(type: "language" | "media") {
   modelCache.delete(type === "language" ? "/api/ai/models" : "/api/ai/media/models");
+  if (type === "media") modelCache.delete("/api/ai/media/models?all=true");
 }
 
 async function readModels<T>(url: string, signal: AbortSignal): Promise<T[]> {
@@ -171,8 +172,8 @@ export function useNodeAi() {
     return readModels<NodeAiModel>("/api/ai/models", requestSignal(signal));
   }
 
-  async function getMediaModels(signal?: AbortSignal) {
-    return readModels<NodeMediaModel>("/api/ai/media/models", requestSignal(signal));
+  async function getMediaModels(signal?: AbortSignal, all = false) {
+    return readModels<NodeMediaModel>(`/api/ai/media/models${all ? "?all=true" : ""}`, requestSignal(signal));
   }
 
   async function readMediaJob(jobId: string, signal: AbortSignal) {

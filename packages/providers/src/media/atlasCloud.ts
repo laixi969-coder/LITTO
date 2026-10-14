@@ -111,9 +111,10 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 }
 
 export default {
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.1.0", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.2.0", rules,
   readme: "支持同步 Atlas Cloud 实时目录并选取已适配的 Seedream、GPT Image 2 图片和可灵视频。所选模型的尺寸、时长、分辨率从官方参数定义更新；复杂参考、分层和多镜头模型需单独适配，不加入可用目录。本地参考图自动上传。\n\n[官方文档](https://www.atlascloud.ai/docs/zh)",
   models: [
+    { id: "sync/lipsync-v3", label: "Sync Lipsync v3 · 已有视频对口型", type: "video", lipSync: true, audio: true, mode: [["videoReference:1", "audioReference:1"]] },
     { id: "bytedance/seedream-v4.5", label: "Seedream 4.5 文生图", type: "image", mode: ["text"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "bytedance/seedream-v4.5/edit", label: "Seedream 4.5 参考图编辑", type: "image", mode: ["singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "kwaivgi/kling-v2.6-pro/text-to-video", label: "Kling 2.6 Pro 文生视频", type: "video", mode: ["text"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
@@ -129,11 +130,16 @@ export default {
     // ACT: 只导入已映射请求参数的家族，复杂任务和未知新协议需单独适配。
     const catalogue: AtlasModel[] = result.data.filter(item => item.display_console === true && typeof item.model === "string" && (
       item.type === "Image" && (/^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2\/(text-to-image|edit|image-to-image)$/.test(item.model))
-      || item.type === "Video" && /^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model)
+      || item.type === "Video" && (/^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || item.model === "sync/lipsync-v3")
     )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(), schemaUrl: item.schema }));
     if (!modelIds) return catalogue;
     const models: AtlasModel[] = [];
     for (const model of catalogue.filter(item => modelIds.includes(item.id))) {
+      if (model.id === "sync/lipsync-v3") {
+        Object.assign(model, { lipSync: true, audio: true, mode: [["videoReference:1", "audioReference:1"]] });
+        models.push(model);
+        continue;
+      }
       if (typeof model.schemaUrl !== "string" || !/^https:\/\/static\.atlascloud\.ai\/model\/schema\//.test(model.schemaUrl)) throw new Error(`模型 ${model.id} 缺少可信参数定义`);
       const response = await this.tool.fetch(model.schemaUrl, { signal, redirect: "error" });
       if (!response.ok) throw new Error(`读取 ${model.id} 参数失败（HTTP ${response.status}）`);
@@ -186,6 +192,24 @@ export default {
     return generate(this, "image", { model: request.model, prompt: request.prompt, size: dimension, ...(editing ? { images: urls } : {}) }, signal);
   },
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
+    if (request.model === "sync/lipsync-v3") {
+      if (request.videos?.length !== 1 || request.audios?.length !== 1 || request.images?.length || request.firstFrame || request.lastFrame || request.cameraTrajectory) throw new Error("专用对口型需要一段原视频和一段声音，不接受重新生成画面的参考参数");
+      if (request.generateAudio === false) throw new Error("对口型结果须保留驱动声音，不能静音");
+      if (request.mode !== undefined && JSON.stringify(request.mode) !== JSON.stringify(["videoReference:1", "audioReference:1"])) throw new Error("专用对口型模式须为视频1与音频1");
+      const media = (input: MediaInput, formats: string[]) => {
+        if (input.type === "url") {
+          if (!/^https?:\/\//i.test(input.url)) throw new Error("同步参考须为 HTTP 地址");
+          return input.url;
+        }
+        if (!formats.includes(input.mimeType)) throw new Error(`同步参考格式不支持：${input.mimeType}`);
+        const data = input.type === "binary" ? Buffer.from(input.data).toString("base64") : input.data.replace(/^data:[^,]+,/, "");
+        if (!data) throw new Error("同步参考不能为空");
+        return `data:${input.mimeType};base64,${data}`;
+      };
+      const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+      // ACT: 官方cut_off仅裁至较短素材，不循环、不变速；保持已生成镜头与原曲节奏。
+      return generate(this, "video", { model: request.model, video_url: media(request.videos[0]!, ["video/mp4", "video/quicktime", "video/webm"]), audio_url: media(request.audios[0]!, ["audio/wav", "audio/mpeg", "audio/mp4"]), sync_mode: "cut_off" }, signal);
+    }
     const synced = this.models?.find(item => item.id === request.model) as AtlasModel | undefined;
     if (synced?.inputSchema) return generateSynced(this, request, "video", synced);
     if (!request.prompt.trim()) throw new Error("请填写提示词");

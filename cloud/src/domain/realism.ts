@@ -4,6 +4,15 @@ import { shotInput } from "./schema.ts";
 import { conflict, notFound, HttpError } from "../util.ts";
 import { statesOf, validateStateDelta } from "./state.ts";
 import { adContext } from "./adDirection.ts";
+import { needsLipSync } from "@toonflow/tool-media-generation/runtime";
+import { z } from "zod";
+export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
+// 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
+export const audioReviewSchema = z.object({
+  speech: z.enum(["pass", "fail", "notApplicable"]), lipSync: z.enum(["pass", "fail", "notApplicable"]),
+  referenceMediaId: z.string().min(1).optional(), inspectionKey: z.string().length(64).optional(),
+  offsetMs: z.number().finite().min(-5000).max(5000).optional(), note: z.string().trim().min(10).max(4000),
+}).strict();
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
@@ -42,6 +51,14 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
 export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Record<string, any>) {
   const latest = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
   const evidence = latest?.evidence;
+  const shot = s.get("shots", item.shotId);
+  if (type === "take" && (needsLipSync(shot ?? {}) || shot?.creativeBrief?.dialogue?.lines?.length)) {
+    const audio = evidence?.audioReview;
+    if (!audio || evidence.fullPlayback !== true || audio.speech !== "pass" || needsLipSync(shot ?? {}) && audio.lipSync !== "pass") {
+      throw conflict("本镜有对白或画内演唱，须完整看听当前视频并记录声音、逐字口型检查；抽帧或生成成功不能证明同步。先对口型或核验实际声音，不重新生成画面绕过", "speech_review_required");
+    }
+    if (item.meta?.speechSync && (audio.inspectionKey !== item.meta.speechSync.inspectionKey || !item.meta.speechSync.audioMatches)) throw conflict("口型检查不是当前声音与视频版本，请重新检核当前素材", "speech_review_stale");
+  }
   const required = realismChecks.filter(key => type === "take" || key !== "motion");
   const matches = evidence && (evidence.fingerprint === shotFingerprint(s, item.shotId, type)
     || type === "keyframe" && evidence.fingerprint === shotFingerprint(s, item.shotId));

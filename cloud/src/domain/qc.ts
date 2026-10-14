@@ -29,13 +29,15 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
 };
 export const OBSERVATION_KINDS = Object.keys(DIAGNOSIS);
 
-export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; dismissedKinds?: string[] } = {}) {
+export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; dismissedKinds?: string[]; audioReview?: { speech: string; lipSync: string; referenceMediaId?: string; inspectionKey?: string; offsetMs?: number; note: string } } = {}) {
     const shot = s.get("shots", shotId);
     if (!shot) throw notFound("shot");
     const obj = s.get(target.type === "take" ? "takes" : "keyframes", target.id);
     if (!obj || obj.shotId !== shotId) throw notFound(target.type);
     if (observations.some(o => !DIAGNOSIS[o.kind])) throw bad("未知的质检问题类型");
     const reviewed = [...new Set(review.reviewed ?? [])];
+    if (review.audioReview && (target.type !== "take" || !review.fullPlayback)) throw bad("声音与口型检查须实际完整播放当前视频");
+    if (review.audioReview?.referenceMediaId && (s.get("media", review.audioReview.referenceMediaId)?.projectId !== shot.projectId || !s.get("media", review.audioReview.referenceMediaId)?.mime.startsWith("audio/"))) throw bad("声音参考须为当前项目的真实音频");
     if (target.type === "take" && reviewed.length && review.fullPlayback !== true) throw bad("视频检查须确认已完整播放当前版本");
     const fingerprint = shotFingerprint(s, shotId, target.type);
     const previous = s.list("qc_reports", { targetType: target.type, targetId: target.id }, "created_at DESC, rowid DESC")[0];
@@ -70,7 +72,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     for (const i of issues) findings.push({ kind: `continuity:${i.category}`, cause: i.message, action: i.repair.action, detail: i.repair.detail, penalty: i.severity === "high" ? 20 : i.severity === "medium" ? 8 : 3, severity: i.severity });
     const complete = realismChecks.filter(key => target.type === "take" || key !== "motion").every(key => reviewed.includes(key));
     const score = complete ? Math.max(0, 100 - findings.reduce((a, f) => a + f.penalty, 0)) : null;
-    const evidence = { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? null, observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, dismissedKinds: dismissed, previousReportId: previous?.id };
+    const evidence = { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? null, observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, audioReview: review.audioReview, dismissedKinds: dismissed, previousReportId: previous?.id };
     const { previousReportId: _previousReportId, ...priorEvidence } = previous?.evidence ?? {};
     const { previousReportId: _currentReportId, ...currentEvidence } = evidence;
     const automaticOnly = !reviewed.length && !review.note && !review.observedStateDelta && !review.fullPlayback && !dismissed.length;

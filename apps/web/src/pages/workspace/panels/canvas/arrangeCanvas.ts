@@ -3,6 +3,19 @@ import type { useVueFlow } from "@vue-flow/core";
 import { graphlib, layout } from "@dagrejs/dagre";
 import { getSelectionTree } from "./selectionNodes";
 
+export function nextCanvasPosition(flow: ReturnType<typeof useVueFlow>, width = 920, height = 600) {
+  const nodes = flow.getNodes.value.filter(node => !node.parentNode);
+  const columns = Math.max(2, Math.min(4, Math.floor((flow.dimensions.value.width || 1600) / (width + 80))));
+  const origin = { x: Math.min(0, ...nodes.map(node => node.position.x)), y: Math.min(0, ...nodes.map(node => node.position.y)) };
+  // ACT: 数百节点内扫描网格空位，O(n²)；更大画布可升级为空间索引，避免横向无限追加。
+  for (let slot = 0; ; slot++) {
+    const position = { x: origin.x + slot % columns * (width + 80), y: origin.y + Math.floor(slot / columns) * (height + 80) };
+    if (!nodes.some(node => position.x < node.position.x + (node.dimensions.width || 400) + 40
+      && position.x + width + 40 > node.position.x && position.y < node.position.y + (node.dimensions.height || 520) + 40
+      && position.y + height + 40 > node.position.y)) return position;
+  }
+}
+
 export async function arrangeCanvas(flow: ReturnType<typeof useVueFlow>, signal?: AbortSignal) {
   signal?.throwIfAborted();
   await nextTick();
@@ -40,6 +53,8 @@ export async function arrangeCanvas(flow: ReturnType<typeof useVueFlow>, signal?
     if (rootId) rootIds.set(node.id, rootId);
   }
   flow.getEdges.value.forEach((edge) => {
+    // 共享素材的历史参考线不把所有镜头合并成一个巨型分组；生成→结果与实际执行依赖仍参与布局。
+    if (edge.data?.lineageKind === "reference") return;
     const source = rootIds.get(edge.source);
     const target = rootIds.get(edge.target);
     if (source && target && source !== target) graph.setEdge(source, target);

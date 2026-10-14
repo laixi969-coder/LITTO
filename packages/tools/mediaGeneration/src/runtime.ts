@@ -28,13 +28,27 @@ const referenceMode = z.templateLiteral([z.enum(["image", "video", "audio"]), "R
   .refine(value => /Reference:(?:[1-9]\d?|1\d{2}|2[0-4]\d|25[0-6])$/.test(value), "参考数量必须在 1 到 256 之间");
 
 export const listMediaModelsSchema = z.strictObject({ all: z.boolean().optional().describe("列出可供用户选择的全部已配置媒体模型；不代表已授权切换") });
+export const audioReviewSchema = z.strictObject({
+  speech: z.enum(["pass", "fail", "notApplicable"]), lipSync: z.enum(["pass", "fail", "notApplicable"]),
+  referenceMediaId: z.string().min(1).optional(), inspectionKey: z.string().length(64).optional(),
+  offsetMs: z.number().finite().min(-5000).max(5000).optional(), note: z.string().trim().min(10).max(4000),
+});
+
+export function needsLipSync(shot: Record<string, any>) {
+  if (shot.creativeBrief?.dialogue?.lines?.some((line: { lipSync: string }) => line.lipSync === "visible")) return true;
+  if (typeof shot.musicVideo?.lipSyncRequired === "boolean") return shot.musicVideo.lipSyncRequired;
+  // ACT: 兼容旧MV明确的演唱段，新规格用显式字段；普通背景人声不推断为口型需求。
+  return shot.musicVideo?.audioMode === "sourceTrack" && /演唱段|本人唱/.test(shot.musicVideo.audioDirection ?? "");
+}
 export const agentReviewSchema = z.strictObject({
   targetType: z.enum(["keyframe", "take"]),
   targetId: z.string().min(1),
-  authorization: z.string().trim().min(8).max(2000),
+  authorization: z.string().trim().min(1).max(2000).describe("引用用户已明确给予的自主审阅授权原话，不能自行编造。短授权同样有效。"),
   note: z.string().trim().min(10).max(8000),
   frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
-  creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional(),
+  fullPlayback: z.boolean().default(false).describe("只有实际完整播放当前视频后才为true，抽帧不能替代看听"),
+  audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
+  creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字，写实际妆造与调度依据。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),
     note: z.string().min(1),

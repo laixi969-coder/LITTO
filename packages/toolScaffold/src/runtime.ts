@@ -150,6 +150,7 @@ export interface GeneratedMedia {
 }
 
 export interface MediaContext {
+  generateShots?: (kind: "image" | "video", requests: MediaGenerationRequest[], signal?: AbortSignal, onProgress?: (message: string) => void) => Promise<{ shotId: string; status: "success" | "blocked"; files?: GeneratedMedia[]; error?: string }[]>;
   production?(operation: string, data: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>;
   requestKeyframeApproval?(toolCallId: string, keyframeIds: string[], signal?: AbortSignal): Promise<unknown>;
   requestProductionDecision?(toolCallId: string, input: { operation: string; data: Record<string, unknown>; reconsider?: boolean }, signal?: AbortSignal): Promise<unknown>;
