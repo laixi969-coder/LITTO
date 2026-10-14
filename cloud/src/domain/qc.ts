@@ -4,6 +4,7 @@ import { checkSequence } from "./continuity.ts";
 import { generateKeyframes, generateTakes } from "./lifecycle.ts";
 import { realismChecks, shotFingerprint } from "./realism.ts";
 import { scheduleLocalRepair } from "./localRepair.ts";
+import { qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
 import { bad } from "../util.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
@@ -29,21 +30,28 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
 };
 export const OBSERVATION_KINDS = Object.keys(DIAGNOSIS);
 
-export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; dismissedKinds?: string[]; audioReview?: { speech: string; lipSync: string; referenceMediaId?: string; inspectionKey?: string; offsetMs?: number; note: string } } = {}) {
+export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; reviewedSegments?: { start: number; end: number }[]; dismissedKinds?: string[]; audioReview?: { speech: string; lipSync: string; referenceMediaId?: string; inspectionKey?: string; offsetMs?: number; note: string } } = {}) {
     const shot = s.get("shots", shotId);
     if (!shot) throw notFound("shot");
     const obj = s.get(target.type === "take" ? "takes" : "keyframes", target.id);
     if (!obj || obj.shotId !== shotId) throw notFound(target.type);
     if (observations.some(o => !DIAGNOSIS[o.kind])) throw bad("未知的质检问题类型");
     const reviewed = [...new Set(review.reviewed ?? [])];
-    if (review.audioReview && (target.type !== "take" || !review.fullPlayback)) throw bad("声音与口型检查须实际完整播放当前视频");
+    const plan = qualityReviewPlan(shot, target.type);
+    if (review.reviewedSegments?.some(range => range.end > (s.get("media", obj.mediaId)?.duration ?? 0))) throw bad("看听区间超出当前素材时长");
+    if (review.audioReview && (target.type !== "take" || !(review.fullPlayback || coversSpeechRanges(plan.speechRanges, review.reviewedSegments ?? [])))) throw bad("声音与口型检查须实际看听全部发声区间");
     if (review.audioReview?.referenceMediaId && (s.get("media", review.audioReview.referenceMediaId)?.projectId !== shot.projectId || !s.get("media", review.audioReview.referenceMediaId)?.mime.startsWith("audio/"))) throw bad("声音参考须为当前项目的真实音频");
-    if (target.type === "take" && reviewed.length && review.fullPlayback !== true) throw bad("视频检查须确认已完整播放当前版本");
+    if (plan.fullPlayback && reviewed.length && review.fullPlayback !== true) throw bad("视频检查须确认已完整播放当前版本");
     const fingerprint = shotFingerprint(s, shotId, target.type);
     const previous = s.list("qc_reports", { targetType: target.type, targetId: target.id }, "created_at DESC, rowid DESC")[0];
     const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind] && item.kind !== "deliveryUnverified") : [];
     const dismissed = review.dismissedKinds ?? [];
     if (dismissed.length && (!review.actor || !review.note?.trim() || !reviewed.length || dismissed.some(kind => !prior.some((item: any) => item.kind === kind)))) throw bad("排除旧告警须逐项选择，并记录复核依据");
+    const sameVersion = previous?.evidence?.mediaId === obj.mediaId && previous.evidence.fingerprint === fingerprint;
+    const inspectionKey = (review.vision as { inspectionKey?: string } | undefined)?.inspectionKey;
+    if (sameVersion && inspectionKey && inspectionKey === previous.evidence.vision?.inspectionKey) {
+        observations = observations.filter(item => !previous.evidence.dismissedKinds?.includes(item.kind));
+    }
     // 重新提交空观察不能抹除同一素材的缺陷；规格变更也不能修复已经生成的视频。
     observations = [...observations, ...prior.filter((item: any) => !dismissed.includes(item.kind) && !observations.some(o => o.kind === item.kind)).map((item: any) => ({ kind: item.kind, note: item.note }))];
     // 观察说明只在标了问题时必填（由检查接口校验）；"看过、没问题"的确认不要求逐条写字。
@@ -70,16 +78,18 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     // 3. continuity issues on this shot.
     const issues = checkSequence(s, shot.sequenceId).filter((i) => i.shotId === shotId);
     for (const i of issues) findings.push({ kind: `continuity:${i.category}`, cause: i.message, action: i.repair.action, detail: i.repair.detail, penalty: i.severity === "high" ? 20 : i.severity === "medium" ? 8 : 3, severity: i.severity });
-    const complete = realismChecks.filter(key => target.type === "take" || key !== "motion").every(key => reviewed.includes(key));
-    const score = complete ? Math.max(0, 100 - findings.reduce((a, f) => a + f.penalty, 0)) : null;
-    const evidence = { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? null, observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, audioReview: review.audioReview, dismissedKinds: dismissed, previousReportId: previous?.id };
+
+    const automaticOnly = !reviewed.length && !review.note && !review.observedStateDelta && !review.fullPlayback && !review.reviewedSegments?.length && !dismissed.length;
+    const preserve = automaticOnly && sameVersion;
+    const evidence = preserve ? { ...previous.evidence, vision: review.vision ?? previous.evidence.vision, previousReportId: previous.id } : { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? (sameVersion ? previous.evidence.vision : null), observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, reviewedSegments: review.reviewedSegments ?? [], audioReview: review.audioReview, dismissedKinds: dismissed, previousReportId: previous?.id };
     const { previousReportId: _previousReportId, ...priorEvidence } = previous?.evidence ?? {};
     const { previousReportId: _currentReportId, ...currentEvidence } = evidence;
-    const automaticOnly = !reviewed.length && !review.note && !review.observedStateDelta && !review.fullPlayback && !dismissed.length;
+    const complete = plan.checks.every(key => evidence.reviewed?.includes(key));
+    const score = complete ? Math.max(0, 100 - findings.reduce((a, f) => a + f.penalty, 0)) : null;
     // ACT: 相同结论不重建报告/修复单；纯自动复查不能清空仍有效的人工看听记录。
     if (previous?.evidence?.mediaId === obj.mediaId && previous.evidence.fingerprint === fingerprint
         && JSON.stringify(previous.findings) === JSON.stringify(findings)
-        && (automaticOnly || JSON.stringify(priorEvidence) === JSON.stringify(currentEvidence))) {
+        && ((automaticOnly && (!review.vision || JSON.stringify(previous.evidence.vision) === JSON.stringify(review.vision))) || JSON.stringify(priorEvidence) === JSON.stringify(currentEvidence))) {
         const actions = s.list("repair_actions", { qcReportId: previous.id });
         return { report: { id: previous.id, score: previous.score, findings, evidence: previous.evidence }, repairActions: actions.map(a => ({ id: a.id, action: a.action, cause: a.cause, detail: a.detail, status: a.status })) };
     }

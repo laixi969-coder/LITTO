@@ -19,7 +19,8 @@ import { importLegacyCanvas } from "../legacy.ts";
 import { mediaView } from "../storage.ts";
 import { estimate } from "../jobs.ts";
 import { autoObserve } from "../domain/qc-vision.ts";
-import { audioReviewSchema } from "../domain/realism.ts";
+import { inspectProductionQuality } from "../domain/qualityInspection.ts";
+import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint } from "../domain/realism.ts";
 import { createBatch, listBatches, listCandidates, promoteCandidate, scoreCandidate } from "../domain/candidates.ts";
 import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference } from "../domain/library.ts";
 import { acceptLocalRepair, repairDirective, scheduleLocalRepair } from "../domain/localRepair.ts";
@@ -138,7 +139,11 @@ production.get("/shots/:id", (c) => {
     const { s } = ctx(c);
     const sh = s.get("shots", c.req.param("id"));
     if (!sh) throw notFound("shot");
-    return c.json({ ...withState(s, sh), bindings: s.list("reference_bindings", { targetType: "shot", targetId: sh.id }), keyframes: s.list("keyframes", { shotId: sh.id }).map(keyframeView), takes: s.list("takes", { shotId: sh.id }).map(takeView), issues: s.list("continuity_issues", { shotId: sh.id }), qc: s.list("qc_reports", { shotId: sh.id }), repairs: s.list("repair_actions", { shotId: sh.id }) });
+    let fingerprints: Partial<Record<"keyframe" | "take", string>> = {};
+    try { fingerprints = { keyframe: shotFingerprint(s, sh.id, "keyframe"), take: shotFingerprint(s, sh.id, "take") }; }
+    catch { /* 无效规格仍须可读取和修正，旧检查不复用。 */ }
+    const qc = s.list("qc_reports", { shotId: sh.id }, "created_at, rowid").map(report => ({ ...report, current: !!report.evidence?.fingerprint && report.evidence.fingerprint === fingerprints[report.targetType as "keyframe" | "take"] && report.evidence?.mediaId === s.get(report.targetType === "take" ? "takes" : "keyframes", report.targetId)?.mediaId }));
+    return c.json({ ...withState(s, sh), bindings: s.list("reference_bindings", { targetType: "shot", targetId: sh.id }), keyframes: s.list("keyframes", { shotId: sh.id }).map(keyframeView), takes: s.list("takes", { shotId: sh.id }).map(takeView), issues: s.list("continuity_issues", { shotId: sh.id }), qc, repairs: s.list("repair_actions", { shotId: sh.id }) });
 });
 production.patch("/shots/:id", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, shotPartial.extend({ confirm: z.boolean().optional(), expectedUpdatedAt: z.string().optional() })); const { confirm, expectedUpdatedAt, ...patch } = b; fresh(s, "shots", c.req.param("id"), expectedUpdatedAt ?? c.req.header("if-unmodified-since")); return c.json(updateShot(s, c.req.param("id"), patch, !!confirm)); });
 production.post("/shots/:id/move", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, z.object({ order: z.number().int() })); return c.json(moveShot(s, c.req.param("id"), b.order)); });
@@ -246,13 +251,18 @@ production.post("/continuity-issues/:id/override", async (c) => {
 production.get("/qc/observation-kinds", (c) => c.json(OBSERVATION_KINDS));
 production.post("/shots/:id/qc", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
-    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), auto: z.boolean().default(false), visionModel: z.object({ providerId: z.string().min(1), modelId: z.string().min(1) }).optional(), fullPlayback: z.boolean().default(false), audioReview: audioReviewSchema.optional(), dismissedKinds: z.array(z.string()).max(30).default([]), reviewed: z.array(z.enum(["surface", "imaging", "world", "motion", "cinematic"])).default([]), note: z.string().max(4000).optional(), observedStateDelta: z.record(z.any()).optional(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
+    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), basic: z.boolean().default(false), auto: z.boolean().default(false), visionModel: z.object({ providerId: z.string().min(1), modelId: z.string().min(1) }).optional(), fullPlayback: z.boolean().default(false), reviewedSegments: reviewedSegmentsSchema, audioReview: audioReviewSchema.optional(), dismissedKinds: z.array(z.string()).max(30).default([]), reviewed: z.array(z.enum(["surface", "imaging", "world", "motion", "cinematic"])).default([]), note: z.string().max(4000).optional(), observedStateDelta: z.record(z.any()).optional(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
+    if (b.basic) {
+        const item = s.get(b.targetType === "take" ? "takes" : "keyframes", b.targetId);
+        if (!item || item.shotId !== c.req.param("id")) throw notFound("shot output");
+        return c.json(await inspectProductionQuality(s, item.projectId, b.targetType, b.targetId));
+    }
     if (b.reviewed.length && b.observations.length && !b.note?.trim()) throw bad("标了问题时，请写明看到的具体情况");
     const obs = [...b.observations];
     let vision: any = null;
     if (b.auto) vision = await autoObserve(s, c.req.param("id"), b.targetType, b.targetId, a.user.id, b.visionModel);
     if (vision?.observations) obs.push(...vision.observations);
-    return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs, { reviewed: b.reviewed, note: b.note, actor: a.user.id, vision, observedStateDelta: b.observedStateDelta, fullPlayback: b.fullPlayback, audioReview: b.audioReview, dismissedKinds: b.dismissedKinds }), vision });
+    return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs, { reviewed: b.reviewed, note: b.note, actor: a.user.id, vision, observedStateDelta: b.observedStateDelta, fullPlayback: b.fullPlayback, reviewedSegments: b.reviewedSegments, audioReview: b.audioReview, dismissedKinds: b.dismissedKinds }), vision });
 });
 production.post("/repair-actions/:id/apply", (c) => { const { s, a } = ctx(c, "EDITOR"); return c.json(applyRepair(s, c.req.param("id"), a.user.id)); });
 

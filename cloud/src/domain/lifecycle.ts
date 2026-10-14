@@ -9,6 +9,7 @@ import { mustRoute, resolvePolicy, type Policy } from "../providers/router.ts";
 import { mediaView } from "../storage.ts";
 import { requireReviewed } from "./realism.ts";
 import { registerCandidates } from "./candidates.ts";
+import { inspectProductionQuality } from "./qualityInspection.ts";
 import { log } from "../util.ts";
 
 /** Job success → materialise domain objects. Nothing is overwritten: every output is a new Keyframe variant or Take candidate. */
@@ -24,6 +25,10 @@ export function onJobSucceeded(s: Scope, job: any, mediaIds: string[]) {
         const kfId = job.parameters?.keyframeId ?? shot.heroKeyframeId;
         for (const m of mediaIds) s.insert("takes", { project_id: job.projectId, shot_id: shot.id, job_id: job.id, media_id: m, keyframe_id: kfId ?? null, status: "candidate", meta });
         s.update("shots", shot.id, { status: shot.approvedTakeId ? shot.status : "taking" });
+    }
+    const type = job.kind === "image" ? "keyframe" : "take";
+    for (const item of s.list(type === "keyframe" ? "keyframes" : "takes", { jobId: job.id })) {
+        void inspectProductionQuality(s, shot.projectId, type, item.id).catch(error => log.error("basic quality check failed", String(error)));
     }
     // 抽卡入池：本批产物自动登记为候选，等待质检与采用；否则抽卡结果无法回本。
     const batchId = job.parameters?.candidateBatchId;
@@ -140,8 +145,8 @@ export function rollbackTake(s: Scope, shotId: string, toTakeId: string, actor: 
     return r;
 }
 
-export const keyframeView = (k: any) => ({ id: k.id, shotId: k.shotId, status: k.status, jobId: k.jobId, modelId: k.meta?.modelId, seed: k.meta?.seed, createdAt: k.createdAt, media: mediaOf(k.workspaceId, k.mediaId) });
-export const takeView = (t: any) => ({ id: t.id, shotId: t.shotId, keyframeId: t.keyframeId, status: t.status, jobId: t.jobId, modelId: t.meta?.modelId, seed: t.meta?.seed, createdAt: t.createdAt, media: mediaOf(t.workspaceId, t.mediaId) });
+export const keyframeView = (k: any) => ({ id: k.id, shotId: k.shotId, status: k.status, jobId: k.jobId, modelId: k.meta?.modelId, seed: k.meta?.seed, createdAt: k.createdAt, basicQuality: k.meta?.basicQuality, media: mediaOf(k.workspaceId, k.mediaId) });
+export const takeView = (t: any) => ({ id: t.id, shotId: t.shotId, keyframeId: t.keyframeId, status: t.status, jobId: t.jobId, modelId: t.meta?.modelId, seed: t.meta?.seed, createdAt: t.createdAt, basicQuality: t.meta?.basicQuality, speechSync: t.meta?.speechSync, media: mediaOf(t.workspaceId, t.mediaId) });
 function mediaOf(ws: string, id: string | null) {
     if (!id) return null;
     const m = get("SELECT * FROM media WHERE id=? AND workspace_id=?", id, ws);

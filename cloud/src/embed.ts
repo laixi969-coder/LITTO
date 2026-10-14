@@ -49,3 +49,5 @@ export function tokenFromHeaders(h: { authorization?: string; cookie?: string })
     const m = h.cookie?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
     return m ? decodeURIComponent(m[1]) : null;
 }
+
+export { inspectProductionQuality, productionQualityView } from "./domain/qualityInspection.ts";

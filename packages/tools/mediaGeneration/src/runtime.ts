@@ -40,12 +40,41 @@ export function needsLipSync(shot: Record<string, any>) {
   // ACT: 兼容旧MV明确的演唱段，新规格用显式字段；普通背景人声不推断为口型需求。
   return shot.musicVideo?.audioMode === "sourceTrack" && /演唱段|本人唱/.test(shot.musicVideo.audioDirection ?? "");
 }
+export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | "take" = "take") {
+  const duration = Number(shot.generationDuration ?? shot.duration);
+  const lines = shot.creativeBrief?.dialogue?.lines ?? [];
+  const speech = type === "take" && (needsLipSync(shot) || lines.length > 0);
+  const motion = shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|hand|grasp|fight/i.test([shot.action, shot.performance?.gesture].join(" "));
+  const visual = motion || !shot.camera?.shotSize || /^(?:ECU|CU|MCU)$/i.test(shot.camera?.shotSize ?? "") || /近景|特写/.test(shot.camera?.shotSize ?? "")
+    || !!shot.inspectionRegion;
+  // ACT: 分级只安排检查投入，不据此宣称质量通过；未知景别进入重点档。明确的演唱无逐句时间时覆盖整段。
+  const tier = speech ? "speech" : visual || !shot.camera?.shotSize ? "visual" : "basic";
+  const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
+  return { tier, sampleCount: tier === "basic" ? 3 : 8, fullPlayback: type === "take" && motion,
+    checks: tier === "basic" ? ["imaging", "world", "cinematic"] : type === "keyframe" || !motion ? ["surface", "imaging", "world", "cinematic"] : ["surface", "imaging", "world", "motion", "cinematic"], speechRanges };
+}
+
+export const reviewedSegmentsSchema = z.array(z.strictObject({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).refine(range => range.end > range.start)).max(80).default([]);
+
+export function coversSpeechRanges(required: { start: number; end: number }[], reviewed: { start: number; end: number }[]) {
+  return required.length > 0 && required.every(range => {
+    if (!Number.isFinite(range.start) || !Number.isFinite(range.end) || range.end <= range.start) return false;
+    let end = range.start;
+    for (const part of [...reviewed].sort((a, b) => a.start - b.start)) {
+      if (!Number.isFinite(part.start) || !Number.isFinite(part.end) || part.end <= part.start) return false;
+      if (part.start <= end + 0.001 && part.end > end) end = part.end;
+    }
+    return end >= range.end - 0.001;
+  });
+}
+
 export const agentReviewSchema = z.strictObject({
   targetType: z.enum(["keyframe", "take"]),
   targetId: z.string().min(1),
   authorization: z.string().trim().min(1).max(2000).describe("引用用户已明确给予的自主审阅授权原话，不能自行编造。短授权同样有效。"),
   note: z.string().trim().min(10).max(8000),
   frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
+  reviewedSegments: reviewedSegmentsSchema.describe("实际看听的局部区间，单位秒；覆盖本镜全部发声区间才可用于声音检查，不能把计划区间当作已看听"),
   fullPlayback: z.boolean().default(false).describe("只有实际完整播放当前视频后才为true，抽帧不能替代看听"),
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
   creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字，写实际妆造与调度依据。"),

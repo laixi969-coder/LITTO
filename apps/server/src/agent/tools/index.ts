@@ -135,6 +135,11 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           if (typeof data.renderId !== "string" || scope.get("renders", data.renderId)?.projectId !== projectId) throw new Error("成片不属于当前项目");
           return api.inspectFinalQuality(scope, data.renderId);
         }
+        if (operation === "inspectQuality") {
+          const { targets } = z.object({ targets: z.array(z.object({ type: z.enum(["keyframe", "take"]), id: z.string().min(1) })).min(1).max(100) }).parse(data);
+          const results = await Promise.allSettled(targets.map(async target => api.inspectProductionQuality(scope, projectId, target.type, target.id)));
+          return { results: results.map((result, index) => result.status === "fulfilled" ? { ...targets[index], ...result.value } : { ...targets[index], error: String(result.reason) }), quality: api.productionQualityView(scope, projectId) };
+        }
         if (operation === "readEdit" || operation === "render") {
           if (typeof data.sequenceId !== "string" || scope.get("sequences", data.sequenceId)?.projectId !== projectId) throw new Error("序列不属于当前项目");
           if (operation === "readEdit") return api.editView(scope, api.getEdit(scope, data.sequenceId, true));

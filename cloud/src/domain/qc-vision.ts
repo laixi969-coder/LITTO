@@ -1,3 +1,5 @@
+import { qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
+import { shotFingerprint } from "./realism.ts";
 import type { Scope } from "../db.ts";
 import { parseJson, runText } from "../llm.ts";
 import { OBSERVATION_KINDS } from "./qc.ts";
@@ -47,7 +49,7 @@ export async function inspectVision(input: Omit<VisionRequest, "providerId" | "m
   finally { if (key && pendingVision.get(key)?.task === task) pendingVision.delete(key); }
 }
 
-// ACT: 短片约每秒四帧、最多 48 帧辅助发现多肢与漂移；长片为均匀抽样，不证明完整动作或音画同步。
+// ACT: 普通镜头三帧、重点镜头八帧辅助观察；抽样不证明完整动作或音画同步，有效观察按素材和规格复用。
 export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "take", id: string, actor: string, model?: { providerId: string; modelId: string }) {
   const shot = s.get("shots", shotId);
   const obj = s.get(type === "take" ? "takes" : "keyframes", id);
@@ -56,6 +58,11 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
   if (!media) return { used: false, reason: "媒体不可读" };
   const frames: { data: Buffer; mime: string }[] = [];
   const timestamps: number[] = [];
+  const plan = qualityReviewPlan(shot, type);
+  const inspectionKey = model ? createHash("sha256").update(JSON.stringify(["tieredVision1", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
+  const cached = inspectionKey && s.list("qc_reports", { targetType: type, targetId: id }, "created_at DESC, rowid DESC")
+    .find(report => report.evidence?.vision?.inspectionKey === inspectionKey)?.evidence?.vision;
+  if (cached?.used) return cached;
   const regions: { frameIndex: number; seconds: number | null; region: unknown }[] = [];
   const region = shot.inspectionRegion ? referenceCropSchema.parse(shot.inspectionRegion) : null;
   const cropFilter = region ? region.unit === "normalized"
@@ -89,7 +96,7 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
       await writeFile(source, await storage.get(media.storageKey));
       const probe = await probeFile(source);
       if (!probe?.duration || !probe.hasVideo) return { used: false, reason: "无法读取视频时长或缺少 ffprobe，请人工播放检查" };
-      const sampleCount = Math.min(48, Math.max(8, Math.ceil(probe.duration * 4) + 1));
+      const sampleCount = plan.sampleCount;
       const sampleTimes = Array.from({ length: sampleCount }, (_, index) => probe.duration! * index / (sampleCount - 1));
       frames.push(...await sampleVideoFrames(source, directory, sampleTimes, probe.duration));
       timestamps.push(...sampleTimes.map(seconds => Number(seconds.toFixed(3))));
@@ -120,6 +127,6 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     result = model ? await inspectVision(input, model, text => observationSchema.parse(parseJson(text))) : await runText(input);
     if (!result) return { used: false, reason: "未配置可用的视觉模型，须人工检查" };
     const parsed = observationSchema.parse(parseJson(result.text));
-    return { used: true, model: result.modelId, jobId: result.jobId, coverage: timestamps.length ? "sampledFrames" : "stillImage", timestamps, regions, observations: parsed.observations };
+    return { used: true, inspectionKey, reused: false, model: result.modelId, jobId: result.jobId, coverage: timestamps.length ? "sampledFrames" : "stillImage", timestamps, regions, observations: parsed.observations };
   } catch (error) { return { used: false, model: result?.modelId, reason: `视觉检查未完成，不能作为通过依据：${error instanceof Error ? error.message : String(error)}` }; }
 }

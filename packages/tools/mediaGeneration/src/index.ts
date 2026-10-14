@@ -45,6 +45,30 @@ const plugin: ToolPlugin = {
       },
     }] : [];
     if (media.production) productionTools.push({
+      name: "inspectProduction", label: "批量基础质检", executionMode: "parallel",
+      description: "对已有素材执行本地解码、尺寸、时长和持续黑场检查，按素材版本复用结果，不调用生成模型。可与其他镜头生成并行调用，一次传入所有待检查素材。返回分级检查计划；普通镜头集中预览一次，重点镜头查看关键画面，声音只看听 speechRanges。自动检测不代表审美或口型通过，发现问题只影响该镜，不重生成、不逐镜询问用户。",
+      parameters: z.toJSONSchema(z.object({ targets: z.array(z.object({ type: z.enum(["keyframe", "take"]), id: z.string().min(1) })).min(1).max(100) })),
+      async execute(_id, params, signal) {
+        const result = await media.production!("inspectQuality", params as Record<string, unknown>, signal);
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      },
+    });
+    if (media.production) productionTools.push({
+      name: "reviewProductions", label: "批量记录检查并采用工作版", executionMode: "sequential",
+      description: "集中预览后一次提交多镜真实观察，不逐镜请求确认。每项独立保存；失败只阻塞该镜，已有有效检查复用。对白/演唱传实际 reviewedSegments 和 audioReview，不能自动填通过。最终交付仍需验收。",
+      parameters: z.toJSONSchema(z.object({ reviews: z.array(agentReviewSchema).min(1).max(60) }), { io: "input", target: "draft-07" }),
+      async execute(_id, params, signal) {
+        const input = z.object({ reviews: z.array(agentReviewSchema).min(1).max(60) }).parse(params);
+        const results = [];
+        for (const review of input.reviews) {
+          signal?.throwIfAborted();
+          try { results.push({ targetId: review.targetId, result: await media.production!("agentReview", review, signal) }); }
+          catch (error) { results.push({ targetId: review.targetId, error: error instanceof Error ? error.message : String(error) }); }
+        }
+        return { content: [{ type: "text", text: JSON.stringify(results) }], details: results };
+      },
+    });
+    if (media.production) productionTools.push({
       name: "reviewProduction", label: "检查并采用工作版", executionMode: "sequential",
       description: "实际查看输出且已获得用户自主审阅授权后，记录一次技术与创意检查。优先使用此明确参数工具，避免在productionSpec的自由data中猜字段。无缺陷observations传[]；有creativeBrief时creativeReview必填，verdict仅pass/revise，styling和staging各至少10字。检查有效时复用；严重缺陷会保留并阻止采用，不自动重新生成。视频抽帧不能证明口型或声音同步。",
       parameters: z.toJSONSchema(agentReviewSchema, { io: "input", target: "draft-07" }),
@@ -69,14 +93,14 @@ const plugin: ToolPlugin = {
         },
       });
     }
-        promptSnippet: "editTimeline 的 ops 每项含 type：set_cut{leftId,rightId,sourceOut,sourceIn,leftMediaId?,rightMediaId?}；bridge_audio{leftId,rightId,mode:jCut|lCut|crossfade|none,duration}；map_segments{mediaId,segments:[{shotId,in,out}]}；add_clip{clip:{trackId,type:shot|media,shotId?,mediaId?,start,duration?,in?,speed?,label?}}；move_clip{id,start?,trackId?}；trim_clip{id,in?,out?,start?,duration?,ripple?}；split_clip{id,at}；delete_clip{id,ripple?}；set_transition{id,transition:{type:cut|dissolve|fade_black,duration}}；set_gain{id,gainDb?,fadeIn?,fadeOut?}；set_speed{id,speed}；add_track{kind:video|audio,name?,role:dialogue|music|sfx}；update_track{id,name?,role?,muted?,locked?,gainDb?}；add_marker{t,label}；remove_marker{id}；reorder{shotIdA,shotIdB}；set_duck{duck:null|{underRole:dialogue|music|sfx,amountDb}}；set_sequence_grade{grade:null|{lift?,gamma?,gain?,saturation?,contrast?,temperature?,exposureStops?,lutCube?}}，颜色 lift/gamma/gain 是三个 -1 至 1 的数。时间单位为秒，所有 ID 来自 read/readEdit。",
-        description: "adDirection{sequenceId,direction} 修改已有采用镜头的整片广告方案，结构同 productionSpec；方案变更使受影响的检查过期。所有制作选择在聊天里展示、确认并保存，不让用户跳到面板。selectQuality{kind:image|video} 让用户直接选择当前模型支持的精度并保存到项目，已选且仍有效时复用；用户主动改选时传 reconsider:true。用户已在消息或首页指定精度则用 productionSpec(setQuality) 直接保存，不能再询问同一选择。selectModel{kind:image|video|audio,providerId?,modelId?} 按类型保存模型选择，已有可用选择时直接复用并返回，不逐张出图或逐镜图生视频重复询问。仅首次选择、原模型不可用或用户要求更换时展示选择卡；主动改选传 reconsider:true。指定模型时不先 askUser 再重复确认。其他操作先 productionSpec read 获取真实记录。approveAssets{assetIds}；selectReference{assetId,mediaIds} 比较当前项目图片并同时采用资产设定与定妆，无需预建候选池；selectCandidate{candidateIds,asHero?} 比较同一资产的定妆图；approveTake{takeIds,overrideReason?} 比较同镜头视频，只问用户是否满意，可选填日常语言意见；满意时保存到工作版时间线，不伪造技术验收；reviewOutput{targetType:keyframe|take,targetId} 仅在需要用户新反馈时收集满意度与修改想法；已采用且检查有效的画面直接复用，此操作不写技术检查记录，不能用于解除 review_required 门禁，不让用户勾内部问题代码或填写专业检查表；world/look{变更字段}；updateShot{shotId,patch}；updateAsset{assetId,patch}；rollbackAsset{assetId,version}；removeBinding{bindingId}；publishAsset{assetId}；importAsset{libraryId}；libraryReference{libraryId,mediaId}；editTimeline{sequenceId,ops} 先 readEdit，ops 沿用剪辑操作；reviewFinal{renderId} 先 inspectFinal；selectVoice{lineId,takeIds} 先 readVoice；configureVoice{project} 提交完整配音方案供确认。已生效的决定直接返回 applied:true，不重复询问；仅用户明确要求改选或重新验收时传 reconsider:true。返回 feedback 时，直接按用户原话处理：想改一下或拿不准就由助手查看实际素材、判断问题并提出或执行已获授权的修改，不再追问用户专业分类。满意则沿用已保存选择继续剪辑与导出；reviewRequired 表示助手须处理已知问题，不能让用户替系统排除告警。用户满意不代表技术质检通过，实际末态、抽帧与声音检查仍由助手按真实证据完成。付费重生成仍遵守已授权范围。跳过和暂不决定不授权后续，不循环追问。不要先 askUser 再调用本工具重复确认。",
-        parameters: z.toJSONSchema(schema, { io: "input", target: "draft-07" }),
-        async execute(id, params, signal) {
     if (media.requestProductionDecision) {
       const schema = z.strictObject({ operation: z.enum(["adDirection", "selectModel", "selectQuality", "approveAssets", "selectReference", "selectCandidate", "approveTake", "reviewOutput", "world", "look", "updateShot", "updateAsset", "rollbackAsset", "removeBinding", "publishAsset", "importAsset", "libraryReference", "editTimeline", "reviewFinal", "selectVoice", "configureVoice"]), data: z.record(z.string(), z.json()), reconsider: z.boolean().optional() });
       productionTools.push({
         name: "requestProductionDecision", label: "确认制作选择", executionMode: "sequential",
+        promptSnippet: "editTimeline 的 ops 每项含 type：set_cut{leftId,rightId,sourceOut,sourceIn,leftMediaId?,rightMediaId?}；bridge_audio{leftId,rightId,mode:jCut|lCut|crossfade|none,duration}；map_segments{mediaId,segments:[{shotId,in,out}]}；add_clip{clip:{trackId,type:shot|media,shotId?,mediaId?,start,duration?,in?,speed?,label?}}；move_clip{id,start?,trackId?}；trim_clip{id,in?,out?,start?,duration?,ripple?}；split_clip{id,at}；delete_clip{id,ripple?}；set_transition{id,transition:{type:cut|dissolve|fade_black,duration}}；set_gain{id,gainDb?,fadeIn?,fadeOut?}；set_speed{id,speed}；add_track{kind:video|audio,name?,role:dialogue|music|sfx}；update_track{id,name?,role?,muted?,locked?,gainDb?}；add_marker{t,label}；remove_marker{id}；reorder{shotIdA,shotIdB}；set_duck{duck:null|{underRole:dialogue|music|sfx,amountDb}}；set_sequence_grade{grade:null|{lift?,gamma?,gain?,saturation?,contrast?,temperature?,exposureStops?,lutCube?}}，颜色 lift/gamma/gain 是三个 -1 至 1 的数。时间单位为秒，所有 ID 来自 read/readEdit。",
+        description: "adDirection{sequenceId,direction} 修改已有采用镜头的整片广告方案，结构同 productionSpec；方案变更使受影响的检查过期。所有制作选择在聊天里展示、确认并保存，不让用户跳到面板。selectQuality{kind:image|video} 让用户直接选择当前模型支持的精度并保存到项目，已选且仍有效时复用；用户主动改选时传 reconsider:true。用户已在消息或首页指定精度则用 productionSpec(setQuality) 直接保存，不能再询问同一选择。selectModel{kind:image|video|audio,providerId?,modelId?} 按类型保存模型选择，已有可用选择时直接复用并返回，不逐张出图或逐镜图生视频重复询问。仅首次选择、原模型不可用或用户要求更换时展示选择卡；主动改选传 reconsider:true。指定模型时不先 askUser 再重复确认。其他操作先 productionSpec read 获取真实记录。approveAssets{assetIds}；selectReference{assetId,mediaIds} 比较当前项目图片并同时采用资产设定与定妆，无需预建候选池；selectCandidate{candidateIds,asHero?} 比较同一资产的定妆图；approveTake{takeIds,overrideReason?} 比较同镜头视频，只问用户是否满意，可选填日常语言意见；满意时保存到工作版时间线，不伪造技术验收；reviewOutput{targetType:keyframe|take,targetId} 仅在需要用户新反馈时收集满意度与修改想法；已采用且检查有效的画面直接复用，此操作不写技术检查记录，不能用于解除 review_required 门禁，不让用户勾内部问题代码或填写专业检查表；world/look{变更字段}；updateShot{shotId,patch}；updateAsset{assetId,patch}；rollbackAsset{assetId,version}；removeBinding{bindingId}；publishAsset{assetId}；importAsset{libraryId}；libraryReference{libraryId,mediaId}；editTimeline{sequenceId,ops} 先 readEdit，ops 沿用剪辑操作；reviewFinal{renderId} 先 inspectFinal；selectVoice{lineId,takeIds} 先 readVoice；configureVoice{project} 提交完整配音方案供确认。已生效的决定直接返回 applied:true，不重复询问；仅用户明确要求改选或重新验收时传 reconsider:true。返回 feedback 时，直接按用户原话处理：想改一下或拿不准就由助手查看实际素材、判断问题并提出或执行已获授权的修改，不再追问用户专业分类。满意则沿用已保存选择继续剪辑与导出；reviewRequired 表示助手须处理已知问题，不能让用户替系统排除告警。用户满意不代表技术质检通过，实际末态、抽帧与声音检查仍由助手按真实证据完成。付费重生成仍遵守已授权范围。跳过和暂不决定不授权后续，不循环追问。不要先 askUser 再调用本工具重复确认。",
+        parameters: z.toJSONSchema(schema, { io: "input", target: "draft-07" }),
+        async execute(id, params, signal) {
           const result = await media.requestProductionDecision!(id, schema.parse(params), signal);
           return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
         },
@@ -101,7 +125,7 @@ const plugin: ToolPlugin = {
       description: `${operation.description}providerId 和 modelId 必须来自 listMediaModels。引用素材的 path 及 outputDirectory 均为工作区相对路径；省略输出目录使用默认媒体目录。等待生成完成后返回已保存的文件路径，不返回 Base64。`,
       promptSnippet: "生成媒体前先查询 listMediaModels 和 productionSpec(readQuality)。用户已指定的精度用 setQuality 保存；尚未选择时用 selectQuality 在聊天中选择。已有有效选择沿用，不自动采用最低档或最高档。compile 返回 request 为实际规格快照，generate 复用该 request。用户要求多格分镜时先读 cinema 的 storyboardGrid 资料，使用 purpose=storyboard 生成总览，复用 FFmpeg 拆格与 importKeyframe 登记，再逐镜生成和剪辑交付。复用实际模型和工作区参考素材。正式分镜先保存 productionSpec 并 compile，生成传 shotId/productionFingerprint；不可用独立文生图绕过同批 Look 与角色/场景参考。写实约束同时覆盖人和环境的材质、光源、曝光、接触与空间层次；整洁、精神好不等于磨皮或去龄。参考须真实发送且按用途说明，文本描述不能冒充已传图片。",
       parameters: z.toJSONSchema(operation.parameters, { io: "input", target: "draft-07" }),
-      promptGuidelines: ["生成前一次性检查编译后的实际提示词、参考用途、人物动作、镜头时间线和模型能力冲突；修正规格后再提交。相同规格的有效检查沿用，只有变更影响的部分重新检查。等待任务由工具自动完成，不另起模型轮询。生成后仍须一次真实结果验收；提示词通过不能证明画面或口型通过。单镜失败不清空画布、不删除其他结果。", "正式镜头生成传 shotId、productionFingerprint 和模型规格即可；prompt 可省略，服务端自动使用编译提示词，不手抄长文本。修改画面须先更新镜头规格再编译，不能改自由 prompt 试错。相同规格默认复用已有任务和素材，跨会话继续也不重新出图。失败时停止重复调用并核查原因；仅明确授权重做或新增候选时使用新的 regenerationId，同一次重做始终复用该 UUID。"],
+      promptGuidelines: ["批量制作将 generateShots 与 inspectProduction 并行安排，先处理可生成镜头，不等待其他镜头质检结束；旧素材只检测不重生成。集中预览后使用 reviewProductions 一次记录真实观察；已有自主审阅授权不再逐镜确认。普通镜头按分级轻量检查，异常只阻塞对应镜头，最终成片另行验收。", "生成前一次性检查编译后的实际提示词、参考用途、人物动作、镜头时间线和模型能力冲突；修正规格后再提交。相同规格的有效检查沿用，只有变更影响的部分重新检查。等待任务由工具自动完成，不另起模型轮询。生成后仍须一次真实结果验收；提示词通过不能证明画面或口型通过。单镜失败不清空画布、不删除其他结果。", "正式镜头生成传 shotId、productionFingerprint 和模型规格即可；prompt 可省略，服务端自动使用编译提示词，不手抄长文本。修改画面须先更新镜头规格再编译，不能改自由 prompt 试错。相同规格默认复用已有任务和素材，跨会话继续也不重新出图。失败时停止重复调用并核查原因；仅明确授权重做或新增候选时使用新的 regenerationId，同一次重做始终复用该 UUID。"],
       // ACT: 图片和视频交给持久队列限流；音频仍走直连，保留串行。
       executionMode: operation.mediaType === "audio" ? "sequential" : "parallel",
       async execute(_id, params, signal, onUpdate) {

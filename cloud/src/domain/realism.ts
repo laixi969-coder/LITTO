@@ -4,7 +4,7 @@ import { shotInput } from "./schema.ts";
 import { conflict, notFound, HttpError } from "../util.ts";
 import { statesOf, validateStateDelta } from "./state.ts";
 import { adContext } from "./adDirection.ts";
-import { needsLipSync } from "@toonflow/tool-media-generation/runtime";
+import { needsLipSync, qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
 import { z } from "zod";
 export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 // 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
@@ -13,6 +13,8 @@ export const audioReviewSchema = z.object({
   referenceMediaId: z.string().min(1).optional(), inspectionKey: z.string().length(64).optional(),
   offsetMs: z.number().finite().min(-5000).max(5000).optional(), note: z.string().trim().min(10).max(4000),
 }).strict();
+
+export const reviewedSegmentsSchema = z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).strict().refine(range => range.end > range.start)).max(80).default([]);
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
@@ -52,19 +54,20 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
   const latest = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
   const evidence = latest?.evidence;
   const shot = s.get("shots", item.shotId);
+  const plan = qualityReviewPlan(shot ?? {}, type);
   if (type === "take" && (needsLipSync(shot ?? {}) || shot?.creativeBrief?.dialogue?.lines?.length)) {
     const audio = evidence?.audioReview;
-    if (!audio || evidence.fullPlayback !== true || audio.speech !== "pass" || needsLipSync(shot ?? {}) && audio.lipSync !== "pass") {
-      throw conflict("本镜有对白或画内演唱，须完整看听当前视频并记录声音、逐字口型检查；抽帧或生成成功不能证明同步。先对口型或核验实际声音，不重新生成画面绕过", "speech_review_required");
+    if (!audio || !(evidence.fullPlayback === true || coversSpeechRanges(plan.speechRanges, evidence.reviewedSegments ?? [])) || audio.speech !== "pass" || needsLipSync(shot ?? {}) && audio.lipSync !== "pass") {
+      throw conflict("本镜有对白或画内演唱，须看听本镜全部发声区间并记录声音、逐字口型检查；抽帧或生成成功不能证明同步。先对口型或核验实际声音，不重新生成画面绕过", "speech_review_required");
     }
     if (item.meta?.speechSync && (audio.inspectionKey !== item.meta.speechSync.inspectionKey || !item.meta.speechSync.audioMatches)) throw conflict("口型检查不是当前声音与视频版本，请重新检核当前素材", "speech_review_stale");
   }
-  const required = realismChecks.filter(key => type === "take" || key !== "motion");
+  const required = plan.checks;
   const matches = evidence && (evidence.fingerprint === shotFingerprint(s, item.shotId, type)
     || type === "keyframe" && evidence.fingerprint === shotFingerprint(s, item.shotId));
   if (!evidence || evidence.mediaId !== item.mediaId || !matches
-    || !required.every(key => evidence.reviewed?.includes(key)) || (type === "take" && evidence.fullPlayback !== true)) {
-    throw conflict("请先查看实际输出并完成真实感检查；规格改变后须重新检查", "review_required");
+    || !required.every(key => evidence.reviewed?.includes(key)) || (plan.fullPlayback && evidence.fullPlayback !== true)) {
+    throw conflict("请先查看实际输出并完成真实感检查；规格改变后须重新检查。reviewOutput 只收集用户喜好，不写技术检查记录，不能用它解除此门禁，也不要重复询问满意度。用户已授权自主审阅时，实际检查后调用 productionSpec 的 agentReview；observations 只记录发现的缺陷，无缺陷传 []，检查依据写入 note 和 creativeReview。尚无审阅授权时批量展示待检查关键帧，不逐镜循环追问", "review_required");
   }
   // 连续性问题由 approveTake 的连续性门禁处理，可记录理由强制通过（PRD §20）；这里只拦画面本身的严重缺陷，
   // 否则该强制通过入口永远走不到，且有连续性冲突的镜头连 Hero 都无法采用。

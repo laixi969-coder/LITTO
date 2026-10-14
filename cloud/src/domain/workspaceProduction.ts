@@ -6,10 +6,12 @@ import { bindReference, createShot, updateShot, shotPartial } from "./shots.ts";
 import { bad, conflict, notFound, sha256 } from "../util.ts";
 import { finalQualityView } from "./finalQuality.ts";
 import { mediaView, saveMedia, sniff } from "../storage.ts";
+import { qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
+import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake } from "./nle.ts";
-import { audioReviewSchema, realismChecks, shotFingerprint } from "./realism.ts";
+import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
 import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
 
@@ -64,7 +66,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       targetType: z.enum(["keyframe", "take"]), targetId: z.string().min(1),
       authorization: z.string().trim().min(1).max(2000), note: z.string().trim().min(10).max(8000),
       frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
-      fullPlayback: z.boolean().default(false), audioReview: audioReviewSchema.optional(),
+      fullPlayback: z.boolean().default(false), reviewedSegments: reviewedSegmentsSchema, audioReview: audioReviewSchema.optional(),
       creativeReview: creativeReviewSchema.optional(),
       observations: z.array(z.strictObject({ kind: z.string(), note: z.string().min(1) })).max(40).default([]),
     }).parse(data);
@@ -79,24 +81,29 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       || input.frameTimes.some((time, index) => time >= media.duration || index > 0 && time <= input.frameTimes[index - 1]!))) {
       throw bad("视频工作版须记录至少两个递增且位于素材时长内的实际抽帧时间");
     }
+    const plan = qualityReviewPlan(shot, input.targetType);
     return tx(() => {
       const previous = s.list("qc_reports", { targetType: input.targetType, targetId: item.id }, "created_at DESC, rowid DESC")[0];
-      // ACT: 同一静帧和规格的有效代理检查只做一次；有新缺陷或要求修改时仍记录新结论。
-      if (input.targetType === "keyframe" && !input.observations.length && input.creativeReview?.verdict !== "revise"
-        && previous?.evidence?.mediaId === item.mediaId && previous.evidence.fingerprint === shotFingerprint(s, shot.id, "keyframe")
+      // ACT: 同一素材和规格的有效代理检查只做一次；有新缺陷或要求修改时仍记录新结论。
+      if (!input.observations.length && input.creativeReview?.verdict !== "revise"
+        && previous?.evidence?.mediaId === item.mediaId && previous.evidence.fingerprint === shotFingerprint(s, shot.id, input.targetType)
         && previous.evidence.vision?.source === "delegatedAgent"
-        && realismChecks.filter(key => key !== "motion").every(key => previous.evidence.reviewed?.includes(key))) {
+        && (input.targetType === "take" || plan.checks.every(key => previous.evidence.reviewed?.includes(key)))
+        && (!input.fullPlayback || previous.evidence.fullPlayback)
+        && (!input.audioReview || JSON.stringify(input.audioReview) === JSON.stringify(previous.evidence.audioReview))
+        && (!input.reviewedSegments.length || JSON.stringify(input.reviewedSegments) === JSON.stringify(previous.evidence.reviewedSegments))) {
         const review = { report: previous, repairActions: s.list("repair_actions", { qcReportId: previous.id }) };
         if (previous.findings.some((finding: { severity: string }) => finding.severity === "high")) {
           return { selected: false, reused: true, review, reason: "已有严重问题记录。重复检查不能消除缺陷；请报告阻塞，不自动重生成" };
         }
-        if (shot.heroKeyframeId !== item.id) promoteHero(s, item.id, `agent:${actor}`);
+        if (input.targetType === "keyframe" && shot.heroKeyframeId !== item.id) promoteHero(s, item.id, `agent:${actor}`);
+        if (input.targetType === "take") selectWorkingTake(s, item.id);
         return { selected: true, reused: true, status: "workingVersion", finalReviewRequired: true, review };
       }
       const review = runQc(s, shot.id, { type: input.targetType, id: item.id }, input.observations, {
         actor: `agent:${actor}`, note: input.note,
-        fullPlayback: input.fullPlayback, audioReview: input.audioReview,
-        reviewed: input.targetType === "keyframe" ? realismChecks.filter(key => key !== "motion") : [],
+        fullPlayback: input.fullPlayback, reviewedSegments: input.reviewedSegments, audioReview: input.audioReview,
+        reviewed: plan.fullPlayback && !input.fullPlayback ? [] : plan.checks,
         vision: { source: "delegatedAgent", authorization: input.authorization, frameTimes: input.frameTimes, creativeReview: input.creativeReview, audioReview: "notVerified", status: "workingVersion" },
       });
       if (review.report.findings.some(finding => finding.severity === "high")) return { selected: false, review, reason: "存在严重问题，已保留检查记录，未采用" };
@@ -109,7 +116,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
   const shots = s.list("shots", { projectId }, "sequence_id, ord");
   if (operation === "read") return {
     decisions: { location: "chat", keyframes: "requestKeyframeApproval({keyframeIds:[...]})：可批量确认并保存主关键帧，不在 updateShot 或 compile 中传 heroKeyframeId", production: "requestProductionDecision：资产、定妆、视频、配音、剪辑和最终验收；有效采用无需重复确认", story: "requestStoryDecision / requestStoryApproval：在聊天中保存故事选择与采用" },
-    projectId, world: s.list("worlds", { projectId }), looks: s.list("looks", { projectId }), assets: s.list("assets", { projectId }),
+    projectId, quality: productionQualityView(s, projectId), world: s.list("worlds", { projectId }), looks: s.list("looks", { projectId }), assets: s.list("assets", { projectId }),
     sequences: s.list("sequences", { projectId }), shots, references: s.list("refs", { projectId }), bindings: s.list("reference_bindings", { projectId }),
     keyframes: s.list("keyframes", { projectId }), takes: s.list("takes", { projectId }), qc: s.list("qc_reports", { projectId }),
     media: s.list("media", { projectId }).map(mediaView),
