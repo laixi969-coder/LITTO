@@ -5,7 +5,7 @@ import { createAsset, assetVersions } from "./assets.ts";
 import { bindReference, createShot, updateShot, shotPartial } from "./shots.ts";
 import { bad, conflict, notFound, sha256 } from "../util.ts";
 import { finalQualityView } from "./finalQuality.ts";
-import { mediaView, saveMedia, sniff } from "../storage.ts";
+import { mediaView, saveMedia, sniff, storage } from "../storage.ts";
 import { compactProductionRead, qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
 import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
@@ -50,6 +50,25 @@ export async function importWorkspaceSpeechTake(s: Scope, projectId: string, sho
   // 对口型只新增候选，不替换原片，不自动批准人物、动作、接戏或最终同步。
   return s.insert("takes", { project_id: projectId, shot_id: shotId, keyframe_id: shot.heroKeyframeId, media_id: media.id, status: "candidate",
     meta: { source: "lipSync", workspacePath: path, speechSync: { ...speechSync, referenceMediaId: audio.id, audioPath } } });
+}
+
+/** 主机读取已授权资产的实际图片，不让模型猜测媒体存储路径。 */
+export async function readWorkspaceAsset(s: Scope, projectId: string, data: Record<string, unknown>) {
+  const asset = workspaceProduction(s, projectId, "readAsset", data) as any;
+  const mediaIds = new Set<string>();
+  if (asset.attributes?.authoritativeReference) mediaIds.add(asset.attributes.authoritativeReference);
+  for (const id of asset.references ?? []) {
+    const reference = s.get("refs", id);
+    if (reference?.projectId !== projectId) throw notFound("project reference");
+    if (reference.kind === "image" && reference.mediaId) mediaIds.add(reference.mediaId);
+  }
+  const images = [];
+  for (const id of mediaIds) {
+    const media = s.get("media", id);
+    if (media?.projectId !== projectId || !media.mime.startsWith("image/")) throw notFound("project image");
+    images.push({ mediaId: id, mimeType: media.mime, data: await storage.get(media.storageKey) });
+  }
+  return { asset, images };
 }
 
 /** 草稿可直接保存；采用与变更确认通过聊天决定卡片写入，和制作面板复用领域规则。 */

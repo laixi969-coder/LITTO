@@ -114,6 +114,19 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         const api = cloud(), tenant = currentTenant();
         if (!api || !tenant || tenant.role === "VIEWER") throw new Error("制片工具需要已登录且有编辑权限的工作区");
         const scope = api.scoped(tenant.workspaceId), projectId = workspaceProject(cwd)!;
+        if (operation === "readAsset") {
+          const { asset, images } = await api.readWorkspaceAsset(scope, projectId, data);
+          const referenceImages = [];
+          for (const image of images) {
+            mediaSignal(signal)?.throwIfAborted();
+            const folder = `assets/characters/${asset.id}`;
+            const path = `${folder}/reference${image.mediaId}`;
+            await files.mkdir(folder, true);
+            await files.writeFile(path, image.data);
+            referenceImages.push({ mediaId: image.mediaId, path, mimeType: image.mimeType });
+          }
+          return { ...asset, referenceImages };
+        }
         if (operation === "readVisionModels") return { models: listAiModels(), note: "已选语言模型；图片输入能力以实际供应商响应为准，检查失败不视为通过" };
         if (operation === "analyzeReference" || operation === "inspectAdPilot" || operation === "inspectAdFilm") {
           const models = listAiModels();
