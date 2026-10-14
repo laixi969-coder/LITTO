@@ -25,7 +25,7 @@ export function assertModelSelection(kind: ModelKind, providerId: string, modelI
 }
 
 export async function assertMediaModelSelection(kind: "image" | "video" | "audio", request: MediaGenerationRequest, directory: string) {
-  if (kind === "video" && !isSelectedModel(kind, request.providerId, request.modelId)) {
+  if (kind === "video") {
     const { isVoiceSyncRequest } = await import("@/utils/media/voiceDecision");
     // 口型选择属于配音方案；仅允许选定声音和原视频的配对请求，不改变正式镜头的默认模型。
     if (await isVoiceSyncRequest(directory, request)) return;

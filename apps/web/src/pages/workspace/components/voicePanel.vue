@@ -10,7 +10,7 @@
         <el-button :disabled="busy || !loaded" @click="run(importStory)">同步已采用剧本台词（保留旧方案）</el-button>
         <el-button v-if="operation" :disabled="stopping" @click="stop">停止处理</el-button>
       </div>
-      <p class="hint">对白或演唱可使用已有声音片段。对口型可选择专用模型，或支持视频与音频参考的原生音画模型；原生模型可能改变画面，生成后须检查人物、动作、原声和逐字嘴型。旁白无需对口型。</p>
+      <p class="hint">对白或演唱可使用已有声音片段。对口型仅选择明确支持此能力的专用模型；音轨匹配与逐字口型分别检查，已有候选和有效检查保留复用。旁白无需对口型。</p>
       <fieldset :disabled="busy || !loaded">
         <h3>角色与音色</h3>
         <div v-for="role in project.roles" :key="role.id" class="roleRow">
@@ -66,7 +66,8 @@
             <div v-for="result in selectedTake(line)?.videos" :key="result.id" class="syncReview">
               <p>声音与口型：{{ syncConfirmed(line, result) ? '当前版本已看听确认' : result.review ? '已记录检查，尚未通过同步验收' : '待检核，尚未确认同步' }}</p>
               <el-button @click="run(() => inspectSync(line, result))">检查当前声音与时间偏移</el-button>
-              <p v-if="result.inspection">声音匹配：{{ result.inspection.audioMatches ? '通过' : '未通过' }} · 偏移 {{ result.inspection.offsetMs }} 毫秒。{{ result.inspection.note }}</p>
+              <p v-if="result.inspection">{{ speechInspectionMessage(result.inspection) }}</p>
+              <p v-if="result.inspection?.note">已有检查记录：{{ result.inspection.note }}</p>
               <label><input v-model="syncDraft(result).watched" type="checkbox" />已完整播放此版本</label>
               <label>对白或歌词<select v-model="syncDraft(result).speech"><option value="uncertain">不确定</option><option value="pass">与采用声音一致</option><option value="fail">不一致</option></select></label>
               <label>可见口型<select v-model="syncDraft(result).mouth"><option value="uncertain">不确定 / 仅局部确认</option><option value="pass">全部可见发声区间匹配</option><option value="fail">存在不同步</option></select></label>
@@ -80,7 +81,7 @@
         <el-button :disabled="project.lines.length >= 500" @click="addLine">添加一句台词</el-button>
         <h3>对口型模型</h3>
         <label>模型<select :value="modelKey({ providerId: project.lipSyncProviderId, modelId: project.lipSyncModelId })" @change="selectLipSyncModel(($event.target as HTMLSelectElement).value)"><option value="">选择模型</option><option v-for="model in lipSyncModels" :key="modelKey(model)" :value="modelKey(model)">{{ model.providerLabel }} · {{ model.label }}</option></select></label>
-        <p class="hint">每句使用一个清晰可见的说话人镜头；多人同框请先拆分。MuseTalk 会按音频长度生成，原片过短可能往返重复，请先裁好镜头并检查完整输出。停止本地等待后，远端推理可能仍需在服务端停止。</p>
+        <p class="hint">仅使用明确声明对口型能力的模型，普通视频模型的音频参考不能保证原曲保留。每句使用一个清晰可见的说话人镜头；多人同框请先拆分。MuseTalk 会按音频长度生成，原片过短可能往返重复，请先裁好镜头并检查完整输出。停止本地等待后，远端推理可能仍需在服务端停止。</p>
         <h3>合成配音</h3>
         <el-button :disabled="!canMix || project.mixes.length >= 100" @click="run(mixSpeech, true)">按台词顺序合成 WAV</el-button>
         <p class="hint">合并每句选定版本并保留句后停顿，原始配音与口型视频均保留。需要已配置的 FFmpeg。</p>
@@ -95,7 +96,7 @@ import { computed, onScopeDispose, ref, watch } from "vue";
 import axios from "axios";
 import { useNodeAi, invalidateNodeModels, type NodeMediaModel, type NodeVideoRequest } from "@toonflow/nodes-scaffold/nodeAi";
 import { createBrowserFfmpeg } from "@toonflow/ffmpeg/browser";
-import { speechSourceKey, voiceProjectSchema, type VoiceProject, type VoiceLine, type VoiceRole } from "@toonflow/tool-media-generation/voiceProject";
+import { speechSourceKey, speechInspectionMessage, voiceProjectSchema, type VoiceProject, type VoiceLine, type VoiceRole } from "@toonflow/tool-media-generation/voiceProject";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { useWorkspaceStore } from "@/stores/workspace";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
@@ -144,7 +145,7 @@ const speechModels = computed(() => models.value.filter(model => model.type === 
 function syncMode(model: NodeMediaModel) {
   return model.mode?.find(mode => Array.isArray(mode) && mode.some(item => /^videoReference:[1-9]\d*$/.test(item)) && mode.some(item => /^audioReference:[1-9]\d*$/.test(item))) as NodeVideoRequest["mode"] | undefined;
 }
-const lipSyncModels = computed(() => models.value.filter(model => model.type === "video" && syncMode(model) && (model.lipSync || model.audio)));
+const lipSyncModels = computed(() => models.value.filter(model => model.type === "video" && syncMode(model) && model.lipSync === true));
 const lipSyncModel = computed(() => lipSyncModels.value.find(model => model.providerId === project.value.lipSyncProviderId && model.modelId === project.value.lipSyncModelId));
 const canMix = computed(() => project.value.lines.length > 0 && project.value.lines.every(line => selectedTake(line) && !stale(line)));
 const mixSourceKey = computed(() => JSON.stringify(project.value.lines.map(line => [line.id, line.takeId, line.pauseAfter, stale(line)])));
@@ -198,7 +199,7 @@ async function refreshModels() {
   invalidateNodeModels("media");
   const selected = await ai.getMediaModels(lifetime.signal);
   const available = await ai.getMediaModels(lifetime.signal, true);
-  models.value = [...selected, ...available.filter(model => model.type === "video" && syncMode(model) && (model.lipSync || model.audio) && !selected.some(item => modelKey(item) === modelKey(model)))];
+  models.value = [...selected, ...available.filter(model => model.type === "video" && syncMode(model) && model.lipSync === true && !selected.some(item => modelKey(item) === modelKey(model)))];
 }
 async function load() {
   try {
@@ -284,16 +285,6 @@ async function syncLine(line: VoiceLine) {
   await save();
   const sourceVideo = { ...line.video };
   const input: NodeVideoRequest = { directory, providerId: model.providerId, modelId: model.modelId, prompt: `以视频参考1为画面依据，以音频参考1为唯一声音和节奏依据。保留原人物身份、衣着、场景、机位、动作与镜头运动，${line.kind === "singing" ? "人物演唱" : "人物说话"}的逐字嘴型严格对应音频参考1，声音从第0秒开始。不得改写、重新配音、改变音高或语速，不添加旁白、对白、音乐。${line.text ? `词句：${line.text}` : ""}`, videos: [sourceVideo], audios: [take.audio], mode: syncMode(model), generateAudio: true, outputDirectory: "assets/speech" };
-  if (!model.lipSync) {
-    const ffmpeg = await createBrowserFfmpeg(directory, signal());
-    const metadata = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => ffmpeg.ffprobe(take.audio.path, (error, data) => error ? reject(error) : resolve(data)));
-    const seconds = Number(metadata.format.duration);
-    const formats = model.durationResolutionMap?.flatMap(format => format.duration.map(duration => ({ duration, resolution: format.resolution.includes("768P") ? "768P" : format.resolution[0] }))).filter(format => format.duration >= seconds - 0.02).sort((left, right) => left.duration - right.duration);
-    const format = formats?.[0];
-    if (!Number.isFinite(seconds) || seconds <= 0 || !format?.resolution) throw new Error("当前声音片段超出该模型支持的时长，请选择支持此片段的模型");
-    input.duration = format.duration;
-    input.resolution = format.resolution;
-  }
   let request = take.syncRequests.find(request => request.sourceVideo.path === sourceVideo.path && request.providerId === model.providerId && request.modelId === model.modelId);
   if (!request) {
     if (take.syncRequests.length >= 100) throw new Error("此配音的同步请求已达上限，请查看已有任务");
@@ -350,7 +341,10 @@ async function prepareAudio(line: VoiceLine) {
 async function inspectSync(line: VoiceLine, result: SyncVideo) {
   const take = selectedTake(line);
   if (!take || stale(line) || !take.videos.some(video => video.id === result.id)) throw new Error("声音版本已变化，请检查当前版本");
-  const inspection = await speechRequest("inspectSpeech", { audioPath: take.audio.path, videoPath: result.video.path, sourceVideoPath: result.sourceVideo.path });
+  const sourceKey = take.sourceKey;
+  const paths = { audioPath: take.audio.path, videoPath: result.video.path, sourceVideoPath: result.sourceVideo.path };
+  const inspection = await speechRequest("inspectSpeech", paths);
+  if (selectedTake(line) !== take || stale(line) || take.sourceKey !== sourceKey || take.audio.path !== paths.audioPath || result.video.path !== paths.videoPath || result.sourceVideo.path !== paths.sourceVideoPath || !take.videos.includes(result)) throw new Error("检查期间素材或采用版本已变化，未附加旧检查结果");
   if (result.review?.inspectionKey !== inspection.key || result.review?.speech === "pass" && !inspection.audioMatches) result.review = undefined;
   result.inspection = inspection;
   await save();

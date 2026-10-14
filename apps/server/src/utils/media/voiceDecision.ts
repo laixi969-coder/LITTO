@@ -8,6 +8,7 @@ import { cloud } from "@/lib/cloud";
 import { readStoryProject } from "@/utils/story";
 import { storyStale } from "@toonflow/tool-scene-list/storyProject";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
+import { getMediaProvider } from "@/utils/media/provider";
 
 export async function readVoiceProject(directory: string) {
   const { path } = await resolveWorkspacePath(directory, "voiceProject.json");
@@ -25,6 +26,8 @@ export async function isVoiceSyncRequest(directory: string, request: MediaGenera
       && take.sourceKey === speechSourceKey(line, project.roles.find(role => role.id === line.roleId));
   });
   if (!line) return false;
+  const provider = await getMediaProvider(request.providerId);
+  if (!provider.models.some(model => model.id === request.modelId && model.type === "video" && model.lipSync === true)) throw new Error("当前模型未声明专用对口型能力；支持音频参考不代表保留原音轨。请选择专用对口型模型，已有结果与未知请求继续保留。");
   if (line.storySource) {
     const story = await readStoryProject(directory);
     const approved = story.revisions.find(item => item.id === story.approvedId);

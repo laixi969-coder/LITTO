@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
 import { mkdir, readFile, stat, unlink, writeAtomic } from "@toonflow/file";
 import type { FfprobeData } from "@toonflow/ffmpeg/types";
-import { speechSegmentSchema, type SpeechInspection } from "@toonflow/tool-media-generation/voiceProject";
+import { speechSegmentSchema, speechInspectionMessage, type SpeechInspection } from "@toonflow/tool-media-generation/voiceProject";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
@@ -99,7 +99,7 @@ export async function inspectSpeechSync(directory: string, audioPath: string, vi
   const key = createHash("sha256").update(JSON.stringify(hashes)).digest("hex");
   const cacheKey = JSON.stringify([directory, key]);
   const cached = speechInspections.get(cacheKey);
-  if (cached) return { ...cached };
+  if (cached) return { ...cached, note: speechInspectionMessage(cached) };
   const ffmpeg = await createWorkspaceFfmpeg(directory, signal);
   const [audio, video] = await Promise.all([probeMedia(ffmpeg, audioPath), probeMedia(ffmpeg, videoPath)]);
   if (!audio.streams.some(stream => stream.codec_type === "audio") || !video.streams.some(stream => stream.codec_type === "audio") || !video.streams.some(stream => stream.codec_type === "video")) throw new Error("口型结果须同时包含视频和声音，参考素材须有音轨");
@@ -123,6 +123,7 @@ export async function inspectSpeechSync(directory: string, audioPath: string, vi
   signal?.throwIfAborted();
   if (JSON.stringify(await Promise.all(paths.map(path => mediaHash(directory, path)))) !== JSON.stringify(hashes)) throw new Error("检查期间音视频已改变，请检查当前版本");
   const inspection = { key, audioMatches: correlation >= 0.9 && Math.abs(offsetMs) <= 80 && Math.abs(audioDuration - videoDuration) <= 0.15, offsetMs, correlation: Math.max(-1, Math.min(1, correlation)), audioDuration, videoDuration, note: "自动检查仅确认参考音轨相似度、整体偏移与时长；不能证明逐字口型同步，须记录实际音画检查中的失败或不确定区间。" };
+  inspection.note = speechInspectionMessage(inspection);
   speechInspections.set(cacheKey, inspection);
   if (speechInspections.size > 32) speechInspections.delete(speechInspections.keys().next().value!);
   return { ...inspection };

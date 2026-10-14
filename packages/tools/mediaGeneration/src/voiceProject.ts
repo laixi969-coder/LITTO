@@ -9,6 +9,15 @@ export const speechInspectionSchema = z.strictObject({
   audioDuration: z.number().finite().positive(), videoDuration: z.number().finite().positive(), note: z.string(),
 });
 export type SpeechInspection = z.infer<typeof speechInspectionSchema>;
+
+export function speechInspectionMessage(inspection: SpeechInspection) {
+  const issues: string[] = [];
+  if (inspection.correlation < 0.9) issues.push("参考音轨相似度不足，无法可靠判断偏移；不能靠平移声音直接修复");
+  else if (Math.abs(inspection.offsetMs) > 80) issues.push(`相似音轨整体偏移 ${inspection.offsetMs} 毫秒`);
+  if (Math.abs(inspection.audioDuration - inspection.videoDuration) > 0.15) issues.push(`时长不符：参考声音 ${inspection.audioDuration.toFixed(3)} 秒，视频 ${inspection.videoDuration.toFixed(3)} 秒`);
+  if (!inspection.audioMatches && !issues.length) issues.push("已有检查未通过，请核对当前素材与检查记录");
+  return (issues.join("；") || `参考音轨整体匹配，估算偏移 ${inspection.offsetMs} 毫秒`) + "。音轨匹配不证明逐字口型同步；仍需检查可见发声区间。";
+}
 const roleSchema = z.strictObject({
   id: z.string().uuid(), name: z.string().max(100), providerId: z.string().max(96), modelId: z.string().max(256), voice: z.string().max(256),
 });
