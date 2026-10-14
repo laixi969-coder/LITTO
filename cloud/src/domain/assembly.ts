@@ -23,6 +23,7 @@ function fromEdit(s: Scope, sequenceId: string): Timeline {
         const sh = c.shotId ? s.get("shots", c.shotId) : null;
         const kind = r.kind === "media" ? (r.mime?.startsWith("video/") ? "take" : r.mediaId ? "hero" : "missing") : r.kind;
         if (kind !== "take") { tl.missing.push(c.shotId ?? c.id); tl.warnings.push(`${sh ? `shot #${sh.ord + 1}` : `clip ${c.label || c.id}`} has no Approved Take${kind === "hero" ? " (Hero Frame stills used as placeholder)" : ""}`); }
+        if (kind === "take" && sh && (!sh.approvedTakeId || s.get("takes", sh.approvedTakeId)?.mediaId !== r.mediaId)) tl.warnings.push(`shot #${sh.ord + 1} uses an unapproved working video; preview only`);
         tl.clips.push({ shotId: c.shotId ?? "", clipId: c.id, order: sh?.ord ?? i, title: c.label || sh?.title || "", kind, mediaId: r.mediaId, mime: r.mime, start: c.start, duration: c.duration, subtitle: sh?.subtitle ?? "", srcIn: c.in, srcOut: c.in + c.duration * c.speed, speed: c.speed, transition: c.transition });
         if (sh?.subtitle) tl.subtitles.push({ start: c.start, end: c.start + c.duration, text: sh.subtitle, shotId: sh.id });
     }

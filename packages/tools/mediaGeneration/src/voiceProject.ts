@@ -26,7 +26,7 @@ const takeSchema = z.strictObject({
   syncRequests: z.array(z.strictObject({ requestId: z.string().uuid(), sourceVideo: videoSchema, providerId: z.string().max(96), modelId: z.string().max(256) })).max(100).default([]),
   videos: z.array(z.strictObject({ id: z.string().uuid(), video: videoSchema, sourceVideo: videoSchema, providerId: z.string().max(96), modelId: z.string().max(256),
     inspection: speechInspectionSchema.optional(),
-    review: z.strictObject({ inspectionKey: z.string().length(64), fullPlayback: z.literal(true), speech: z.enum(["pass", "fail", "uncertain"]), lipSync: z.enum(["pass", "fail", "uncertain"]), note: z.string().trim().min(10).max(2000) }).optional(),
+    review: z.strictObject({ inspectionKey: z.string().length(64), fullPlayback: z.boolean(), speech: z.enum(["pass", "fail", "uncertain"]), lipSync: z.enum(["pass", "fail", "uncertain"]), note: z.string().trim().min(10).max(2000) }).optional(),
   })).max(100),
 });
 const lineSchema = z.strictObject({
@@ -49,6 +49,7 @@ export const voiceProjectSchema = z.strictObject({
     if (line.roleId && !project.roles.some(role => role.id === line.roleId)) context.addIssue({ code: "custom", message: "台词引用的角色不存在" });
     if (line.takeId && !line.takes.some(take => take.id === line.takeId)) context.addIssue({ code: "custom", message: "选定配音版本不存在" });
     for (const take of line.takes) for (const video of take.videos) {
+      if (video.review && !video.review.fullPlayback && (video.review.speech === "pass" || video.review.lipSync === "pass")) context.addIssue({ code: "custom", message: "通过结论必须完整看听；局部检查只能记录不通过或不确定" });
       if (video.review && (!video.inspection || video.review.inspectionKey !== video.inspection.key || video.review.speech === "pass" && !video.inspection.audioMatches)) context.addIssue({ code: "custom", message: "音画检查须对应当前素材；声音未匹配不能记录为通过" });
     }
   }

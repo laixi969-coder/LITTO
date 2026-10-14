@@ -72,7 +72,7 @@
               <label>对白或歌词<select v-model="syncDraft(result).speech"><option value="uncertain">不确定</option><option value="pass">与采用声音一致</option><option value="fail">不一致</option></select></label>
               <label>可见口型<select v-model="syncDraft(result).mouth"><option value="uncertain">不确定 / 仅局部确认</option><option value="pass">全部可见发声区间匹配</option><option value="fail">存在不同步</option></select></label>
               <textarea v-model="syncDraft(result).note" rows="2" aria-label="同步检查依据与失败或不确定的时间区间" />
-              <el-button :disabled="!result.inspection || !syncDraft(result).watched || syncDraft(result).note.trim().length < 10 || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => reviewSync(line, result))">保存此版本的检查结果</el-button>
+              <el-button :disabled="!result.inspection || (!syncDraft(result).watched && (syncDraft(result).speech === 'pass' || syncDraft(result).mouth === 'pass')) || syncDraft(result).note.trim().length < 10 || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => reviewSync(line, result))">保存此版本的检查结果</el-button>
               <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
               <el-button v-if="shots.length" :disabled="!line.shotId || !syncConfirmed(line, result)" @click="run(() => registerSync(line, result))">登记为镜头候选（保留原片）</el-button>
             </div>
@@ -131,7 +131,7 @@ function syncDraft(result: SyncVideo) {
   return syncReviews.value[result.id]!;
 }
 function syncConfirmed(line: VoiceLine, result: SyncVideo) {
-  return result.review?.speech === "pass" && result.review.lipSync === "pass" && result.inspection?.audioMatches === true && result.review.inspectionKey === result.inspection.key && result.sourceVideo.path === line.video?.path && !stale(line);
+  return result.review?.fullPlayback === true && result.review.speech === "pass" && result.review.lipSync === "pass" && result.inspection?.audioMatches === true && result.review.inspectionKey === result.inspection.key && result.sourceVideo.path === line.video?.path && !stale(line);
 }
 const operation = ref<AbortController>();
 const lifetime = new AbortController();
@@ -352,12 +352,12 @@ async function inspectSync(line: VoiceLine, result: SyncVideo) {
 
 async function reviewSync(line: VoiceLine, result: SyncVideo) {
   const draft = syncDraft(result);
-  if (!draft.watched || draft.note.trim().length < 10 || result.sourceVideo.path !== line.video?.path) throw new Error("请完整看听当前视频并记录检查依据；局部通过或证据不足应保存为不确定");
+  if ((!draft.watched && (draft.speech === "pass" || draft.mouth === "pass")) || draft.note.trim().length < 10 || result.sourceVideo.path !== line.video?.path) throw new Error("通过结论必须完整看听；局部检查可记录不通过或不确定，并填写实际依据");
   const key = result.inspection?.key;
   await inspectSync(line, result);
   if (!key || key !== result.inspection?.key) throw new Error("素材已变化，请检查当前实际版本，不能沿用旧确认");
   if (draft.speech === "pass" && !result.inspection.audioMatches) throw new Error("声音检查未匹配，请记录不一致或不确定，不能确认通过");
-  result.review = { inspectionKey: key, fullPlayback: true, speech: draft.speech, lipSync: draft.mouth, note: draft.note.trim() };
+  result.review = { inspectionKey: key, fullPlayback: draft.watched, speech: draft.speech, lipSync: draft.mouth, note: draft.note.trim() };
   await save();
 }
 
