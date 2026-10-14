@@ -85,6 +85,10 @@ export function startWorker() {
     // ACT: 无上游任务句柄的脚本不能安全重发，重启后保留失败记录，交由用户决定重试。
     for (const job of all("SELECT * FROM generation_jobs WHERE status='RUNNING' AND provider_id='workspaceMedia'")) {
         tx(() => {
+            const parameters = JSON.parse(job.parameters ?? "{}");
+            // 没有回执不等于未受理；旧适配器重启后也必须阻止手动重发。
+            if (!parameters.remoteTask) parameters.remoteTask = { status: "unknown", updatedAt: now() };
+            run("UPDATE generation_jobs SET parameters=? WHERE id=?", j(parameters), job.id);
             run("UPDATE generation_jobs SET status='FAILED', finished_at=?, held=0, error=? WHERE id=?", now(), "服务重启，供应商结果待核查；未自动重发，请核查后重试", job.id);
             release(job.workspace_id, job.id, job.held, "server interrupted");
         });
@@ -216,7 +220,9 @@ async function finish(job: any, result: GenResult, durationMs: number) {
 async function fail(job: any, err: Error & { retryable?: boolean; timeout?: boolean }, durationMs: number) {
     const cur = get("SELECT * FROM generation_jobs WHERE id=?", job.id)!;
     if (cur.status === "CANCELLED") return;
-    const retryable = err.retryable !== false;
+    const p = cur.parameters ? JSON.parse(cur.parameters) : {};
+    const remoteUnresolved = cur.provider_id === "workspaceMedia" && p.remoteTask && !["failed", "rejected"].includes(p.remoteTask.status);
+    const retryable = err.retryable !== false && !remoteUnresolved;
     inc(`provider_${cur.provider_id}_errors`);
     if (retryable && cur.attempts < cur.max_attempts) {
         inc("job_retries");
@@ -226,8 +232,7 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
         return;
     }
     // Provider exhausted → fallback to the next-best model that satisfies the same roles.
-    const p = cur.parameters ? JSON.parse(cur.parameters) : {};
-    if (p.fallbackAllowed !== false) {
+    if (!remoteUnresolved && p.fallbackAllowed !== false) {
         const roles = (JSON.parse(cur.input_refs ?? "[]") as any[]).map((r) => r.role);
         const excluded = [...(p.excluded ?? []), cur.model_id];
         const chain = JSON.parse(cur.fallback_chain ?? "[]");
@@ -271,6 +276,8 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     const o = scoped(workspaceId).get("generation_jobs", id, true);
     if (!o) throw bad("job not found");
     if (["QUEUED", "RUNNING"].includes(o.status)) throw conflict("job still active");
+    if (o.status === "SUCCEEDED") throw conflict("任务已完成，请复用已有结果", "job_already_completed");
+    if (inflight.has(id)) throw conflict("原任务仍在停止或收取结果，不能同时重发", "job_still_settling");
     if (o.providerId === "workspaceMedia" && o.parameters?.remoteTask && !["failed", "rejected"].includes(o.parameters.remoteTask.status)) throw conflict("供应商结果尚未核清或已完成，请先查询并恢复原任务，不得重复提交", "remote_result_unresolved");
     const { negativePrompt, label, remoteTask, ...rest } = o.parameters ?? {};
     return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label, idempotencyKey: `retry:${o.id}` });

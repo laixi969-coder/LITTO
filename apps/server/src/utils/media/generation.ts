@@ -205,6 +205,8 @@ async function generateMediaUnrecorded(
     mediaType === "video" && request.lastFrame ? reference(request.lastFrame, "image") : undefined,
   ]);
   signal?.throwIfAborted();
+  // 兼容尚未上报远端句柄的适配器：进入调用后不能把无回执当作可安全重试。
+  await reportTask?.({ status: "submitting" });
   const assets = await (async () => mediaType === "audio"
     ? await provider.generateAudio!({
       model: request.modelId, text: request.prompt, audios,
@@ -226,6 +228,8 @@ async function generateMediaUnrecorded(
       throw error;
     });
   if (!Array.isArray(assets) || !assets.length) invalid("供应商未返回生成结果");
+  // 下载或写入失败不能重新生成已经完成的素材。
+  await reportTask?.({ status: "completed" });
   const written: string[] = [];
   const result: GeneratedMedia[] = [];
   try {

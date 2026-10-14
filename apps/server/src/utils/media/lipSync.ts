@@ -2,12 +2,15 @@ import { createHash, randomUUID } from "node:crypto";
 import { PassThrough } from "node:stream";
 import { mkdir, readFile, stat, unlink, writeAtomic } from "@toonflow/file";
 import type { FfprobeData } from "@toonflow/ffmpeg/types";
-import { speechSegmentSchema } from "@toonflow/tool-media-generation/voiceProject";
+import { speechSegmentSchema, type SpeechInspection } from "@toonflow/tool-media-generation/voiceProject";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
 import { workspaceProject } from "@/utils/media/jobs";
+
+// ACT: 仅保留本进程最近32份数值结果；每次先核验实际字节，不信任客户端缓存。
+const speechInspections = new Map<string, SpeechInspection>();
 
 async function mediaHash(directory: string, path: string) {
   const resolved = await resolveWorkspacePath(directory, path);
@@ -92,6 +95,11 @@ async function audioEnvelope(ffmpeg: Awaited<ReturnType<typeof createWorkspaceFf
 export async function inspectSpeechSync(directory: string, audioPath: string, videoPath: string, signal?: AbortSignal, sourceVideoPath?: string) {
   const paths = [audioPath, videoPath, ...(sourceVideoPath ? [sourceVideoPath] : [])];
   const hashes = await Promise.all(paths.map(path => mediaHash(directory, path)));
+  signal?.throwIfAborted();
+  const key = createHash("sha256").update(JSON.stringify(hashes)).digest("hex");
+  const cacheKey = JSON.stringify([directory, key]);
+  const cached = speechInspections.get(cacheKey);
+  if (cached) return { ...cached };
   const ffmpeg = await createWorkspaceFfmpeg(directory, signal);
   const [audio, video] = await Promise.all([probeMedia(ffmpeg, audioPath), probeMedia(ffmpeg, videoPath)]);
   if (!audio.streams.some(stream => stream.codec_type === "audio") || !video.streams.some(stream => stream.codec_type === "audio") || !video.streams.some(stream => stream.codec_type === "video")) throw new Error("口型结果须同时包含视频和声音，参考素材须有音轨");
@@ -114,10 +122,14 @@ export async function inspectSpeechSync(directory: string, audioPath: string, vi
   }
   signal?.throwIfAborted();
   if (JSON.stringify(await Promise.all(paths.map(path => mediaHash(directory, path)))) !== JSON.stringify(hashes)) throw new Error("检查期间音视频已改变，请检查当前版本");
-  return { key: createHash("sha256").update(JSON.stringify(hashes)).digest("hex"), audioMatches: correlation >= 0.9 && Math.abs(offsetMs) <= 80 && Math.abs(audioDuration - videoDuration) <= 0.15, offsetMs, correlation: Math.max(-1, Math.min(1, correlation)), audioDuration, videoDuration, note: "自动检查仅确认参考音轨相似度、整体偏移与时长；仍须完整看听实际视频，核对对白/歌词与逐字口型。" };
+  const inspection = { key, audioMatches: correlation >= 0.9 && Math.abs(offsetMs) <= 80 && Math.abs(audioDuration - videoDuration) <= 0.15, offsetMs, correlation: Math.max(-1, Math.min(1, correlation)), audioDuration, videoDuration, note: "自动检查仅确认参考音轨相似度、整体偏移与时长；不能证明逐字口型同步，须记录实际音画检查中的失败或不确定区间。" };
+  speechInspections.set(cacheKey, inspection);
+  if (speechInspections.size > 32) speechInspections.delete(speechInspections.keys().next().value!);
+  return { ...inspection };
 }
 
-export async function importSpeechTake(directory: string, input: { shotId: string; videoPath: string; audioPath: string; sourceVideoPath: string; inspectionKey: string; note: string }) {
+export async function importSpeechTake(directory: string, input: { shotId: string; videoPath: string; audioPath: string; sourceVideoPath: string; inspectionKey: string; fullPlayback: true; speech: "pass"; lipSync: "pass"; note: string }) {
+  if (input.fullPlayback !== true || input.speech !== "pass" || input.lipSync !== "pass") throw new Error("须确认当前版本全部可见发声区间同步；局部通过或不确定不能整体采用");
   const tenant = currentTenant(), api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权登记口型候选"), { status: 403 });
   const projectId = workspaceProject(directory)!;

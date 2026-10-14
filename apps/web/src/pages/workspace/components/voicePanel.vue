@@ -64,16 +64,16 @@
               <attachmentPreview v-for="(result, resultIndex) in selectedTake(line)?.videos" :key="result.id" :attachment="{ ...result.video, name: `口型版本 ${resultIndex + 1}${result.sourceVideo.path === line.video?.path ? '' : '（旧原片）'}` }" :directory="directory" />
             </div>
             <div v-for="result in selectedTake(line)?.videos" :key="result.id" class="syncReview">
-              <p>声音与口型：{{ result.review && result.inspection?.audioMatches && result.review.inspectionKey === result.inspection.key && result.sourceVideo.path === line.video?.path && !stale(line) ? '当前版本已看听确认' : '待检核，尚未确认同步' }}</p>
+              <p>声音与口型：{{ syncConfirmed(line, result) ? '当前版本已看听确认' : result.review ? '已记录检查，尚未通过同步验收' : '待检核，尚未确认同步' }}</p>
               <el-button @click="run(() => inspectSync(line, result))">检查当前声音与时间偏移</el-button>
               <p v-if="result.inspection">声音匹配：{{ result.inspection.audioMatches ? '通过' : '未通过' }} · 偏移 {{ result.inspection.offsetMs }} 毫秒。{{ result.inspection.note }}</p>
-              <label><input v-model="syncDraft(result.id).watched" type="checkbox" />已完整播放此版本</label>
-              <label><input v-model="syncDraft(result.id).speech" type="checkbox" />对白或歌词与采用声音一致</label>
-              <label><input v-model="syncDraft(result.id).mouth" type="checkbox" />可见口型与发声逐字匹配</label>
-              <textarea v-model="syncDraft(result.id).note" rows="2" aria-label="同步检查依据" />
-              <el-button :disabled="!result.inspection?.audioMatches || !syncDraft(result.id).watched || !syncDraft(result.id).speech || !syncDraft(result.id).mouth || syncDraft(result.id).note.trim().length < 10 || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => reviewSync(line, result))">保存此版本的同步确认</el-button>
+              <label><input v-model="syncDraft(result).watched" type="checkbox" />已完整播放此版本</label>
+              <label>对白或歌词<select v-model="syncDraft(result).speech"><option value="uncertain">不确定</option><option value="pass">与采用声音一致</option><option value="fail">不一致</option></select></label>
+              <label>可见口型<select v-model="syncDraft(result).mouth"><option value="uncertain">不确定 / 仅局部确认</option><option value="pass">全部可见发声区间匹配</option><option value="fail">存在不同步</option></select></label>
+              <textarea v-model="syncDraft(result).note" rows="2" aria-label="同步检查依据与失败或不确定的时间区间" />
+              <el-button :disabled="!result.inspection || !syncDraft(result).watched || syncDraft(result).note.trim().length < 10 || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => reviewSync(line, result))">保存此版本的检查结果</el-button>
               <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
-              <el-button v-if="shots.length" :disabled="!line.shotId || !result.review || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => registerSync(line, result))">登记为镜头候选（保留原片）</el-button>
+              <el-button v-if="shots.length" :disabled="!line.shotId || !syncConfirmed(line, result)" @click="run(() => registerSync(line, result))">登记为镜头候选（保留原片）</el-button>
             </div>
           </template>
         </article>
@@ -119,9 +119,19 @@ const busy = ref(false);
 const stopping = ref(false);
 const error = ref("");
 const message = ref("");
-const syncReviews = ref<Record<string, { watched: boolean; speech: boolean; mouth: boolean; note: string }>>({});
+const syncReviews = ref<Record<string, { inspectionKey?: string; watched: boolean; speech: "pass" | "fail" | "uncertain"; mouth: "pass" | "fail" | "uncertain"; note: string }>>({});
 type SyncVideo = VoiceLine["takes"][number]["videos"][number];
-function syncDraft(id: string) { return syncReviews.value[id] ??= { watched: false, speech: false, mouth: false, note: "" }; }
+function syncDraft(result: SyncVideo) {
+  const key = result.inspection?.key;
+  if (!syncReviews.value[result.id] || syncReviews.value[result.id]!.inspectionKey !== key) {
+    const review = result.review?.inspectionKey === key ? result.review : undefined;
+    syncReviews.value[result.id] = { inspectionKey: key, watched: review?.fullPlayback === true, speech: review?.speech ?? "uncertain", mouth: review?.lipSync ?? "uncertain", note: review?.note ?? "" };
+  }
+  return syncReviews.value[result.id]!;
+}
+function syncConfirmed(line: VoiceLine, result: SyncVideo) {
+  return result.review?.speech === "pass" && result.review.lipSync === "pass" && result.inspection?.audioMatches === true && result.review.inspectionKey === result.inspection.key && result.sourceVideo.path === line.video?.path && !stale(line);
+}
 const operation = ref<AbortController>();
 const lifetime = new AbortController();
 let activeJob = "";
@@ -341,25 +351,26 @@ async function inspectSync(line: VoiceLine, result: SyncVideo) {
   const take = selectedTake(line);
   if (!take || stale(line) || !take.videos.some(video => video.id === result.id)) throw new Error("声音版本已变化，请检查当前版本");
   const inspection = await speechRequest("inspectSpeech", { audioPath: take.audio.path, videoPath: result.video.path, sourceVideoPath: result.sourceVideo.path });
-  if (result.review?.inspectionKey !== inspection.key || !inspection.audioMatches) result.review = undefined;
+  if (result.review?.inspectionKey !== inspection.key || result.review?.speech === "pass" && !inspection.audioMatches) result.review = undefined;
   result.inspection = inspection;
   await save();
 }
 
 async function reviewSync(line: VoiceLine, result: SyncVideo) {
-  const draft = syncDraft(result.id);
-  if (!draft.watched || !draft.speech || !draft.mouth || draft.note.trim().length < 10 || result.sourceVideo.path !== line.video?.path) throw new Error("请完整看听当前视频并记录声音、逐字口型检查依据");
+  const draft = syncDraft(result);
+  if (!draft.watched || draft.note.trim().length < 10 || result.sourceVideo.path !== line.video?.path) throw new Error("请完整看听当前视频并记录检查依据；局部通过或证据不足应保存为不确定");
   const key = result.inspection?.key;
   await inspectSync(line, result);
-  if (!key || !result.inspection?.audioMatches || key !== result.inspection.key) throw new Error("素材已变化或声音不匹配，请检查当前实际版本，不能沿用旧确认");
-  result.review = { inspectionKey: key, fullPlayback: true, speech: "pass", lipSync: "pass", note: draft.note.trim() };
+  if (!key || key !== result.inspection?.key) throw new Error("素材已变化，请检查当前实际版本，不能沿用旧确认");
+  if (draft.speech === "pass" && !result.inspection.audioMatches) throw new Error("声音检查未匹配，请记录不一致或不确定，不能确认通过");
+  result.review = { inspectionKey: key, fullPlayback: true, speech: draft.speech, lipSync: draft.mouth, note: draft.note.trim() };
   await save();
 }
 
 async function registerSync(line: VoiceLine, result: SyncVideo) {
   const take = selectedTake(line);
-  if (!line.shotId || !take || stale(line) || !result.review || result.sourceVideo.path !== line.video?.path) throw new Error("请先确认当前版本同步并选择对应镜头");
-  await speechRequest("importSpeech", { shotId: line.shotId, audioPath: take.audio.path, videoPath: result.video.path, sourceVideoPath: result.sourceVideo.path, inspectionKey: result.review.inspectionKey, fullPlayback: result.review.fullPlayback, note: result.review.note });
+  if (!line.shotId || !take || !result.review || !syncConfirmed(line, result)) throw new Error("请先确认当前版本全部可见发声区间同步并选择对应镜头；局部通过不能整体采用");
+  await speechRequest("importSpeech", { shotId: line.shotId, audioPath: take.audio.path, videoPath: result.video.path, sourceVideoPath: result.sourceVideo.path, inspectionKey: result.review.inspectionKey, fullPlayback: result.review.fullPlayback, speech: result.review.speech, lipSync: result.review.lipSync, note: result.review.note });
   message.value = "口型版本已登记为候选，原片保留；请在镜头检查中确认人物、动作、接戏与声音后采用";
 }
 

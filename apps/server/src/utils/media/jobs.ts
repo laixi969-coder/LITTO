@@ -109,7 +109,8 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
         ...(input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
       }, input.signal, async task => {
         // ACT: 工作区适配器仍是单次执行；远端号作为恢复证据保存，不触发不支持的自动 poll 或重提。
-        api.dbRun("UPDATE generation_jobs SET parameters=json_set(parameters,'$.remoteTask',json(?)) WHERE id=? AND workspace_id=?", JSON.stringify({ ...task, providerId, modelId, updatedAt: new Date().toISOString() }), context.jobId, context.workspaceId);
+        const previous = api.scoped(context.workspaceId).get("generation_jobs", context.jobId)?.parameters?.remoteTask;
+        api.dbRun("UPDATE generation_jobs SET parameters=json_set(parameters,'$.remoteTask',json(?)) WHERE id=? AND workspace_id=?", JSON.stringify({ ...previous, ...task, id: task.id ?? previous?.id, providerId, modelId, updatedAt: new Date().toISOString() }), context.jobId, context.workspaceId);
       });
       const outputs = [];
       for (const file of files) {
