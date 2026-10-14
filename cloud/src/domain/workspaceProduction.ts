@@ -6,7 +6,7 @@ import { bindReference, createShot, updateShot, shotPartial } from "./shots.ts";
 import { bad, conflict, notFound, sha256 } from "../util.ts";
 import { finalQualityView } from "./finalQuality.ts";
 import { mediaView, saveMedia, sniff } from "../storage.ts";
-import { qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
+import { compactProductionRead, qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
 import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
@@ -114,7 +114,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     });
   }
   const shots = s.list("shots", { projectId }, "sequence_id, ord");
-  if (operation === "read") return {
+  if (operation === "read") return compactProductionRead({
     decisions: { location: "chat", keyframes: "requestKeyframeApproval({keyframeIds:[...]})：可批量确认并保存主关键帧，不在 updateShot 或 compile 中传 heroKeyframeId", production: "requestProductionDecision：资产、定妆、视频、配音、剪辑和最终验收；有效采用无需重复确认", story: "requestStoryDecision / requestStoryApproval：在聊天中保存故事选择与采用" },
     projectId, quality: productionQualityView(s, projectId), world: s.list("worlds", { projectId }), looks: s.list("looks", { projectId }), assets: s.list("assets", { projectId }),
     sequences: s.list("sequences", { projectId }), shots, references: s.list("refs", { projectId }), bindings: s.list("reference_bindings", { projectId }),
@@ -123,7 +123,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     candidateBatches: s.list("candidate_batches", { projectId }), candidates: s.list("candidates", { projectId }),
     library: s.list("library_assets"), assetVersions: s.list("asset_versions").filter(item => s.get("assets", item.assetId)?.projectId === projectId),
     renders: s.list("renders", { projectId }).map(render => ({ ...render, quality: finalQualityView(s, render), media: render.mediaId ? mediaView(s.get("media", render.mediaId)) : null })),
-  };
+  });
   if (operation === "world" || operation === "look") {
     if (shots.some(shot => shot.heroKeyframeId || shot.approvedTakeId)) throw conflict("已有采用镜头，请调用 requestProductionDecision 在聊天中确认世界或影调修改", "approved_world");
     const table = operation === "world" ? "worlds" : "looks";

@@ -271,7 +271,8 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     const o = scoped(workspaceId).get("generation_jobs", id, true);
     if (!o) throw bad("job not found");
     if (["QUEUED", "RUNNING"].includes(o.status)) throw conflict("job still active");
-    const { negativePrompt, label, ...rest } = o.parameters ?? {};
+    if (o.providerId === "workspaceMedia" && o.parameters?.remoteTask && !["failed", "rejected"].includes(o.parameters.remoteTask.status)) throw conflict("供应商结果尚未核清或已完成，请先查询并恢复原任务，不得重复提交", "remote_result_unresolved");
+    const { negativePrompt, label, remoteTask, ...rest } = o.parameters ?? {};
     return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label, idempotencyKey: `retry:${o.id}` });
 }
 void setting; void conflict;

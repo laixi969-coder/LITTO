@@ -3,6 +3,24 @@ import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 
 export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia, MediaContext } from "@toonflow/tools-scaffold/runtime";
 
+/** 项目总览不重复回传每个产物的整段编译提示词；原生成记录与其余参数仍保留。 */
+export function compactProductionRead<T>(value: T): T {
+  if (!value || typeof value !== "object") return value;
+  const result = value as Record<string, any>;
+  if (typeof result.projectId !== "string" || !Array.isArray(result.shots) || !Array.isArray(result.keyframes) || !Array.isArray(result.takes)) return value;
+  const compact = (item: Record<string, any>) => {
+    if (!item || typeof item.meta !== "object" || !item.meta) return item;
+    const { prompt, ...meta } = item.meta;
+    if (meta.parameters?.request && typeof meta.parameters.request === "object") {
+      const { prompt, negativePrompt, ...request } = meta.parameters.request;
+      const { negativePrompt: compiledNegative, ...parameters } = meta.parameters;
+      meta.parameters = { ...parameters, request };
+    }
+    return { ...item, meta };
+  };
+  return { ...result, keyframes: result.keyframes.map(compact), takes: result.takes.map(compact) } as T;
+}
+
 const relativePath = z.string().min(1).max(2048).refine(
   path => !/^[\\/]|[:\u0000-\u001f]/.test(path) && path.split(/[\\/]/).every(part => part && part !== "." && part !== ".."),
   "路径必须是工作区内的相对路径，不能包含空路径段或 ..",

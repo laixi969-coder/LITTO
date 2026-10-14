@@ -4,6 +4,7 @@ import { resizeImage, type AgentSession } from "@earendil-works/pi-coding-agent"
 import { modelAccess } from "@/utils/modelAvailability";
 import { cloud } from "@/lib/cloud";
 import { assertModelSelection } from "@/utils/modelSelection";
+import { compactProductionRead } from "@toonflow/tool-media-generation/runtime";
 
 const requestBytes = 1800 * 1024;
 const historyImageNote = "[历史图片预览已省略；原始素材与会话记录保留，需要检查细节时请按原路径重新读取。]";
@@ -11,8 +12,29 @@ const historyImageNote = "[历史图片预览已省略；原始素材与会话�
 // ACT: 只转换出站副本，不修改会话或素材。预算独立于供应商的 token 窗口。
 export function createRequestBudget() {
   const previews = new Map<string, { data: string; mimeType: string }>();
-  return async (payload: unknown, reduced = false) => {
+  async function prepare(payload: unknown, reduced = false): Promise<Record<string, unknown>> {
     const body = structuredClone(payload) as Record<string, unknown>;
+    const compactText = (text: string) => {
+      try {
+        const parsed = JSON.parse(text);
+        const compact = compactProductionRead(parsed);
+        return compact === parsed ? text : JSON.stringify(compact);
+      } catch { return text; }
+    };
+    // 旧会话也在出站副本中去除总览的重复提示词；不裁剪用户指令、工具调用或质检证据。
+    const messages = body.messages ?? body.input;
+    for (const message of (Array.isArray(messages) ? messages : []) as Record<string, any>[]) {
+      if (!message || typeof message !== "object") continue;
+      if (message.role === "tool" && typeof message.content === "string") message.content = compactText(message.content);
+      if (message.type === "function_call_output" && typeof message.output === "string") message.output = compactText(message.output);
+      for (const part of Array.isArray(message.content) ? message.content : []) {
+        if (message.role === "tool" && part.type === "text") part.text = compactText(part.text);
+        if (part.type === "tool_result") {
+          if (typeof part.content === "string") part.content = compactText(part.content);
+          else for (const content of Array.isArray(part.content) ? part.content : []) if (content.type === "text") content.text = compactText(content.text);
+        }
+      }
+    }
     const images: { part: Record<string, any>; kind: string; data: string; mime: string }[] = [];
     function visit(value: unknown) {
       if (!value || typeof value !== "object") return;
@@ -51,9 +73,12 @@ export function createRequestBudget() {
       else part.image_url = { ...part.image_url, url: `data:${preview.mimeType};base64,${preview.data}` };
     }
     const bytes = Buffer.byteLength(JSON.stringify(body));
-    if (bytes > requestBytes) throw new Error(`本次模型请求为 ${(bytes / 1024 / 1024).toFixed(2)} MB，超过 1.76 MB 请求预算。历史图片已减量，原始记录未改动；请压缩文字上下文或减少本次视频/附件，不能原样重试。`);
+    // ACT: 本地超限先使用现有减量档；不发送注定失败的请求，也不等待模型或 413 才减量。
+    if (bytes > requestBytes && !reduced && images.length) return prepare(payload, true);
+    if (bytes > requestBytes) throw new Error(`本次模型请求为 ${(bytes / 1024 / 1024).toFixed(2)} MB，超过 1.76 MB 请求预算。已精简重复的项目总览${images.length ? "并减量历史图片" : ""}，原始记录未改动；请压缩文字上下文或减少本次视频/附件，不能原样重试。`);
     return body;
-  };
+  }
+  return prepare;
 }
 
 export function installRequestBudget(session: AgentSession) {

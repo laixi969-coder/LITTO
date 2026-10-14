@@ -11,27 +11,31 @@ async function fetchJson(context: ProviderContext, path: string, signal: AbortSi
     method: body === undefined ? "GET" : "POST", signal, body,
     headers: { Authorization: `Bearer ${key}`, ...(typeof body === "string" ? { "Content-Type": "application/json" } : {}) },
   });
-  if (!response.ok) throw new Error(`Atlas Cloud 请求失败（HTTP ${response.status}）`);
+  if (!response.ok) throw Object.assign(new Error(`Atlas Cloud 请求失败（HTTP ${response.status}）`), { status: response.status });
   const result = await response.json() as Record<string, any>;
   if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("Atlas Cloud 响应格式错误");
-  if (result.error || (typeof result.code === "number" && result.code >= 400)) throw new Error(context.tool.errorMessage(result) || "Atlas Cloud 请求失败");
+  if (result.error || Number(result.code) >= 400) throw Object.assign(new Error(context.tool.errorMessage(result) || "Atlas Cloud 请求失败"), { status: Number(result.code) });
   return result;
 }
 
-async function uploadImage(context: ProviderContext, input: MediaInput, signal: AbortSignal) {
+async function uploadMedia(context: ProviderContext, input: MediaInput, signal: AbortSignal, formats: string[], maxBytes: number) {
   if (input.type === "url") {
-    if (!/^https?:\/\//i.test(input.url)) throw new Error("参考图须使用 HTTP 地址");
+    if (!/^https?:\/\//i.test(input.url)) throw new Error("参考素材须使用 HTTP 地址");
     return input.url;
   }
-  if (!["image/png", "image/jpeg", "image/webp"].includes(input.mimeType)) throw new Error("参考图须为 PNG、JPEG 或 WebP");
+  if (!formats.includes(input.mimeType)) throw new Error(`参考素材格式不支持：${input.mimeType}`);
   const bytes = input.type === "binary" ? input.data : Buffer.from(input.data.replace(/^data:[^,]+,/, ""), "base64");
-  if (!bytes.byteLength || bytes.byteLength > 10 * 1024 * 1024) throw new Error("参考图须为不超过 10 MB 的文件");
+  if (!bytes.byteLength || bytes.byteLength > maxBytes) throw new Error(`参考素材须为不超过 ${maxBytes / 1024 / 1024} MB 的非空文件`);
   const form = new FormData();
-  form.append("file", new Blob([new Uint8Array(bytes)], { type: input.mimeType }), `image.${input.mimeType.split("/")[1]}`);
+  form.append("file", new Blob([new Uint8Array(bytes)], { type: input.mimeType }), `media.${input.mimeType.split("/")[1]}`);
   const result = await fetchJson(context, "/api/v1/model/uploadMedia", signal, form);
   const url = result.data?.download_url ?? result.url;
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) throw new Error("Atlas Cloud 上传未返回有效地址");
   return url;
+}
+
+function uploadImage(context: ProviderContext, input: MediaInput, signal: AbortSignal) {
+  return uploadMedia(context, input, signal, ["image/png", "image/jpeg", "image/webp"], 10 * 1024 * 1024);
 }
 
 function wait(signal: AbortSignal, milliseconds: number) {
@@ -44,11 +48,20 @@ function wait(signal: AbortSignal, milliseconds: number) {
 }
 
 async function generate(context: ProviderContext, mediaType: "image" | "video", body: Record<string, unknown>, signal: AbortSignal): Promise<MediaAsset[]> {
-  const task = await fetchJson(context, `/api/v1/model/${mediaType === "image" ? "generateImage" : "generateVideo"}`, signal, JSON.stringify(body));
+  await context.tool.reportTask?.({ status: "submitting" });
+  let task;
+  try {
+    task = await fetchJson(context, `/api/v1/model/${mediaType === "image" ? "generateImage" : "generateVideo"}`, signal, JSON.stringify(body));
+  } catch (error) {
+    const rejected = [400, 401, 402, 403, 404, 413, 415, 422, 429].includes(Number((error as { status?: number }).status));
+    await context.tool.reportTask?.({ status: rejected ? "rejected" : "unknown" });
+    throw error;
+  }
   let result = task.data ?? task;
   const id = result.id;
   if (typeof id !== "string" || !id) throw new Error("Atlas Cloud 未返回任务 ID");
   while (true) {
+    await context.tool.reportTask?.({ id, status: String(result.status ?? "unknown") });
     if (result.status === "completed") {
       if (!Array.isArray(result.outputs) || !result.outputs.length) throw new Error("Atlas Cloud 未返回生成结果");
       return result.outputs.map((url: unknown): MediaAsset => {
@@ -111,7 +124,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 }
 
 export default {
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.2.0", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.2.1", rules,
   readme: "支持同步 Atlas Cloud 实时目录并选取已适配的 Seedream、GPT Image 2 图片和可灵视频。所选模型的尺寸、时长、分辨率从官方参数定义更新；复杂参考、分层和多镜头模型需单独适配，不加入可用目录。本地参考图自动上传。\n\n[官方文档](https://www.atlascloud.ai/docs/zh)",
   models: [
     { id: "sync/lipsync-v3", label: "Sync Lipsync v3 · 已有视频对口型", type: "video", lipSync: true, audio: true, mode: [["videoReference:1", "audioReference:1"]] },
@@ -196,19 +209,12 @@ export default {
       if (request.videos?.length !== 1 || request.audios?.length !== 1 || request.images?.length || request.firstFrame || request.lastFrame || request.cameraTrajectory) throw new Error("专用对口型需要一段原视频和一段声音，不接受重新生成画面的参考参数");
       if (request.generateAudio === false) throw new Error("对口型结果须保留驱动声音，不能静音");
       if (request.mode !== undefined && JSON.stringify(request.mode) !== JSON.stringify(["videoReference:1", "audioReference:1"])) throw new Error("专用对口型模式须为视频1与音频1");
-      const media = (input: MediaInput, formats: string[]) => {
-        if (input.type === "url") {
-          if (!/^https?:\/\//i.test(input.url)) throw new Error("同步参考须为 HTTP 地址");
-          return input.url;
-        }
-        if (!formats.includes(input.mimeType)) throw new Error(`同步参考格式不支持：${input.mimeType}`);
-        const data = input.type === "binary" ? Buffer.from(input.data).toString("base64") : input.data.replace(/^data:[^,]+,/, "");
-        if (!data) throw new Error("同步参考不能为空");
-        return `data:${input.mimeType};base64,${data}`;
-      };
       const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+      // 使用已验证的 URL 接入，避免内嵌 Base64 视频被受理后失败；上传原素材，不重生成画面。
+      const videoUrl = await uploadMedia(this, request.videos[0]!, signal, ["video/mp4", "video/quicktime", "video/webm"], 100 * 1024 * 1024);
+      const audioUrl = await uploadMedia(this, request.audios[0]!, signal, ["audio/wav", "audio/mpeg", "audio/mp4"], 100 * 1024 * 1024);
       // ACT: 官方cut_off仅裁至较短素材，不循环、不变速；保持已生成镜头与原曲节奏。
-      return generate(this, "video", { model: request.model, video_url: media(request.videos[0]!, ["video/mp4", "video/quicktime", "video/webm"]), audio_url: media(request.audios[0]!, ["audio/wav", "audio/mpeg", "audio/mp4"]), sync_mode: "cut_off" }, signal);
+      return generate(this, "video", { model: request.model, video_url: videoUrl, audio_url: audioUrl, sync_mode: "cut_off" }, signal);
     }
     const synced = this.models?.find(item => item.id === request.model) as AtlasModel | undefined;
     if (synced?.inputSchema) return generateSynced(this, request, "video", synced);

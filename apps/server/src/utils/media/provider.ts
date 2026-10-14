@@ -359,7 +359,7 @@ export async function deleteMediaProvider(fileName: string, revision: string) {
   } finally { release(); }
 }
 
-export async function loadMediaProviderSource(source: string, config: Record<string, unknown> = {}, signal?: AbortSignal, fetchRequest: typeof fetch = guardedFetch, cwd?: string) {
+export async function loadMediaProviderSource(source: string, config: Record<string, unknown> = {}, signal?: AbortSignal, fetchRequest: typeof fetch = guardedFetch, cwd?: string, reportTask?: ProviderTools["reportTask"]) {
   signal?.throwIfAborted();
   const { id } = parseProvider(source);
   // ACT: VM 只隔离可信供应商的全局上下文；不可信代码需要独立进程等更强隔离。
@@ -384,6 +384,10 @@ export async function loadMediaProviderSource(source: string, config: Record<str
     config: providerConfig,
     signal,
     tool: {
+      reportTask: reportTask ? async (task: { id?: string; status: string }) => {
+        if (!task || (task.id !== undefined && (typeof task.id !== "string" || !task.id.trim() || task.id.length > 512)) || typeof task.status !== "string" || !task.status.trim() || task.status.length > 64) throw new Error("供应商任务信息无效");
+        await reportTask({ id: task.id, status: task.status });
+      } : undefined,
       fetch: signal ? Object.assign((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
         signal.throwIfAborted();
         const requestSignal = init?.signal === null ? undefined : init?.signal ?? (input instanceof Request ? input.signal : undefined);

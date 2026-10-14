@@ -3,7 +3,7 @@ import { guardedFetch } from "@/utils/ssrf";
 import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
-import { mediaProviders, type Provider } from "@toonflow/providers";
+import { mediaProviders, type Provider, type ProviderTools } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
@@ -166,6 +166,7 @@ async function generateMediaUnrecorded(
   mediaType: "image" | "video" | "audio",
   request: MediaGenerationRequest,
   signal?: AbortSignal,
+  reportTask?: ProviderTools["reportTask"],
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
   if (!request.prompt.trim()) invalid("请输入生成提示词");
@@ -183,7 +184,7 @@ async function generateMediaUnrecorded(
   validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
-  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory);
+  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory, reportTask);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;
   if (typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
@@ -277,11 +278,12 @@ export async function generateMediaDirect(
   mediaType: "image" | "video" | "audio",
   request: MediaGenerationRequest,
   signal?: AbortSignal,
+  reportTask?: ProviderTools["reportTask"],
 ): Promise<GeneratedMedia[]> {
   const started = Date.now();
   const base = { kind: mediaType, providerId: request.providerId, modelId: request.modelId, durationMs: 0 };
   try {
-    const files = await generateMediaUnrecorded(cwd, mediaType, request, signal);
+    const files = await generateMediaUnrecorded(cwd, mediaType, request, signal, reportTask);
     const seconds = (request as { duration?: number }).duration;
     recordUsage(mediaType === "video" && seconds ? { ...base, units: seconds, unit: "second", durationMs: Date.now() - started }
       : { ...base, units: Math.max(1, files.length), unit: mediaType === "image" ? "image" : "call", durationMs: Date.now() - started });

@@ -107,7 +107,10 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
         // 任务记录中的负面词与种子优先；镜头编译产出的负面词不能因路径不同而丢失。
         ...(input.negativePrompt ? { negativePrompt: input.negativePrompt } : {}),
         ...(input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
-      }, input.signal);
+      }, input.signal, async task => {
+        // ACT: 工作区适配器仍是单次执行；远端号作为恢复证据保存，不触发不支持的自动 poll 或重提。
+        api.dbRun("UPDATE generation_jobs SET parameters=json_set(parameters,'$.remoteTask',json(?)) WHERE id=? AND workspace_id=?", JSON.stringify({ ...task, providerId, modelId, updatedAt: new Date().toISOString() }), context.jobId, context.workspaceId);
+      });
       const outputs = [];
       for (const file of files) {
         const { path } = await resolveWorkspacePath(directory, file.path);
