@@ -113,11 +113,17 @@ export function setLibraryFavorite(s: Scope, libraryId: string, favorite: boolea
   return s.get("library_assets", libraryId)!;
 }
 
+export function findLibraryAsset(s: Scope, entry: Row, projectId: string) {
+  const source = s.get("assets", entry.sourceAssetId);
+  if (source?.projectId === projectId) return source;
+  return s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === entry.id);
+}
+
 export async function importFromLibrary(s: Scope, libraryId: string, projectId: string, actor: string, overrides: { name?: string; invariants?: string[] } = {}, beforeWrite?: () => void) {
   const entry = s.get("library_assets", libraryId);
   if (!entry) throw notFound("library asset");
   if (!s.get("projects", projectId)) throw notFound("project");
-  const previous = s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === libraryId);
+  const previous = findLibraryAsset(s, entry, projectId);
   if (previous) { beforeWrite?.(); return previous; }
   const authoritative = entry.authoritativeReference;
   if (!authoritative || !s.get("media", authoritative)?.mime.startsWith("image/")) throw bad("角色库定妆图不可用，请重新设置");
@@ -125,7 +131,7 @@ export async function importFromLibrary(s: Scope, libraryId: string, projectId: 
   return copyMedia(s, [authoritative, ...references.map(ref => ref.mediaId)], projectId, copies => {
     beforeWrite?.(); unchanged(s, "library_assets", entry);
     if (!s.get("projects", projectId)) throw notFound("project");
-    const imported = s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === libraryId);
+    const imported = findLibraryAsset(s, entry, projectId);
     if (imported) {
       for (const id of copies.values()) s.softDelete("media", id);
       return imported;

@@ -1,7 +1,8 @@
 import { copyFile, cp, lstat, mkdir, readFile, readdir, rename, unlink, writeAtomic, writeFile } from "@toonflow/file";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 
-export default async function initializePlugins(targetDirectory: string, sourceDirectory: string, fileFilter?: RegExp | readonly string[], revision?: string) {
+export default async function initializePlugins(targetDirectory: string, sourceDirectory: string, fileFilter?: RegExp | readonly string[], revision?: string | true) {
   const marker = resolve(targetDirectory, "initialized");
   const initialized = await readFile(marker, "utf8").catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return null;
@@ -18,6 +19,14 @@ export default async function initializePlugins(targetDirectory: string, sourceD
   const files = entries.filter(file => fileFilter
     ? file.isFile() && (fileFilter instanceof RegExp ? fileFilter.test(file.name) : fileFilter.includes(file.name))
     : file.isDirectory());
+  if (revision === true) {
+    const hash = createHash("sha256");
+    for (const file of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
+      hash.update(file.name).update("\0").update(await readFile(resolve(sourceDirectory, file.name))).update("\0");
+    }
+    revision = hash.digest("hex");
+    if (initialized === revision) return;
+  }
   if (!files.length && revision === undefined) return;
   for (const file of files) {
     const source = resolve(sourceDirectory, file.name);

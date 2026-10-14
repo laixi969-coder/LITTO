@@ -77,7 +77,7 @@ function prepareStoryProduction(revisionId: string, model: string) {
 function prepareCharacterGeneration(assetId: string) {
   const project = workspaceStore.project;
   if (!project) return;
-  workspaceStore.pendingAgentMessage = { directory: project.directory, model: "", reasoningEffort: "", prompt: `请为当前项目角色资产 ${assetId} 生成定妆参考图。先 productionSpec read 读取该角色的实际档案和已有参考，沿用已选图片模型与精度，展示具体生成方案并沿用或取得本批次算力授权。复用现有图片生成能力，不为定妆照虚构剧情镜头。生成后展示真实图片，使用 requestProductionDecision selectReference 保存用户选中的定妆；随后 productionSpec publishAsset 收藏到跨项目角色资产库。保留原图与旧版本，不能用角色描述冒充已生成图片。` };
+  workspaceStore.pendingAgentMessage = { directory: project.directory, model: "", reasoningEffort: "", prompt: `请为当前项目角色资产 ${assetId} 生成定妆参考图。先 productionSpec readAsset{assetId} 读取该角色的实际档案和已有参考，沿用已选图片模型与精度，展示具体生成方案并沿用或取得本批次算力授权。复用现有图片生成能力，使用 purpose=asset 和角色参考，不为定妆照虚构剧情镜头。生成后展示真实图片，使用 requestProductionDecision selectReference 保存用户选中的定妆；随后 productionSpec publishAsset 收藏到跨项目角色资产库。保留原图与旧版本，不能用角色描述冒充已生成图片。` };
   agentVisible.value = true;
 }
 const voiceVisible = ref(false);

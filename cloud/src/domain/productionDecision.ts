@@ -7,7 +7,7 @@ import { mediaView } from "../storage.ts";
 import { assetInput, worldSchema, lookSchema } from "./schema.ts";
 import { approveAsset, assetVersions, event, newAssetVersion, rollbackAsset, updateAsset } from "./assets.ts";
 import { createBatch, promoteCandidate, registerCandidates } from "./candidates.ts";
-import { importFromLibrary, publishToLibrary, updateLibraryReference, libraryContent } from "./library.ts";
+import { importFromLibrary, publishToLibrary, updateLibraryReference, libraryContent, findLibraryAsset } from "./library.ts";
 import { promoteHero } from "./lifecycle.ts";
 import { runQc } from "./qc.ts";
 import { requireReviewed, shotFingerprint } from "./realism.ts";
@@ -237,7 +237,7 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       request.title = action.operation === "importAsset" ? `复用角色库资产：${entry.name}` : `更新角色库定妆：${entry.name}`;
       request.question = `${entry.description || ""}\n固定特征：${(entry.invariants ?? []).join("；")}`;
       if (action.operation === "importAsset") {
-        const imported = s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === entry.id);
+        const imported = findLibraryAsset(s, entry, projectId);
         records.push(imported ?? null); completed = !!imported; selectedId = imported?.id;
       } else {
         const nextMedia = preview(action.data.mediaId, "新的定妆参考");

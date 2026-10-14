@@ -382,9 +382,10 @@ async function refreshLibrarySources() {
 }
 async function importLibraryAsset(entry: any) {
   const created = await request(`/projects/${projectId}/library/import/${entry.id}`, "POST", {});
+  const existing = assets.value.some(asset => asset.id === created.id);
   assets.value = [...assets.value.filter(asset => asset.id !== created.id), created];
   await refreshAssetLibrary();
-  message.value = `已导入：${created.name}（继承定妆参考）`;
+  message.value = existing ? `已在本项目：${created.name}，沿用现有资产` : `已导入：${created.name}（继承定妆参考）`;
 }
 async function saveShot() {
   if (!draft.value || !dirty.value) return;
@@ -659,7 +660,7 @@ defineExpose({ flushSave, openShot, openLibrary });
   .assetList, .jobList { padding: 0; list-style: none; li { padding: 12px 0; border-bottom: 1px solid var(--studioBorder); display: flex; justify-content: space-between; gap: 16px; } small { display: block; } }
   .assetPortrait { display: block; width: 180px; max-height: 240px; object-fit: contain; margin: 12px 0; border-radius: var(--ui-radius); }
   .assetImagePicker { margin: 12px 0; summary { cursor: pointer; } .assetImageGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; max-height: 360px; overflow: auto; button { padding: 6px; display: flex; flex-direction: column; gap: 4px; &[aria-pressed="true"] { outline: 2px solid var(--el-color-primary); } img { width: 100%; height: 120px; object-fit: contain; } span { font-size: 11px; } } } }
-  .libraryList { padding: 0; list-style: none; li { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--studioBorder); } figure { width: 64px; flex: none; margin: 0; img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--ui-radius); } } .libraryMeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; small { color: var(--studioMuted); } } button { flex: none; } }
+  .libraryList { padding: 0; list-style: none; li { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--studioBorder); } figure { width: 64px; flex: none; margin: 0; img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--ui-radius); } } .libraryMeta { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 2px; small { color: var(--studioMuted); } } button { flex: none; } }
   .candidateGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 12px; figure { margin: 0; border: 1px solid var(--studioBorder); border-radius: var(--ui-radius); padding: 8px; img, video { width: 100%; max-height: 220px; object-fit: contain; background: var(--studioRail); } &.promoted { border-color: var(--studioDone); border-width: 2px; } figcaption { font-size: 12px; margin: 8px 0; } .candidateActions { display: flex; gap: 8px; align-items: center; input { width: 64px; flex: none; min-height: 36px; } button { min-height: 36px; padding: 4px 10px; font-size: 12px; flex: none; } } } }
   .sentReferences { display: flex; flex-wrap: wrap; gap: 12px; figure { width: 180px; margin: 0; img, video, audio { width: 100%; max-height: 180px; object-fit: contain; } figcaption { overflow-wrap: anywhere; font-size: 12px; } } }
   .outputPreview { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--studioRail); margin: 16px 0; }
