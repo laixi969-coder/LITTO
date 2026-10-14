@@ -8,6 +8,7 @@ import { compileShot, compileWorkspacePrompt, requireCompiledInputs, renderCompi
 import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
 import { bad, conflict, notFound, now } from "./util.ts";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
+import { localRepairSchema, prepareLocalRepair } from "./domain/localRepair.ts";
 
 /** Host-only execution bridge. Tenant identity comes from the stored job, never its parameters. */
 export function configureWorkspaceMedia(execute: (request: GenRequest) => Promise<GenResult>) {
@@ -86,7 +87,7 @@ export function enqueueWorkspaceMedia(input: {
     price: {},
     capabilities: input.production?.capabilities ?? {},
   });
-  const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt);
+  const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt, input.request.purpose);
   if (input.production) {
     const scope = scoped(input.workspaceId);
     const negativePrompt = input.negativePrompt ?? input.request.negativePrompt;
@@ -112,7 +113,7 @@ export function enqueueWorkspaceMedia(input: {
     modelId,
     compiledPrompt: prompt,
     negativePrompt: input.negativePrompt ?? input.request.negativePrompt,
-    parameters: { directory: input.directory, request: { ...input.request, prompt, seed: input.seed ?? input.request.seed }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
+    parameters: { directory: input.directory, request: { ...input.request, prompt, seed: input.seed ?? input.request.seed }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint, ...input.production.repairParameters } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
     seed: input.seed ?? input.request.seed,
     inputRefs: input.production?.compiled.inputs ?? [],
     fallbackAllowed: false,
@@ -131,7 +132,7 @@ function generationSignature(request: Record<string, unknown>, prompt: string, n
 
 export function prepareWorkspaceShot(input: {
   workspaceId: string; projectId: string; shotId: string; kind: "image" | "video";
-  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean;
+  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean; localRepair?: unknown;
 }) {
   const s = scoped(input.workspaceId);
   const shot = s.get("shots", input.shotId);
@@ -158,18 +159,26 @@ export function prepareWorkspaceShot(input: {
     requireReviewed(s, "keyframe", keyframe);
     if (!capabilities.image2video) throw bad("当前模式不能接收主关键帧，请选择图生视频模式");
   }
-  const compiled = compileShot(s, shot.id, input.kind, modelId, { startFrameMediaId: keyframe?.mediaId, startFrameAsReference: input.kind === "video" && !firstFrame });
+  const repair = input.localRepair === undefined ? undefined : prepareLocalRepair(s, localRepairSchema.parse(input.localRepair));
+  if (repair && (input.kind !== "image" || repair.shot.id !== shot.id)) throw bad("精修原图须属于当前图像镜头");
+  // ACT: 工作区适配器以图片输入模式声明参考图编辑能力，未声明蒙版能力，不承诺区域外像素不变。
+  if (repair && imageLimit < 1) throw bad("当前图像模型不能接收原图，请选择支持图片输入的编辑模型");
+  const compiled = repair?.compiled ?? compileShot(s, shot.id, input.kind, modelId, { startFrameMediaId: keyframe?.mediaId, startFrameAsReference: input.kind === "video" && !firstFrame });
   // ACT: 主帧必占一个输入槽；不得为了多参考丢掉已批准主帧。
   if (compiled.inputs.filter(ref => ref.sent).length > capabilities.maxInputs) throw bad("参考数量超出当前模式容量，请减少参考或更换模式");
   if (mode === "startEndRequired" && !compiled.inputs.some(ref => ref.role === "END_FRAME" && ref.sent)) throw bad("此模式须绑定尾帧");
   requireCompiledInputs(compiled);
   const counts = { image: 0, video: 0, audio: 0 };
+  const importedAssets = s.list("assets", { projectId: input.projectId }).filter(asset => asset.attributes?.importedFrom);
   for (const ref of compiled.inputs.filter(ref => ref.sent)) {
     const media = ref.mediaId && s.get("media", ref.mediaId);
     const kind = ref.role === "AUDIO" ? "audio" : ["PERFORMANCE", "CAMERA_MOTION"].includes(ref.role) ? "video" : "image";
-    const asset = ref.referenceId.startsWith("asset:") ? s.get("assets", ref.referenceId.slice(6)) : undefined;
-    const libraryReference = asset?.projectId === input.projectId && asset.attributes?.authoritativeReference === ref.mediaId
-      && asset.attributes?.importedFrom && s.get("library_assets", asset.attributes.importedFrom);
+    const asset = ref.referenceId.startsWith("asset:") ? s.get("assets", ref.referenceId.slice(6))
+      : importedAssets.find(asset => asset.references?.includes(ref.referenceId));
+    const library = asset?.attributes?.importedFrom && s.get("library_assets", asset.attributes.importedFrom);
+    const libraryReference = asset?.projectId === input.projectId && library && (library.authoritativeReference === ref.mediaId
+      || library.referenceSnapshots?.some((reference: { mediaId?: string }) => reference.mediaId === ref.mediaId)
+      || library.references?.some((id: string) => s.get("refs", id)?.mediaId === ref.mediaId));
     if (!media || (media.projectId !== input.projectId && !libraryReference) || !media.mime.startsWith(`${kind}/`)) throw bad(`参考须是当前项目或已导入角色库的有效 ${kind} 媒体`);
     counts[kind]++;
   }
@@ -188,5 +197,6 @@ export function prepareWorkspaceShot(input: {
   compiled.sections["Objective" in compiled.sections ? "Reference binding" : "reference plan"] = referencePlan;
   compiled.prompt = renderCompiledPrompt(compiled.sections);
   const nativeDialogue = shot.creativeBrief?.dialogue?.mode === "native" && shot.creativeBrief.dialogue.lines.length > 0;
-  return { shotId: shot.id, keyframeId: keyframe?.id, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
+  const repairParameters = repair ? { localRepairOf: repair.keyframe.id, localRepairKind: repair.kind, localRepairTarget: repair.target } : undefined;
+  return { shotId: shot.id, keyframeId: keyframe?.id, repairParameters, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
 }

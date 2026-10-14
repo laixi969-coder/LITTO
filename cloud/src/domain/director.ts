@@ -1,14 +1,15 @@
 import { type Scope } from "../db.ts";
-import { bad, notFound } from "../util.ts";
+import { bad, notFound, sha256 } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
-import { createShotsFromDrafts } from "./shots.ts";
+import { createShotsFromDrafts, validateVisibleAssets } from "./shots.ts";
 import { storyboardDirector, visualDirector, assetDirector, type ShotDraft } from "./skills.ts";
 import { generateKeyframes } from "./lifecycle.ts";
 import { mustRoute, resolvePolicy } from "../providers/router.ts";
 import { parseJson, runText } from "../llm.ts";
-import { cameraSchema, lightingSchema, NARRATIVE_FUNCTIONS } from "./schema.ts";
+import { cameraSchema, lightingSchema, NARRATIVE_FUNCTIONS, creativeBriefSchema, shotInput } from "./schema.ts";
 import { z } from "zod";
 import { tx } from "../db.ts";
+import { validateStateDelta } from "./state.ts";
 
 type Step = { step: string; status: "done" | "skipped" | "needs_confirmation"; detail: any };
 
@@ -17,31 +18,59 @@ type Step = { step: string; status: "done" | "skipped" | "needs_confirmation"; d
  * Freedom map → Router → Generate → QC → Continuity → Repair.
  * Anything that touches LOCKed content, approved assets or core shot intent needs `confirm: true`.
  */
-const refined = z.object({ shots: z.array(z.object({ title: z.string(), narrativeFunction: z.enum(NARRATIVE_FUNCTIONS), action: z.string(), performance: z.object({ emotion: z.string(), intensity: z.number().min(0).max(1), eyeline: z.string(), gesture: z.string(), timing: z.string() }), camera: cameraSchema, lighting: lightingSchema, duration: z.number().min(1).max(30), subtitle: z.string().optional() }).passthrough()) });
+const refined = z.object({ shots: z.array(z.object({
+  sourceIndexes: z.array(z.number().int().nonnegative()).min(1),
+  visibleAssetIds: z.array(z.string()),
+  title: z.string(), narrativeFunction: z.enum(NARRATIVE_FUNCTIONS), action: z.string().trim().min(1),
+  performance: shotInput.shape.performance.removeDefault().extend({ intensity: z.number().min(0).max(1) }),
+  blocking: shotInput.shape.blocking.removeDefault(),
+  camera: cameraSchema, lighting: lightingSchema, duration: z.number().finite().min(0.5).max(30),
+  intendedStateDelta: shotInput.shape.intendedStateDelta.removeDefault(),
+  creativeBrief: creativeBriefSchema,
+})).min(1).max(180) });
 
 /**
- * LLM refinement on top of the deterministic storyboard: the model may rewrite function / action / performance / camera / lighting / timing,
- * but never the shot count, order, scene assignment or asset ids (those carry continuity). Anything invalid → keep the rule-based draft.
+ * 按源节拍映射拆合镜头；场次、事件顺序、资产与逐句对白仍可追踪。失败保留草稿，不自动生成。
  */
 async function refineWithLlm(s: Scope, projectId: string, actor: string, script: string, drafts: ShotDraft[], world: any, goal?: string) {
   const system = [
-    "You are a film storyboard director and cinematographer. Refine the draft shot list. Return ONLY JSON {\"shots\":[...]} with exactly the same number of shots in the same order; keep each shot's fields (title, narrativeFunction, action, performance{emotion,intensity,eyeline,gesture,timing}, camera{shotSize,position,height,angle,lensMm,focus,depth,motion,motivation,side,screenDirection}, lighting{motivatedLight,key,fill,negativeFill,practicals,exposure,keyDirection,timeOfDay,colorTemp}, duration, subtitle).",
-    "Respect: cut by narrative function, stay on one side of the 180-degree axis within a scene, motivate every camera move, keep lighting consistent within a scene. Describe performer paths separately from camera paths. Preserve story facts, exact dialogue and approved identity; no filler words like 8K or cinematic.",
-    "Add camera.design with technique, purpose, start, end, subjectPath, cameraPath, timing, cut, invariants (array), acceptance (array), fallback. Choose a static shot when sufficient. Dolly changes position, pan rotates, zoom changes field of view; orbit requires an arc, dolly zoom requires coordinated distance and FOV. Budget actual dialogue and action durations. Do not invent scene layout, emotional reactions or product capabilities to fill coverage. These are draft designs, not verified model controls.",
-    "Keep action, subjectPath, cameraPath, timing, start/end and performance mutually consistent. For combat, identify the attacker, contact point, receiver's displacement and follow-through in concrete timed beats. Use real-time speed unless requested otherwise; heavy subjects do not imply slow motion. Do not fill a shot with repeated preparation or a held contact. Start from action already underway, preserve damage progression, and separate neighbouring-shot edit notes from explicitly requested internal cuts. Acceptance and fallback are production notes, not alternate instructions for the video model.",
-    "Use GOAL to preserve the requested action intensity; realistic physics does not mean restrained choreography. For intense combat, chain pressure, defensive response and a changed position into the next exchange without a mutual reset. Supporting fighters must affect routes or choices, not queue for solo turns. Allocate time to concrete events, not equal multi-second slots per strike/block. Do not repair combat inactivity with breathing or eye movements. Plan readable spatial coverage, contact/reaction coverage and motivated action-phase cuts; do not default to distant full-body coverage throughout. Draft duration is an estimate to revise, not time to fill; generation length is not the final edit length. In combat camera.design.acceptance, record observable failure conditions such as turn-taking taps, unexplained waiting, no contact consequence or repeated resets. These criteria require later video review and are not a claim of verified output. Preserve purposeful stillness and non-combat performances when the goal calls for them.",
-    // 方法来源与适配边界见 cinema/references/performanceDirectionLicense.md。
-    "For shots with performers, put each character's immediate objective, tactic and observable behavior in action/performance.gesture, their attention target in eyeline, and the trigger, response order, dialogue delivery and ending residue in timing. Name the performer for each behavior. Emotion labels and intensity alone are not performance direction.",
-    "Listening can start during a partner's line only after the relevant cue is available. Preserve emotional carryover across adjacent shots. Keep established voice identity while varying delivery for the scene. Give ensemble members distinct attention and responses when appropriate; do not force synchronized gestures, repetitive blinking, crying, damage, new props or new backstory. Match behavior scale to framing and leave room for the existing dialogue and pauses. Empty environment or object shots need no human acting notes.",
-  ].join(" ");
-    const slim = drafts.map((d) => ({ title: d.title, narrativeFunction: d.narrativeFunction, action: d.action, performance: d.performance, camera: d.camera, lighting: d.lighting, duration: d.duration, subtitle: d.subtitle ?? "" }));
-    const r = await runText({ workspaceId: s.workspaceId, projectId, actor, system, prompt: `GOAL: ${JSON.stringify(goal ?? "Follow the script's intended tone and intensity")}\nWORLD: ${JSON.stringify(world ?? {})}\nSCRIPT:\n${script}\nDRAFT:\n${JSON.stringify({ shots: slim })}`, json: true, label: "director.refine", mockEcho: JSON.stringify({ shots: slim }) });
+    "You are a film director. Return ONLY JSON {\"shots\":[...]}. Each shot needs sourceIndexes (zero-based draft indexes), visibleAssetIds, title, narrativeFunction, action, performance{emotion,intensity,eyeline,lookTarget,gesture,timing}, blocking{foreground,midground,background}, camera, lighting, duration, intendedStateDelta and creativeBrief. Merge adjacent beats within a scene or split one beat into consecutive shots when motivated. Cover all beats in order without repeating events; repeated sourceIndexes are only for a split beat. Preserve real asset IDs; visibleAssetIds is the subset appearing at some point, excluding voice-only characters.",
+    "Preserve SCRIPT facts and GOAL. Design unspecified staging and responses to established intentions without inventing events, props, backstory or dialogue. A shot earns its duration through action, information, relationship change or purposeful stillness. Use the shortest readable duration preserving speech, action and reaction; estimate edit handles separately. Do not fill a draft duration with breathing, blinking, slow pushes or explanatory narration. Select useful behavior from CHARACTERS for the current goal; do not paste biographies, relationships or full habit/knowledge lists into execution fields.",
+    "Stage before photography. Anchor each visible performer to existing landmarks; separate body facing, gaze and camera direction, with contact/held props when relevant. camera.design needs technique,purpose,start,end,subjectPath,cameraPath,timing,cut,invariants[],acceptance[],fallback. start describes ONE initial instant, excluding later entrances; end is the visible result. Subject and camera paths are separate. Camera distance, framing, background, depth and focus describe visible results, not just lens numbers. A move needs trigger, path and stopping point; static is valid. Preserve world light source and geography across reverse angles. Acceptance, fallback and neighbouring-shot edit notes are production records, not extra actions.",
+    "For each performer name the immediate goal, tactic and observable evidence in action/gesture; put cue and response order in timing, attention target in eyeline/lookTarget. Match behavior scale to framing. Change tactic when resistance or new information motivates it; listening starts only after the relevant cue, possibly during a partner's line. Preserve ending residue into the next shot. Give ensemble members distinct tasks rather than synchronized tics. Silent characters need no voice instructions. Nonhuman performers follow their medium; object/environment shots need no human acting notes.",
+    "creativeBrief is {kind:performance|combat|establishing|product,intent,visualPayoff,dialogue:{mode:native|post,lines:[{speakerId,text,start,end,delivery,lipSync:visible|offscreen,framing}]}}. Copy every sourceDialogue exactly once, in order, with the same speakerId and full text, in a shot covering that source. Never rewrite, split or narrate a line. Preserve explicit offscreen coverage; otherwise keep speaking visible. Keep voice identity, adapt delivery to the current tactic. Use native unless a post-production plan is requested; silence uses lines:[]. Local times run from 0 to duration and allow natural speech and reactions. intendedStateDelta records only the changes actually reached at this shot's end, keyed by real asset IDs; do not apply the full source result prematurely in a split shot.",
+    "Keep action, performance, paths, start/end and timing consistent without copying the same paragraph into each. Motion defaults to real time; show necessary contact, force, response and support rather than jumping between end states. Combat additionally needs combat{dramaticTurn,signature,coverage,beats:[{attackerId,defenderId,action,reaction,endState,supportingAction}]}. Preserve GOAL intensity through connected pressure, defense, displacement and follow-through, not alternating taps, equal multi-second slots or mutual resets. Supporting fighters affect routes and choices. Plan readable contact/reaction coverage and motivated cuts; preserve requested continuous takes. Do not impose combat speed or extra movement on purposeful stillness. No added cuts, slow motion or preparation merely to fill time.",
+  ].join(" ");   if (drafts.some(draft => draft.subtitle && !draft.sourceDialogue)) return { used: false, reason: "存在未匹配说话人的台词或旁白，请先明确声音来源并补充真实角色；不把字幕静默当成已执行对白" };
+    const usedAssets = new Set(drafts.flatMap(draft => draft.assetIds));
+    const characterDirection = s.list("assets", { projectId }).filter(asset => asset.type === "Character" && usedAssets.has(asset.id)).map(asset => ({ id: asset.id, name: asset.name, characterDirection: asset.attributes?.characterDirection }));
+    const slim = drafts.map((draft, index) => ({ ...draft, visibleAssetIds: draft.visibleAssetIds ?? draft.assetIds, sourceIndexes: [index] }));
+    const r = await runText({ workspaceId: s.workspaceId, projectId, actor, system, prompt: `GOAL: ${JSON.stringify(goal ?? "Follow the script's intended tone and intensity")}\nCHARACTERS: ${JSON.stringify(characterDirection)}\nWORLD: ${JSON.stringify(world ?? {})}\nSCRIPT:\n${script}\nDRAFT:\n${JSON.stringify({ shots: slim })}`, json: true, label: "director.refine", mockEcho: JSON.stringify({ shots: slim }) });
     if (!r) return { used: false, reason: "no usable text model" };
     try {
         const parsed = refined.parse(parseJson(r.text));
-        if (parsed.shots.length !== drafts.length) throw new Error(`shot count changed ${drafts.length} → ${parsed.shots.length}`);
-        if (parsed.shots.some((shot, index) => shot.subtitle !== undefined && shot.subtitle !== (drafts[index].subtitle ?? ""))) throw new Error("原文台词不能被改写");
-        parsed.shots.forEach((x, i) => Object.assign(drafts[i], { title: x.title, narrativeFunction: x.narrativeFunction, action: x.action, performance: x.performance, camera: x.camera, lighting: x.lighting, duration: x.duration, subtitle: x.subtitle ?? drafts[i].subtitle }));
+        const coverage = parsed.shots.flatMap(shot => shot.sourceIndexes);
+        if (coverage[0] !== 0 || coverage.at(-1) !== drafts.length - 1
+          || coverage.some((index, i) => i > 0 && (index < coverage[i - 1] || index > coverage[i - 1] + 1))) throw new Error("源节拍遗漏、越界或顺序改变");
+        const sourceCounts = new Map<number, number>();
+        for (const index of coverage) sourceCounts.set(index, (sourceCounts.get(index) ?? 0) + 1);
+        const expectedDialogue = drafts.flatMap(draft => draft.sourceDialogue ? [draft.sourceDialogue] : []);
+        const actualDialogue = parsed.shots.flatMap(shot => shot.creativeBrief.dialogue.lines.map(({ speakerId, text }) => ({ speakerId, text })));
+        if (JSON.stringify(actualDialogue) !== JSON.stringify(expectedDialogue)) throw new Error("原文对白遗漏、重复、改词或说话人改变");
+        const next = parsed.shots.map(shot => {
+          const sources = shot.sourceIndexes.map(index => drafts[index]);
+          if (sources.some(source => source.sceneIndex !== sources[0].sceneIndex)) throw new Error("不能跨场合镜");
+          if (shot.sourceIndexes.length > 1 && shot.sourceIndexes.some(index => sourceCounts.get(index)! > 1)) throw new Error("重复源节拍只能独立拆镜，不能与合镜交叉");
+          for (const line of shot.creativeBrief.dialogue.lines) {
+            if (line.end <= line.start || line.end > shot.duration) throw new Error("对白时间超出本镜");
+            if (!sources.some(source => source.sourceDialogue?.speakerId === line.speakerId && source.sourceDialogue.text === line.text)) throw new Error("对白被移到无关源节拍");
+          }
+          validateStateDelta(s, projectId, shot.intendedStateDelta);
+          const assetIds = [...new Set(sources.flatMap(source => source.assetIds))];
+          validateVisibleAssets({ assetIds, visibleAssetIds: shot.visibleAssetIds, creativeBrief: shot.creativeBrief });
+          const { sourceIndexes, ...design } = shot;
+          return { ...sources[0], ...design, source: { scriptHash: sha256(script), beatIndexes: sourceIndexes, beats: sources.map(source => source.action), }, assetIds, subtitle: shot.creativeBrief.dialogue.lines.map(line => line.text).join("\n") };
+        });
+        drafts.splice(0, drafts.length, ...next);
         return { used: true, model: r.modelId, jobId: r.jobId };
     } catch (e) {
         return { used: false, reason: `LLM reply rejected (${(e as Error).message}); kept rule-based draft`, model: r.modelId };
@@ -72,7 +101,9 @@ export async function directorRun(s: Scope, projectId: string, actor: string, in
     }
     const drafts = storyboardDirector(input.script, assets.map((a) => ({ id: a.id, name: a.name, type: a.type })));
     if (!drafts.length) throw bad("剧本没有可执行的动作或台词");
-    const llm = input.useLlm ? await refineWithLlm(s, projectId, actor, input.script, drafts, world, input.goal) : null;
+    drafts.forEach((draft, index) => { draft.source = { scriptHash: sha256(input.script), beatIndexes: [index], beats: [draft.action] }; });
+    const llm = input.useLlm !== false ? await refineWithLlm(s, projectId, actor, input.script, drafts, world, input.goal) : null;
+    if (input.generate && !llm?.used) throw bad("导演设计尚未完成，不能直接用规则草稿生成正式镜头", llm?.reason ?? "请开启 useLlm 或先人工补齐镜头设计");
     const shots = tx(() => {
         if (seq && s.get("sequences", seq.id)?.projectId !== projectId) throw notFound("sequence");
         if (!seq) seq = s.insert("sequences", { project_id: projectId, name: "Sequence 1", ord: 0, script: input.script, data: {} });
@@ -84,7 +115,7 @@ export async function directorRun(s: Scope, projectId: string, actor: string, in
     steps.push({ step: "sequence_and_shots", status: "done", detail: { sequenceId: seq.id, shotCount: shots.length, functions: shots.map((x: any) => x.narrativeFunction), warnings: input.minShots && shots.length < input.minShots ? ["原文节拍不足以支撑指定镜数，保留真实覆盖，需导演补充有目的的镜头设计"] : [] } });
 
     const vis = visualDirector(`${world?.realism ?? ""} ${input.goal ?? ""}`);
-    steps.push({ step: "skills", status: "done", detail: { storyboardDirector: "rule-based draft; director review required", cinematographer: "draft lens/lighting suggestions, not verified controls", motionDirector: "action-specific constraints require review", visualDirector: vis.look, assetDirector: assets.filter((a) => !a.invariants?.length).map((a) => ({ asset: a.name, suggested: assetDirector(a.type, a.name) })) } });
+    steps.push({ step: "skills", status: "done", detail: { storyboardDirector: llm?.used ? "source-mapped director draft; actual video review still required" : "rule-based draft only; performance, blocking and dialogue execution require completion", cinematographer: "draft lens/lighting suggestions, not verified controls", motionDirector: "action-specific constraints require review", visualDirector: vis.look, assetDirector: assets.filter((a) => !a.invariants?.length).map((a) => ({ asset: a.name, suggested: assetDirector(a.type, a.name) })) } });
 
     const bindings = s.list("reference_bindings", { targetType: "shot" });
     steps.push({ step: "reference_plan", status: "done", detail: { perShot: shots.map((x: any) => ({ shotId: x.id, assets: x.assetIds.length, bound: bindings.filter((b: any) => b.targetId === x.id).map((b: any) => b.role) })) } });

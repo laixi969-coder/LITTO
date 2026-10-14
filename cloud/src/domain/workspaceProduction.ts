@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { tx, type Scope } from "../db.ts";
 import { assetInput, bindingInput, shotInput, worldSchema, lookSchema } from "./schema.ts";
-import { createAsset } from "./assets.ts";
+import { createAsset, assetVersions } from "./assets.ts";
 import { bindReference, createShot, updateShot, shotPartial } from "./shots.ts";
 import { bad, conflict, notFound, sha256 } from "../util.ts";
 import { finalQualityView } from "./finalQuality.ts";
@@ -10,10 +10,11 @@ import { compactProductionRead, qualityReviewPlan } from "@toonflow/tool-media-g
 import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
-import { selectWorkingTake } from "./nle.ts";
+import { selectWorkingTake, applyOps, getEdit, editView } from "./nle.ts";
 import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
 import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
+import { searchLibrary, setLibraryFavorite, importFromLibrary, publishToLibrary } from "./library.ts";
 
 /** 拆格或用户上传的干净单帧进入候选，采用仍复用聊天中的真实检查。 */
 export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string) {
@@ -54,6 +55,50 @@ export async function importWorkspaceSpeechTake(s: Scope, projectId: string, sho
 /** 草稿可直接保存；采用与变更确认通过聊天决定卡片写入，和制作面板复用领域规则。 */
 export function workspaceProduction(s: Scope, projectId: string, operation: string, data: Record<string, unknown>, actor?: string) {
   if (!s.get("projects", projectId)) throw notFound("project");
+  if (operation === "readLibrary") return searchLibrary(s, data);
+  if (operation === "readAsset") {
+    const input = z.object({ assetId: z.string().min(1) }).strict().parse(data);
+    const asset = s.get("assets", input.assetId);
+    if (asset?.projectId !== projectId) throw notFound("project asset");
+    return { ...asset, versions: assetVersions(s, asset.id) };
+  }
+  if (["favoriteAsset", "importAsset", "publishAsset"].includes(operation)) {
+    if (!actor) throw bad("角色库操作须有已认证的操作人");
+    if (operation === "favoriteAsset") {
+      const input = z.object({ libraryId: z.string().min(1), favorite: z.boolean() }).strict().parse(data);
+      return setLibraryFavorite(s, input.libraryId, input.favorite, actor);
+    }
+    if (operation === "importAsset") {
+      const input = z.object({ libraryId: z.string().min(1) }).strict().parse(data);
+      return importFromLibrary(s, input.libraryId, projectId, actor);
+    }
+    const input = z.object({ assetId: z.string().min(1) }).strict().parse(data);
+    if (s.get("assets", input.assetId)?.projectId !== projectId) throw notFound("project asset");
+    return publishToLibrary(s, input.assetId, actor);
+  }
+  if (operation === "soundCues") {
+    const input = z.strictObject({
+      sequenceId: z.string().min(1), expectedVersion: z.number().int().nonnegative(),
+      cues: z.array(z.strictObject({
+        trackId: z.string().min(1), mediaId: z.string().min(1), shotId: z.string().min(1).optional(),
+        start: z.number().finite().nonnegative(), duration: z.number().finite().positive(), in: z.number().finite().nonnegative().default(0),
+        gainDb: z.number().min(-60).max(24).default(0), fadeIn: z.number().finite().nonnegative().default(0), fadeOut: z.number().finite().nonnegative().default(0),
+        purpose: z.string().trim().min(1).max(1000),
+      })).min(1).max(100),
+      duck: z.strictObject({ underRole: z.enum(["dialogue", "music", "sfx"]), amountDb: z.number().min(-40).max(-1) }).nullable().optional(),
+    }).parse(data);
+    if (s.get("sequences", input.sequenceId)?.projectId !== projectId) throw notFound("project sequence");
+    const edit = getEdit(s, input.sequenceId, false);
+    const ops: unknown[] = input.cues.map(({ purpose, ...cue }) => {
+      const track = edit.tracks.find(track => track.id === cue.trackId);
+      const media = s.get("media", cue.mediaId);
+      if (!track || track.kind !== "audio" || track.locked || track.muted) throw bad("声音须写入未锁定、未静音的声音轨");
+      if (!media || media.projectId !== projectId || !media.mime.startsWith("audio/")) throw bad("声音段须引用当前项目的真实音频素材");
+      return { type: "add_clip", clip: { ...cue, type: "media", label: purpose } };
+    });
+    if (input.duck !== undefined) ops.push({ type: "set_duck", duck: input.duck });
+    return editView(s, applyOps(s, input.sequenceId, ops, input.expectedVersion));
+  }
   if (operation === "adDirection" || operation === "readAdDirection") {
     const sequenceId = z.string().min(1).parse(data.sequenceId);
     if (s.get("sequences", sequenceId)?.projectId !== projectId) throw notFound("project sequence");
@@ -121,7 +166,6 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     keyframes: s.list("keyframes", { projectId }), takes: s.list("takes", { projectId }), qc: s.list("qc_reports", { projectId }),
     media: s.list("media", { projectId }).map(mediaView),
     candidateBatches: s.list("candidate_batches", { projectId }), candidates: s.list("candidates", { projectId }),
-    library: s.list("library_assets"), assetVersions: s.list("asset_versions").filter(item => s.get("assets", item.assetId)?.projectId === projectId),
     renders: s.list("renders", { projectId }).map(render => ({ ...render, quality: finalQualityView(s, render), media: render.mediaId ? mediaView(s.get("media", render.mediaId)) : null })),
   });
   if (operation === "world" || operation === "look") {

@@ -60,8 +60,11 @@ export function recomputeStates(s: Scope, sequenceId: string) {
     const assets = new Map(s.list("assets").map((a) => [a.id, a]));
     let prev: State | null = null;
     let prevScene: string | null = null;
+    const results = new Map<string, { state: State; sceneId: string }>();
     for (const shot of shots) {
-        const start = seed(prev ?? emptyState(), shot, assets, shot.sceneId !== prevScene);
+        const reference = shot.continuityFromShotId ? results.get(shot.continuityFromShotId) : undefined;
+        if (shot.continuityFromShotId && !reference) throw bad("接戏来源必须是本序列中更早且未删除的镜头；请先调整依赖再删除或重排");
+        const start = seed(reference?.state ?? prev ?? emptyState(), shot, assets, shot.sceneId !== (reference?.sceneId ?? prevScene));
         prevScene = shot.sceneId;
         const delta = shot.intendedStateDelta ?? {};
         const approved = shot.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
@@ -73,6 +76,7 @@ export function recomputeStates(s: Scope, sequenceId: string) {
         };
         upsert("start", start);
         upsert("result", result);
+        results.set(shot.id, { state: result, sceneId: shot.sceneId });
         prev = result;
     }
 }

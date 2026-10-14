@@ -43,10 +43,10 @@
     </el-tooltip>
     <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" />
     <settings v-model="settingsVisible" />
-    <div class="productionActions"><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <div class="productionActions"><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="productionPanelRef?.openLibrary()">角色资产库</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
     <storyPanel v-if="workspaceStore.project" :key="`story${workspaceStore.project.directory}`" ref="storyPanelRef" v-model="storyVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" @produce="prepareStoryProduction" />
     <voicePanel v-if="workspaceStore.project" :key="`voice${workspaceStore.project.directory}`" ref="voicePanelRef" v-model="voiceVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" />
-    <productionPanel v-if="workspaceStore.project" :key="workspaceStore.project.directory" ref="productionPanelRef" v-model="productionVisible" :projectId="workspaceStore.project.projectId" :directory="workspaceStore.project.directory" />
+    <productionPanel v-if="workspaceStore.project" :key="workspaceStore.project.directory" ref="productionPanelRef" v-model="productionVisible" :projectId="workspaceStore.project.projectId" :directory="workspaceStore.project.directory" @generateCharacter="prepareCharacterGeneration" />
   </main>
 </template>
 
@@ -72,6 +72,12 @@ function prepareStoryProduction(revisionId: string, model: string) {
   const project = workspaceStore.project;
   if (!project) return;
   workspaceStore.pendingAgentMessage = { directory: project.directory, model, reasoningEffort: "", prompt: `请先 readStoryProject，核对已采用版本 ${revisionId}。仅整理这版剧本的制作场次表：saveSceneList 的 storyRevisionId 必须引用该版本，逐场保留 sceneId、顺序和正文语义；然后 saveBreakdown 提取资产与待定项。不要改写剧本，不生成图片、视频或音频。完成后列出下一步需要核对的制作事项。` };
+  agentVisible.value = true;
+}
+function prepareCharacterGeneration(assetId: string) {
+  const project = workspaceStore.project;
+  if (!project) return;
+  workspaceStore.pendingAgentMessage = { directory: project.directory, model: "", reasoningEffort: "", prompt: `请为当前项目角色资产 ${assetId} 生成定妆参考图。先 productionSpec read 读取该角色的实际档案和已有参考，沿用已选图片模型与精度，展示具体生成方案并沿用或取得本批次算力授权。复用现有图片生成能力，不为定妆照虚构剧情镜头。生成后展示真实图片，使用 requestProductionDecision selectReference 保存用户选中的定妆；随后 productionSpec publishAsset 收藏到跨项目角色资产库。保留原图与旧版本，不能用角色描述冒充已生成图片。` };
   agentVisible.value = true;
 }
 const voiceVisible = ref(false);

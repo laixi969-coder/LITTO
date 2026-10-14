@@ -14,20 +14,37 @@
             <label v-for="field in lookFields" :key="field[0]">{{ field[1] }}<textarea v-model="look[field[0]]" rows="2" @input="worldDirty = true" /></label>
           </div>
           <button type="button" @click="run(saveWorld)">保存世界与影调</button>
+        </template>
+        <template v-else-if="section === 'assets'">
           <h3>项目资产</h3>
           <div class="fieldGrid">
             <label>类型<select v-model="asset.type"><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
             <label>名称<input v-model="asset.name" /></label>
             <label>几何、肤质、材质与空间说明<textarea v-model="asset.description" /></label>
             <label>不可改变的特征（每行一项）<textarea v-model="asset.invariants" /></label>
+            <template v-if="asset.type === 'Character'">
+              <label>说话与演唱习惯<textarea v-model="asset.speech" /></label>
+              <label>表演与行为习惯<textarea v-model="asset.behavior" /></label>
+            </template>
+            <label>定妆参考图<select v-model="asset.authoritativeReference"><option value="">未选择</option><option v-for="image in assetImages" :key="image.id" :value="image.id">{{ image.source === 'upload' ? '上传' : '生成 / 导入' }} · {{ image.id.slice(-8) }}</option></select></label>
+            <label>上传角色照片<input type="file" accept="image/png,image/jpeg,image/webp" @change="run(() => uploadReference($event, true))" /></label>
             <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="asset.personaTags[axis.key]"><option value="">未指定</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
           </div>
+          <img v-if="assetImage" class="assetPortrait" :src="mediaUrl(assetImage.url)" :alt="`${asset.name || '角色'}定妆参考`" />
+          <details class="assetImagePicker">
+            <summary>从上传或生成结果中选图（{{ assetImages.length }}）</summary>
+            <button type="button" @click="run(refreshAssetLibrary)">刷新图片</button>
+            <div class="assetImageGrid"><button v-for="image in assetImages" :key="image.id" type="button" :aria-pressed="asset.authoritativeReference === image.id" :aria-label="`选择定妆图 ${image.id.slice(-8)}`" @click="asset.authoritativeReference = image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><span>{{ image.source === 'upload' ? '上传照片' : '生成 / 导入' }} · {{ image.id.slice(-5) }}</span></button></div>
+          </details>
+          <button type="button" :disabled="!asset.name.trim() || asset.type !== 'Character'" @click="run(generateCharacter)">生成定妆图</button>
           <p class="reviewHint">气质标签仅用于角色库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
           <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
-          <ul class="assetList"><li v-for="item in assets" :key="item.id"><button type="button" @click="run(() => editAsset(item))">编辑与历史</button><span>{{ item.name }} · v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}<template v-if="hasPersonaTags(item.personaTags)"> · {{ personaSummary(item.personaTags) }}</template></span><button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button><button v-else-if="!librarySourceIds.has(item.id)" type="button" @click="run(() => publishAsset(item.id))">入池角色库</button></li></ul><ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
+          <ul class="assetList"><li v-for="item in assets" :key="item.id"><button type="button" @click="run(() => editAsset(item))">编辑与历史</button><span>{{ item.name }} · v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}<template v-if="hasPersonaTags(item.personaTags)"> · {{ personaSummary(item.personaTags) }}</template></span><button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button><button v-else-if="!librarySourceIds.has(item.id)" type="button" @click="run(() => publishAsset(item.id))">收藏到角色库</button></li></ul><ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
           <h3>角色库（跨项目复用）</h3>
-          <p class="reviewHint">已采用且选出定妆参考图的资产可入池；新项目导入后继承同一张脸，避免跨项目崩脸。</p>
+          <p class="reviewHint">上传照片或生成定妆图，保存并采用资产后收藏。角色库独立保存参考图，各项目导入后可单独修改。</p>
           <div class="fieldGrid">
+            <label>名称或描述<input v-model="libraryFilter.q" @keyup.enter="run(searchLibraryAssets)" /></label>
+            <label>收藏<select v-model="libraryFilter.favorite"><option value="">全部</option><option value="true">只看收藏</option></select></label>
             <label>类型<select v-model="libraryFilter.type"><option value="">全部</option><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
             <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="libraryFilter[axis.key]"><option value="">不限</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
           </div>
@@ -35,6 +52,7 @@
           <ul class="libraryList"><li v-for="entry in libraryAssets" :key="entry.id">
             <figure v-if="entry.media"><img :src="mediaUrl(entry.media.url)" :alt="entry.name" /></figure>
             <div class="libraryMeta"><strong>{{ entry.name }}</strong><span>{{ assetTypeLabel(entry.type) }} · 复用 {{ entry.reuseCount }} 次<template v-if="hasPersonaTags(entry.personaTags)"> · {{ personaSummary(entry.personaTags) }}</template></span><small>{{ entry.description }}</small></div>
+            <button type="button" :aria-pressed="entry.favorite" @click="run(() => toggleFavorite(entry))">{{ entry.favorite ? '取消收藏' : '收藏' }}</button>
             <button type="button" @click="run(() => importLibraryAsset(entry))">导入本项目</button>
           </li></ul>
           <p v-if="librarySearched && !libraryAssets.length" class="reviewHint">角色库暂无匹配资产。</p>
@@ -68,7 +86,7 @@
             <label><input :checked="!!draft.inspectionRegion" type="checkbox" @change="draft.inspectionRegion = ($event.target as HTMLInputElement).checked ? { x: 0.25, y: 0.25, width: 0.5, height: 0.5, unit: 'normalized' } : null; dirty = true" />指定脸部或材质区域（0–1），辅助检查会附加原尺寸局部图</label>
             <div v-if="draft.inspectionRegion" class="fieldGrid"><label v-for="field in ['x', 'y', 'width', 'height']" :key="field">{{ field }}<input v-model.number="draft.inspectionRegion[field]" type="number" min="0" max="1" step="0.01" @input="dirty = true" /></label></div>
             <h3>出场资产</h3>
-            <div class="checkList"><label v-for="item in assets" :key="item.id"><input v-model="draft.assetIds" type="checkbox" :value="item.id" @change="dirty = true" />{{ item.name }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</label></div>
+            <div class="checkList"><div v-for="item in assets" :key="item.id"><label><input v-model="draft.assetIds" type="checkbox" :value="item.id" @change="changeShotAsset(item.id)" />{{ item.name }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</label><label v-if="draft.assetIds.includes(item.id)"><input type="checkbox" :checked="(draft.visibleAssetIds ?? draft.assetIds).includes(item.id)" @change="setAssetVisibility(item.id, ($event.target as HTMLInputElement).checked)" />出镜</label></div></div>
             <div class="fieldGrid" @change="dirty = true"><label>轴线侧<select v-model="draft.camera.side"><option value="none">未指定</option><option value="A">A 侧</option><option value="B">B 侧</option></select></label><label>画面运动方向<select v-model="draft.camera.screenDirection"><option value="none">无</option><option value="left">向左</option><option value="right">向右</option></select></label><label>光向坐标<select v-model="draft.lighting.directionSpace"><option value="screen">画面坐标</option><option value="world">场景固定坐标</option></select></label><label>主光方向<select v-model="draft.lighting.keyDirection"><option v-for="value in ['none', 'left', 'right', 'front', 'back', 'top']" :key="value">{{ value }}</option></select></label></div>
             <button type="button" @click="run(saveShot)">{{ dirty ? '保存镜头规格' : '镜头规格已保存' }}</button>
             <h3>参考用途</h3>
@@ -190,11 +208,12 @@ import { needsLipSync, qualityReviewPlan } from "@toonflow/tool-media-generation
 const visible = defineModel<boolean>({ default: false });
 const props = defineProps<{ projectId?: string; directory: string }>();
 const projectId = props.projectId;
+const emit = defineEmits<{ generateCharacter: [assetId: string] }>();
 const section = ref("world"), busy = ref(false), error = ref(""), message = ref("");
 const controller = new AbortController();
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 onScopeDispose(() => { controller.abort(); clearTimeout(pollTimer); clearInterval(watchTimer); });
-const tabs = [{ id: "world", label: "世界与资产" }, { id: "shot", label: "镜头规格" }, { id: "generate", label: "生成" }, { id: "review", label: "检查与采用" }, { id: "edit", label: "剪辑与衔接" }];
+const tabs = [{ id: "world", label: "世界与影调" }, { id: "assets", label: "角色资产库" }, { id: "shot", label: "镜头规格" }, { id: "generate", label: "生成" }, { id: "review", label: "检查与采用" }, { id: "edit", label: "剪辑与衔接" }];
 const worldFields = [["era", "年代"], ["locationLogic", "地点与空间逻辑"], ["architecture", "建筑"], ["weather", "天气"], ["time", "时间"], ["material", "环境材质"], ["physics", "物理规则"], ["realism", "影像媒介（摄影写实、动画等）"]];
 const lookFields = [["contrast", "对比"], ["saturation", "饱和度"], ["skinTone", "肤色"], ["highlightRolloff", "高光滚降"], ["shadowBehavior", "暗部表现"], ["lensCharacter", "镜头特性"], ["texture", "纹理"], ["sharpnessPhilosophy", "锐度策略"]];
 const cameraFields = [["shotSize", "景别"], ["position", "机位"], ["focus", "焦点"], ["depth", "景深"], ["motion", "摄影机运动"], ["motivation", "运镜动机"], ["axisCrossing", "越轴动机（没有则留空）"]];
@@ -216,7 +235,7 @@ const hasPersonaTags = (tags: any) => !!tags && Object.values(tags).some(Boolean
 const personaSummary = (tags: any) => Object.values(tags ?? {}).filter(Boolean).map(v => personaLabel[v as string] ?? v).join(" / ");
 const assetTypeLabel = (type: string) => assetTypes.find(item => item[0] === type)?.[1] ?? type;
 const libraryAssets = ref<any[]>([]), librarySearched = ref(false), librarySourceIds = ref(new Set<string>());
-const libraryFilter = ref<Record<string, string>>({ type: "Character", bearing: "", gaze: "", focus: "", rapport: "" });
+const libraryFilter = ref<Record<string, string>>({ type: "Character", q: "", favorite: "", bearing: "", gaze: "", focus: "", rapport: "" });
 const asBatch = ref(false), batchId = ref(""), batchAssetId = ref(""), candidateBatches = ref<any[]>([]);
 const candidatePool = ref<any[]>([]), candidateScores = ref<Record<string, number | null>>({});
 const statusLabel = (status: string) => ({ candidate: "待评", promoted: "已采用", rejected: "落选" }[status] ?? status);
@@ -226,8 +245,11 @@ const world = ref<Record<string, any>>({}), look = ref<Record<string, any>>({}),
 const assets = ref<any[]>([]), shots = ref<any[]>([]), sequences = ref<any[]>([]), references = ref<any[]>([]);
 const editingAsset = ref(""), assetVersions = ref<any[]>([]);
 const emptyPersona = () => ({ bearing: "", gaze: "", focus: "", rapport: "" });
-const asset = ref({ type: "Character", name: "", description: "", invariants: "", personaTags: emptyPersona() });
+const asset = ref({ type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", personaTags: emptyPersona() });
 let savedAsset = JSON.stringify(asset.value);
+const assetImages = ref<any[]>([]);
+const assetImage = computed(() => assetImages.value.find(image => image.id === asset.value.authoritativeReference));
+let assetDetails: any = {};
 let pendingRequestId = "";
 const binding = ref({ referenceId: "", role: "IDENTITY", lockLevel: "LOCK", weight: 1 });
 const cropEnabled = ref(false), referenceCrop = ref({ x: 0, y: 0, width: 1, height: 1, unit: "normalized" });
@@ -295,7 +317,7 @@ async function load() {
   const languageResponse = await fetch("/api/ai/models", { signal: controller.signal });
   if (!languageResponse.ok) throw new Error("检查模型列表读取失败");
   visualModels.value = (await languageResponse.json()).data;
-  await refreshLibrarySources().catch(() => {});
+  await refreshAssetLibrary();
   await refreshJobs();
 }
 let loaded = false;
@@ -313,19 +335,27 @@ async function saveWorld() {
   await request(`/projects/${projectId}/looks/project`, "PUT", look.value);
   worldDirty.value = false; preview.value = null; message.value = "世界与影调已保存";
 }
-function clearAsset() { editingAsset.value = ""; assetVersions.value = []; asset.value = { type: "Character", name: "", description: "", invariants: "", personaTags: emptyPersona() }; savedAsset = JSON.stringify(asset.value); }
+function clearAsset() { assetDetails = {}; editingAsset.value = ""; assetVersions.value = []; asset.value = { type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", personaTags: emptyPersona() }; savedAsset = JSON.stringify(asset.value); }
 async function editAsset(item: any) {
   if (JSON.stringify(asset.value) !== savedAsset) throw new Error("请先保存当前资产，再切换编辑对象");
-  const value = await request(`/assets/${item.id}`); editingAsset.value = item.id; assetVersions.value = value.versions;
-  asset.value = { type: value.type, name: value.name, description: value.description, invariants: value.invariants.join("\n"), personaTags: { ...emptyPersona(), ...(value.personaTags ?? {}) } };
+  const value = await request(`/assets/${item.id}`); assetDetails = value; editingAsset.value = item.id; assetVersions.value = value.versions;
+  asset.value = { type: value.type, name: value.name, description: value.description, invariants: value.invariants.join("\n"), speech: value.attributes?.characterDirection?.speech ?? "", behavior: value.attributes?.characterDirection?.behavior ?? "", authoritativeReference: value.attributes?.authoritativeReference ?? "", personaTags: { ...emptyPersona(), ...(value.personaTags ?? {}) } };
   savedAsset = JSON.stringify(asset.value);
 }
 const personaPayload = (tags: Record<string, string>) => Object.fromEntries(Object.entries(tags).filter(([, v]) => v));
 async function createAsset() {
   if (editingAsset.value) await ElMessageBox.confirm("将建立新的资产版本，已采用镜头需重新检查。历史版本保留。", "建立版本", { confirmButtonText: "建立", cancelButtonText: "取消" });
   const tags = personaPayload(asset.value.personaTags);
-  const item = await request(editingAsset.value ? `/assets/${editingAsset.value}/versions` : `/projects/${projectId}/assets`, "POST", { ...asset.value, invariants: asset.value.invariants.split(/\n/).map(value => value.trim()).filter(Boolean), ...(Object.keys(tags).length ? { personaTags: tags } : {}) });
-  assets.value = editingAsset.value ? assets.value.map(value => value.id === item.id ? item : value) : [...assets.value, item]; clearAsset();
+  const { speech, behavior, authoritativeReference, ...form } = asset.value;
+  const attributes = { ...(assetDetails.attributes ?? {}), ...(asset.value.type === "Character" ? { characterDirection: { ...assetDetails.attributes?.characterDirection, speech, behavior } } : {}) };
+  if (authoritativeReference) attributes.authoritativeReference = authoritativeReference;
+  else delete attributes.authoritativeReference;
+  const selectedRef = references.value.find(ref => ref.mediaId === authoritativeReference);
+  const item = await request(editingAsset.value ? `/assets/${editingAsset.value}/versions` : `/projects/${projectId}/assets`, "POST", {
+    ...form, attributes, personaTags: tags, references: [...new Set([...(assetDetails.references ?? []), ...(selectedRef ? [selectedRef.id] : [])])],
+    invariants: asset.value.invariants.split(/\n/).map(value => value.trim()).filter(Boolean),
+  });
+  assets.value = editingAsset.value ? assets.value.map(value => value.id === item.id ? item : value) : [...assets.value, item]; clearAsset(); return item;
 }
 async function rollbackAsset(version: number) {
   await ElMessageBox.confirm("恢复将建立一个新版本，并影响后续镜头。现有版本保留。", "恢复资产", { confirmButtonText: "恢复", cancelButtonText: "取消" });
@@ -338,8 +368,8 @@ async function approveAsset(id: string) {
 }
 async function publishAsset(id: string) {
   const entry = await request(`/library/assets/${id}/publish`, "POST", {});
-  await refreshLibrarySources();
-  message.value = `已入池角色库：${entry.name}`;
+  await refreshAssetLibrary();
+  message.value = `已收藏到角色资产库：${entry.name}`;
 }
 async function searchLibraryAssets() {
   const params = new URLSearchParams(Object.entries(libraryFilter.value).filter(([, v]) => v));
@@ -347,13 +377,13 @@ async function searchLibraryAssets() {
   libraryAssets.value = rows; librarySearched.value = true;
 }
 async function refreshLibrarySources() {
-  const rows = await request("/library/assets");
+  const rows = await request("/library/assets?limit=500");
   librarySourceIds.value = new Set(rows.map((row: any) => row.sourceAssetId).filter(Boolean));
 }
 async function importLibraryAsset(entry: any) {
   const created = await request(`/projects/${projectId}/library/import/${entry.id}`, "POST", {});
-  assets.value = [...assets.value, created];
-  entry.reuseCount += 1;
+  assets.value = [...assets.value.filter(asset => asset.id !== created.id), created];
+  await refreshAssetLibrary();
   message.value = `已导入：${created.name}（继承定妆参考）`;
 }
 async function saveShot() {
@@ -365,6 +395,15 @@ async function saveShot() {
   const item = await request(`/shots/${shotId.value}`, "PATCH", { ...draft.value, sceneId: draft.value.sceneId ?? undefined, confirm, expectedUpdatedAt: baseUpdatedAt });
   dirty.value = false; baseUpdatedAt = item.updatedAt ?? undefined; detail.value.updatedAt = item.updatedAt; preview.value = null; message.value = "镜头规格已保存";
   shots.value = shots.value.map(shot => shot.id === item.id ? item : shot);
+}
+function changeShotAsset(id: string) {
+  if (draft.value.visibleAssetIds) draft.value.visibleAssetIds = [...new Set([...draft.value.visibleAssetIds, id])].filter(value => draft.value.assetIds.includes(value));
+  dirty.value = true;
+}
+function setAssetVisibility(id: string, visible: boolean) {
+  const ids = new Set<string>(draft.value.visibleAssetIds ?? draft.value.assetIds);
+  if (visible) ids.add(id); else ids.delete(id);
+  draft.value.visibleAssetIds = [...ids]; dirty.value = true;
 }
 async function selectShot(id: string) {
   await saveShot(); shotId.value = id; preview.value = null; targetId.value = "";
@@ -409,14 +448,17 @@ async function createShot() {
   const item = await request(`/projects/${projectId}/shots`, "POST", { sequenceId: sequence.id, sceneId: scene.id, title: `镜头 ${shots.value.length + 1}` });
   shots.value.push(item); await selectShot(item.id); section.value = "shot";
 }
-async function uploadReference(event: Event) {
+async function uploadReference(event: Event, forAsset = false) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0]; if (!file) return;
   const response = await fetch(`/cloud/media?projectId=${encodeURIComponent(projectId!)}`, { method: "POST", headers: { "x-litto-csrf": "1", "Content-Type": file.type }, body: file, signal: controller.signal });
   const media = await response.json();
   if (!response.ok) throw new Error(media.error?.message || "上传失败");
   const reference = await request(`/projects/${projectId}/references`, "POST", { kind: media.mime.split("/")[0], name: file.name, mediaId: media.id });
-  references.value.push(reference); binding.value.referenceId = reference.id; input.value = "";
+  references.value.push(reference);
+  if (forAsset) { assetImages.value.unshift(media); asset.value.authoritativeReference = media.id; }
+  else binding.value.referenceId = reference.id;
+  input.value = "";
 }
 async function bindReference() { await saveShot(); await request(`/shots/${shotId.value}/bindings`, "POST", { ...binding.value, ...(cropEnabled.value ? { crop: referenceCrop.value } : {}) }); detail.value = await request(`/shots/${shotId.value}`); preview.value = null; }
 async function removeBinding(item: any) {
@@ -566,7 +608,7 @@ async function confirmVersion() {
   await request(`/shots/${shotId.value}/qc`, "POST", reviewPayload(item));
   const result = await request(`/${item.type === "keyframe" ? "keyframes" : "takes"}/${item.id}/${item.type === "keyframe" ? "promote" : "approve"}`, "POST", {});
   await refreshResults(); selectPendingVersion();
-  message.value = result.autoRenderError || (result.autoRender ? "全部镜头已采用，正在合成成片；完成后自动展示到画布" : item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准，结束状态已记录");
+  message.value = result.autoRenderError || (result.autoRender ? "全部镜头已采用，正在合成粗剪；完成后可查看接缝并调整，再导出定稿" : item.type === "keyframe" ? "主关键帧已选定" : "Take 已批准，结束状态已记录");
   if (result.autoRender) {
     section.value = "edit";
     await editPanel.value?.trackRender(result.autoRender.id, sequenceId, context && canvasId ? { context, id: canvasId } : undefined);
@@ -577,7 +619,25 @@ async function closePanel(done: () => void) { try { await flushSave(); done(); }
 async function openShot(id: string) {
   await run(async () => { if (!loaded) { await load(); loaded = true; } await selectShot(id); section.value = "review"; visible.value = true; });
 }
-defineExpose({ flushSave, openShot });
+async function refreshAssetLibrary() {
+  const [images, refs, projectAssets] = await Promise.all([request(`/projects/${projectId}/assetImages`), request(`/projects/${projectId}/references`), request(`/projects/${projectId}/assets`)]);
+  assetImages.value = images; references.value = refs; assets.value = projectAssets;
+  await Promise.all([searchLibraryAssets(), refreshLibrarySources()]);
+}
+async function toggleFavorite(entry: any) {
+  await request(`/library/assets/${entry.id}/favorite`, "PUT", { favorite: !entry.favorite });
+  await searchLibraryAssets();
+}
+async function generateCharacter() {
+  const item = editingAsset.value && JSON.stringify(asset.value) === savedAsset ? { id: editingAsset.value } : await createAsset();
+  emit("generateCharacter", item.id);
+  visible.value = false;
+}
+async function openLibrary() {
+  section.value = "assets"; visible.value = true;
+  if (loaded) await run(refreshAssetLibrary);
+}
+defineExpose({ flushSave, openShot, openLibrary });
 </script>
 
 <style scoped lang="scss">
@@ -597,6 +657,8 @@ defineExpose({ flushSave, openShot });
   .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
   .checkList { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; label { flex-direction: row; align-items: center; } input { width: 20px; min-height: 20px; } }
   .assetList, .jobList { padding: 0; list-style: none; li { padding: 12px 0; border-bottom: 1px solid var(--studioBorder); display: flex; justify-content: space-between; gap: 16px; } small { display: block; } }
+  .assetPortrait { display: block; width: 180px; max-height: 240px; object-fit: contain; margin: 12px 0; border-radius: var(--ui-radius); }
+  .assetImagePicker { margin: 12px 0; summary { cursor: pointer; } .assetImageGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; max-height: 360px; overflow: auto; button { padding: 6px; display: flex; flex-direction: column; gap: 4px; &[aria-pressed="true"] { outline: 2px solid var(--el-color-primary); } img { width: 100%; height: 120px; object-fit: contain; } span { font-size: 11px; } } } }
   .libraryList { padding: 0; list-style: none; li { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--studioBorder); } figure { width: 64px; flex: none; margin: 0; img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--ui-radius); } } .libraryMeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; small { color: var(--studioMuted); } } button { flex: none; } }
   .candidateGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 12px; figure { margin: 0; border: 1px solid var(--studioBorder); border-radius: var(--ui-radius); padding: 8px; img, video { width: 100%; max-height: 220px; object-fit: contain; background: var(--studioRail); } &.promoted { border-color: var(--studioDone); border-width: 2px; } figcaption { font-size: 12px; margin: 8px 0; } .candidateActions { display: flex; gap: 8px; align-items: center; input { width: 64px; flex: none; min-height: 36px; } button { min-height: 36px; padding: 4px 10px; font-size: 12px; flex: none; } } } }
   .sentReferences { display: flex; flex-wrap: wrap; gap: 12px; figure { width: 180px; margin: 0; img, video, audio { width: 100%; max-height: 180px; object-fit: contain; } figcaption { overflow-wrap: anywhere; font-size: 12px; } } }

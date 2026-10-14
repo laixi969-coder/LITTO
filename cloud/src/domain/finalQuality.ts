@@ -31,6 +31,7 @@ export function sequenceFingerprint(s: Scope, sequenceId: string) {
 function renderMedia(s: Scope, id: string) {
   const render = s.get("renders", id);
   if (!render) throw notFound("render");
+  if (render.manifest?.options?.draft) throw conflict("草稿导出不进入检测验收；需要验收请重新导出并省略 options.draft", "draft_render");
   const media = render.mediaId ? s.get("media", render.mediaId) : null;
   if (render.status !== "SUCCEEDED" || !media || media.projectId !== render.projectId) throw conflict("请先完成成片导出", "no_render");
   return { render, media };
@@ -42,7 +43,8 @@ export function finalQualityView(s: Scope, render: Record<string, any>) {
   const stale = !render.manifest?.sourceFingerprint || render.manifest.sourceFingerprint !== sequenceFingerprint(s, render.sequenceId) || quality.mediaId !== render.mediaId;
   const sequence = s.get("sequences", render.sequenceId);
   const pilotReviewRequired = sequence && isAdSequence(sequence) && !adReadiness(s, sequence.id).ready;
-  return { ...quality, status: stale ? "stale" : pilotReviewRequired && quality.status === "pass" ? "unverified" : quality.status };
+  const storyReviewRequired = ["narrative", "performance", "dialogueCoverage", "editing"].some(key => quality.review?.checks?.[key] !== "pass");
+  return { ...quality, status: stale ? "stale" : (pilotReviewRequired || storyReviewRequired) && quality.status === "pass" ? "unverified" : quality.status };
 }
 
 export const finalReviewSchema = z.object({
@@ -54,12 +56,15 @@ export const finalReviewSchema = z.object({
     lighting: z.enum(["pass", "fail", "unverified"]),
     continuity: z.enum(["pass", "fail", "unverified"]),
     sound: z.enum(["pass", "fail", "unverified"]),
-    emotion: z.enum(["pass", "fail", "unverified"]).optional(),
+    narrative: z.enum(["pass", "fail", "unverified"]).default("unverified").describe("按已定作品目标检查事件、信息或关系推进，不能靠旁白补掉关键戏剧过程；非剧情作品检查其表达目标"),
+    performance: z.enum(["pass", "fail", "unverified"]).default("unverified").describe("完整看片核对角色目标、触发、反应及走位，人物微动或摄影机移动不等于表演；无人镜头在 note 说明适用范围"),
+    dialogueCoverage: z.enum(["pass", "fail", "unverified"]).default("unverified").describe("逐句对照采用剧本，核对真实声音、说话人及画内/画外通道；不能用字幕或旁白替代对白，无对白时说明依据"),
     lipSync: z.enum(["pass", "fail", "unverified"]).optional(),
+    emotion: z.enum(["pass", "fail", "unverified"]).optional(),
     product: z.enum(["pass", "fail", "unverified"]).optional(),
     composition: z.enum(["pass", "fail", "unverified"]).optional(),
     color: z.enum(["pass", "fail", "unverified"]).optional(),
-    editing: z.enum(["pass", "fail", "unverified"]).optional(),
+    editing: z.enum(["pass", "fail", "unverified"]).default("unverified"),
   }),
   note: z.string().trim().min(10).max(4000),
   acknowledgements: z.array(z.object({ id: z.string(), reason: z.string().trim().min(10).max(1000) })).max(300).default([]),
@@ -164,8 +169,8 @@ export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: 
   const quality = finalQualityView(s, render);
   if (!quality.analysisId || quality.analysisId !== review.analysisId || quality.status === "stale") throw conflict("检测记录已过期，请重新导出或检测", "stale");
   const passing = Object.values(review.checks).every(value => value === "pass");
-  const sequence = s.get("sequences", render.sequenceId)!;
   if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(needsLipSync) && review.checks.lipSync !== "pass") throw bad("成片包含画内对白或演唱，须完整看听并确认逐字口型同步；不能只以声音检查替代口型验收");
+  const sequence = s.get("sequences", render.sequenceId)!;
   if (passing && isAdSequence(sequence)) {
     if (!["emotion", "product", "composition", "color", "editing"].every(key => review.checks[key as keyof typeof review.checks] === "pass")) throw bad("广告成片须检查情绪表达、产品识别、构图、整片色调与剪辑节奏");
     if (!quality.advertising || quality.advertising.fingerprint !== sequenceFingerprint(s, render.sequenceId)) throw bad("请先 inspectAdFilm 对实际导出文件完成广告表达审片");

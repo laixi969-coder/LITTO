@@ -114,26 +114,27 @@
         <h3>导出成片</h3>
         <div class="editFields">
           <label>尺寸<select v-model="exportSize"><option value="source">沿用首个主轨素材</option><option value="1920x1080">1920×1080</option><option value="1080x1920">1080×1920</option></select></label>
-          <button type="button" @click="run(render)">导出当前剪辑</button>
+          <button type="button" @click="run(() => render(true))">导出粗剪预览</button>
+          <button type="button" @click="run(() => render(false))">导出定稿</button>
           <button type="button" @click="run(loadRenders)">刷新导出状态</button>
         </div>
-        <p>导出完成仅表示文件已生成。请检测最终文件并完整看听后逐项验收；自动信号检测不证明电影级质感。</p>
+        <p>先预览接缝并调整剪点或声音，准备交付时导出定稿。粗剪用于看片调整；定稿导出后再检测最终文件并完整看听验收。</p>
         <article v-for="item in renders" :key="item.id" class="finalReview">
-          <p>{{ item.status === 'SUCCEEDED' ? '文件已生成' : item.status }} · {{ qualityLabels[item.quality?.status] || '未验收' }} <span v-if="item.error">{{ item.error }}</span></p>
+          <p>{{ item.draft ? '粗剪预览' : '定稿导出' }} · {{ item.status === 'SUCCEEDED' ? '文件已生成' : item.status }} · {{ item.draft ? '待剪辑与看听' : qualityLabels[item.quality?.status] || '未验收' }} <span v-if="item.error">{{ item.error }}</span></p>
           <template v-if="item.media">
             <video class="seamPreview" :src="url(item.media.url)" controls preload="metadata" />
             <div class="editFields">
-              <button type="button" @click="run(() => download(item))">下载 / 另存成片</button>
-              <button type="button" @click="run(() => publish(item))">{{ published.has(item.id) ? '定位画布成片' : '放到画布' }}</button>
+              <button type="button" @click="run(() => download(item))">{{ item.draft ? '下载粗剪' : '下载 / 另存成片' }}</button>
+              <button type="button" @click="run(() => publish(item))">{{ published.has(item.id) ? '定位画布视频' : '放到画布' }}</button>
             </div>
             <p v-if="publishErrors[item.id]" role="alert">{{ publishErrors[item.id] }}（文件已导出，可直接下载或重试放到画布）</p>
-            <button type="button" @click="run(() => analyzeQuality(item.id))">检测最终文件与声音接缝</button>
+            <button v-if="!item.draft" type="button" @click="run(() => analyzeQuality(item.id))">检测最终文件与声音接缝</button>
             <details v-if="item.quality?.advertising">
               <summary>广告表达抽帧审片</summary>
               <p>覆盖 {{ item.quality.advertising.timestamps.length }} 个样本；{{ item.quality.advertising.omittedCuts }} 个切点未专项采样。声音需完整试听。</p>
-              <p v-for="field in adQualityFields" :key="field[0]">{{ field[1] }}：{{ item.quality.advertising[field[0]].evidence.map((evidence: any) => `${item.quality.advertising.timestamps[evidence.frameIndex]} 秒：${evidence.observation}`).join('；') }}。{{ item.quality.advertising[field[0]].repair }}</p>
+              <p v-for="field in adQualityFields" :key="field[0]">{{ field[1] }}：{{ item.quality.advertising[field[0]].evidence.map((evidence: any) => `${evidence.frameIndex < item.quality.advertising.timestamps.length ? item.quality.advertising.timestamps[evidence.frameIndex] + " 秒" : "参考图 " + (evidence.frameIndex + 1)}：${evidence.observation}`).join('；') }}。{{ item.quality.advertising[field[0]].repair }}</p>
             </details>
-            <details v-if="qualityDrafts[item.id] && item.quality?.analysisId">
+            <details v-if="!item.draft && qualityDrafts[item.id] && item.quality?.analysisId">
               <summary>最终声画验收</summary>
               <p>每项记录实际观察；有意静默或声音进入需解释告警，未解决则选返修。剪辑或素材改变后须重新导出。</p>
               <label v-for="field in reviewFields" :key="field[0]">{{ field[1] }}<select v-model="qualityDrafts[item.id].checks[field[0]]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
@@ -159,8 +160,8 @@ import saveFile from "@/lib/saveFile";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 import { ElMessageBox } from "element-plus";
-const props = defineProps<{ directory: string; sequences: any[]; shots: any[]; references: any[]; request: (path: string, method?: string, body?: unknown) => Promise<any> }>();
 import { needsLipSync } from "@toonflow/tool-media-generation/runtime";
+const props = defineProps<{ directory: string; sequences: any[]; shots: any[]; references: any[]; request: (path: string, method?: string, body?: unknown) => Promise<any> }>();
 const sequenceId = ref(""), edit = ref<any>(null), busy = ref(false), error = ref(""), message = ref("");
 const ranges = ref<Record<string, { in: number; out: number }>>({});
 const rightId = ref(""), candidates = ref<any[]>([]), suggestionNote = ref(""), preview = ref<any>(null);
@@ -168,10 +169,10 @@ const transition = ref("cut"), transitionDuration = ref(0.3), soundMode = ref("j
 const audioMediaId = ref(""), audioRole = ref("sfx"), audioStart = ref(0), audioDuration = ref(1);
 const segmentMediaId = ref(""), segments = ref<{ shotId: string; in: number; out: number }[]>([]);
 const exportSize = ref("source"), renders = ref<any[]>([]);
-const qualityFields = [["surface", "皮肤、头发与商品材质"], ["motion", "肢体、动作受力与手物接触"], ["lighting", "场景光源、曝光与光色"], ["continuity", "人物、服装、场景与剪点连续"], ["sound", "对白、环境声、音画同步与接缝"]];
+const qualityFields = [["surface", "皮肤、头发与商品材质"], ["motion", "肢体、动作受力与手物接触"], ["lighting", "场景光源、曝光与光色"], ["continuity", "人物、服装、场景与剪点连续"], ["sound", "对白、环境声、音画同步与接缝"], ["narrative", "事件、信息或关系有推进，画面承担叙事"], ["performance", "角色有目的、可见反应与明确调度"], ["dialogueCoverage", "原文台词真实发声，说话人与声音通道正确"], ["editing", "节奏、留白与邻镜连接"]];
 const adQualityFields = [["emotion", "情绪与创意表达"], ["product", "产品识别与结尾品牌记忆"], ["composition", "构图与视觉主次"], ["color", "整片色调、肤色与产品本色"], ["editing", "节奏、留白与邻镜连接"]];
 const adPlan = ref<any>(null);
-const reviewFields = computed(() => [...qualityFields, ...(props.shots.some(shot => shot.sequenceId === sequenceId.value && needsLipSync(shot)) ? [["lipSync", "画内对白或演唱的逐字口型"]] : []), ...(adPlan.value?.readiness.required ? adQualityFields : [])]);
+const reviewFields = computed(() => [...qualityFields, ...(props.shots.some(shot => shot.sequenceId === sequenceId.value && needsLipSync(shot)) ? [["lipSync", "画内对白或演唱的逐字口型"]] : []), ...(adPlan.value?.readiness.required ? adQualityFields.filter(field => field[0] !== "editing") : [])]);
 const visualLabels: Record<string, string> = { palette: "色彩", light: "用光", materials: "材质", composition: "构图", motion: "运动" };
 const grade = ref({ exposureStops: 0, temperature: 0, saturation: 1, contrast: 1 });
 const qualityLabels: Record<string, string> = { unverified: "未验收", fail: "需要返修", pass: "人工验收通过", stale: "版本已改变，须重新导出验收" };
@@ -247,7 +248,7 @@ async function mapSegments() {
   await ops([{ type: "map_segments", mediaId: segmentMediaId.value, segments: segments.value }]);
 }
 async function download(item: any) {
-  await saveFile(() => axios.get<Blob>(url(item.media.url), { responseType: "blob", signal: lifetime.signal }).then(result => result.data), `成片${item.id}.mp4`);
+  await saveFile(() => axios.get<Blob>(url(item.media.url), { responseType: "blob", signal: lifetime.signal }).then(result => result.data), `${item.draft ? "粗剪" : "成片"}${item.id}.mp4`);
 }
 async function publish(item: any, focus = true) {
   const directory = props.directory;
@@ -266,7 +267,7 @@ async function publish(item: any, focus = true) {
     await files.write(path, data, true, lifetime.signal);
   }
   lifetime.signal.throwIfAborted();
-  const result = await context.call({ name: "publishVideo", args: { path, canvasId, label: `成片 · ${props.sequences.find(sequence => sequence.id === sequenceId.value)?.name ?? "影片"}` } }, lifetime.signal) as { node: { id: string } };
+  const result = await context.call({ name: "publishVideo", args: { path, canvasId, label: `${item.draft ? "粗剪" : "成片"} · ${props.sequences.find(sequence => sequence.id === sequenceId.value)?.name ?? "影片"}` } }, lifetime.signal) as { node: { id: string } };
   published.value.add(item.id);
   delete publishErrors.value[item.id];
   if (focus) await context.call({ name: "fitCanvas", args: { nodeIds: [result.node.id] } }, lifetime.signal);
@@ -307,13 +308,13 @@ async function trackRender(id: string, targetSequence: string, binding?: { conte
   else await loadRenders();
 }
 defineExpose({ trackRender });
-async function render() {
+async function render(draft: boolean) {
   const [width, height] = exportSize.value.split("x").map(Number);
   const context = getCanvas?.();
   const canvasId = context?.id;
-  const item = await props.request(`/sequences/${sequenceId.value}/render`, "POST", exportSize.value === "source" ? {} : { width, height });
+  const item = await props.request(`/sequences/${sequenceId.value}/render`, "POST", { draft, ...(exportSize.value === "source" ? {} : { width, height }) });
   if (context && canvasId) renderCanvases.set(item.id, { context, id: canvasId });
-  message.value = "正在导出，完成后自动展示到画布，可直接播放和下载"; await loadRenders();
+  message.value = `${draft ? "正在导出粗剪预览" : "正在导出定稿"}，完成后自动展示到画布，可直接播放和下载`; await loadRenders();
 }
 </script>
 

@@ -8,6 +8,7 @@ const sceneListPath = "场次表.json";
 const historyDirectory = "场次表历史";
 const breakdownPath = "拆解清单.json";
 const storyApprovalSchema = z.strictObject({ revisionId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/) });
+const storyDecisionParameters = z.strictObject({ decision: storyDecisionSchema });
 
 type SavedSceneList = SceneList & { schemaVersion: 1; version: number; savedAt: string };
 
@@ -30,7 +31,7 @@ const plugin: ToolPlugin = {
   createTools({ files, story }) {
     async function checkStory(value: SceneList) {
       if (!story) return;
-      const project = storyProjectSchema.parse(await story.read());
+      const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read());
       // 版本用于并发控制；仅收藏视觉参考不代表已经进入故事采用流程。
       if (!project.revisions.length && !project.sources.length && !project.directions.length && JSON.stringify(project.brief) === JSON.stringify(newStoryProject().brief)) {
         return { approved: undefined, visualReferences: resolveVisualBoard(project.visualBoard) };
@@ -127,7 +128,7 @@ const plugin: ToolPlugin = {
     ];
     if (story) tools.push({
       name: "readStoryProject", label: "读取故事工作台", description: "恢复创作简报、资料理解、方向、故事版本、已采用版本的事实/线索、审稿与预演、真实发布反馈。继续创作前先读。", parameters: z.toJSONSchema(z.object({})),
-      async execute() { const project = storyProjectSchema.parse(await story.read()); return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) }); },
+      async execute() { const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read()); return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) }); },
     }, {
       name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
       description: "按 readStoryProject 的 version 保存资料理解、创意方向、剧本候选、精确引句审稿或单场改写。采用故事版本请调用 requestStoryApproval，在聊天中显示确认卡片。不得代用户确认资料、采用方向/定稿、处置问题或录入观众反馈。旧版本保留。",
@@ -145,10 +146,12 @@ const plugin: ToolPlugin = {
     });
     if (story?.requestDecision) tools.push({
       name: "requestStoryDecision", label: "确认故事创作选择", executionMode: "sequential",
-      description: "在聊天中请用户确认资料理解、比较并选择已保存的故事方向，或按展示的理由保留审稿问题。confirmSource 传资料 id；chooseDirection 展示全部候选，不代用户选定；已有方向直接返回，仅用户明确改选时传 reconsider:true；release 传 value 展示并保存用户提供的发布反馈，不执行对外发布；decideIssue 传 reviewId、issueId、reason，理由须展示给用户确认。返回 applied: true 才表示决定已保存；跳过或暂不决定时等待，不循环追问。已有明确决定不重复询问。采用定稿用 requestStoryApproval。",
-      // OpenAI 函数参数 schema 顶层必须 type: "object"；discriminatedUnion 只转出 oneOf，需补顶层类型。
-      parameters: { ...z.toJSONSchema(storyDecisionSchema, { target: "draft-07", io: "input" }), type: "object" },
-      async execute(id, params, signal) { return json(await story.requestDecision!(id, storyDecisionSchema.parse(params), signal)); },
+      description: "在 decision 中指定故事创作选择，并在聊天中请用户确认资料理解、比较并选择已保存的故事方向，或按展示的理由保留审稿问题。confirmSource 传资料 id；chooseDirection 展示全部候选，不代用户选定；已有方向直接返回，仅用户明确改选时传 reconsider:true；release 传 value 展示并保存用户提供的发布反馈，不执行对外发布；decideIssue 传 reviewId、issueId、reason，理由须展示给用户确认。返回 applied: true 才表示决定已保存；跳过或暂不决定时等待，不循环追问。已有明确决定不重复询问。采用定稿用 requestStoryApproval。",
+      parameters: z.toJSONSchema(storyDecisionParameters, { target: "draft-07", io: "input" }),
+      async execute(id, params, signal) {
+        const { decision } = storyDecisionParameters.parse(params);
+        return json(await story.requestDecision!(id, decision, signal));
+      },
     });
     return tools;
   },

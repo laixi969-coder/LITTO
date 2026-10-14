@@ -18,7 +18,10 @@ export async function inspectFrames(input: { workspaceId: string; projectId: str
     const started = Date.now();
     try {
       const context: Context = { systemPrompt: input.system, messages: [{ role: "user", timestamp: Date.now(), content: [
-        { type: "text", text: input.prompt }, ...input.frames.map(frame => ({ type: "image" as const, mimeType: frame.mime, data: frame.data.toString("base64") })),
+        { type: "text", text: input.prompt }, ...input.frames.flatMap((frame, frameIndex) => [
+          { type: "text" as const, text: `frameIndex: ${frameIndex}` },
+          { type: "image" as const, mimeType: frame.mime, data: frame.data.toString("base64") },
+        ]),
       ] }] };
       const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(180000)]) : AbortSignal.timeout(180000);
       const stream = streamAi(configured, context, signal);

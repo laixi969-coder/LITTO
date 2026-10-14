@@ -19,6 +19,7 @@ export function speechInspectionMessage(inspection: SpeechInspection) {
   return (issues.join("；") || `参考音轨整体匹配，估算偏移 ${inspection.offsetMs} 毫秒`) + "。音轨匹配不证明逐字口型同步；仍需检查可见发声区间。";
 }
 const roleSchema = z.strictObject({
+  speechStyle: z.string().max(2000).optional(),
   id: z.string().uuid(), name: z.string().max(100), providerId: z.string().max(96), modelId: z.string().max(256), voice: z.string().max(256),
 });
 const takeSchema = z.strictObject({
@@ -59,7 +60,11 @@ export type VoiceProject = z.infer<typeof voiceProjectSchema>;
 export type VoiceRole = VoiceProject["roles"][number];
 export type VoiceLine = VoiceProject["lines"][number];
 
+export function speechInstructions(line: VoiceLine, role?: VoiceRole) {
+  return [role?.speechStyle?.trim(), line.emotion.trim(), line.delivery.trim()].filter(Boolean).join("；");
+}
+
 export function speechSourceKey(line: VoiceLine, role?: VoiceRole) {
   if (line.sourceAudio) return JSON.stringify([line.text.trim(), line.sourceAudio]);
-  return JSON.stringify([line.text.trim(), line.emotion.trim(), line.delivery.trim(), line.speed, role?.providerId, role?.modelId, role?.voice]);
+  return JSON.stringify([line.text.trim(), line.emotion.trim(), line.delivery.trim(), line.speed, role?.providerId, role?.modelId, role?.voice, ...(role?.speechStyle?.trim() ? [role.speechStyle.trim()] : [])]);
 }

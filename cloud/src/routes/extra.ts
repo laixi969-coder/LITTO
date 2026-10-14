@@ -38,7 +38,7 @@ extra.post("/sequences/:id/render", async (c) => {
 });
 extra.get("/sequences/:id/renders", (c) => {
     const { s } = ctx(c);
-    return c.json(s.list("renders", { sequenceId: c.req.param("id") }, "created_at DESC").map((r: any) => ({ id: r.id, status: r.status, quality: finalQualityView(s, r), error: r.error, createdAt: r.createdAt, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null })));
+    return c.json(s.list("renders", { sequenceId: c.req.param("id") }, "created_at DESC").map((r: any) => ({ id: r.id, status: r.status, draft: r.manifest?.options?.draft === true, quality: finalQualityView(s, r), error: r.error, createdAt: r.createdAt, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null })));
 });
 extra.put("/sequences/:id/subtitles", async (c) => {
     const { s } = ctx(c, "EDITOR");

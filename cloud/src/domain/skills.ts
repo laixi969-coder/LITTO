@@ -1,4 +1,5 @@
 import { NARRATIVE_FUNCTIONS } from "./schema.ts";
+import type { ShotInput } from "./schema.ts";
 
 /**
  * Skills output STRUCTURED specs (never just a long prompt). They are deterministic, rule-based experts;
@@ -13,6 +14,10 @@ export type ShotDraft = {
     camera: { shotSize: string; position: string; height: string; angle: string; lensMm: number; focus: string; depth: string; motion: string; motivation: string; side: "A" | "B" | "none"; screenDirection: "left" | "right" | "none" };
     lighting: { motivatedLight: string; key: string; fill: string; negativeFill: string; practicals: string[]; exposure: string; keyDirection: "left" | "right" | "front" | "back" | "top" | "none"; timeOfDay: string; colorTemp: string };
     intendedStateDelta: Record<string, any>; duration: number; sceneIndex: number; subtitle?: string;
+    sourceDialogue?: { speakerId: string; text: string };
+    creativeBrief?: ShotInput["creativeBrief"];
+    source?: ShotInput["source"];
+    visibleAssetIds?: string[];
 };
 
 const HEADING = /^\s*((?:INT|EXT|I\/E)[./ ].*|内景.*|外景.*|场景.*|SCENE\b.*)$/i;
@@ -96,6 +101,7 @@ export function storyboardDirector(script: string, assets: AssetLite[], opts: { 
             // Shot–reverse-shot: same side of the axis, opposite eyelines.
             shots.push(base(turn ? "Reaction" : "Rhythm", "MCU", 50, `${b.speaker}: "${b.text.slice(0, 40)}"`, { assetIds: [...new Set([...sceneEnv, ...spk, ...found.map((a) => a.id)])], subtitle: b.text, duration: Math.max(4, Math.ceil(b.text.replace(/\s/g, "").length / 4 + 1)), performance: { emotion: emo?.[1] ?? "neutral", intensity: emo?.[2] ?? 0.45, eyeline: dir === "none" ? "待确认多人空间关系" : `screen ${dir} (proposed, verify blocking)`, gesture: "", timing: "on the line" }, camera: { shotSize: "MCU", position: "over-shoulder", height: "eye level", angle: "neutral", lensMm: 50, focus: speaker?.name ?? "", depth: "shallow", motion: "static", motivation: "", side: "A", screenDirection: dir } }));
             prevSpeaker = b.speaker;
+            if (speaker) shots[shots.length - 1].sourceDialogue = { speakerId: speaker.id, text: b.text };
             continue;
         }
 
@@ -114,7 +120,7 @@ export function storyboardDirector(script: string, assets: AssetLite[], opts: { 
 export function assetDirector(type: string, name: string, description = "") {
     const common = { forbiddenChanges: ["identity / defining silhouette", "approved colours"], allowedVariations: ["natural lighting response", "material response consistent with the specified condition"] };
     const t: Record<string, any> = {
-        Character: { views: ["single front full-body identity reference; portrait framing with head and feet visible"], invariants: [`${name}: face geometry and proportions`, "hairline and hair style", "skin tone and age cues", "hands and distinctive marks", "natural age-appropriate torso and leg proportions; no limb compression to fit the frame"], allowedVariations: ["micro-expressions", "natural hair strands"], forbiddenChanges: ["face geometry", "body proportions", "age", "distinctive marks"] },
+        Character: { views: ["front 0° full body", "strict right side 90° full body", "back 180° full body"], invariants: [`${name}: face geometry and proportions`, "hairline and hair style", "skin tone and age cues", "hands and distinctive marks", "natural age-appropriate torso and leg proportions; no limb compression to fit the frame"], allowedVariations: ["micro-expressions", "natural hair strands"], forbiddenChanges: ["face geometry", "body proportions", "age", "distinctive marks"] },
         Wardrobe: { views: ["front", "back", "fabric macro"], invariants: ["cut / silhouette", "fabric and weave", "colour", "closure details and trim"], allowedVariations: ["natural creasing", "movement of cloth"], forbiddenChanges: ["colour", "silhouette", "logos / trim"] },
         Environment: { views: ["master wide", "reverse wide", "detail of key set dressing"], invariants: ["spatial topology (door/window positions)", "furniture relationships", "materials", "practical light positions"], allowedVariations: ["source-motivated light response"], forbiddenChanges: ["room layout", "window / door placement"] },
         Prop: { views: ["front", "side", "top", "scale reference in hand"], invariants: ["geometry and real-world size", "material", "distinctive details and specified condition"], allowedVariations: ["reflections", "light falloff"], forbiddenChanges: ["shape", "size", "markings"] },

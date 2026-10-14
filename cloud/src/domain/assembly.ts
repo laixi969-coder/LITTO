@@ -164,7 +164,8 @@ export function assembleApprovedSequence(s: Scope, sequenceId: string, actor: st
     if (!timeline.clips.length || timeline.missing.length) return null;
     const fingerprint = sequenceFingerprint(s, sequenceId);
     const existing = s.list("renders", { sequenceId }, "created_at DESC").find(render =>
-        ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.sourceFingerprint === fingerprint);
-    return existing ?? startRender(sequence.workspaceId, sequence.projectId, sequenceId, actor);
+        ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.sourceFingerprint === fingerprint && render.manifest?.options?.draft === true);
+    // ACT: 素材齐备只触发粗剪，接缝处理后由现有 render 入口显式导出定稿。
+    return existing ?? startRender(sequence.workspaceId, sequence.projectId, sequenceId, actor, { draft: true });
 }
 void bad;

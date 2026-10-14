@@ -45,7 +45,7 @@ export function route(opts: { kind: "image" | "video" | "text"; need?: string[];
         const needsKey = ADAPTERS[prov.adapter].requiresKey;
         const usable = !needsKey || !!credentialFor(prov.id, opts.workspaceId, opts.projectId);
         const caps = m.capabilities;
-        const base = opts.kind === "video" ? (caps.image2video || caps.text2video) : opts.kind === "text" ? caps.chat : caps.text2image;
+        const base = opts.kind === "video" ? (caps.image2video || caps.text2video) : opts.kind === "text" ? caps.chat : opts.need?.includes("imageEdit") ? caps.imageEdit : caps.text2image;
         if (!base || (opts.need ?? []).some((n) => !caps[n])) continue;
         const degradations: Candidate["degradations"] = [];
         let penalty = 0;

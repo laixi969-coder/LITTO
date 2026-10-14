@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { storyImpact } from "@toonflow/tool-scene-list/storyProject";
 import { t } from "@/lib/i18n";
 import { listMediaModels, generateMedia, readReference } from "@/utils/media/generation";
 import { z } from "zod";
@@ -17,7 +19,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 import { workspaceProject, prepareShot } from "@/utils/media/jobs";
 import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
-import { readStoryProject, applyStoryAction, checkSources, requestStoryApproval, requestStoryDecision } from "@/utils/story";
+import { readStoryContext, readStoryProject, applyStoryAction, checkSources, requestStoryApproval, requestStoryDecision } from "@/utils/story";
 import { requestKeyframeApproval } from "@/utils/media/keyframeApproval";
 import { requestProductionDecision } from "@/utils/media/productionDecision";
 import { readVoiceProject } from "@/utils/media/voiceDecision";
@@ -93,7 +95,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
   };
   return {
     story: {
-      read: () => readStoryProject(cwd),
+      read: () => readStoryContext(cwd),
       validateSources: async () => checkSources(cwd, (await readStoryProject(cwd)).sources),
       apply: (version, action) => applyStoryAction(cwd, version, action),
       requestApproval: question ? (toolCallId, revisionId, signal) => requestStoryApproval(cwd, toolCallId, revisionId, question, mediaSignal(signal)) : undefined,
@@ -119,6 +121,36 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const model = data.model ?? (models.length === 1 ? { providerId: models[0]!.providerId, modelId: models[0]!.modelId } : undefined);
           return api.inspectAd(scope, projectId, operation, { ...data, model }, tenant.userId, mediaSignal(signal));
         }
+        if ((operation === "shot" || operation === "updateShot") && data.source !== undefined) {
+          const source = z.strictObject({ sceneId: z.string().regex(/^s\d{2,3}$/) }).parse(data.source);
+          const story = await readStoryProject(cwd);
+          const revision = story.revisions.find(item => item.id === story.approvedId);
+          const scene = revision?.scenes.find(item => item.sceneId === source.sceneId);
+          if (!revision || !scene) throw new Error("来源场次必须属于当前已采用的剧本");
+          data = { ...data, source: { sceneId: scene.sceneId, revisionId: revision.id, sceneText: scene.text, speech: scene.speech, knowledge: scene.knowledge } };
+        }
+        if (operation === "readStoryImpact") {
+          const story = await readStoryProject(cwd);
+          const revision = story.revisions.find(item => item.id === story.approvedId);
+          const shots = scope.list("shots", { projectId });
+          const voice = (await readVoiceProject(cwd)).project;
+          const impacts = new Map(story.revisions.map(previous => [previous.id, revision ? storyImpact(previous, revision) : null]));
+          return { revisionId: revision?.id, shots: shots.map(shot => {
+            const scene = revision?.scenes.find(item => item.sceneId === shot.source?.sceneId);
+            const sequence = scope.get("sequences", shot.sequenceId);
+            const linked = Boolean(shot.source?.sceneId);
+            const impact = impacts.get(shot.source?.revisionId);
+            const dependent = Boolean(impact?.dependent.includes(shot.source?.sceneId));
+            const stale = linked ? !scene || scene.text !== shot.source.sceneText || scene.speech !== shot.source.speech || scene.knowledge !== shot.source.knowledge || Boolean(impact?.changed.includes(shot.source.sceneId)) || dependent
+              : shot.source?.scriptHash ? createHash("sha256").update(sequence?.script ?? "").digest("hex") !== shot.source.scriptHash : null;
+            const edit = api.getEdit(scope, shot.sequenceId, false);
+            return { shotId: shot.id, source: shot.source, stale, dependent,
+              voiceLineIds: voice.lines.filter(line => line.shotId === shot.id || linked && line.storySource?.sceneId === shot.source.sceneId).map(line => line.id),
+              takeIds: scope.list("takes", { shotId: shot.id }).map(take => take.id),
+              clips: edit.clips.filter(clip => clip.shotId === shot.id || clip.refId?.startsWith(`${shot.id}:`) || clip.linkedClipId && edit.clips.some(parent => parent.id === clip.linkedClipId && parent.shotId === shot.id)).map(clip => ({ id: clip.id, start: clip.start, end: clip.start + clip.duration })),
+            };
+          }) };
+        }
         if (operation === "sequence") {
           const story = await readStoryProject(cwd);
           const revision = story.revisions.find(item => item.id === story.approvedId);
@@ -139,6 +171,15 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const { targets } = z.object({ targets: z.array(z.object({ type: z.enum(["keyframe", "take"]), id: z.string().min(1) })).min(1).max(100) }).parse(data);
           const results = await Promise.allSettled(targets.map(async target => api.inspectProductionQuality(scope, projectId, target.type, target.id)));
           return { results: results.map((result, index) => result.status === "fulfilled" ? { ...targets[index], ...result.value } : { ...targets[index], error: String(result.reason) }), quality: api.productionQualityView(scope, projectId) };
+        }
+        if (operation === "suggestCuts" || operation === "previewCut" || operation === "soundBridge") {
+          const { sequenceId } = z.object({ sequenceId: z.string().min(1) }).parse(data);
+          if (scope.get("sequences", sequenceId)?.projectId !== projectId) throw new Error("序列不属于当前项目");
+          if (operation === "soundBridge") return api.soundBridge(scope, sequenceId, api.soundBridgeSchema.parse(data), mediaSignal(signal));
+          const input = api.cutPairSchema.parse(data);
+          const result = await api[operation](scope, sequenceId, input.leftId, input.rightId, input.expectedVersion);
+          mediaSignal(signal)?.throwIfAborted();
+          return result;
         }
         if (operation === "readEdit" || operation === "render") {
           if (typeof data.sequenceId !== "string" || scope.get("sequences", data.sequenceId)?.projectId !== projectId) throw new Error("序列不属于当前项目");

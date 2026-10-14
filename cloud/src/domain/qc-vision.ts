@@ -12,6 +12,8 @@ import { z } from "zod";
 import { referenceCropSchema } from "./schema.ts";
 import { sampleVideoFrames } from "./mediaInspection.ts";
 import { createHash } from "node:crypto";
+import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
+import { statesOf } from "./state.ts";
 
 type VisionRequest = { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[]; label?: string; signal?: AbortSignal };
 let workspaceVision: ((input: VisionRequest) => Promise<{ text: string; modelId: string; jobId: string }>) | undefined;
@@ -19,7 +21,7 @@ const visionResults = new Map<string, { text: string; modelId: string; jobId: st
 const pendingVision = new Map<string, { signal?: AbortSignal; task: Promise<{ text: string; modelId: string; jobId: string }> }>();
 export function configureWorkspaceVision(execute: NonNullable<typeof workspaceVision>) { workspaceVision = execute; visionResults.clear(); pendingVision.clear(); }
 
-export async function inspectVision(input: Omit<VisionRequest, "providerId" | "modelId">, model?: { providerId: string; modelId: string }, validate?: (text: string) => unknown) {
+export async function inspectVision(input: Omit<VisionRequest, "providerId" | "modelId">, model?: { providerId: string; modelId: string }, validate?: (text: string) => unknown, reconsider = false) {
   input.signal?.throwIfAborted();
   if (model && !workspaceVision) throw new Error("当前服务未连接工作区视觉模型");
   // ACT: 仅缓存当前进程最近 32 次已校验结果，不缓存图片；未指定模型的动态路由不猜测模型身份。
@@ -27,9 +29,9 @@ export async function inspectVision(input: Omit<VisionRequest, "providerId" | "m
     input.workspaceId, input.projectId, input.actor, model.providerId, model.modelId, input.label, input.system, input.prompt,
     input.frames.map(frame => [frame.mime, createHash("sha256").update(frame.data).digest("hex")]),
   ])).digest("hex") : undefined;
-  const cached = key ? visionResults.get(key) : undefined;
+  const cached = key && !reconsider ? visionResults.get(key) : undefined;
   if (cached) { validate!(cached.text); return { ...cached }; }
-  const pending = key ? pendingVision.get(key) : undefined;
+  const pending = key && !reconsider ? pendingVision.get(key) : undefined;
   // 不合并不同取消信号的请求，避免一个用户停止检查影响另一个请求。
   if (pending && pending.signal === input.signal) { const result = await pending.task; validate?.(result.text); return { ...result }; }
   const executor = workspaceVision;
@@ -56,13 +58,13 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
   if (!shot || obj?.shotId !== shotId || !obj.mediaId) return { used: false, reason: "检查对象不属于当前镜头或没有媒体" };
   const media = s.get("media", obj.mediaId);
   if (!media) return { used: false, reason: "媒体不可读" };
-  const frames: { data: Buffer; mime: string }[] = [];
-  const timestamps: number[] = [];
   const plan = qualityReviewPlan(shot, type);
   const inspectionKey = model ? createHash("sha256").update(JSON.stringify([plan.interaction.required ? "physicalInteraction2" : "tieredVision2", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
   const cached = inspectionKey && s.list("qc_reports", { targetType: type, targetId: id }, "created_at DESC, rowid DESC")
     .find(report => report.evidence?.vision?.inspectionKey === inspectionKey)?.evidence?.vision;
   if (cached?.used) return { ...cached, reused: true };
+  const frames: { data: Buffer; mime: string }[] = [];
+  const timestamps: number[] = [];
   const regions: { frameIndex: number; seconds: number | null; region: unknown }[] = [];
   const region = shot.inspectionRegion ? referenceCropSchema.parse(shot.inspectionRegion) : null;
   const cropFilter = region ? region.unit === "normalized"
@@ -113,15 +115,33 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     } finally { await rm(directory, { recursive: true, force: true }); }
   } else return { used: false, reason: `尚不支持自动观察 ${media.mime}` };
   const kinds = OBSERVATION_KINDS.filter(kind => kind !== "capability_mismatch");
-  const references = s.list("reference_bindings", { targetType: "shot", targetId: shotId })
-    .map(binding => s.get("refs", binding.referenceId)?.mediaId)
-    .filter((id): id is string => !!id && /^image\/(png|jpeg|webp)$/.test(s.get("media", id)?.mime ?? "")).slice(0, 4);
+  const assets = (shot.assetIds as string[]).map(assetId => s.get("assets", assetId)).filter((asset): asset is NonNullable<typeof asset> => !!asset);
+  const referenceRoles = [
+    ...assets.filter(asset => asset.attributes?.authoritativeReference).map(asset => ({
+      mediaId: asset.attributes.authoritativeReference as string,
+      role: asset.type === "Character" || asset.type === "Creature" ? "IDENTITY" : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY",
+      notes: `${asset.name}: authoritative asset reference`,
+    })),
+    ...s.list("reference_bindings", { targetType: "shot", targetId: shotId }).map(binding => ({
+      mediaId: s.get("refs", binding.referenceId)?.mediaId as string | undefined, role: binding.role, notes: binding.notes,
+    })),
+  ];
+  const references = [...new Set(referenceRoles.map(reference => reference.mediaId)
+    .filter((id): id is string => !!id && /^image\/(png|jpeg|webp)$/.test(s.get("media", id)?.mime ?? "")))].slice(0, 4);
   const input = { workspaceId: s.workspaceId, projectId: shot.projectId, actor, frames, imageMediaIds: references,
     json: true, label: "qc.observe", system: `Inspect actual film imagery, not prompt quality. First ${frames.length} images are output images; full frames are in temporal order, with additional native-resolution regions indexed in the prompt; remaining images are references. Report only visible defects using ${kinds.join(", ")}. Explicitly count visible limbs and track them through occlusion; duplicated arms/legs or impossible mirror anatomy are anatomy_failure. Compare wardrobe/product length, seams and shape against references and earlier frames; unexplained changes are wardrobe_drift. Check waxy/plastic skin, erased texture, implausible material highlights, exposure and focus, spatial contact, temporal identity/layout drift, performance. Sampled frames cannot prove biomechanics, lip sync or sound quality. Cite frame/time and visible evidence. Separate confirmed visible defects from uncertainty caused by occlusion, missing references, sampling gaps or perspective. Do not treat plausible motion blur, lighting or foreshortening alone as defects. Return JSON {"observations":[{"kind":"...","note":"...","certainty":"defect or uncertain or clear"}]}; Use defect only for a confirmed visible defect, uncertain for insufficient evidence, and clear for normal behavior or absent defects. Normal motion, correct composition and no anomaly must never use defect. Do not claim a complete pass.`,
     prompt: JSON.stringify({ shot: { action: shot.action, camera: shot.camera, lighting: shot.lighting, realism: shot.realism, performance: shot.performance }, world: s.list("worlds", { projectId: shot.projectId }), looks: s.list("looks", { projectId: shot.projectId }).filter(look => look.scope === "project" || look.scope === "sequence" && look.scopeId === shot.sequenceId || look.scope === "shot" && look.scopeId === shotId),
       objectInteractionReview: plan.interaction.required ? { instruction: plan.interaction.instruction, ranges: plan.interaction.ranges,
         evidence: "Track the actual opening/support location and object through approach, contact, passage/transfer, release and settling. Compare earlier frames and references, including both sides of cuts. Visible entry through a closed surface or unsupported objects are motion_physics; an invented/moved opening or changing object geometry is scene_structure. Cite visible frame/time evidence. If the contact or opening is obscured or falls between samples, do not infer success from the final pose or prompt. Sampled images cannot establish complete physical correctness." } : undefined,
       surfaceReview: "Inspect the whole frame, not just faces: foliage, soil, walls, mountains, sky, water and props. Look for uniform waxy/glossy response across different materials, repeated or melted texture, implausibly equal foreground/background sharpness, HDR halos, flattened atmospheric depth and mismatched subject/environment lighting or contact shadows. Compare to the specified medium and references; intentional stylization, makeup, soft light or clean surfaces alone are not defects. Natural skin texture must be age- and shot-scale-appropriate; do not demand wrinkles, dirt or grain. Cite visible locations and evidence; a matching color palette is not proof of matching photographic texture.",
+      visualDefaults: cleanVisualDefaults,
+      referenceUse: characterReferenceUse,
+      assets,
+      startingState: statesOf(s, shotId).start,
+      plannedChanges: shot.intendedStateDelta,
+      referenceRoles: referenceRoles.map(reference => ({ ...reference, imageIndex: references.indexOf(reference.mediaId ?? "") >= 0 ? frames.length + references.indexOf(reference.mediaId!) : null })),
+      referenceIndexConvention: "imageIndex is zero-based in the complete image input list; null means the reference image was not sent and cannot be visually verified.",
+      conditionReview: "Report visible unrequested dirt, damage, aging of garments/props, unreadable underexposure or excessive noise using the existing defect kinds. Distinguish specified age features, night lighting and authorized local wear from defects. Planned changes are intent, not proof they occurred. Identity is compared to the approved character reference, not merely the previous generated frame. If the necessary reference or authorization evidence is absent, state the uncertainty; do not invent a pass or demand pristine restoration of an established state.",
       timestamps, regions, referenceCount: references.length }),
   };
   for (const id of model ? references : []) {

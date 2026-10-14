@@ -16,6 +16,15 @@ export async function readStoryProject(directory: string): Promise<StoryProject>
   if (!result.success) fail("故事项目格式无效，原文件未覆盖", 409);
   return result.data;
 }
+export async function readStoryContext(directory: string) {
+  const project = await readStoryProject(directory);
+  const api = cloud(), tenant = currentTenant();
+  const link = api && tenant ? api.dbGet("SELECT project_id FROM workspace_project_links WHERE workspace_id=? AND directory=?", tenant.workspaceId, directory) : null;
+  const characters = api && tenant && link ? api.scoped(tenant.workspaceId).list("assets", { projectId: link.project_id })
+    .filter(asset => asset.type === "Character")
+    .map(asset => ({ id: asset.id, name: asset.name, description: asset.description, characterDirection: asset.attributes?.characterDirection })) : [];
+  return { ...project, productionContext: { characters } };
+}
 async function readSource(directory: string, relativePath: string, maxBytes: number) {
   const { path } = await resolveWorkspacePath(directory, relativePath);
   const info = await stat(path);

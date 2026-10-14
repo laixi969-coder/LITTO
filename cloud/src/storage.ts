@@ -91,7 +91,16 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     const id = ulid();
     const key = `${workspaceId}/${projectId ?? "_"}/${id}`;
     await storage.put(key, data);
-    const row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: probed?.duration ?? opts.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });
+    let row;
+    try {
+        // 文件写入期间其他请求也可能完成入库；同步复核配额与记录写入之间不能再 await。
+        const current = get("SELECT quota_bytes FROM workspaces WHERE id=? AND deleted_at IS NULL", workspaceId);
+        if (!current || usage(workspaceId).bytes + data.length > current.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
+        row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: probed?.duration ?? opts.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });
+    } catch (error) {
+        await storage.delete(key);
+        throw error;
+    }
     if (!process.env.LITTO_NO_DERIVATIVES) void makeDerivatives(row as any);
     return row;
 }
@@ -105,6 +114,12 @@ export const mediaView = (m: any) => {
 };
 
 export async function softDeleteMedia(workspaceId: string, id: string) {
+    const scope = scoped(workspaceId);
+    const library = scope.list("library_assets");
+    if (library.some(entry => entry.authoritativeReference === id || entry.referenceSnapshots?.some((ref: any) => ref.mediaId === id)
+        || entry.references?.some((ref: string) => scope.get("refs", ref)?.mediaId === id))) {
+        throw conflict("此素材正在角色资产库中使用，请先更换库中的参考", "media_in_use");
+    }
     scoped(workspaceId).softDelete("media", id);
 }
 /** Permanent cleanup of soft-deleted media older than `olderThanMs`. */

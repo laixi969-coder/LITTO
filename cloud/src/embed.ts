@@ -24,6 +24,7 @@ export { prepareKeyframeApproval, approveKeyframes } from "./domain/keyframeAppr
 export { prepareProductionDecision, applyProductionDecision } from "./domain/productionDecision.ts";
 export { inspectFinalQuality, sequenceFingerprint } from "./domain/finalQuality.ts";
 export { editView, getEdit } from "./domain/nle.ts";
+export { cutPairSchema, soundBridgeSchema, suggestCuts, previewCut, soundBridge } from "./domain/cutEditing.ts";
 export { startRender } from "./domain/assembly.ts";
 export { renderOptionsSchema } from "./domain/nle-render.ts";
 export { configureWorkspaceVision } from "./domain/qc-vision.ts";

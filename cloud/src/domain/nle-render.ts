@@ -19,6 +19,8 @@ const atempo = (sp: number) => { const out: string[] = []; let x = sp; while (x 
 export const renderOptionsSchema = z.object({
     normalizeAudio: z.boolean().default(true), targetLufs: z.number().min(-40).max(-5).default(-16),
     burnSubtitles: z.boolean().default(false),
+    /** 草稿导出仅供迭代预览，不进入检测与验收链；定稿导出不带此标记。 */
+    draft: z.boolean().default(false),
     width: z.number().int().min(2).max(8192).multipleOf(2).optional(),
     height: z.number().int().min(2).max(8192).multipleOf(2).optional(),
 }).refine(options => (options.width === undefined) === (options.height === undefined), "导出宽高须同时指定");

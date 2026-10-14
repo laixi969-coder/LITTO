@@ -43,7 +43,12 @@ export const lookSchema = z.object({
 export const assetInput = z.object({
     type: z.enum(ASSET_TYPES), name: z.string().min(1).max(120),
     description: z.string().default(""),
-    attributes: z.record(z.any()).default({}), // type-specific: faceGeometry, bodyProportion, layout, geometry, fabric ...
+    attributes: z.object({
+        characterDirection: z.object({
+            speech: z.string().trim().max(2000), behavior: z.string().trim().max(2000),
+            relationships: z.string().trim().max(2000).default(""),
+        }).strict().optional(),
+    }).catchall(z.any()).default({}),
     /** 中性气质标签；仅用于检索去重，不强制写入生成提示词。 */
     personaTags: personaTagSchema.optional(),
     references: z.array(z.string()).default([]), // reference ids
@@ -156,8 +161,17 @@ const stateDeltaSchema = z.object({
 export const shotInput = z.object({
     sequenceId: z.string(), sceneId: z.string().optional(), order: z.number().int().optional(),
     title: z.string().default(""),
+    source: z.object({
+        scriptHash: z.string().length(64).optional(),
+        beatIndexes: z.array(z.number().int().nonnegative()).max(1000).default([]),
+        beats: z.array(z.string().max(12000)).max(1000).default([]),
+        revisionId: z.string().max(100).optional(), sceneId: z.string().regex(/^s\d{2,3}$/).optional(),
+        sceneText: z.string().max(12000).optional(), speech: z.string().max(6000).optional(), knowledge: z.string().max(2000).optional(),
+    }).strict().optional(),
+    continuityFromShotId: z.string().min(1).max(128).nullable().optional().describe("明确返回同一时刻/空间时引用更早的镜头；不自动按场景名推断倒叙或时间跳跃"),
     narrativeFunction: z.enum(NARRATIVE_FUNCTIONS).default("Establish"),
     assetIds: z.array(z.string()).default([]),
+    visibleAssetIds: z.array(z.string()).optional().describe("本镜实际出镜的资产，须为 assetIds 的子集；画外声音保留在对白中。省略时兼容旧镜头，沿用 assetIds；空数组表示无人无物出镜"),
     action: z.string().default(""), performance: z.object({ emotion: z.string().default(""), intensity: z.number().default(0.5), eyeline: z.string().default(""), lookTarget: z.string().default(""), gesture: z.string().default(""), timing: z.string().default("") }).default({}),
     blocking: z.object({ foreground: z.string().default(""), midground: z.string().default(""), background: z.string().default("") }).default({}),
     camera: cameraSchema.default({}), lighting: lightingSchema.default({}),

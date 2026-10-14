@@ -23,6 +23,7 @@ export function workspaceProject(directory: string) {
 }
 
 export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string) {
+  if (request.localRepair && (!request.shotId || kind !== "image")) throw Object.assign(new Error("精修须提供图像镜头 shotId"), { status: 400 });
   if (!request.shotId && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
   await assertMediaModelSelection(kind, request, directory);
   const tenant = currentTenant();
@@ -134,6 +135,19 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权制作镜头"), { status: 403 });
   const model = (await listMediaModels()).find(item => item.providerId === request.providerId && item.modelId === request.modelId && item.type === kind);
   if (!model) throw Object.assign(new Error("模型不存在"), { status: 400 });
+  if (request.localRepair) {
+    const scope = api.scoped(tenant.workspaceId);
+    const frame = scope.get("keyframes", request.localRepair.keyframeId);
+    const media = frame?.mediaId && scope.get("media", frame.mediaId);
+    if (kind !== "image" || frame?.shotId !== shotId || !media?.width || !media?.height) throw new Error("精修需要当前镜头原图及实际宽高");
+    const ratios = request.ratio ? [request.ratio] : model.imageRatios?.length ? model.imageRatios : [`${media.width}:${media.height}`];
+    const ratio = ratios.find(value => {
+      const [width, height] = value.split(":").map(Number);
+      return width > 0 && height > 0 && Math.abs(media.width - media.height * width / height) <= 1;
+    });
+    if (!ratio) throw new Error("精修须保持原图画幅；当前画幅或模型不支持，不能通过裁剪、拉伸改变原构图");
+    request = { ...request, ratio };
+  }
   request = await applyMediaQuality(directory, kind, request, model);
   validateCameraRequest(model, request, kind);
   if (kind === "video") {
@@ -143,7 +157,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     if (model.durationResolutionMap?.length && !model.durationResolutionMap.some(rule => rule.duration.includes(request.duration!) && rule.resolution.includes(request.resolution!))) throw Object.assign(new Error("时长与分辨率组合不受模型支持"), { status: 400 });
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
-    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true });
+    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, localRepair: request.localRepair });
   if (kind === "video" && request.providerId === "meta" && request.modelId === "MiniMax-H3") {
     result.compiled.prompt = compactVideoPrompt(result.compiled.prompt);
   }
@@ -156,5 +170,5 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
-  return { ...result, request: { ...request, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
+  return { ...result, request: { ...request, shotId, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
 }

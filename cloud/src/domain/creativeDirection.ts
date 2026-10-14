@@ -8,7 +8,8 @@ const stylingSchema = z.object({
 
 // ACT: 这里只校验设计是否可执行，不用关键词、分数或服饰繁简冒充审美判断。
 export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; name: string; type: string; attributes?: Record<string, unknown> }[]) {
-  const characters = assets.filter(asset => asset.type === "Character");
+  const visibleIds = new Set(shot.visibleAssetIds ?? shot.assetIds);
+  const characters = assets.filter(asset => asset.type === "Character" && visibleIds.has(asset.id));
   if (!shot.creativeBrief && !characters.length && !assets.some(asset => asset.type === "Product") && !shot.advertising) return [];
   const parsed = creativeBriefSchema.safeParse(shot.creativeBrief);
   if (!parsed.success) return ["请由导演补充 creativeBrief：创作目标、可见视觉设计、产品展示或攻防编排（如适用）和对白计划；不要让用户填写技术表单"];
@@ -17,15 +18,21 @@ export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; n
     if (!stylingSchema.safeParse(asset.attributes?.styling).success) issues.push(`${asset.name} 缺少 attributes.styling 的 makeup、hair、costume、accessories 设计；可明确自然妆或无配饰及其理由，不默认素衣或华服`);
   }
   const brief = parsed.data;
+  if (characters.length && (brief.kind === "performance" || brief.kind === "combat")) {
+    if (!shot.action?.trim() || !shot.performance?.gesture?.trim() || !shot.performance?.timing?.trim()) issues.push("人物戏须明确行动目标、可见表演、触发与反应节拍；情绪标签不能代替表演");
+    if (!Object.values(shot.blocking ?? {}).some(value => value.trim()) || !shot.camera?.design?.subjectPath?.trim()) issues.push("人物戏须明确相对位置与人物路径；有意不移动时写明停留位置、注意对象和叙事作用，不用摄影机运动代替人物行为");
+    if (!shot.camera?.design?.purpose?.trim() || !shot.camera?.design?.cut?.trim() || !shot.camera?.design?.timing?.trim()) issues.push("人物戏须明确镜头传递的信息、局部行动节拍及剪辑入出依据，不能用固定时长填满空动作");
+  }
   if (brief.kind === "combat" && !brief.combat) issues.push("武打镜头须先设计 combat 的局面转折、标志性动作、攻防因果与摄影覆盖，不能只填写强度或激烈形容词");
   const duration = shot.generationDuration ?? shot.duration;
-  const characterIds = new Set(characters.map(asset => asset.id));
-  const assetIds = new Set(assets.map(asset => asset.id));
+  const characterIds = new Set(assets.filter(asset => asset.type === "Character").map(asset => asset.id));
+  const assetIds = visibleIds;
   for (const beat of brief.combat?.beats ?? []) {
     if (!assetIds.has(beat.attackerId) || !assetIds.has(beat.defenderId) || beat.attackerId === beat.defenderId) issues.push("攻防双方须为本镜实际出场的不同资产");
   }
   for (const line of brief.dialogue.lines) {
     if (!characterIds.has(line.speakerId)) issues.push("对白说话人须为本镜的真实角色资产");
+    if (line.lipSync === "visible" && !visibleIds.has(line.speakerId)) issues.push("画内说话人须在出镜资产中；画外声音使用 offscreen");
     if (line.end <= line.start || line.end > duration) issues.push("对白起止时间须在本段生成时长内，并为发声及口型留出时间");
   }
   if (brief.dialogue.lines.length && brief.dialogue.mode === "native" && shot.musicVideo && shot.musicVideo.audioMode !== "generated") issues.push("原生对白与静音/原曲方案冲突；保留台词，修改声音方案或明确后期配音对口型路径");

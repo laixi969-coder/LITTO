@@ -304,6 +304,7 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
   const { cloud } = await import("@/lib/cloud");
   const { currentTenant } = await import("@/utils/tenant");
   const api = cloud();
+  if (request.localRepair && (!api || !currentTenant() || mediaType !== "image" || !request.shotId)) invalid("关键帧精修须使用已连接项目的图像镜头，不能退化成独立文生图");
   if (!api || !currentTenant() || mediaType === "audio") {
     if (mediaType !== "audio") {
       const model = (await listMediaModels()).find(model => model.type === mediaType && model.providerId === request.providerId && model.modelId === request.modelId);

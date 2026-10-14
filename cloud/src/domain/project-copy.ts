@@ -61,6 +61,22 @@ export function duplicateProject(s: Scope, id: string, name: string, actor: stri
 
 /** Permanent removal of a project and all its rows + media files. */
 export async function purgeProject(workspaceId: string, projectId: string) {
+    const scope = scoped(workspaceId);
+    // 兼容旧库的共享媒体：删项目前把引用快照留在库中，仍被其他作品使用的文件转为租户持有。
+    // 新入库/导入已经复制文件；这里只迁移旧记录，不改变已采用角色的媒体 ID。
+    tx(() => {
+        const retained = new Set<string>();
+        for (const entry of scope.list("library_assets")) {
+            const refs = entry.referenceSnapshots ?? (entry.references ?? []).map((id: string) => scope.get("refs", id)).filter(Boolean)
+                .map((ref: any) => ({ kind: ref.kind, name: ref.name, mediaId: ref.mediaId, text: ref.text }));
+            if (!entry.referenceSnapshots) run("UPDATE library_assets SET data=json_set(data,'$.referenceSnapshots',json(?),'$.references',json('[]')) WHERE id=? AND workspace_id=?", JSON.stringify(refs), entry.id, workspaceId);
+            if (entry.authoritativeReference) retained.add(entry.authoritativeReference);
+            for (const ref of refs) if (ref.mediaId) retained.add(ref.mediaId);
+        }
+        for (const ref of scope.list("refs")) if (ref.projectId !== projectId && ref.mediaId) retained.add(ref.mediaId);
+        for (const asset of scope.list("assets")) if (asset.projectId !== projectId && asset.attributes?.authoritativeReference) retained.add(asset.attributes.authoritativeReference);
+        for (const id of retained) run("UPDATE media SET project_id=NULL WHERE id=? AND workspace_id=? AND project_id=?", id, workspaceId, projectId);
+    });
     for (const m of all("SELECT storage_key FROM media WHERE workspace_id=? AND project_id=?", workspaceId, projectId)) await storage.delete(m.storage_key).catch(() => {});
     const tables = all("SELECT name FROM sqlite_master WHERE type='table'").map((r) => r.name).filter((n) => all(`PRAGMA table_info(${n})`).some((c) => c.name === "project_id") && all(`PRAGMA table_info(${n})`).some((c) => c.name === "workspace_id"));
     tx(() => {

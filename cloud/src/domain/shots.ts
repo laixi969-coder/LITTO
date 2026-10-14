@@ -7,12 +7,19 @@ import type { z } from "zod";
 
 export const shotPartial = shotInput.partial();
 
+export function validateVisibleAssets(input: Pick<ShotInput, "assetIds" | "visibleAssetIds" | "creativeBrief">) {
+    if (input.visibleAssetIds === undefined) return;
+    if (input.visibleAssetIds.some(id => !input.assetIds.includes(id))) throw bad("出镜资产须属于本镜 assetIds");
+    if (input.creativeBrief?.dialogue.lines.some(line => line.lipSync === "visible" && !input.visibleAssetIds!.includes(line.speakerId))) throw bad("画内说话人须在出镜资产中；画外声音使用 offscreen");
+}
+
 const dataOf = (i: ShotInput) => {
     const { sequenceId, sceneId, order, ...data } = i;
     return data;
 };
 
 export function createShot(s: Scope, projectId: string, input: ShotInput) {
+    validateVisibleAssets(input);
     validateMusicVideoTiming(input);
     validateStateDelta(s, projectId, input.intendedStateDelta);
     const seq = s.get("sequences", input.sequenceId);
@@ -29,10 +36,11 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["sceneId", "narrativeFunction", "action", "assetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "creativeBrief", "advertising"] as const;
+const CORE = ["source", "continuityFromShotId", "sceneId", "narrativeFunction", "action", "assetIds", "visibleAssetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "creativeBrief", "advertising"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
+    validateVisibleAssets({ ...shot, ...patch } as ShotInput);
     if (patch.intendedStateDelta !== undefined) validateStateDelta(s, shot.projectId, patch.intendedStateDelta);
     const actionChanged = patch.action !== undefined && patch.action !== shot.action;
     const timelineChanged = patch.musicVideo !== undefined && JSON.stringify(patch.musicVideo?.timeline) !== JSON.stringify(shot.musicVideo?.timeline);
@@ -52,7 +60,9 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
     validateMusicVideoTiming({ ...shot, ...patch } as ShotInput);
     if (patch.sequenceId !== undefined && patch.sequenceId !== shot.sequenceId) throw bad("use the sequence workflow to move a shot");
     if (patch.sceneId && s.get("scenes", patch.sceneId)?.sequenceId !== shot.sequenceId) throw bad("scene does not belong to sequence");
-    const changed = CORE.filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(shot[k]));
+    // ACT: 尚无已采用视频时，首次补齐创作简报属于制作准备；仍更新规格指纹，不能沿用旧检查。
+    const changed = CORE.filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(shot[k])
+        && !(k === "creativeBrief" && !shot.creativeBrief && !shot.approvedTakeId));
     if (changed.length && (shot.heroKeyframeId || shot.approvedTakeId) && !confirm) throw conflict(`changing ${changed.join(", ")} affects an approved Hero Frame/Take; resend with confirm:true`, "needs_confirmation", { fields: changed, heroKeyframeId: shot.heroKeyframeId, approvedTakeId: shot.approvedTakeId });
     for (const aid of patch.assetIds ?? []) if (s.get("assets", aid)?.projectId !== shot.projectId) throw bad(`unknown project asset ${aid}`);
     const { id: _i, workspaceId, projectId, sequenceId, sceneId, ord, schemaVersion, status, heroKeyframeId, approvedTakeId, createdAt, updatedAt, deletedAt, ...data } = shot;
@@ -79,8 +89,10 @@ export function moveShot(s: Scope, id: string, toOrder: number) {
 export function deleteShot(s: Scope, id: string) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
-    s.softDelete("shots", id);
-    recomputeStates(s, shot.sequenceId);
+    tx(() => {
+        s.softDelete("shots", id);
+        recomputeStates(s, shot.sequenceId);
+    });
 }
 
 export function bindReference(s: Scope, projectId: string, target: { type: "shot" | "asset"; id: string }, b: { referenceId: string; role: string; weight?: number; lockLevel?: string; crop?: any; notes?: string }) {
@@ -98,9 +110,10 @@ export function createShotsFromDrafts(s: Scope, projectId: string, sequenceId: s
     tx(() => {
         if (opts.replace) for (const sh of s.list("shots", { sequenceId })) if (!sh.approvedTakeId && !sh.heroKeyframeId) s.softDelete("shots", sh.id);
         for (const d of drafts) {
+            validateVisibleAssets(d);
             if (!scenes.has(d.sceneIndex)) scenes.set(d.sceneIndex, s.insert("scenes", { project_id: projectId, sequence_id: sequenceId, name: d.sceneName, ord: d.sceneIndex, data: {} }).id);
             const ord = all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", sequenceId, s.workspaceId)[0].n;
-            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration } });
+            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, ...(d.visibleAssetIds !== undefined ? { visibleAssetIds: d.visibleAssetIds } : {}), action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration, ...(d.source ? { source: d.source } : {}), ...(d.creativeBrief ? { creativeBrief: d.creativeBrief } : {}) } });
             out.push(shot);
         }
         recomputeStates(s, sequenceId);

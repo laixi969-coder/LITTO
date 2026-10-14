@@ -9,6 +9,10 @@ import { bad } from "../util.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
 const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string; penalty: number; severity: "high" | "medium" | "low" }> = {
+    narrativeFailure: { cause: "剧情因果或信息揭示不成立", action: "storyRevise", detail: "先 readStoryImpact 定位源场次和关联镜头，修改故事后只重做受影响段落", penalty: 25, severity: "high" },
+    dialogueMismatch: { cause: "对白缺漏、错词或说话人错误", action: "dialogueRevise", detail: "读取源台词与 readVoice，对照实际声音；修正对应句和口型候选，不重做无关画面", penalty: 25, severity: "high" },
+    editingPace: { cause: "剪辑入出点导致拖沓或反应被截断", action: "editTrim", detail: "readEdit 定位片段，用 previewCut 和 editTimeline 的 set_cut/trim_clip 修正实际入出点，保留完整对白与有效反应", penalty: 15, severity: "medium" },
+    soundMasking: { cause: "音乐或效果掩盖对白和关键声音", action: "soundMix", detail: "readEdit 后用 editTimeline 的 set_gain/set_duck 调整已有声音；缺少音效才用 soundCues 添加真实素材", penalty: 15, severity: "medium" },
     creativeMismatch: { cause: "造型或动作未达到本镜创作目标", action: "directionRevise", detail: "先对照创作目标修订妆造资产或攻防编排，再检查新候选；不把无变形、身份一致或生成成功当作创作质量通过", penalty: 25, severity: "high" },
     anatomy_failure: { cause: "肢体增减、身体结构或遮挡关系错误", action: "motion_regenerate", detail: "定位多肢、消失或穿透的时间段，拒绝该候选；保持身份，简化为一次完整动作并重新生成，完整播放复核", penalty: 40, severity: "high" },
     wardrobe_drift: { cause: "服装或商品形状与锁定参考不一致", action: "geometry_lock", detail: "核对实际商品参考、裤长、腰头、缝线与服装状态；更换不一致镜头，不用转场掩盖", penalty: 30, severity: "high" },
@@ -16,8 +20,8 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
     imaging_failure: { cause: "曝光、焦平面或光学表现不可信", action: "imaging_revise", detail: "核对实景光源、曝光主体、高光滚降、暗部和景深，调整摄影规格后另出候选", penalty: 20, severity: "high" },
     temporal_drift: { cause: "视频材质、身份或空间随时间漂移", action: "motion_regenerate", detail: "标记出错时间段，锁定 Hero 和身份/环境参考，简化该段动作后生成新 Take", penalty: 25, severity: "high" },
     performance_failure: { cause: "表演或摄影机运动缺少动机", action: "performance_revise", detail: "重写可观察的反应、动作与收势节拍，明确走位和摄影机动机，再生成新 Take", penalty: 20, severity: "high" },
-    hand_artifact: { cause: "Local anatomical failure (hands)", action: "inpaint_local", detail: "Mask the hands and inpaint / local edit; do not regenerate the whole frame", penalty: 15, severity: "medium" },
-    face_artifact: { cause: "Local anatomical failure (face)", action: "inpaint_local", detail: "Mask the face region and inpaint with the IDENTITY reference", penalty: 15, severity: "medium" },
+    hand_artifact: { cause: "Local anatomical failure (hands)", action: "inpaint_local", detail: "根据实际图像指定哪一人物、哪只手和缺陷；用原图做定向编辑，保留新候选并检查区域外漂移", penalty: 15, severity: "medium" },
+    face_artifact: { cause: "Local anatomical failure (face)", action: "inpaint_local", detail: "指定受影响人物的面部，用原帧做定向编辑；保留身份与表情，不同时重画其他人的脸", penalty: 15, severity: "medium" },
     identity_drift: { cause: "Identity drifted from approved asset", action: "reference_replace", detail: "Re-bind the IDENTITY reference at weight 1.0 (LOCK) and regenerate", penalty: 30, severity: "high" },
     composition_off: { cause: "Composition deviates from the shot spec", action: "composition_ref", detail: "Add a COMPOSITION reference (Hero Frame / sketch) and regenerate", penalty: 15, severity: "medium" },
     motion_physics: { cause: "Implausible motion / physics", action: "motion_regenerate", detail: "Regenerate with motion-director notes (anticipation, weight transfer, inertia) or a PERFORMANCE reference", penalty: 25, severity: "high" },
@@ -35,7 +39,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (!shot) throw notFound("shot");
     const obj = s.get(target.type === "take" ? "takes" : "keyframes", target.id);
     if (!obj || obj.shotId !== shotId) throw notFound(target.type);
-    if (observations.some(o => !DIAGNOSIS[o.kind])) throw bad("未知的质检问题类型");
+    if (observations.some(o => !Object.hasOwn(DIAGNOSIS, o.kind))) throw bad(`未知的质检问题类型。observations 只记录实际缺陷，无缺陷传 []，正常表现写入 note 或 creativeReview；不要把 realism、lighting 等检查维度当作缺陷。支持的 kind：${OBSERVATION_KINDS.join("、")}`);
     const reviewed = [...new Set(review.reviewed ?? [])];
     const plan = qualityReviewPlan(shot, target.type);
     if (review.reviewedSegments?.some(range => range.end > (s.get("media", obj.mediaId)?.duration ?? 0))) throw bad("看听区间超出当前素材时长");
@@ -99,10 +103,11 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
 }
 
 /** Apply a repair: creates a NEW variant/take (old ones are kept) with the fix expressed in structured form. */
-export function applyRepair(s: Scope, repairId: string, actor: string) {
+export function applyRepair(s: Scope, repairId: string, actor: string, target?: { assetId?: string; region: string }) {
     const r = s.get("repair_actions", repairId);
     if (!r) throw notFound("repair action");
-    if (r.action === "directionRevise") return { applied: false, manual: true, message: "由助手先修订创作目标对应的妆造或攻防规格，并复核实际参考；未改方案前不自动付费重生成", repairActionId: r.id };
+    const revisionActions: Record<string, string> = { directionRevise: "updateShot", performance_revise: "updateShot", imaging_revise: "updateShot", inspectDelivery: "inspectQuality", storyRevise: "readStoryImpact", dialogueRevise: "readVoice", editTrim: "readEdit", soundMix: "readEdit" };
+    if (revisionActions[r.action]) return { applied: false, manual: true, nextOperation: revisionActions[r.action], shotId: r.shotId, source: s.get("shots", r.shotId)?.source, message: r.detail, repairActionId: r.id };
     const qc = s.get("qc_reports", r.qcReportId);
     const video = qc?.targetType === "take";
     const lock = ["identity_drift", "reference_replace"].includes(r.action) ? ["IDENTITY at weight 1.0 — do not alter facial geometry"] : r.action === "geometry_lock" || r.action === "environment_lock" ? ["geometry of environment and key props — do not alter layout"] : [];
@@ -110,10 +115,11 @@ export function applyRepair(s: Scope, repairId: string, actor: string) {
     const policy = r.action === "switch_model" ? { disabledModelIds: qc ? [(s.get(video ? "takes" : "keyframes", qc.targetId) as any)?.meta?.modelId].filter(Boolean) : [] } : undefined;
     let res: any;
     if (r.action === "look_normalization") return normalizeLook(s, r);
-    // 局部缺陷改为真实排单：整帧重绘 + 其余元素锁定，结果作为新关键帧走人工验收。
+    // 按当前修复单定位缺陷，不能把同一报告的第一条脸部问题用于之后的手部修复。
     if (r.action === "inpaint_local" && qc?.targetType === "keyframe") {
-        const kind = qc.findings.find((f: any) => f.action === "inpaint_local")?.kind ?? "face_artifact";
-        const out = scheduleLocalRepair(s, { keyframeId: qc.targetId, kind, actor, note: r.detail }, { policy });
+        const findings = qc.findings.filter((f: any) => f.action === r.action && f.cause === r.cause && f.detail === r.detail);
+        if (!findings.length || new Set(findings.map((f: any) => f.kind)).size !== 1) throw bad("原修复问题已无法匹配，请重新查看当前图像，不猜测修复部位");
+        const out = scheduleLocalRepair(s, { keyframeId: qc.targetId, kind: findings[0].kind, actor, target, note: findings.length === 1 ? findings[0].note : undefined }, { policy });
         s.update("repair_actions", repairId, { status: "applied" });
         return { applied: true, ...out };
     }

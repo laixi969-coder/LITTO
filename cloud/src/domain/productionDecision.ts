@@ -7,7 +7,7 @@ import { mediaView } from "../storage.ts";
 import { assetInput, worldSchema, lookSchema } from "./schema.ts";
 import { approveAsset, assetVersions, event, newAssetVersion, rollbackAsset, updateAsset } from "./assets.ts";
 import { createBatch, promoteCandidate, registerCandidates } from "./candidates.ts";
-import { importFromLibrary, publishToLibrary, updateLibraryReference } from "./library.ts";
+import { importFromLibrary, publishToLibrary, updateLibraryReference, libraryContent } from "./library.ts";
 import { promoteHero } from "./lifecycle.ts";
 import { runQc } from "./qc.ts";
 import { requireReviewed, shotFingerprint } from "./realism.ts";
@@ -62,10 +62,11 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
   const request: QuestionRequest = { title: "确认制作选择", question: "", options: ["确认保存", "暂不决定"], images: [], media: [] };
   let completed = false;
   let selectedId: string | undefined;
+  let feedbackFingerprint: string | undefined;
   const record = (table: string, targetId: string, projectScoped = true) => {
     const item = s.get(table, targetId);
     if (!item || projectScoped && item.projectId !== projectId) throw notFound("当前项目记录");
-    records.push(item);
+    records.push(table === "library_assets" ? libraryContent(item) : item);
     return item;
   };
   const preview = (mediaId: string, title: string) => {
@@ -151,6 +152,8 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       if (items.some(item => item.shotId !== items[0]!.shotId)) throw bad("一次比较同一镜头的候选");
       const contexts = items.map(item => outputContext(type, item));
       const shot = contexts[0]!.shot;
+      // ACT: 满意度绑定素材和规格；技术检查记录更新不重问，等待期间仍校验完整状态。
+      if (action.operation === "reviewOutput") feedbackFingerprint = hash(items.map(item => ({ id: item.id, mediaId: item.mediaId, fingerprint: shotFingerprint(s, item.shotId, type) })));
       // ACT: 选片只绑定本镜在剪辑中的素材选择；其他镜头或本镜裁切不改变已确认的候选偏好。
       if (action.operation === "approveTake") records.push(getEdit(s, shot.sequenceId, true).clips.filter(clip => clip.shotId === shot.id).map(clip => ({ id: clip.id, mediaId: clip.mediaId })));
       request.media!.forEach((item, index) => { item.title = `候选 ${index + 1} · ${shot.title}`; });
@@ -167,6 +170,10 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
           try { requireReviewed(s, "take", selected); completed = true; selectedId = selected.id; }
           catch (error) { if ((error as { code?: string }).code !== "review_required") throw error; }
         }
+      }
+      if (action.operation === "reviewOutput" && type === "keyframe" && shot.heroKeyframeId === items[0]!.id && items[0]!.status === "hero") {
+        try { requireReviewed(s, "keyframe", items[0]!); completed = true; selectedId = items[0]!.id; }
+        catch (error) { if ((error as { code?: string }).code !== "review_required") throw error; }
       }
       break;
     }
@@ -210,7 +217,7 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       } else {
         request.title = `将「${asset.name}」加入工作区角色库`;
         request.question += "\n\n供本工作区的其他项目复用同一套设定和定妆图。";
-        const entry = s.list("library_assets", { sourceAssetId: asset.id })[0]; records.push(entry ?? null); completed = !!entry;
+        const entry = s.list("library_assets", { sourceAssetId: asset.id })[0]; records.push(libraryContent(entry)); completed = !!entry;
       }
       break;
     }
@@ -233,9 +240,9 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
         const imported = s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === entry.id);
         records.push(imported ?? null); completed = !!imported; selectedId = imported?.id;
       } else {
-        preview(action.data.mediaId, "新的定妆参考");
+        const nextMedia = preview(action.data.mediaId, "新的定妆参考");
         request.question += "\n\n将更新工作区角色库供后续项目使用的参考。";
-        completed = entry.authoritativeReference === action.data.mediaId;
+        completed = entry.authoritativeReference === action.data.mediaId || Boolean(nextMedia.hash && nextMedia.hash === s.get("media", entry.authoritativeReference)?.hash);
       }
       break;
     }
@@ -276,11 +283,12 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
   const fingerprint = hash(records);
   const key = hash(action);
   const receipt = s.list("approval_events", { projectId, entityType: "production_decision", entityId: key }, "created_at DESC, rowid DESC")[0];
-  if (receipt?.reason === fingerprint) completed = true;
-  return { action, request, fingerprint, key, completed: completed && !reconsider, selectedId };
+  const receiptFingerprint = feedbackFingerprint ?? fingerprint;
+  if (receipt?.reason === fingerprint || receipt?.reason === receiptFingerprint) completed = true;
+  return { action, request, fingerprint, receiptFingerprint, key, completed: completed && !reconsider, selectedId };
 }
 
-export function applyProductionDecision(s: Scope, projectId: string, prepared: ReturnType<typeof prepareProductionDecision>, response: QuestionAnswer, actor: string) {
+export async function applyProductionDecision(s: Scope, projectId: string, prepared: ReturnType<typeof prepareProductionDecision>, response: QuestionAnswer, actor: string) {
   const current = prepareProductionDecision(s, projectId, prepared.action, true);
   if (current.fingerprint !== prepared.fingerprint) throw conflict("展示的素材、规格或检查记录已改变，请重新核对；本次未覆盖", "stale");
   const { action, request } = prepared;
@@ -306,7 +314,7 @@ export function applyProductionDecision(s: Scope, projectId: string, prepared: R
       }
       if (decision === "满意，继续") {
         const after = prepareProductionDecision(s, projectId, action, true);
-        event(s, projectId, "production_decision", prepared.key, "apply", actor, after.fingerprint);
+        event(s, projectId, "production_decision", prepared.key, "apply", actor, after.receiptFingerprint);
       }
       return { applied: decision === "满意，继续", selected, targetId, feedback: { decision, note }, reviewRequired,
         answer: decision !== "满意，继续" ? "已记下你的想法，接下来由助手检查并提出具体修改，不需要你判断专业问题。"
@@ -322,6 +330,17 @@ export function applyProductionDecision(s: Scope, projectId: string, prepared: R
     return { ...feedbackResult, autoRender, autoRenderError };
   }
   if (response.skipped || !request.options?.slice(0, -1).includes(response.answer)) return { applied: false };
+  if (["publishAsset", "importAsset", "libraryReference"].includes(action.operation)) {
+    const beforeWrite = () => {
+      if (prepareProductionDecision(s, projectId, action, true).fingerprint !== prepared.fingerprint) throw conflict("复制期间展示内容已改变，请重新核对", "stale");
+    };
+    const result = action.operation === "publishAsset" ? await publishToLibrary(s, action.data.assetId, actor, undefined, beforeWrite)
+      : action.operation === "importAsset" ? await importFromLibrary(s, action.data.libraryId, projectId, actor, {}, beforeWrite)
+      : action.operation === "libraryReference" ? await updateLibraryReference(s, action.data.libraryId, action.data.mediaId, actor, beforeWrite) : undefined;
+    const after = prepareProductionDecision(s, projectId, action, true);
+    event(s, projectId, "production_decision", prepared.key, "apply", actor, after.fingerprint);
+    return { applied: true, result };
+  }
   const result = tx(() => {
     let result: unknown;
     switch (action.operation) {
@@ -363,9 +382,6 @@ export function applyProductionDecision(s: Scope, projectId: string, prepared: R
       case "updateAsset": { const asset = s.get("assets", action.data.assetId)!; result = asset.approvalStatus === "approved" ? newAssetVersion(s, asset.id, action.data.patch) : updateAsset(s, asset.id, action.data.patch); break; }
       case "rollbackAsset": result = rollbackAsset(s, action.data.assetId, action.data.version, actor); break;
       case "removeBinding": run("DELETE FROM reference_bindings WHERE id=? AND workspace_id=?", action.data.bindingId, s.workspaceId); result = { removed: true }; break;
-      case "publishAsset": result = publishToLibrary(s, action.data.assetId, actor); break;
-      case "importAsset": result = importFromLibrary(s, action.data.libraryId, projectId, actor); break;
-      case "libraryReference": result = updateLibraryReference(s, action.data.libraryId, action.data.mediaId, actor); break;
       case "editTimeline": result = editView(s, applyOps(s, action.data.sequenceId, action.data.ops, getEdit(s, action.data.sequenceId, false).version)); break;
     }
     const after = prepareProductionDecision(s, projectId, action, true);

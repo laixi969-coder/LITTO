@@ -24,7 +24,7 @@ export default Router().post("/", validateFields({
   const job = cloud()!.enqueueWorkspaceMedia({ workspaceId: tenant.workspaceId, userId: tenant.userId,
     projectId: u.mediaJobs.workspaceProject(directory)!, directory, kind, production, requestId,
     // 负面词走独立字段，不拼进提示词正文；种子与抽卡批次一并透传。
-    request: { ...request, prompt: production.compiled.prompt },
+    request: production.request,
     negativePrompt: production.compiled.negativePrompt || undefined,
     candidateBatchId: req.body.candidateBatchId,
   });

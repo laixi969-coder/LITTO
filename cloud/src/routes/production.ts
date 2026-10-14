@@ -22,8 +22,8 @@ import { autoObserve } from "../domain/qc-vision.ts";
 import { inspectProductionQuality } from "../domain/qualityInspection.ts";
 import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint } from "../domain/realism.ts";
 import { createBatch, listBatches, listCandidates, promoteCandidate, scoreCandidate } from "../domain/candidates.ts";
-import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference } from "../domain/library.ts";
-import { acceptLocalRepair, repairDirective, scheduleLocalRepair } from "../domain/localRepair.ts";
+import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference, setLibraryFavorite } from "../domain/library.ts";
+import { acceptLocalRepair, repairDirective, scheduleLocalRepair, localRepairSchema } from "../domain/localRepair.ts";
 
 export const production = new Hono();
 const P = "/projects/:pid";
@@ -50,6 +50,10 @@ production.put(`${P}/looks/:scope/:scopeId?`, async (c) => {
 });
 
 // ---- Assets ----
+production.get(`${P}/assetImages`, (c) => {
+    const { s } = project(c, c.req.param("pid"));
+    return c.json(s.list("media", { projectId: c.req.param("pid") }, "created_at DESC").filter(media => media.mime.startsWith("image/")).map(mediaView));
+});
 production.get(`${P}/assets`, (c) => { const { s } = project(c, c.req.param("pid")); return c.json(s.list("assets", { projectId: c.req.param("pid") })); });
 production.post(`${P}/assets`, async (c) => {
     const { s, audit } = project(c, c.req.param("pid"), "EDITOR");
@@ -264,12 +268,16 @@ production.post("/shots/:id/qc", async (c) => {
     if (vision?.observations) obs.push(...vision.observations);
     return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs, { reviewed: b.reviewed, note: b.note, actor: a.user.id, vision, observedStateDelta: b.observedStateDelta, fullPlayback: b.fullPlayback, reviewedSegments: b.reviewedSegments, audioReview: b.audioReview, dismissedKinds: b.dismissedKinds }), vision });
 });
-production.post("/repair-actions/:id/apply", (c) => { const { s, a } = ctx(c, "EDITOR"); return c.json(applyRepair(s, c.req.param("id"), a.user.id)); });
+production.post("/repair-actions/:id/apply", async (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    const b = await body(c, localRepairSchema.pick({ target: true }));
+    return c.json(applyRepair(s, c.req.param("id"), a.user.id, b.target));
+});
 
 // ---- Director Agent ----
 production.post(`${P}/director/run`, async (c) => {
     const { s, a } = project(c, c.req.param("pid"), "EDITOR");
-    const b = await body(c, z.object({ goal: z.string().optional(), script: z.string(), sequenceId: z.string().optional(), mode: z.enum(["simple", "director"]).default("simple"), generate: z.boolean().default(false), confirm: z.boolean().default(false), replace: z.boolean().default(false), useLlm: z.boolean().default(false), minShots: z.number().int().min(1).max(60).optional() }));
+    const b = await body(c, z.object({ goal: z.string().optional(), script: z.string(), sequenceId: z.string().optional(), mode: z.enum(["simple", "director"]).default("simple"), generate: z.boolean().default(false), confirm: z.boolean().default(false), replace: z.boolean().default(false), useLlm: z.boolean().default(true), minShots: z.number().int().min(1).max(60).optional() }));
     return c.json(await directorRun(s, c.req.param("pid"), a.user.id, b));
 });
 
@@ -384,29 +392,36 @@ production.get("/library/assets", (c) => {
         if (v) (acc as any)[axis] = v;
         return acc;
     }, {} as Record<string, string>);
-    return c.json(searchLibrary(s, { type: t, tags: Object.keys(tags).length ? (tags as any) : undefined, excludeName: n }));
+    const favorite = c.req.query("favorite");
+    if (favorite !== undefined && !["true", "false"].includes(favorite)) throw bad("favorite 须为 true 或 false");
+    return c.json(searchLibrary(s, { type: t as any, tags: Object.keys(tags).length ? (tags as any) : undefined, excludeName: n, q: c.req.query("q"), favorite: favorite === undefined ? undefined : favorite === "true", limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined }));
 });
 production.post("/library/assets/:assetId/publish", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
     const b = await body(c, z.object({ personaTags: personaTagSchema.optional() }).default({}));
-    return c.json(publishToLibrary(s, c.req.param("assetId"), a.user.id, b.personaTags), 201);
+    return c.json(await publishToLibrary(s, c.req.param("assetId"), a.user.id, b.personaTags), 201);
 });
 production.post(`${P}/library/import/:libraryId`, async (c) => {
     const { s, a } = project(c, c.req.param("pid"), "EDITOR");
     const b = await body(c, z.object({ name: z.string().optional(), invariants: z.array(z.string()).optional() }).default({}));
-    return c.json(importFromLibrary(s, c.req.param("libraryId"), c.req.param("pid"), a.user.id, b), 201);
+    return c.json(await importFromLibrary(s, c.req.param("libraryId"), c.req.param("pid"), a.user.id, b), 201);
 });
 production.put("/library/assets/:id/reference", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
     const b = await body(c, z.object({ mediaId: z.string().min(1) }));
-    return c.json(updateLibraryReference(s, c.req.param("id"), b.mediaId, a.user.id));
+    return c.json(await updateLibraryReference(s, c.req.param("id"), b.mediaId, a.user.id));
+});
+production.put("/library/assets/:id/favorite", async (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    const b = await body(c, z.object({ favorite: z.boolean() }));
+    return c.json(setLibraryFavorite(s, c.req.param("id"), b.favorite, a.user.id));
 });
 
 // ---- Local repair (QC inpaint_local 的真实执行) ----
 production.post("/keyframes/:id/repair", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
-    const b = await body(c, z.object({ kind: z.string().min(1), note: z.string().optional() }));
-    return c.json(scheduleLocalRepair(s, { keyframeId: c.req.param("id"), kind: b.kind, actor: a.user.id, note: b.note }), 202);
+    const b = await body(c, localRepairSchema.omit({ keyframeId: true }));
+    return c.json(scheduleLocalRepair(s, { ...b, keyframeId: c.req.param("id"), actor: a.user.id }), 202);
 });
 production.post("/keyframes/:id/repair/accept", (c) => {
     const { s, a } = ctx(c, "EDITOR");

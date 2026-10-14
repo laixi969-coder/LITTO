@@ -1,127 +1,169 @@
-import { all, get, run, tx, type Scope } from "../db.ts";
+import { z } from "zod";
+import { run, tx, audit, type Scope, type Row } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
-import { audit } from "../db.ts";
-import { ASSET_TYPES, assetInput, personaTagSchema, type PersonaTags } from "./schema.ts";
-import { createAsset, event } from "./assets.ts";
-import { mediaView } from "../storage.ts";
+import { assetInput, personaTagSchema, type PersonaTags } from "./schema.ts";
+import { createAsset, approveAsset, event } from "./assets.ts";
+import { mediaView, saveMedia, storage } from "../storage.ts";
 
-/**
- * 租户级资产库（跨项目复用）。
- *
- * 项目级资产只能保证「本项目内同脸一致」，换项目就要重新捏脸——这正是
- * AI 角色跨作品崩脸的根因。角色库把已采用且有权威参考图的资产提升到租户维度，
- * 新项目引用后即拥有同一定妆基准，复用次数越高，资产越经得起考验。
- */
+export const librarySearchSchema = z.object({
+  type: assetInput.shape.type.optional(), tags: personaTagSchema.optional(),
+  q: z.string().trim().max(120).optional(), favorite: z.boolean().optional(),
+  excludeName: z.string().max(120).optional(), limit: z.number().int().min(1).max(500).default(100),
+});
 
-/** 入池前必须已有权威参考图，否则等于把「未确认的脸」当成可复用资产。 */
-export function publishToLibrary(s: Scope, assetId: string, actor: string, personaTags?: PersonaTags) {
-    const asset = s.get("assets", assetId);
-    if (!asset) throw notFound("asset");
-    if (asset.approvalStatus !== "approved") throw conflict("资产须先采用才能进入角色库", "asset_not_approved");
-    const authoritative = asset.attributes?.authoritativeReference;
-    if (!authoritative) throw bad("该资产还没有权威参考图，请先用候选池选出定妆图再入池", "no_authoritative_reference");
-    const media = s.get("media", authoritative);
-    if (!media?.mime.startsWith("image/")) throw bad("权威参考图不可用");
-    const existing = all("SELECT * FROM library_assets WHERE workspace_id=? AND source_asset_id=? AND deleted_at IS NULL", s.workspaceId, assetId)[0];
-    if (existing) throw conflict("该资产已在角色库中", "already_published");
-    const tags = personaTags ? personaTagSchema.parse(personaTags) : (asset.personaTags ?? {});
-    return tx(() => {
-        const entry = s.insert("library_assets", {
-            source_asset_id: asset.id, type: asset.type, name: asset.name,
-            // ACT: assets.data 会被 hydrate 摊平到顶层，因此按顶层字段取，不能再读 asset.data.xxx。
-            data: {
-                description: asset.description ?? "", attributes: asset.attributes ?? {}, references: asset.references ?? [],
-                invariants: asset.invariants ?? [], allowedVariations: asset.allowedVariations ?? [], forbiddenChanges: asset.forbiddenChanges ?? [],
-                authoritativeReference: authoritative, sourceProjectId: asset.projectId,
-            },
-            persona_tags: tags,
-        });
-        event(s, asset.projectId, "library_asset", entry.id, "publish", actor, `from asset ${asset.id}`);
-        audit(actor, "library.publish", entry.id, { assetId: asset.id, type: asset.type }, s.workspaceId);
-        return entry;
-    });
+// 演员自身的习惯可以复用，项目人物关系、配音记录和来源标记不能成为下一部作品的事实。
+function reusableAttributes(attributes: Record<string, any> = {}) {
+  const { importedFrom, authoritativeReference, voice, voiceId, characterDirection, ...rest } = attributes;
+  return { ...rest, ...(characterDirection ? { characterDirection: { speech: characterDirection.speech ?? "", behavior: characterDirection.behavior ?? "", relationships: "" } } : {}) };
 }
 
-/** 按类型与气质标签检索角色库；不指定标签时列出该租户全部资产。 */
-export function searchLibrary(s: Scope, input: { type?: string; tags?: PersonaTags; excludeName?: string; limit?: number } = {}) {
-    const rows = all("SELECT * FROM library_assets WHERE workspace_id=? AND deleted_at IS NULL ORDER BY reuse_count DESC, created_at", s.workspaceId);
-    const wanted = input.tags ? Object.entries(input.tags).filter(([, v]) => v).map(([k, v]) => [k, v] as const) : [];
-    return rows.filter((r: any) => {
-        if (input.type && r.type !== input.type) return false;
-        if (input.excludeName && r.name === input.excludeName) return false;
-        const tags = JSON.parse(r.persona_tags || "{}");
-        return wanted.every(([axis, pole]) => tags[axis] === pole);
-    }).slice(0, input.limit ?? 50).map((r: any) => {
-        const data = JSON.parse(r.data);
-        return {
-            id: r.id, name: r.name, type: r.type, personaTags: JSON.parse(r.persona_tags || "{}"),
-            reuseCount: r.reuse_count, authoritativeReference: data.authoritativeReference, sourceAssetId: r.source_asset_id,
-            description: data.description, invariants: data.invariants ?? [], attributes: data.attributes ?? {},
-            references: data.references ?? [], media: mediaOf(s.workspaceId, data.authoritativeReference),
-            createdAt: r.created_at,
-        };
-    });
+function referenceSnapshots(s: Scope, entry: Row): Row[] {
+  return entry.referenceSnapshots ?? (entry.references ?? []).map((id: string) => {
+    const ref = s.get("refs", id);
+    if (!ref) throw bad("原参考已不存在，请重新选择参考图后收藏");
+    return { kind: ref.kind, name: ref.name, mediaId: ref.mediaId, text: ref.text };
+  });
 }
 
-/**
- * 引用到当前项目：复制为项目资产并继承权威参考图。
- * 复用不是共享同一条记录——项目资产仍是本项目的唯一事实来源，可独立迭代版本。
- */
-export function importFromLibrary(s: Scope, libraryId: string, projectId: string, actor: string, overrides: { name?: string; invariants?: string[] } = {}) {
-    const entry = s.get("library_assets", libraryId);
-    if (!entry) throw notFound("library asset");
+// 库与项目分别保存媒体副本。失败副本交给现有回收流程，不占用有效素材配额。
+async function copyMedia<T>(s: Scope, ids: string[], projectId: string | null, commit: (copies: Map<string, string>) => T): Promise<T> {
+  const copies = new Map<string, string>();
+  try {
+    for (const id of new Set(ids.filter(Boolean))) {
+      const media = s.get("media", id);
+      if (!media) throw notFound("reference media");
+      const copy = await saveMedia(s.workspaceId, projectId, await storage.get(media.storageKey), { source: "library", duration: media.duration });
+      copies.set(id, copy.id);
+    }
+    for (const id of copies.keys()) if (!s.get("media", id)) throw conflict("复制期间参考图已删除，请重新选择", "stale");
+    return tx(() => commit(copies));
+  } catch (error) {
+    for (const id of copies.values()) s.update("media", id, { deleted_at: new Date().toISOString() });
+    throw error;
+  }
+}
+
+export function libraryContent(entry: Row | null | undefined) {
+  if (!entry) return null;
+  const { favorite, reuseCount, updatedAt, ...content } = entry;
+  return content;
+}
+
+function unchanged(s: Scope, table: string, entry: Row) {
+  const current = s.get(table, entry.id);
+  const content = table === "library_assets" ? libraryContent : (value: Row | undefined) => value;
+  if (JSON.stringify(content(current)) !== JSON.stringify(content(entry))) throw conflict("复制期间资产已改变，请重新读取", "stale");
+}
+
+export async function publishToLibrary(s: Scope, assetId: string, actor: string, personaTags?: PersonaTags, beforeWrite?: () => void) {
+  const asset = s.get("assets", assetId);
+  if (!asset) throw notFound("asset");
+  const existing = s.list("library_assets", { sourceAssetId: assetId })[0];
+  if (existing) { beforeWrite?.(); return setLibraryFavorite(s, existing.id, true, actor); }
+  if (asset.approvalStatus !== "approved") throw conflict("资产须先采用才能收藏到角色库", "asset_not_approved");
+  const authoritative = asset.attributes?.authoritativeReference;
+  if (!authoritative || !s.get("media", authoritative)?.mime.startsWith("image/")) throw bad("请先选择可用的定妆参考图", "no_authoritative_reference");
+  const references = referenceSnapshots(s, asset);
+  const tags = personaTags ? personaTagSchema.parse(personaTags) : asset.personaTags ?? {};
+  return copyMedia(s, [authoritative, ...references.map(ref => ref.mediaId)], null, copies => {
+    beforeWrite?.(); unchanged(s, "assets", asset);
+    if (!s.get("projects", asset.projectId)) throw notFound("project");
+    const published = s.list("library_assets", { sourceAssetId: assetId })[0];
+    if (published) {
+      for (const id of copies.values()) s.softDelete("media", id);
+      return setLibraryFavorite(s, published.id, true, actor);
+    }
+    const entry = s.insert("library_assets", {
+      source_asset_id: asset.id, type: asset.type, name: asset.name, persona_tags: tags,
+      data: {
+        description: asset.description ?? "", attributes: reusableAttributes(asset.attributes), references: [],
+        invariants: asset.invariants ?? [], allowedVariations: asset.allowedVariations ?? [], forbiddenChanges: asset.forbiddenChanges ?? [],
+        authoritativeReference: copies.get(authoritative), sourceProjectId: asset.projectId, favorite: true,
+        referenceSnapshots: references.map(ref => ({ ...ref, mediaId: ref.mediaId ? copies.get(ref.mediaId) : null })),
+      },
+    });
+    event(s, asset.projectId, "library_asset", entry.id, "publish", actor, `from asset ${asset.id}`);
+    audit(actor, "library.publish", entry.id, { assetId }, s.workspaceId);
+    return entry;
+  });
+}
+
+export function searchLibrary(s: Scope, input: z.input<typeof librarySearchSchema> = {}) {
+  const parsed = librarySearchSchema.safeParse(input);
+  if (!parsed.success) throw bad("角色库筛选参数无效", parsed.error.issues);
+  const query = parsed.data;
+  const wanted = Object.entries(query.tags ?? {}).filter(([, value]) => value);
+  return s.list("library_assets", {}, "reuse_count DESC, created_at DESC").filter(entry => {
+    return (!query.type || entry.type === query.type) && (!query.excludeName || entry.name !== query.excludeName)
+      && (query.favorite === undefined || Boolean(entry.favorite) === query.favorite)
+      && (!query.q || `${entry.name} ${entry.description ?? ""}`.toLocaleLowerCase().includes(query.q.toLocaleLowerCase()))
+      && wanted.every(([axis, value]) => entry.personaTags?.[axis] === value);
+  }).slice(0, query.limit).map(entry => ({
+    id: entry.id, name: entry.name, type: entry.type, personaTags: entry.personaTags ?? {}, favorite: Boolean(entry.favorite),
+    reuseCount: entry.reuseCount, sourceAssetId: entry.sourceAssetId, authoritativeReference: entry.authoritativeReference,
+    description: entry.description, invariants: entry.invariants ?? [], attributes: reusableAttributes(entry.attributes),
+    media: entry.authoritativeReference ? mediaView(s.get("media", entry.authoritativeReference)) : null, createdAt: entry.createdAt,
+  }));
+}
+
+export function setLibraryFavorite(s: Scope, libraryId: string, favorite: boolean, actor: string) {
+  if (!s.get("library_assets", libraryId)) throw notFound("library asset");
+  run("UPDATE library_assets SET data=json_set(data,'$.favorite',json(?)), updated_at=? WHERE id=? AND workspace_id=?", JSON.stringify(favorite), new Date().toISOString(), libraryId, s.workspaceId);
+  audit(actor, "library.favorite", libraryId, { favorite }, s.workspaceId);
+  return s.get("library_assets", libraryId)!;
+}
+
+export async function importFromLibrary(s: Scope, libraryId: string, projectId: string, actor: string, overrides: { name?: string; invariants?: string[] } = {}, beforeWrite?: () => void) {
+  const entry = s.get("library_assets", libraryId);
+  if (!entry) throw notFound("library asset");
+  if (!s.get("projects", projectId)) throw notFound("project");
+  const previous = s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === libraryId);
+  if (previous) { beforeWrite?.(); return previous; }
+  const authoritative = entry.authoritativeReference;
+  if (!authoritative || !s.get("media", authoritative)?.mime.startsWith("image/")) throw bad("角色库定妆图不可用，请重新设置");
+  const references = referenceSnapshots(s, entry);
+  return copyMedia(s, [authoritative, ...references.map(ref => ref.mediaId)], projectId, copies => {
+    beforeWrite?.(); unchanged(s, "library_assets", entry);
     if (!s.get("projects", projectId)) throw notFound("project");
-    if (!(ASSET_TYPES as readonly string[]).includes(entry.type)) throw bad("资产类型不受支持");
-    // ACT: library_assets.data 同样被 hydrate 摊平，资产字段位于顶层。
-    const data = entry;
-    const media = data.authoritativeReference ? s.get("media", data.authoritativeReference) : undefined;
-    if (!media?.mime.startsWith("image/")) throw bad("角色库的权威参考图不可用");
-    return tx(() => {
-        // ACT: 同租户媒体复用；参考记录属于目标项目，不把来源项目的参考 ID 当成本地引用。
-        const sourceReferences = (data.references ?? []).map((id: string) => s.get("refs", id)).filter(Boolean);
-        const references = sourceReferences.map((ref: any) => s.insert("refs", {
-            project_id: projectId, kind: ref.kind, name: ref.name, media_id: ref.mediaId,
-            text: ref.text, source: "library", source_ref: ref.id,
-        }).id);
-        if (!sourceReferences.some((ref: any) => ref.mediaId === media.id)) references.push(s.insert("refs", {
-            project_id: projectId, kind: "image", name: entry.name, media_id: media.id, source: "library", source_ref: libraryId,
-        }).id);
-        const created = createAsset(s, projectId, {
-            type: entry.type, name: overrides.name ?? entry.name, description: data.description ?? "",
-            attributes: { ...(data.attributes ?? {}), authoritativeReference: data.authoritativeReference, importedFrom: libraryId },
-            references,
-            invariants: overrides.invariants ?? data.invariants ?? [],
-            allowedVariations: data.allowedVariations ?? [],
-            forbiddenChanges: data.forbiddenChanges ?? [],
-            personaTags: entry.personaTags,
-        });
-        run("UPDATE library_assets SET reuse_count=reuse_count+1, updated_at=? WHERE id=?", new Date().toISOString(), libraryId);
-        event(s, projectId, "asset", created.id, "import_from_library", actor, `library ${libraryId}`);
-        return s.get("assets", created.id)!;
-    });
+    const imported = s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === libraryId);
+    if (imported) {
+      for (const id of copies.values()) s.softDelete("media", id);
+      return imported;
+    }
+    const localReferences = references.map(ref => s.insert("refs", {
+      project_id: projectId, kind: ref.kind, name: ref.name, media_id: ref.mediaId ? copies.get(ref.mediaId) : null,
+      text: ref.text ?? null, source: "library", source_ref: libraryId,
+    }).id);
+    if (!references.some(ref => ref.mediaId === authoritative)) localReferences.push(s.insert("refs", {
+      project_id: projectId, kind: "image", name: entry.name, media_id: copies.get(authoritative), source: "library", source_ref: libraryId,
+    }).id);
+    const created = createAsset(s, projectId, assetInput.parse({
+      type: entry.type, name: overrides.name ?? entry.name, description: entry.description ?? "",
+      attributes: { ...reusableAttributes(entry.attributes), authoritativeReference: copies.get(authoritative), importedFrom: libraryId },
+      references: localReferences, invariants: overrides.invariants ?? entry.invariants ?? [],
+      allowedVariations: entry.allowedVariations ?? [], forbiddenChanges: entry.forbiddenChanges ?? [], personaTags: entry.personaTags,
+    }));
+    run("UPDATE library_assets SET reuse_count=reuse_count+1, updated_at=? WHERE id=? AND workspace_id=?", new Date().toISOString(), libraryId, s.workspaceId);
+    event(s, projectId, "asset", created.id, "import_from_library", actor, `library ${libraryId}`);
+    // 原样复用库中已采用的身份不再重复审批；改写固定特征则保留草稿。
+    return created.invariants.length && overrides.invariants === undefined ? approveAsset(s, created.id, actor) : created;
+  });
 }
 
-/** 角色库内直接迭代：给库资产追加新的权威参考图，用于角色长期演进。 */
-export function updateLibraryReference(s: Scope, libraryId: string, mediaId: string, actor: string) {
-    const entry = s.get("library_assets", libraryId);
-    if (!entry) throw notFound("library asset");
-    const media = s.get("media", mediaId);
-    if (!media) throw notFound("media");
-    if (!media.mime.startsWith("image/")) throw bad("权威参考须是图像");
-    if (media.projectId && !s.get("projects", media.projectId)) throw bad("参考图所属项目不可用");
-    return tx(() => {
-        const { type, name, ...data } = assetInput.parse(entry);
-        s.update("library_assets", libraryId, { data: {
-            ...data, attributes: { ...data.attributes, authoritativeReference: mediaId },
-            authoritativeReference: mediaId, sourceProjectId: entry.sourceProjectId,
-        } });
-        event(s, entry.sourceProjectId, "library_asset", libraryId, "update_reference", actor, `media ${mediaId}`);
-        return s.get("library_assets", libraryId)!;
-    });
-}
-
-function mediaOf(ws: string, id: string | null) {
-    if (!id) return null;
-    const m = get("SELECT * FROM media WHERE id=? AND workspace_id=?", id, ws);
-    return m ? mediaView({ ...m, storageKey: m.storage_key, createdAt: m.created_at }) : null;
+export async function updateLibraryReference(s: Scope, libraryId: string, mediaId: string, actor: string, beforeWrite?: () => void) {
+  const entry = s.get("library_assets", libraryId);
+  if (!entry) throw notFound("library asset");
+  if (!s.get("media", mediaId)?.mime.startsWith("image/")) throw bad("权威参考须是可用图像");
+  const references = referenceSnapshots(s, entry).map(ref => ref.mediaId === entry.authoritativeReference ? { ...ref, mediaId } : ref);
+  return copyMedia(s, [mediaId, ...references.map(ref => ref.mediaId)], null, copies => {
+    beforeWrite?.(); unchanged(s, "library_assets", entry);
+    const { type, name, ...data } = assetInput.parse(entry);
+    const result = s.update("library_assets", libraryId, { data: {
+      ...data, attributes: reusableAttributes(data.attributes), references: [], favorite: Boolean(s.get("library_assets", libraryId)!.favorite),
+      authoritativeReference: copies.get(mediaId), sourceProjectId: entry.sourceProjectId,
+      referenceSnapshots: references.map(ref => ({ ...ref, mediaId: ref.mediaId ? copies.get(ref.mediaId) : null })),
+    } });
+    audit(actor, "library.reference", libraryId, { mediaId }, s.workspaceId);
+    return result;
+  });
 }

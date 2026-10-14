@@ -417,7 +417,19 @@ export function undoRedo(s: Scope, sequenceId: string, dir: "undo" | "redo") {
 /** API view: resolved sources next to each clip, history stripped to depths. */
 export function editView(s: Scope, row: EditRow) {
     return { version: row.version, fps: row.fps, tracks: row.tracks, markers: row.markers, grade: row.grade ? { ...row.grade, lutCube: row.grade.lutCube ? "(cube)" : undefined } : null, duck: row.duck, historyDepth: row.history.length, futureDepth: row.future.length, duration: Math.max(0, ...row.clips.map(end)),
-        clips: row.clips.map((c) => { const r = resolveClip(s, c); const sh = c.shotId ? s.get("shots", c.shotId) : null; return { ...c, out: r3(c.in + c.duration * c.speed), source: { kind: r.kind, mediaId: r.mediaId, mime: r.mime, srcDuration: r.srcDuration, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null }, shotOrder: sh?.ord ?? null, subtitle: sh?.subtitle ?? "", grade: sh?.grade ?? null }; }) };
+        clips: row.clips.map(c => {
+            const resolved = resolveClip(s, c);
+            const shot = c.shotId ? s.get("shots", c.shotId) : null;
+            const isVideo = row.tracks.find(track => track.id === c.trackId)?.kind === "video";
+            const dialogue = (isVideo ? shot?.creativeBrief?.dialogue?.lines ?? [] : []).flatMap((line: any) => {
+                const from = Math.max(line.start, c.in), to = Math.min(line.end, c.in + c.duration * c.speed);
+                return to > from ? [{ ...line, start: r3(c.start + (from - c.in) / c.speed), end: r3(c.start + (to - c.in) / c.speed), truncated: from > line.start || to < line.end }] : [];
+            });
+            return { ...c, out: r3(c.in + c.duration * c.speed),
+                source: { kind: resolved.kind, mediaId: resolved.mediaId, mime: resolved.mime, srcDuration: resolved.srcDuration, media: resolved.mediaId ? mediaView(s.get("media", resolved.mediaId)) : null },
+                storySource: shot?.source ?? null, dialogue, shotOrder: shot?.ord ?? null, subtitle: shot?.subtitle ?? "", grade: shot?.grade ?? null };
+        }) };
+
 }
 void all; void get; void forbidden;
 

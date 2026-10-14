@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, writeFile, rm } from "@toonflow/file";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
 import type { Scope } from "../db.ts";
 import { bad, conflict, sha256 } from "../util.ts";
 import { storage, saveMedia, mediaView } from "../storage.ts";
@@ -8,6 +9,9 @@ import { probeFile, runCmd } from "../media-tools.ts";
 import { adjacentClips, applyOps, editView, end, getEdit, resolveClip } from "./nle.ts";
 import type { EClip } from "./nle.ts";
 import { renderTimeline } from "./nle-render.ts";
+
+export const cutPairSchema = z.object({ leftId: z.string().min(1), rightId: z.string().min(1), expectedVersion: z.number().int().nonnegative() });
+export const soundBridgeSchema = cutPairSchema.extend({ mode: z.enum(["jCut", "lCut", "crossfade", "none"]), duration: z.number().finite().min(0).max(3) });
 
 function currentPair(s: Scope, sequenceId: string, leftId: string, rightId: string, version: number) {
   const edit = getEdit(s, sequenceId, true);
@@ -56,12 +60,17 @@ export async function suggestCuts(s: Scope, sequenceId: string, leftId: string, 
       return { sourceOut: Math.round(x.time * edit.fps) / edit.fps, sourceIn: Math.round(y.time * edit.fps) / edit.fps, score: appearance + motion * 0.3 + displacement * 0.05 };
     })).filter(item => item.sourceOut > left.in + 0.1 * left.speed && item.sourceIn < right.in + (right.duration - 0.1) * right.speed).sort((x, y) => x.score - y.score);
     if (JSON.stringify(currentPair(s, sequenceId, leftId, rightId, version).sourceIds) !== JSON.stringify(sourceIds)) throw conflict("源素材已更换，请刷新后重试", "stale");
-    return { version, method: "appearanceAndMotion", note: "按画面差异与局部变化量排序，仅作剪点候选；不代表动作、视线或对白语义匹配。请连播听音后采用。", candidates: candidates.slice(0, 5) };
+    return { version, leftMediaId: sourceIds[0], rightMediaId: sourceIds[1], method: "appearanceAndMotion", note: "按画面差异与局部变化量排序，仅作剪点候选；不代表动作、视线或对白语义匹配。请连播听音后采用。", candidates: candidates.slice(0, 5) };
   } finally { await rm(directory, { recursive: true, force: true }); }
 }
 
-export async function soundBridge(s: Scope, sequenceId: string, input: { leftId: string; rightId: string; expectedVersion: number; mode: "jCut" | "lCut" | "crossfade" | "none"; duration: number }) {
+export async function soundBridge(s: Scope, sequenceId: string, input: z.infer<typeof soundBridgeSchema>, signal?: AbortSignal) {
+  input = soundBridgeSchema.parse(input);
+  signal?.throwIfAborted();
   const { left, right, sourceIds } = currentPair(s, sequenceId, input.leftId, input.rightId, input.expectedVersion);
+  if ((input.mode === "jCut" || input.mode === "crossfade") && (right.in < input.duration * right.speed || right.start < input.duration)) {
+    throw bad("后镜素材头部没有足够声音余量，请先调整画面入点或使用独立声音素材");
+  }
   const directory = await mkdtemp(join(tmpdir(), "littoSound"));
   try {
     for (const clip of [left, right]) {
@@ -71,6 +80,7 @@ export async function soundBridge(s: Scope, sequenceId: string, input: { leftId:
       if (clip.in + clip.duration * clip.speed + extension > probe.duration + 0.001) throw bad("素材尾部没有足够声音余量，请先缩短画面使用区间");
     }
     if (JSON.stringify(currentPair(s, sequenceId, input.leftId, input.rightId, input.expectedVersion).sourceIds) !== JSON.stringify(sourceIds)) throw conflict("源素材已更换，请刷新后重试", "stale");
+    signal?.throwIfAborted();
     return editView(s, applyOps(s, sequenceId, [{ ...input, type: "bridge_audio" }], input.expectedVersion));
   } finally { await rm(directory, { recursive: true, force: true }); }
 }

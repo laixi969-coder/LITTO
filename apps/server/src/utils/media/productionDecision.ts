@@ -58,13 +58,23 @@ export async function requestProductionDecision(directory: string, toolCallId: s
   const scope = api.scoped(tenant.workspaceId);
   const prepared = api.prepareProductionDecision(scope, projectId, input, input.reconsider);
   if (prepared.completed) return { title: prepared.request.title, applied: true, selectedId: prepared.selectedId, answer: "此决定已保存且仍有效，无需重复确认" };
+  if (prepared.action.operation === "updateShot" && !input.reconsider) {
+    try {
+      const { shotId, patch } = prepared.action.data;
+      const result = api.workspaceProduction(scope, projectId, "updateShot", { ...patch, shotId }, tenant.userId);
+      return { title: prepared.request.title, applied: true, result, answer: "镜头修改已保存；此修改不需要再次确认" };
+    } catch (error) {
+      // 复用领域层的确认边界；仅已采用镜头的实质变更继续展示确认卡。
+      if ((error as { code?: string }).code !== "needs_confirmation") throw error;
+    }
+  }
   const response = await question.ask(toolCallId, prepared.request, signal);
   signal?.throwIfAborted();
   if (response.skipped || response.answer === "暂不决定" || response.values?.decision === "暂不决定") return { ...prepared.request, ...response, applied: false };
   const member = api.dbGet("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", tenant.workspaceId, tenant.userId);
   if (!member || member.role === "VIEWER") throw new Error("制作选择的编辑权限已失效");
   if (workspaceProject(directory) !== projectId) throw new Error("工作目录关联项目已改变，请重新确认");
-  const result = api.applyProductionDecision(scope, projectId, prepared, response, tenant.userId);
+  const result = await api.applyProductionDecision(scope, projectId, prepared, response, tenant.userId);
   if ("feedback" in result) return { ...prepared.request, ...result };
   let answer = result.applied ? "决定已保存，可继续已授权的后续工作" : "本次未采用，已保留候选";
   return { ...prepared.request, ...result, answer };

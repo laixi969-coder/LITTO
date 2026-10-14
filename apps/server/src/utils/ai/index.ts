@@ -111,7 +111,9 @@ export function getConfiguredModel(providerId: string, modelId: string) {
   if (!model) throw Object.assign(new Error("所选模型不存在，请重新选择"), { status: 400 });
   assertPublicUrlLiteral(provider.apiUrl); // literal private/loopback addresses never reach the model client
   const baseUrl = new URL(provider.apiUrl);
-  if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
+  // Anthropic SDK 自带 /v1/messages，配置中的版本前缀不能重复拼接。
+  if (provider.protocol === "anthropic-messages") baseUrl.pathname = baseUrl.pathname.replace(/\/v1\/*$/, "") || "/";
+  else if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
   const limits = getModelLimits(providerId, model);
   return { providerId, provider, model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens }, baseUrl: baseUrl.href.replace(/\/+$/, "") };
 }

@@ -103,7 +103,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "图片生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeImageRequest }; prompt: string; promptModel: PromptModel; model: string; size: string; ratio: string });
+const data = computed(() => node.data as { purpose?: "asset" | "standalone" | "storyboard"; production?: { shotId: string; productionFingerprint: string }; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeImageRequest }; prompt: string; promptModel: PromptModel; model: string; size: string; ratio: string });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -221,14 +221,16 @@ async function startGeneration() {
   if (uploading.value) throw new Error("图片正在替换，请等待完成");
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择图片模型");
-  if (!generationPrompt.value) throw new Error("请输入生成提示词");
-  if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+  if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
+  if (!data.value.production && refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   const input = {
     providerId: choice.providerId,
     modelId: choice.modelId,
     prompt: generationPrompt.value,
+    ...data.value.production,
+    purpose: data.value.purpose,
     size: data.value.size,
     ratio: data.value.ratio,
     outputDirectory: `assets/${id}`,
@@ -312,6 +314,8 @@ async function resizeImage(event: Event) {
 function getConfig() {
   return {
     config: {
+      production: data.value.production,
+      purpose: data.value.purpose,
       providerId: selectedModel.value?.providerId ?? "",
       modelId: selectedModel.value?.modelId ?? "",
       size: data.value.size,
@@ -378,10 +382,16 @@ nodeTools.register({
 
 nodeTools.register({
   name: "generateImage",
-  description: "启动此节点的后台图片生成，使用当前提示词、模型、分辨率、比例和参考图片；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
-  parameters: z.strictObject({}),
-  execute(_args, { signal }) {
+  description: "正式镜头先 productionSpec compile，传 production:{shotId,productionFingerprint:返回的fingerprint}，节点配置须与编译 request 一致；服务器使用编译的表演、对白与参考，规格变化须重编译。独立定妆传 purpose:asset，独立画面传 purpose:standalone，不关联镜头。启动此节点的后台图片生成，使用当前提示词、模型、分辨率、比例和参考图片；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
+  parameters: z.strictObject({ purpose: z.enum(["asset", "standalone", "storyboard"]).optional(), production: z.strictObject({ shotId: z.string().min(1), productionFingerprint: z.string().min(1) }).optional() }),
+  execute(args, { signal }) {
     signal?.throwIfAborted();
+    if (generating.value || uploading.value || deleting.value) throw new Error("节点正在生成、替换或删除，请稍后再试");
+    if (args.production && args.purpose) throw new Error("镜头绑定与独立素材用途不能同时指定");
+    if (args.production || args.purpose) {
+      data.value.production = args.production;
+      data.value.purpose = args.purpose;
+    }
     return startGeneration();
   },
 });

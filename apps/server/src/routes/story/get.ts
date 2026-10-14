@@ -6,5 +6,5 @@ import { success } from "@/lib/responseFormat";
 
 export default Router().get("/", validateFields({ directory: z.string().min(1).max(4096) }, "query"), async (req, res) => {
   const directory = await u.workspace.resolveWorkspace(req, req.query.directory as string);
-  res.json(success(await u.story.readStoryProject(directory)));
+  res.json(success(await u.story.readStoryContext(directory)));
 });

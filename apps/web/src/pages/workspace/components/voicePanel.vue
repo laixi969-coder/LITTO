@@ -17,6 +17,7 @@
           <label>角色名称<input v-model="role.name" maxlength="100" /></label>
           <label>配音模型<select :value="modelKey(role)" @change="selectRoleModel(role, ($event.target as HTMLSelectElement).value)"><option value="">选择模型</option><option v-for="model in speechModels" :key="modelKey(model)" :value="modelKey(model)">{{ model.providerLabel }} · {{ model.label }}</option></select></label>
           <label>固定音色<select v-if="roleModel(role)?.voices?.length" v-model="role.voice"><option value="">选择音色</option><option v-for="voice in roleModel(role)?.voices" :key="voice.voice" :value="voice.voice">{{ voice.title }}</option></select><input v-else v-model="role.voice" maxlength="256" aria-label="供应商音色 ID" /></label>
+          <label>说话习惯<input v-model="role.speechStyle" maxlength="2000" /></label>
           <el-button :disabled="project.lines.some(line => line.roleId === role.id)" @click="project.roles.splice(project.roles.indexOf(role), 1)">删除角色</el-button>
         </div>
         <el-button :disabled="project.roles.length >= 50" @click="addRole">添加角色 / 旁白音色</el-button>
@@ -96,7 +97,7 @@ import { computed, onScopeDispose, ref, watch } from "vue";
 import axios from "axios";
 import { useNodeAi, invalidateNodeModels, type NodeMediaModel, type NodeVideoRequest } from "@toonflow/nodes-scaffold/nodeAi";
 import { createBrowserFfmpeg } from "@toonflow/ffmpeg/browser";
-import { speechSourceKey, speechInspectionMessage, voiceProjectSchema, type VoiceProject, type VoiceLine, type VoiceRole } from "@toonflow/tool-media-generation/voiceProject";
+import { speechInstructions, speechSourceKey, speechInspectionMessage, voiceProjectSchema, type VoiceProject, type VoiceLine, type VoiceRole } from "@toonflow/tool-media-generation/voiceProject";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { useWorkspaceStore } from "@/stores/workspace";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
@@ -247,7 +248,7 @@ async function generateSpeech(line: VoiceLine) {
   if (line.takes.length >= 100) throw new Error("每句最多保留 100 个配音版本");
   await save();
   const sourceKey = speechSourceKey(line, role);
-  const instructions = [line.emotion.trim(), line.delivery.trim()].filter(Boolean).join("；");
+  const instructions = speechInstructions(line, role);
   const [audio] = await ai.generateAudio({ directory, providerId: role.providerId, modelId: role.modelId, prompt: line.text.trim(), voice: role.voice, speed: line.speed, instructions, format: "wav", outputDirectory: "assets/speech" }, signal());
   if (!audio || audio.mediaType !== "audio") throw new Error("供应商没有返回配音文件");
   const take = { id: crypto.randomUUID(), audio: { path: audio.path, mimeType: audio.mimeType }, sourceKey, syncRequests: [], videos: [] };

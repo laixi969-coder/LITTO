@@ -103,7 +103,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "视频生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
+const data = computed(() => node.data as { purpose?: "asset" | "standalone"; production?: { shotId: string; productionFingerprint: string }; cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -138,6 +138,7 @@ const mediaCounts = computed(() => ({
 const matchingModes = computed(() => getMatchingModes(selectedModel.value));
 
 function getMatchingModes(choice?: NodeMediaModel) {
+  if (data.value.production) return choice?.mode ?? [];
   return (choice?.mode ?? []).filter((mode) => {
     const { image, video, audio } = mediaCounts.value;
     if (Array.isArray(mode)) return image + video + audio > 0 && Object.entries(mediaCounts.value).every(([type, count]) =>
@@ -252,16 +253,18 @@ async function startGeneration() {
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择视频模型");
   if (choice.cameraTrajectory && (!data.value.cameraTrajectory || !data.value.imageAndCameraOnly)) throw new Error("请先通过 setCameraTrajectory 配置并校准轨迹，或在镜头制作面板导入轨迹");
-  if (!generationPrompt.value) throw new Error("请输入生成提示词");
-  if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+  if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
+  if (!data.value.production && refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const images = refList.value.flatMap((item) => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
-  if (choice.mode?.length && !matchingModes.value.length) throw new Error("当前模型没有适合这些参考素材的生成模式，请更换模型或调整引用");
+  if (choice.mode?.length && !matchingModes.value.some(mode => JSON.stringify(mode) === data.value.mode)) throw new Error("当前模式不适用于这些参考素材，请更换模式或调整引用");
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   const input: Omit<NodeVideoRequest, "directory"> = {
     providerId: choice.providerId,
     modelId: choice.modelId,
     prompt: generationPrompt.value,
+    ...data.value.production,
+    purpose: data.value.purpose,
     mode: selectedMode.value,
     duration: data.value.duration,
     resolution: data.value.resolution || undefined,
@@ -353,6 +356,8 @@ async function resizeVideo(event: Event) {
 function getConfig() {
   return {
     config: {
+      production: data.value.production,
+      purpose: data.value.purpose,
       providerId: selectedModel.value?.providerId ?? "",
       modelId: selectedModel.value?.modelId ?? "",
       duration: data.value.duration,
@@ -383,7 +388,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "setConfig",
-  description: "修改此视频生成节点的模型、时长、分辨率、比例、模式或声音；先用 getConfig 查询能力，providerId 与 modelId 必须同时提供；mode 使用返回的原始字符串或数组，须匹配当前引用；不修改提示词、不启动生成",
+  description: "修改此视频生成节点的模型、时长、分辨率、比例、模式或声音；先用 getConfig 查询能力，providerId 与 modelId 必须同时提供。正式镜头同时传 production 绑定和编译返回的配置，模式与参考由服务器核验；独立素材的 mode 须匹配画布引用。不启动生成",
   parameters: z.strictObject({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
@@ -392,6 +397,7 @@ nodeTools.register({
     ratio: z.enum(ratioOptions).optional(),
     mode: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     generateAudio: z.boolean().optional(),
+    production: z.strictObject({ shotId: z.string().min(1), productionFingerprint: z.string().min(1) }).optional(),
   }).refine((args) => (args.providerId === undefined) === (args.modelId === undefined), "providerId 与 modelId 必须同时提供"),
   async execute(args, { signal }) {
     signal?.throwIfAborted();
@@ -408,8 +414,10 @@ nodeTools.register({
     const resolutions = getResolutions(choice, duration);
     if (args.resolution !== undefined && !resolutions.includes(args.resolution)) throw new Error(`当前时长不支持分辨率 ${args.resolution}，可选：${resolutions.join("、")}`);
     const resolution = args.resolution ?? (resolutions.includes(data.value.resolution) ? data.value.resolution : resolutions[0] ?? "");
-    if (args.mode !== undefined && !getMatchingModes(choice).some((item) => JSON.stringify(item) === JSON.stringify(args.mode))) throw new Error("所选模式不受当前模型支持或不适用于当前引用，请根据模型能力及已连接素材选择");
+    const modes = args.production ? choice.mode ?? [] : getMatchingModes(choice);
+    if (args.mode !== undefined && !modes.some((item) => JSON.stringify(item) === JSON.stringify(args.mode))) throw new Error("所选模式不受当前模型支持或不适用于当前引用，请根据模型能力及已连接素材选择");
     if (args.generateAudio !== undefined && choice.audio !== "optional" && args.generateAudio !== (choice.audio === true)) throw new Error("当前模型不支持切换声音，请查看 getConfig 返回的 audio 能力");
+    if (args.production) { data.value.production = args.production; data.value.purpose = undefined; }
     data.value.model = JSON.stringify([choice.providerId, choice.modelId]);
     data.value.duration = duration;
     data.value.resolution = resolution;
@@ -447,10 +455,16 @@ nodeTools.register({
 
 nodeTools.register({
   name: "generateVideo",
-  description: "启动此节点的后台视频生成，使用当前提示词、模型、模式、时长、分辨率、比例和参考素材；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
-  parameters: z.strictObject({}),
-  execute(_args, { signal }) {
+  description: "正式镜头先 productionSpec compile，传 production:{shotId,productionFingerprint:返回的fingerprint}，节点配置须与编译 request 一致；服务器使用编译的表演、对白与参考，规格变化须重编译。独立定妆传 purpose:asset，独立画面传 purpose:standalone，不关联镜头。启动此节点的后台视频生成，使用当前提示词、模型、模式、时长、分辨率、比例和参考素材；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
+  parameters: z.strictObject({ purpose: z.enum(["asset", "standalone"]).optional(), production: z.strictObject({ shotId: z.string().min(1), productionFingerprint: z.string().min(1) }).optional() }),
+  execute(args, { signal }) {
     signal?.throwIfAborted();
+    if (generating.value || uploading.value || deleting.value) throw new Error("节点正在生成、替换或删除，请稍后再试");
+    if (args.production && args.purpose) throw new Error("镜头绑定与独立素材用途不能同时指定");
+    if (args.production || args.purpose) {
+      data.value.production = args.production;
+      data.value.purpose = args.purpose;
+    }
     return startGeneration();
   },
 });

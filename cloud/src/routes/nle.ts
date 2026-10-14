@@ -6,7 +6,7 @@ import { audioReport } from "../domain/nle-render.ts";
 import { parseGrade } from "../domain/grade.ts";
 import { notFound } from "../util.ts";
 import { authOf } from "../auth.ts";
-import { previewCut, soundBridge, suggestCuts } from "../domain/cutEditing.ts";
+import { cutPairSchema, previewCut, soundBridge, soundBridgeSchema, suggestCuts } from "../domain/cutEditing.ts";
 import { inspectFinalQuality, reviewFinalQuality, finalReviewSchema } from "../domain/finalQuality.ts";
 import { adReadiness } from "../domain/adDirection.ts";
 
@@ -29,21 +29,20 @@ nle.post("/renders/:id/quality/review", async c => {
 
 const view = (c: any, s: any, id: string, persist: boolean) => editView(s, getEdit(s, id, persist));
 const canWrite = (c: any) => ["EDITOR", "ADMIN", "OWNER"].includes(authOf(c).role);
-const cutPair = z.object({ leftId: z.string().min(1), rightId: z.string().min(1), expectedVersion: z.number().int().nonnegative() });
 
 nle.post("/sequences/:id/edit/suggestCuts", async c => {
     const { s } = ctx(c, "EDITOR");
-    const input = await body(c, cutPair);
+    const input = await body(c, cutPairSchema);
     return c.json(await suggestCuts(s, c.req.param("id"), input.leftId, input.rightId, input.expectedVersion));
 });
 nle.post("/sequences/:id/edit/previewCut", async c => {
     const { s } = ctx(c, "EDITOR");
-    const input = await body(c, cutPair);
+    const input = await body(c, cutPairSchema);
     return c.json(await previewCut(s, c.req.param("id"), input.leftId, input.rightId, input.expectedVersion));
 });
 nle.post("/sequences/:id/edit/soundBridge", async c => {
     const { s } = ctx(c, "EDITOR");
-    const input = await body(c, cutPair.extend({ mode: z.enum(["jCut", "lCut", "crossfade", "none"]), duration: z.number().finite().min(0).max(3) }));
+    const input = await body(c, soundBridgeSchema);
     return c.json(await soundBridge(s, c.req.param("id"), input));
 });
 

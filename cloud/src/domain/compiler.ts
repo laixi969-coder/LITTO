@@ -1,5 +1,6 @@
 import { bad, notFound } from "../util.ts";
 import { all, get, type Scope } from "../db.ts";
+import { validateVisibleAssets } from "./shots.ts";
 import { statesOf, validateStateDelta } from "./state.ts";
 import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
@@ -11,6 +12,7 @@ import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
 import { physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
+import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -58,7 +60,7 @@ export function renderCompiledPrompt(sections: Record<string, string>) {
 }
 
 // ACT: 同一渲染约束用于自由生成与镜头编译；只约束已选写实媒介，不将插画/动画改成摄影。
-const photographicRendering = "For photographic or live-action imagery, render the entire frame as one coherent photographed scene, including landscapes and empty environments. Use the scene's actual light sources, consistent light direction, exposure, bounce light, occlusion and contact shadows across subjects and surroundings. Preserve material-specific roughness and highlights: skin, cloth, paper, foliage, soil, stone, concrete and metal must not share a uniform glossy or smoothed finish. Keep fine detail appropriate to focus, distance and atmospheric depth; distant scenery is not as crisp or contrasty as the foreground. Retain natural, non-repeating variation in vegetation and surfaces without inventing damage or clutter. Grade highlights and color transitions without clipped golden saturation, HDR halos or uniformly glowing surfaces. For people, preserve specified age, identity, natural skin tone variation and scale-appropriate texture; clean, energetic or well-groomed does not mean de-aged or poreless. Respect intentional makeup and soft light without erasing anatomy or material response. Do not simulate realism by adding wrinkles, dirt, damage, grain or sharpening. Explicit illustration, animation and other stylized media retain their chosen rendering rules.";
+const photographicRendering = "Keep the chosen medium. For photography, use coherent source lighting, contact shadows, material-specific roughness and scale-appropriate texture; preserve natural skin detail without smoothing or artificial sharpening.";
 
 function effectiveLook(s: Scope, projectId: string, sequenceId?: string, shotId?: string) {
   const looks = s.list("looks", { projectId });
@@ -77,15 +79,18 @@ function effectiveLook(s: Scope, projectId: string, sequenceId?: string, shotId?
   return lookSchema.parse(result);
 }
 
-export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: string) {
+export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: string, purpose?: unknown) {
   if (!s.get("projects", projectId)) throw bad("生成项目不存在");
   const world = s.list("worlds", { projectId })[0];
   const look = effectiveLook(s, projectId);
   return renderCompiledPrompt({
     request: prompt,
-    projectVisualContext: `Inherit these project defaults unless the request explicitly changes the medium or scene. Do not relocate the requested scene or change its time of day to match a style reference. ${JSON.stringify({ medium: world?.realism, materials: world?.material, look })}`,
+    projectVisualContext: purpose === "asset"
+      ? `Reusable identity reference. Use a simple background and neutral readable light unless explicitly requested otherwise. Preserve only the chosen medium: ${world?.realism ?? "photographic"}. Do not inherit scene lighting, time of day, dramatic grading or story action.`
+      : `Inherit these project defaults unless the request explicitly changes the medium or scene. Do not relocate the requested scene or change its time of day to match a style reference. ${JSON.stringify({ medium: world?.realism, materials: world?.material, look })}`,
     renderingStandard: photographicRendering,
-    referenceUse: "Use each supplied reference only for its stated role. Identity references preserve identity, not baked-in lighting or skin smoothing. Look references inform material and photographic response, not copied locations, costumes or time of day. A text description is not an image reference; do not invent missing reference content.",
+    visualDefaults: cleanVisualDefaults,
+    referenceUse: characterReferenceUse,
   });
 }
 
@@ -104,6 +109,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     if (!shot) throw notFound("shot");
     if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
     validateStateDelta(s, shot.projectId, shot.intendedStateDelta);
+    validateVisibleAssets(shot as ShotInput);
     validateMusicVideoTiming(shot as ShotInput);
     const proj = shot.projectId;
     const world = s.list("worlds", { projectId: proj })[0] as any;
@@ -111,12 +117,32 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const projectAssets = new Map(s.list("assets", { projectId: proj }).map(asset => [asset.id, asset]));
     const missingAssets = (shot.assetIds as string[]).filter(id => !projectAssets.has(id));
     if (missingAssets.length) throw bad(`镜头资产不存在或不属于当前项目：${missingAssets.join("、")}；请在生成前修正资产引用`);
-    const assets = (shot.assetIds as string[]).map(id => projectAssets.get(id)!) as any[];
-    const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId }) as any[];
+    // ACT: 旧镜头未标明出镜集合时沿用 assetIds；不凭台词中的画外标记猜测整镜是否出镜。
+    const visibleIds = new Set<string>(shot.visibleAssetIds ?? shot.assetIds);
+    const state = statesOf(s, shotId);
+    const relevantIds = new Set(visibleIds);
+    for (const id of visibleIds) {
+        const wardrobeId = state.start.characters[id]?.wardrobeId;
+        if (wardrobeId && projectAssets.get(wardrobeId)?.type === "Wardrobe") relevantIds.add(wardrobeId);
+    }
+    const assets = [...relevantIds].map(id => projectAssets.get(id)!) as any[];
+    const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId }).filter(binding => {
+        if (!["IDENTITY", "WARDROBE", "GEOMETRY", "ENVIRONMENT"].includes(binding.role)) return true;
+        const reference = s.get("refs", binding.referenceId);
+        const owners = [...projectAssets.values()].filter(asset => asset.references?.includes(binding.referenceId)
+            || reference?.mediaId && asset.attributes?.authoritativeReference === reference.mediaId);
+        return !owners.length || owners.some(asset => relevantIds.has(asset.id));
+    });
     const model = modelView(get("SELECT * FROM models WHERE id=?", modelId)!);
     const caps = model.capabilities;
-    const state = statesOf(s, shotId);
-    const { start } = state;
+    // 保留完整状态账本，只投影本镜资产；不把历史人物、全场知情或情绪档案作为画面指令。
+    const start = Object.fromEntries(["characters", "wardrobe", "props", "environment"].map(group => [group,
+        Object.fromEntries(Object.entries(state.start[group as keyof typeof state.start]).filter(([id]) => relevantIds.has(id)).map(([id, value]) => {
+            if (!value || typeof value !== "object" || Array.isArray(value)) return [id, value];
+            const { heldBy, present, ...rest } = value;
+            return [id, { ...rest, ...(heldBy && visibleIds.has(heldBy) ? { heldBy: projectAssets.get(heldBy)?.name ?? heldBy } : {}) }];
+        })),
+    ]));
     const warnings: string[] = [];
     const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
     const overrides = s.list("continuity_issues", { shotId, status: "overridden" });
@@ -124,7 +150,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const continuity = checkPair(previous ?? null, { ...shot, bindings }, previous ? statesOf(s, previous.id) : null, state, projectAssets);
     warnings.push(...continuity.filter(issue => !overrides.some(item => item.category === issue.category && item.message === issue.message))
         .map(issue => `生成前连续性提醒（${issue.severity}）：${issue.message}；${issue.repair.detail}`));
-    warnings.push(...creativeDirectionIssues(shot as ShotInput, assets).map(issue => `创作准备未完成：${issue}`));
+    warnings.push(...creativeDirectionIssues(shot as ShotInput, shot.assetIds.map((id: string) => projectAssets.get(id)!)).map(issue => `创作准备未完成：${issue}`));
     warnings.push(...adShotIssues(s, shot).map(issue => `创作准备未完成：${issue}`));
     const advertising = adContext(s, shot);
     if (kind === "video" && shot.creativeBrief?.dialogue.mode === "native" && shot.creativeBrief.dialogue.lines.length
@@ -211,21 +237,35 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     lock.push(...(extra.repair?.addLock ?? []));
     const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : [] };
     const brief = shot.creativeBrief as ShotInput["creativeBrief"];
-    const assetName = (id: string) => assets.find(asset => asset.id === id)?.name ?? id;
+    const assetName = (id: string) => projectAssets.get(id)?.name ?? id;
+    const appearance = assets.flatMap(asset => {
+        const attributes = Object.fromEntries(Object.entries(asset.attributes ?? {}).filter(([key]) => !["characterDirection", "authoritativeReference", "importedFrom", "biography", "backstory", "relationships", "voice"].includes(key)));
+        return Object.keys(attributes).length ? [`${asset.name}: ${JSON.stringify(attributes)}`] : [];
+    });
 
     let sections: Record<string, string> = {
-        creativeIntent: shot.creativeBrief ? J([shot.creativeBrief.intent, shot.creativeBrief.visualPayoff]) : "",
+        creativeIntent: kind === "video" && shot.creativeBrief ? J([shot.creativeBrief.intent, shot.creativeBrief.visualPayoff]) : "",
         combatDesign: kind === "video" && brief?.combat ? J([brief.combat.dramaticTurn, brief.combat.signature,
             ...brief.combat.beats.map(beat => `${assetName(beat.attackerId)}对${assetName(beat.defenderId)}：${beat.action} → ${beat.reaction} → ${beat.endState}；其他人物：${beat.supportingAction}`)]) : "",
         dialogue: kind === "video" && brief?.dialogue.lines.length
-            ? `${brief.dialogue.mode === "native" ? "生成以下原文对白及声音，并按要求同步人物口型" : "后期配音及口型处理计划，当前素材不代表声画同步已完成"}：\n${brief.dialogue.lines.map(line => `${musicTimecode(line.start)}–${musicTimecode(line.end)} ${assetName(line.speakerId)}说：${JSON.stringify(line.text)}；${line.delivery}；${line.lipSync === "visible" ? "可见嘴部与此句逐字同步" : "画外音，不要求画内人物说此句"}；${line.framing}`).join("\n")}` : "",
-        shotDesign: kind === "image" && cam.design ? `Render only the single start state; end, paths and timing are continuity context, not multiple panels. ${JSON.stringify(cam.design)}` : "",
-        subject: J(assets.map((a) => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)),
-        assetDetails: J(assets.filter(a => Object.keys(a.attributes ?? {}).length).map(a => `${a.name}: ${JSON.stringify(a.attributes)}`)),
-        narrative: shot.narrativeFunction,
-        action: clean(shot.action || shot.title, "action"),
-        performance: J([shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`, shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`, shot.performance?.lookTarget && `looking at ${shot.performance.lookTarget}`, shot.performance?.gesture && `gesture ${shot.performance.gesture}`, shot.performance?.timing && `timing ${shot.performance.timing}`]),
-        blocking: J([shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`, shot.blocking?.midground && `midground: ${shot.blocking.midground}`, shot.blocking?.background && `background: ${shot.blocking.background}`]),
+            ? `${brief.dialogue.mode === "native" ? "生成以下原文对白及声音，并按要求同步人物口型" : "后期配音及口型处理计划，当前素材不代表声画同步已完成"}：\n${brief.dialogue.lines.map(line => `${musicTimecode(line.start)}–${musicTimecode(line.end)} ${assetName(line.speakerId)}${!visibleIds.has(line.speakerId) ? "（仅画外声音，不出镜）" : ""}说：${JSON.stringify(line.text)}；${line.delivery}；${line.lipSync === "visible" ? "可见嘴部与此句逐字同步" : "画外音，不要求画内人物说此句"}；${line.framing}`).join("\n")}` : "",
+        shotDesign: kind === "image" && cam.design ? J([cam.design.start && `Single starting frame: ${cam.design.start}`, ...cam.design.invariants]) : "",
+        subject: J([kind === "image" && !!cam.design?.start && "Appearance references only; initial occupancy is defined exclusively by the starting frame, not by this list",
+            ...assets.map(a => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)]),
+        assetDetails: J(appearance),
+        action: kind === "image" && cam.design?.start ? "Render the specified starting frame only." : clean(shot.action || shot.title, "action"),
+        performance: kind === "video" ? J([
+            shot.performance?.gesture, shot.performance?.timing,
+            shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`,
+            shot.performance?.lookTarget && `looking at ${shot.performance.lookTarget}`,
+            !shot.performance?.gesture && shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`,
+        ]) : "",
+        blocking: J([
+            Object.values(start).some(group => Object.keys(group).length) && `Inherited continuity for present subjects only; starting-frame occupancy/positions take precedence: ${JSON.stringify(start)}`,
+            (kind === "video" || !cam.design?.start) && shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`,
+            (kind === "video" || !cam.design?.start) && shot.blocking?.midground && `midground: ${shot.blocking.midground}`,
+            (kind === "video" || !cam.design?.start) && shot.blocking?.background && `background: ${shot.blocking.background}`,
+        ]),
         view: viewText,
         camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
         lighting: J([lt.worldSource && `fixed world light source: ${lt.worldSource}`, lt.keyDirection && lt.keyDirection !== "none" && `key direction ${lt.keyDirection} in ${lt.directionSpace ?? "screen"} coordinates`, lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
@@ -235,13 +275,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         realism: J(Object.entries(shot.realism ?? {}).filter(([key, value]) => value && (kind === "video" || key !== "motion")).map(([key, value]) => `${key}: ${clean(String(value), `realism.${key}`)}`)),
         renderingStandard: photographicRendering,
         constraints: J(shot.constraints ?? []),
-        physicalContinuity: J([
-            assets.some(a => a.type === "Character") && "Preserve each character's reference anatomy and limb count through the entire action, including occlusions and mirror reflections; movement has preparation, contact, weight transfer and settling",
-            assets.some(a => a.type === "Product" || a.type === "Wardrobe" || a.type === "Prop") && "Preserve the referenced garment/product/prop silhouette, length, seams, fastening, openings and marks except for explicitly planned changes at their specified action or timeline beat; preserve unaffected details and identity. Cloth deforms locally under actual contact rather than changing design",
-            "Keep surface response specific to each material and visible at this shot scale; preserve source-motivated light and contact shadows; do not replace missing texture with sharpening or artificial grain",
-        ]),
-        state: J([...Object.entries<any>(start.props).filter(([, p]) => p.present).map(([id, p]) => `${p.name ?? id}${p.heldBy ? ` held by ${start.characters[p.heldBy]?.name ?? p.heldBy}` : ""}`), ...Object.entries<any>(start.characters).map(([id, c]) => c.wardrobeId ? `${c.name ?? id} wearing ${start.wardrobe[c.wardrobeId]?.name ?? c.wardrobeId}` : "")]),
-        observedState: J(Object.values(start).flatMap(group => Object.values<any>(group).filter(value => value && typeof value === "object" && value.note).map(value => `${value.name ?? "asset"}: ${value.note}`))),
+        physicalContinuity: kind === "video" ? "Keep anatomy and object geometry stable; show contact, weight transfer and the resulting motion at the planned speed." : "",
         opticalTexture: look ? J([look.shadowBehavior && `shadows: ${look.shadowBehavior}`, look.texture && `texture: ${look.texture}`, look.sharpnessPhilosophy && `sharpness: ${look.sharpnessPhilosophy}`, look.bloom && `bloom: ${look.bloom}`]) : "",
         referenceIntent: J(bindings.filter(b => b.notes).map(b => `${b.referenceId} (${b.role}): ${b.notes}`)),
         references: textFallback.join("; "),
@@ -250,11 +284,10 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         allow: J([...freedom.ALLOW, ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]),
         random: freedom.RANDOM.join("; "),
         forbiddenChanges: J(assets.flatMap(a => (a.forbiddenChanges ?? []).map((value: string) => `${a.name}: ${value}`))),
-        assetCondition: "Preserve the condition specified by the story and approved references. When unspecified, use intact, normally maintained surfaces and clean clothing; texture and realism do not imply dirt, wear, rust, damage or poverty. Preserve age-appropriate anatomy and natural torso-to-leg proportions; do not compress limbs to fit the composition.",
-        constraintPriority: "Preserve identity and explicit invariants. Current starting continuity state takes precedence over baseline mutable appearance; apply only explicitly planned changes at their action or timeline beat and preserve unaffected details. Allow natural performance without changing identity. Forbidden changes override allowed variations; optional variation must not alter specified action, lighting or continuity.",
+        constraintPriority: "Explicit identity and invariants remain fixed. Current continuity overrides baseline mutable appearance; apply planned changes only at their specified beat.",
         frameContinuity: kind === "video" && extra.startFrameMediaId ? extra.startFrameAsReference
-            ? "These are appearance and composition references, not a native locked first frame. Follow the specified action starting state and timing; do not freeze the subjects in the reference poses. Preserve identities, scale and established scene landmarks; references do not imply additional copies of subjects or buildings."
-            : "Continue the actual start frame, including action already in progress; do not rewind to repeat an earlier action. World and identity descriptions are context, not instructions to put every mentioned subject on screen. Keep off-screen subjects off screen unless the shot action explicitly calls for their entrance. Preserve the established subject scale relative to buildings and other subjects; do not invent miniature background versions or duplicates." : "",
+            ? "References guide appearance and composition; action starts from this shot's plan, not a frozen reference pose."
+            : "Continue the actual first frame without restarting the action. Keep offscreen subjects offscreen until a specified entrance; preserve scale and identity." : "",
         repair: extra.repair?.note ?? "",
     };
     if (kind === "video") {
@@ -269,11 +302,10 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         sections.motionTiming = J([
             musicVideo && "The execution timeline defines the action order, timing and explicitly timed camera changes. Apply untimed path and camera descriptions only where compatible; never introduce an extra action, cut or pause from background context.",
             !musicVideo && cam.design?.timing && `Action timing: ${cam.design.timing}`,
-            "Use the specified playback speed; otherwise use real-time motion. Heavy mass is not slow motion. Continue action already underway without repeating its preparation. Contact causes the visible reaction; do not stretch brief contact into a held pose. Camera motion must not substitute for subject motion. Internal cuts occur only when explicitly directed in the execution beats; neighbouring-shot edit notes are not internal cuts.",
+            "Real-time unless specified. Continue ongoing action; camera movement does not replace performance. Cut only where the execution beats explicitly direct it.",
         ]);
-        sections.narrative = "";
         sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
-        sections.renderingStandard = "Respect the selected photographic or stylized medium. Preserve material-specific roughness, coherent light, contact shadows, stable exposure and scale-appropriate detail. Use natural motion blur at the specified speed; keep contact and reactions readable. Do not add slow motion, artificial sharpening, grain, damage or uniformly glossy surfaces to imply cinematic quality.";
+        sections.renderingStandard = photographicRendering;
     }
     let negativePrompt = J(shotAvoid(freedom));
     if (kind === "video" && musicVideo) {
@@ -288,18 +320,16 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         if (typeof externalModelId === "string" && /(?:^|[/_-])seedance[-_ ]?2[._-]5(?:$|[/_-])/i.test(externalModelId)) {
             // ACT: 只重排已保存的规格，不由编译器编故事。其他模型继续使用通用段落。
             sections = {
-                Objective: J([shot.title, sections.narrative, sections.action]),
+                Objective: sections.action,
                 "Reference binding": inputs.filter(input => input.sent).map(input => `${input.referenceId}: ${input.role}`).join("; "),
                 "Immutable locks": J([sections.lock, sections.constraintPriority]),
                 "Target duration": `${shot.generationDuration ?? shot.duration} seconds`,
                 Timeline: timeline,
                 "Visual direction": J([
-                    // ACT: 起始状态用于接戏，不作为禁止本段剧情变化的永久锁。
-                    J([sections.state, sections.observedState]) && `Starting continuity state (apply only explicitly planned changes during the shot): ${J([sections.state, sections.observedState])}`,
                     Object.entries(sections).filter(([key]) => !["narrative", "action", "lock", "state", "observedState", "constraintPriority", "forbiddenChanges"].includes(key)).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join("; "),
                 ]),
                 "Audio direction": audio,
-                Preserve: J([sections.lock, "Preserve reference identity and all details not explicitly changed; baseline styling is not a permanent lock on planned costume or makeup changes"]),
+                Preserve: "Preserve details not explicitly changed by this shot.",
                 // ACT: 该模型的排除项只经 Avoid 段落表达；独立 negativePrompt 字段对它无效，仍返回给调用方用于模型切换后复用。
                 Avoid: J([sections.forbiddenChanges, negativePrompt]),
             };
@@ -334,15 +364,14 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
                 ? "参考图用于人物外貌与构图；动作起点按本镜规格执行。"
                 : "从首帧正在发生的动作继续，保持画内人物、兵器和空间关系。" : "",
             subjects: J([sections.subject, sections.assetDetails]),
-            staging: J([sections.blocking, sections.state, sections.observedState, sections.shotDesign, sections.view]),
+            staging: J([sections.blocking, sections.shotDesign, sections.view]),
             performance: sections.performance,
-            camera: J([sections.camera, !musicVideo && cam.design?.timing && `Action timing: ${cam.design.timing}`]),
+            camera: sections.camera,
             appearance: J([sections.world, sections.lighting, sections.look, sections.realism, sections.opticalTexture]),
             references: J([sections.referenceIntent, sections.references]),
             audio: sections.audio,
             constraints: J([sections.constraints, sections.lock, sections.repair,
-                "保持人物身份与兵器形状；按时间线执行接触、反应和镜头变化，未指定速度时使用实时速度。",
-                "起始状态随明确动作变化；未安排变化的身份、服装、材质和场景保持一致。"]),
+                sections.physicalContinuity, sections.motionTiming, sections.constraintPriority]),
             forbiddenChanges: sections.forbiddenChanges,
             variations: J([...(shot.freedomMap?.CONTROL ?? []), sections.allow, sections.random]),
         };
@@ -352,13 +381,20 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         sections.objectInteraction = kind === "video" ? interaction.instruction : "Preserve the reference object's geometry, openings and support surfaces. Show the actual interaction opening or contact surface clearly enough to establish the planned action; do not invent an opening or hide impossible contact.";
         warnings.push("物体交互预检：核对参考与起始画面中的真实入口、承托面、尺寸和动作路径；文字约束不代表视觉已核实。结果需检查接近、接触、进入或交接及释放后的承托，无法看清时不得记为通过。");
     }
-    // 在模型专用重排之后加入，所有模型都保留整片导演意图。
-    if (advertising) sections.adDirection = JSON.stringify({
-        direction: advertising.direction, shot: shot.advertising,
-        referencePrinciples: advertising.studies,
-        beat: advertising.direction?.emotionalArc?.find((beat: { id: string }) => beat.id === shot.advertising?.beatId),
-        referenceUse: "样镜只校准色彩、光线、材质与构图密度；按本镜地点、动作与产品角色执行，不照搬样镜场景。声音为后期与生成计划，图片不代表声音已完成。",
-    });
+    // 整片弧线和参考研究留给导演；执行只取当前节拍及已采用的统一视觉关系。
+    if (advertising?.direction) {
+        const direction = advertising.direction;
+        const beat = direction.emotionalArc.find((beat: { id: string }) => beat.id === shot.advertising?.beatId);
+        const { motion, ...appearanceRules } = direction.visualRules;
+        sections.adDirection = JSON.stringify({ visualRules: kind === "video" ? direction.visualRules : appearanceRules, avoid: direction.avoid,
+            beat: kind === "video" && beat ? { visibleAction: beat.visibleAction, productBeat: beat.productBeat, sound: beat.sound } : undefined,
+            productRead: shot.advertising?.productRead,
+        });
+    }
+    sections["Objective" in sections ? "Visual defaults" : "visualDefaults"] = cleanVisualDefaults;
+    if (inputs.length || assets.some(asset => asset.type === "Character" || asset.type === "Creature")) {
+        sections["Objective" in sections ? "Reference roles" : "referenceUse"] = characterReferenceUse;
+    }
     const prompt = renderCompiledPrompt(sections);
     for (const key of ["surface", "imaging", "world", "cinematic", ...(kind === "video" ? ["motion"] : [])]) {
         if (!shot.realism?.[key]?.trim()) warnings.push(`未填写真实感规格：${key}`);

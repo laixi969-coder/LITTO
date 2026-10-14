@@ -59,7 +59,7 @@ LITTO 独立编写。用于把已选故事、音乐和参考素材转成可执�
 
 查询真实模型能力，核对音频参考和声音输出是两种能力。音频参考须有真实绑定；文字中的曲名或路径不代表已送入音频。可选音频模型中，`generated` 请求须 `generateAudio:true`，`silent` 须 `false`。原曲方案可先生成无声画面再后期铺原曲，但不支持对齐时不能称为已实现可见对口型。只有实际模型支持并且用户授权，才执行生成。
 
-Seedance 2.5 沿用 [模型规则 A9.2](../../workflow/references/seedanceDirector.md)：故事目标进 Objective，真实参考进 Reference binding，时间块进 Timeline，摄影与表演进 Visual direction，音乐与演唱进 Audio direction，其余锁定进 Immutable locks / Preserve / Avoid。每段完整可用，不另叠一份外部模板。编译预览中必须能看到这些信息；切换模型后保留内容，不强套 2.5 外壳。
+Seedance 2.5 沿用 [模型文本组织](../../workflow/references/seedanceDirector.md)：故事目标进 Objective，真实参考进 Reference binding，时间块进 Timeline，摄影与表演进 Visual direction，音乐与演唱进 Audio direction，其余锁定进 Immutable locks / Preserve / Avoid。每段完整可用，不另叠一份外部模板。编译预览中必须能看到这些信息；切换模型后保留内容，不强套 2.5 外壳。
 
 ## 对抗式审查与修订
 

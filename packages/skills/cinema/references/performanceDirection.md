@@ -61,6 +61,7 @@ LITTO 适配版，2026-10-13。在原有 O-Side、NolanX、H3 方法上，对照
 
 | 现有字段 | 落实内容 |
 | --- | --- |
+| visibleAssetIds / camera.design.start | 本镜实际出镜集合 / 首帧瞬间的占位、姿势和持物；稍后入镜写进行动时点，纯画外发声者不填画面站位 |
 | action | 谁对谁做什么、触发事件和可见结果；必要的说话者与原句 |
 | performance.emotion / intensity | 本镜情绪方向与适当强度，不能单独作为完整表演指令 |
 | performance.eyeline / lookTarget | 已有空间里的目光方向与对象 |
@@ -70,7 +71,7 @@ LITTO 适配版，2026-10-13。在原有 O-Side、NolanX、H3 方法上，对照
 | constraints | 本镜真正需要防止的提前反应、串人、擅改台词或无故复位 |
 | intendedStateDelta.emotional | 按实际角色资产 ID 记录计划中的情绪变化；未查看输出不能称为观测事实 |
 
-跨镜读取已确认的上一镜实际状态；只有计划时明确为待核对，并把需要承接的呼吸、目光或未完成动作写进本镜 action/performance.timing。不能假定状态表中存在就已经进入模型请求。表演习惯、声音设定可保存在角色现有 attributes 或设定文档，情绪和表情不能作为永久身份锁定项。
+跨镜读取已确认的上一镜实际状态；只有计划时明确为待核对，并把需要承接的呼吸、目光或未完成动作写进本镜 action/performance.timing。不能假定状态表中存在就已经进入模型请求。角色长期档案使用 attributes.characterDirection{speech,behavior,relationships}，导演按当场目的选用，生成请求不复制整份档案。发声习惯转成该句 dialogue.delivery，静默人物不附声音指令；情绪和表情不能作为永久身份锁定项。
 
 通过 productionSpec 保存并 compile 后，检查实际请求的 PERFORMANCE、ACTION、BLOCKING 与约束是否保留人物归属、触发、顺序和声音意图。工具字段不支持的内容放入合适的现有文本字段，不能只写在聊天分析里。画布模式则将同一内容写入真实生成节点并核对引用。若只是无大模型的规则草案，标为基础草案，不称为专业表演设计已完成。
 

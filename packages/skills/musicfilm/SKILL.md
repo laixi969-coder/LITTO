@@ -99,7 +99,7 @@ MV 入口可提供 `musicAnalysis.txt`（`kind: littoMusicAnalysis`）和 `music
 
 进入短 MV、剧情演唱、多图编排、音画切点或生成反馈修订时，读取 [MV 导演编排](references/musicVideoDirection.md)。它负责把故事、表演与音乐写成同一个可执行时间轴；摄影与资产继续复用 cinema 和 continuity，不重复建立另一套制作系统。
 
-选择 Seedance 2.5 时，将完整内容编入 workflow 的 A9.2 字段，交付本段全部参考、时间块、视听方向与约束，不只交付零散建议。实际制作须先保存 `musicVideo` 规格并检查编译预览；自由 prompt 会被服务端编译结果替换，不能只在聊天中保存音画方案。其他模型保留同一创作意图，按真实能力编译。
+选择 Seedance 2.5 时，将完整内容编入 workflow 的“模型文本组织”字段，交付本段全部参考、时间块、视听方向与约束，不只交付零散建议。实际制作须先保存 `musicVideo` 规格并检查编译预览；自由 prompt 会被服务端编译结果替换，不能只在聊天中保存音画方案。其他模型保留同一创作意图，按真实能力编译。
 
 ## 6. 交接
 

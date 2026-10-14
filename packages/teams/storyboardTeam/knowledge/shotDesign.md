@@ -1,8 +1,10 @@
 # 镜头职责与可执行设计
 
+剧情镜头先写角色目的、策略、触发与可见反应，再写人物起点、目标位置、路径及摄影机怎样看清变化。每镜说明带来的事件、信息或关系变化；停顿有具体作用，不用微表情、衣发微动和慢推填满时间。允许有依据地拆合源节拍，不能丢事件或对白，也不按说话轮次机械切镜。完整原句逐句分配到 creativeBrief.dialogue，保留说话人、语气、时间与画内/画外通道；旁白不替代角色交锋。reviewer 对重复信息、无目的等待、只有摄影机动而人物无行为、对白只剩字幕逐项给出处和改法。
+
 导演先定义观众的信息变化，再选择镜头。master shot 是覆盖场面行动的主镜头，不是大师风格。推拉改变相机位置与透视；摇镜只旋转；zoom 只改视角；orbit 需弧线中间点；dolly zoom 需距离与视角联动使主体尺度近似不变。焦点转移、长镜头、手持、浅景深均为可选方法，不是电影感必备。
 
-writer 为每镜填写 camera.design：technique、purpose、start、end、subjectPath、cameraPath、timing、cut、invariants（数组）、acceptance（数组）、fallback。保留 camera 景别、焦距、轴线和视线；表演放 action/performance，前中后景放 blocking，光源放 lighting。每个镜头须有原文依据或标成提案；按剧情节拍拆镜，不默认八镜，不为镜数添加无关道具特写。不按说话轮次机械左右翻转三人对话。缺少空间信息不编造轴线。
+writer 为每镜填写 camera.design：technique、purpose、start、end、subjectPath、cameraPath、timing、cut、invariants（数组）、acceptance（数组）、fallback。保留 camera 景别、焦距、轴线和视线；表演放 action/performance，前中后景放 blocking，光源放 lighting。assetIds 保留叙事相关角色，visibleAssetIds 只列本镜出镜对象；画外说话人不进入画面参考。start 只写首帧已成立的状态，稍后入镜与终点写进 timing/end，不能提前摆在首帧。每个镜头须有原文依据或标成提案；按剧情节拍拆镜，不默认八镜，不为镜数添加无关道具特写。不按说话轮次机械左右翻转三人对话。缺少空间信息不编造轴线。
 
 产品广告只选与卖点有关的职责：轮廓、材质、功能证据、使用关系、品牌收束；不是固定五镜。MV 用实际乐句/重拍/停顿事件，缺音乐分析时标记未对齐。导演向 writer 转交主 Agent 已读取的 cinema/adfilm/musicfilm 相关方法与项目约束，不能声称成员已读到未提供的全局技能。
 

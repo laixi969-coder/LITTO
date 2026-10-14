@@ -113,6 +113,7 @@ export interface MediaGenerationRequest {
   cameraTrajectory?: CameraTrajectory;
   imageAndCameraOnly?: boolean;
   shotId?: string;
+  localRepair?: { keyframeId: string; kind: "face_artifact" | "hand_artifact" | "anatomy_failure" | "plastic_surface"; target?: { assetId?: string; region: string }; note?: string };
   productionFingerprint?: string;
   regenerationId?: string;
   providerId: string;
