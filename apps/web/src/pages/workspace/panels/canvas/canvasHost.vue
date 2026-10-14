@@ -41,7 +41,8 @@ const canvases = shallowRef<{ id: string }[]>([]);
 provide("canvasList", canvases);
 provide("canvasAssetNodes", (id: string) => [...instances.values()].find(panel => panel.canvasId === id)?.getRetainedNodes() ?? []);
 watch(canvases, (current, previous) => {
-  const removed = new Set(previous.filter(canvas => !current.includes(canvas)).map(canvas => canvas.id));
+  const currentIds = new Set(current.map(canvas => canvas.id));
+  const removed = new Set(previous.filter(canvas => !currentIds.has(canvas.id)).map(canvas => canvas.id));
   if (!removed.size) return;
   entries.value = entries.value.filter(entry => {
     const panel = instances.get(entry.key);

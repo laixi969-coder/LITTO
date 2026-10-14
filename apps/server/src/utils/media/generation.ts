@@ -294,7 +294,7 @@ export async function generateMediaDirect(
 
 
 /** Agent tools keep their awaitable contract; the actual generation is owned by the persistent worker. */
-export async function generateMedia(cwd: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]> {
+export async function generateMedia(cwd: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]> {
   const { cloud } = await import("@/lib/cloud");
   const { currentTenant } = await import("@/utils/tenant");
   const api = cloud();
@@ -307,17 +307,27 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
     return generateMediaDirect(cwd, mediaType, request, signal);
   }
   signal?.throwIfAborted();
+  onProgress?.("正在校验编译规格与参考素材，尚未提交生成");
   const { enqueueMedia } = await import("@/utils/media/jobs");
   const job = await enqueueMedia(cwd, mediaType, request, crypto.randomUUID());
+  const started = Date.now();
+  let reported = "";
+  let reportedAt = 0;
   try {
     while (true) {
       signal?.throwIfAborted();
       const state = api.jobView(api.scoped(currentTenant()!.workspaceId).get("generation_jobs", job.id, true));
+      if (state.status !== reported || Date.now() - reportedAt >= 10000) {
+        reported = state.status;
+        reportedAt = Date.now();
+        const label = state.status === "QUEUED" ? "已入队，等待执行" : state.status === "RUNNING" ? "任务处理中（供应商未提供百分比）" : state.status;
+        onProgress?.(`任务 ${job.id} · ${label} · 已等待 ${Math.floor((Date.now() - started) / 1000)} 秒`);
+      }
       if (state.status === "SUCCEEDED") return state.files;
       if (["FAILED", "CANCELLED", "TIMEOUT"].includes(state.status)) throw new Error(`${state.error || "媒体生成已停止"}。任务 ${job.id} 已停止。${request.shotId ? "相同镜头请求不会自动重发。确认需要重做后使用新的 regenerationId，同一次重做须复用该 ID。" : "请核查失败原因后再决定是否重试。"}`);
       await new Promise<void>((resolve, reject) => {
         const cancel = () => { clearTimeout(timer); reject(signal?.reason); };
-        const timer = setTimeout(() => { signal?.removeEventListener("abort", cancel); resolve(); }, 500);
+        const timer = setTimeout(() => { signal?.removeEventListener("abort", cancel); resolve(); }, 2000);
         signal?.addEventListener("abort", cancel, { once: true });
       });
     }

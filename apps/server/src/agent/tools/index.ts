@@ -43,7 +43,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     try { await canvas.call({ name: "publishFile", args: { path } }, mediaSignal(signal)); }
     catch (error) { throw new Error(`文件已保存：${path}，但画布展示失败：${error instanceof Error ? error.message : error}。仅重试 publishFile，禁止重新生成或覆盖文件。`); }
   }
-  async function generateAndPublish(kind: "image" | "video" | "audio", request: Parameters<typeof generateMedia>[2], signal?: AbortSignal) {
+  async function generateAndPublish(kind: "image" | "video" | "audio", request: Parameters<typeof generateMedia>[2], signal?: AbortSignal, onProgress?: (message: string) => void) {
     if (kind !== "audio" && !request.shotId && !request.purpose) {
       const api = cloud(), tenant = currentTenant();
       const projectId = api && tenant ? workspaceProject(cwd) : undefined;
@@ -51,7 +51,8 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         throw new Error("当前项目已有正式镜头，生成分镜须传 shotId 并先 compile 取得 productionFingerprint，以继承共同质感与参考。仅基础资产可标 purpose=asset；用户明确要求的独立画面可标 purpose=standalone。此次未提交生成、未消耗算力。");
       }
     }
-    const result = await generateMedia(cwd, kind, request, mediaSignal(signal));
+    const result = await generateMedia(cwd, kind, request, mediaSignal(signal), onProgress);
+    onProgress?.("结果已保存，正在补充画布节点与连线");
     for (const asset of result) await publishFile(asset.path, signal);
     return result;
   }
@@ -152,18 +153,9 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         return api.workspaceProduction(api.scoped(tenant.workspaceId), workspaceProject(cwd)!, operation, data, tenant.userId);
       },
       listModels: listMediaModels,
-      generateImage: (request, signal) => generateAndPublish("image", request, signal),
-      generateVideo: (request, signal) => generateAndPublish("video", request, signal),
-      generateAudio: (request, signal) => generateAndPublish("audio", request, signal),
-    },
-    sdk: {
-      defineTool, createReadToolDefinition, createWriteToolDefinition, createEditToolDefinition, createLsToolDefinition,
-      detectSupportedImageMimeTypeFromFile: path => files.detectImageMimeType(path, true),
-    },
-  };
-}
-
-export async function createAgentTools(cwd: string, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): Promise<ToolDefinition[]> {
+      generateImage: (request, signal, onProgress) => generateAndPublish("image", request, signal, onProgress),
+      generateVideo: (request, signal, onProgress) => generateAndPublish("video", request, signal, onProgress),
+      generateAudio: (request, signal, onProgress) => generateAndPublish("audio", request, signal, onProgress),
       async generateShots(kind, requests, signal, onProgress) {
         let completed = 0;
         return Promise.all(requests.map(async request => {
@@ -188,6 +180,15 @@ export async function createAgentTools(cwd: string, canvas?: CanvasContext, ques
           } finally { onProgress?.(`已返回 ${++completed}/${requests.length} 镜；已有任务复用，失败不自动重发`); }
         }));
       },
+    },
+    sdk: {
+      defineTool, createReadToolDefinition, createWriteToolDefinition, createEditToolDefinition, createLsToolDefinition,
+      detectSupportedImageMimeTypeFromFile: path => files.detectImageMimeType(path, true),
+    },
+  };
+}
+
+export async function createAgentTools(cwd: string, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): Promise<ToolDefinition[]> {
   const tools: ToolDefinition[] = [];
   const names = new Set<string>();
   const context = createAgentToolContext(cwd, {}, canvas, question, parentSignal);

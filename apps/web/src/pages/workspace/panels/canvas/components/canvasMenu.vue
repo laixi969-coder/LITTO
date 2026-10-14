@@ -75,7 +75,9 @@ const getRetainedNodes = inject<(id: string) => { id: string; data?: unknown }[]
 const boundCanvas = shallowRef<Canvas>();
 const activeCanvasId = defineModel<string>("canvasId", { default: "" });
 watch(canvases, () => {
-  if (boundCanvas.value) activeCanvasId.value = canvases.value.includes(boundCanvas.value) ? boundCanvas.value.id : "";
+  if (!boundCanvas.value) return;
+  boundCanvas.value = canvases.value.find(canvas => canvas.id === boundCanvas.value!.id);
+  activeCanvasId.value = boundCanvas.value?.id ?? "";
 }, { flush: "sync" });
 const canvasListVisible = ref(false);
 const activeCanvasName = computed(() => canvases.value.find(canvas => canvas.id === activeCanvasId.value)?.name || translate("选择画布"));
@@ -90,19 +92,20 @@ const { toObject, setNodes, setEdges, setViewport } = useVueFlow();
 
 watch(() => props.directory, async (directory, _previous, onCleanup) => {
   let cancelled = false;
-  onCleanup(() => { cancelled = true; });
+  const loading = new AbortController();
+  onCleanup(() => { cancelled = true; loading.abort(new Error("画布加载已失效")); });
   busy.value = true;
   loadError.value = "";
   boundCanvas.value = undefined;
   activeCanvasId.value = "";
   try {
-    if (!props.initialCanvasId) canvases.value = [];
+    // 加载期间保留列表；临时清空会被宿主误认为所有画布已删除。
     newCanvasId.value = null;
     editingId.value = null;
     renameError.value = "";
     if (!directory) return;
     if (props.initialCanvasId) {
-      await applyCanvas(props.initialCanvasId, directory);
+      await applyCanvas(props.initialCanvasId, directory, loading.signal);
       return;
     }
     let loaded = await listCanvases(directory);
@@ -120,7 +123,7 @@ watch(() => props.directory, async (directory, _previous, onCleanup) => {
     }
     if (cancelled) return;
     canvases.value = loaded;
-    if (canvases.value[0]) await applyCanvas(canvases.value[0].id, directory);
+    if (canvases.value[0]) await applyCanvas(canvases.value[0].id, directory, loading.signal);
   } catch (err) {
     if (!cancelled) {
       loadError.value = errorMessage(err, "读取画布失败");
@@ -162,7 +165,10 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
     checkCanvasDirectory(directory, signal);
     return;
   }
-  if (!nextCanvas.flow) {
+  // 重载组件时共享列表仍可能持有旧 flow；先落盘，再读最新快照，避免旧缓存抹掉后来新增的节点。
+  await props.flushSave();
+  checkCanvasDirectory(directory, signal);
+  {
     const data = await useWorkspaceFiles(directory).readJson<Partial<NonNullable<Canvas["flow"]>> & { toonflowCanvas?: boolean } | null>(nextCanvas.id);
     checkCanvasDirectory(directory, signal);
     if (data?.toonflowCanvas !== true || !Array.isArray(data.nodes) || !Array.isArray(data.edges) || !data.viewport
@@ -171,7 +177,6 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
     for (const node of data.nodes) if (node.type === "remote-videoNode" && node.data) delete node.data.exportProgress;
     nextCanvas.flow = { nodes: data.nodes, edges: data.edges, viewport: data.viewport };
   }
-  await props.flushSave();
   checkCanvasDirectory(directory, signal);
   if (currentCanvas) currentCanvas.flow = toObject();
   // 应用画布数据时暂时清空文件名，避免初始化触发自动保存。
@@ -181,7 +186,7 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
   setEdges(nextCanvas.flow.edges.map(({ interactionWidth, ...edge }) => edge));
   await setViewport(nextCanvas.flow.viewport);
   await nextTick();
-  checkCanvasDirectory(directory);
+  checkCanvasDirectory(directory, signal);
   boundCanvas.value = nextCanvas;
   activeCanvasId.value = nextCanvas.id;
   signal?.throwIfAborted();

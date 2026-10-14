@@ -155,9 +155,9 @@ export interface MediaContext {
   requestKeyframeApproval?(toolCallId: string, keyframeIds: string[], signal?: AbortSignal): Promise<unknown>;
   requestProductionDecision?(toolCallId: string, input: { operation: string; data: Record<string, unknown>; reconsider?: boolean }, signal?: AbortSignal): Promise<unknown>;
   listModels(all?: boolean): Promise<MediaModel[]>;
-  generateImage(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
-  generateVideo(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
-  generateAudio(request: MediaGenerationRequest, signal?: AbortSignal): Promise<GeneratedMedia[]>;
+  generateImage(request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]>;
+  generateVideo(request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]>;
+  generateAudio(request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]>;
 }
 
 export interface QuestionField {
