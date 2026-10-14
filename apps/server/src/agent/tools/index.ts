@@ -40,9 +40,9 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     finally { release(); }
   };
   const mediaSignal = (signal?: AbortSignal) => parentSignal && signal ? AbortSignal.any([parentSignal, signal]) : parentSignal ?? signal;
-  async function publishFile(path: string, signal?: AbortSignal) {
+  async function publishFile(path: string, signal?: AbortSignal, label?: string) {
     if (!canvas) return;
-    try { await canvas.call({ name: "publishFile", args: { path } }, mediaSignal(signal)); }
+    try { await canvas.call({ name: "publishFile", args: { path, ...(label ? { label } : {}) } }, mediaSignal(signal)); }
     catch (error) { throw new Error(`文件已保存：${path}，但画布展示失败：${error instanceof Error ? error.message : error}。仅重试 publishFile，禁止重新生成或覆盖文件。`); }
   }
   async function generateAndPublish(kind: "image" | "video" | "audio", request: Parameters<typeof generateMedia>[2], signal?: AbortSignal, onProgress?: (message: string) => void) {
@@ -55,7 +55,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     }
     const result = await generateMedia(cwd, kind, request, mediaSignal(signal), onProgress);
     onProgress?.("结果已保存，正在补充画布节点与连线");
-    for (const asset of result) await publishFile(asset.path, signal);
+    for (const asset of result) await publishFile(asset.path, signal, request.outputName);
     return result;
   }
   const files: ToolFiles = {

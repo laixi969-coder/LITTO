@@ -7,7 +7,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { generateMediaDirect, listMediaModels, validateCameraRequest } from "@/utils/media/generation";
+import { generateMediaDirect, listMediaModels, readReference, validateCameraRequest } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
@@ -30,6 +30,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
+  if (production && request.productionFingerprint !== production.fingerprint) throw Object.assign(new Error("提交参数或镜头规格与已预览版本不一致；请重新 compile 并完整复用返回的 request，保留画幅、精度和 productionFingerprint"), { status: 409 });
   // ACT: 正式镜头以当前规格和指纹为准，提示词由服务端编译，避免模型逐字复制长文本。
   if (production) request = production.request;
   else {
@@ -37,7 +38,6 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     if (!model) throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
     request = await applyMediaQuality(directory, kind, request, model);
   }
-  if (production && request.productionFingerprint !== production.fingerprint) throw Object.assign(new Error("镜头规格须先预览；请重新编译后提交"), { status: 409 });
   const projectId = workspaceProject(directory)!;
   // 负面词与种子走独立字段，不拼进提示词正文：拼接后模型只会当作要绘制的文字内容。
   const compiled = production?.compiled;
@@ -47,6 +47,19 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     ...(compiled?.negativePrompt ? { negativePrompt: compiled!.negativePrompt } : {}),
   };
   const seed = request.seed ?? compiled?.seed;
+  let assetReferenceFingerprint: string | undefined;
+  if (!production && request.purpose === "asset") {
+    const hash = createHash("sha256");
+    let count = 0;
+    for (const [references, type] of [[request.images ?? [], "image"], [request.videos ?? [], "video"], [request.audios ?? [], "audio"], [[request.firstFrame, request.lastFrame].filter((item): item is NonNullable<typeof item> => !!item), "image"]] as const) {
+      for (const reference of references) {
+        const content = await readReference(directory, reference, type);
+        hash.update(JSON.stringify([type, content.mimeType, content.data]));
+        count++;
+      }
+    }
+    if (count) assetReferenceFingerprint = hash.digest("hex");
+  }
   return api.enqueueWorkspaceMedia({
     workspaceId: tenant.workspaceId,
     userId: tenant.userId,
@@ -56,6 +69,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     request: merged,
     seed,
     requestId,
+    assetReferenceFingerprint,
     production,
   });
 }
@@ -170,5 +184,5 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
-  return { ...result, request: { ...request, shotId, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
+  return { ...result, request: { ...request, shotId, productionFingerprint: result.fingerprint, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
 }

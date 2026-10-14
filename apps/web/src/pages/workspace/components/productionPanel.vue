@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" title="镜头制作" size="min(1180px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
+  <el-drawer v-model="visible" :title="section === 'assets' ? '角色资产库' : '镜头制作'" size="min(1180px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
     <div class="productionPanel" :aria-busy="busy">
       <p v-if="error" class="errorMessage" role="alert">{{ error }}</p>
       <p v-if="message" class="statusMessage" role="status">{{ message }}</p>
@@ -16,46 +16,62 @@
           <button type="button" @click="run(saveWorld)">保存世界与影调</button>
         </template>
         <template v-else-if="section === 'assets'">
-          <h3>项目资产</h3>
-          <div class="fieldGrid">
-            <label>类型<select v-model="asset.type"><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
-            <label>名称<input v-model="asset.name" /></label>
-            <label>几何、肤质、材质与空间说明<textarea v-model="asset.description" /></label>
-            <label>不可改变的特征（每行一项）<textarea v-model="asset.invariants" /></label>
-            <template v-if="asset.type === 'Character'">
-              <label>说话与演唱习惯<textarea v-model="asset.speech" /></label>
-              <label>表演与行为习惯<textarea v-model="asset.behavior" /></label>
-            </template>
-            <label>定妆参考图<select v-model="asset.authoritativeReference"><option value="">未选择</option><option v-for="image in assetImages" :key="image.id" :value="image.id">{{ image.source === 'upload' ? '上传' : '生成 / 导入' }} · {{ image.id.slice(-8) }}</option></select></label>
-            <label>上传角色照片<input type="file" accept="image/png,image/jpeg,image/webp" @change="run(() => uploadReference($event, true))" /></label>
-            <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="asset.personaTags[axis.key]"><option value="">未指定</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
-          </div>
-          <img v-if="assetImage" class="assetPortrait" :src="mediaUrl(assetImage.url)" :alt="`${asset.name || '角色'}定妆参考`" />
-          <details class="assetImagePicker">
-            <summary>从上传或生成结果中选图（{{ assetImages.length }}）</summary>
-            <button type="button" @click="run(refreshAssetLibrary)">刷新图片</button>
-            <div class="assetImageGrid"><button v-for="image in assetImages" :key="image.id" type="button" :aria-pressed="asset.authoritativeReference === image.id" :aria-label="`选择定妆图 ${image.id.slice(-8)}`" @click="asset.authoritativeReference = image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><span>{{ image.source === 'upload' ? '上传照片' : '生成 / 导入' }} · {{ image.id.slice(-5) }}</span></button></div>
-          </details>
-          <button type="button" :disabled="!asset.name.trim() || asset.type !== 'Character'" @click="run(generateCharacter)">生成定妆图</button>
-          <p class="reviewHint">气质标签仅用于角色库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
-          <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
-          <ul class="assetList"><li v-for="item in assets" :key="item.id"><button type="button" @click="run(() => editAsset(item))">编辑与历史</button><span>{{ item.name }} · v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}<template v-if="hasPersonaTags(item.personaTags)"> · {{ personaSummary(item.personaTags) }}</template></span><button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button><button v-else-if="!librarySourceIds.has(item.id)" type="button" @click="run(() => publishAsset(item.id))">收藏到角色库</button></li></ul><ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
           <h3>角色库（跨项目复用）</h3>
           <p class="reviewHint">上传照片或生成定妆图，保存并采用资产后收藏。角色库独立保存参考图，各项目导入后可单独修改。</p>
-          <div class="fieldGrid">
-            <label>名称或描述<input v-model="libraryFilter.q" @keyup.enter="run(searchLibraryAssets)" /></label>
-            <label>收藏<select v-model="libraryFilter.favorite"><option value="">全部</option><option value="true">只看收藏</option></select></label>
-            <label>类型<select v-model="libraryFilter.type"><option value="">全部</option><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
-            <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="libraryFilter[axis.key]"><option value="">不限</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
-          </div>
-          <button type="button" @click="run(searchLibraryAssets)">检索角色库</button>
+          <details class="libraryFilters"><summary>搜索与筛选</summary>
+            <div class="fieldGrid">
+              <label>名称或描述<input v-model="libraryFilter.q" @keyup.enter="run(searchLibraryAssets)" /></label>
+              <label>收藏<select v-model="libraryFilter.favorite"><option value="">全部</option><option value="true">只看收藏</option></select></label>
+              <label>类型<select v-model="libraryFilter.type"><option value="">全部</option><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
+              <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="libraryFilter[axis.key]"><option value="">不限</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
+            </div>
+            <button type="button" @click="run(searchLibraryAssets)">检索角色库</button>
+          </details>
           <ul class="libraryList"><li v-for="entry in libraryAssets" :key="entry.id">
-            <figure v-if="entry.media"><img :src="mediaUrl(entry.media.url)" :alt="entry.name" /></figure>
-            <div class="libraryMeta"><strong>{{ entry.name }}</strong><span>{{ assetTypeLabel(entry.type) }} · 复用 {{ entry.reuseCount }} 次<template v-if="hasPersonaTags(entry.personaTags)"> · {{ personaSummary(entry.personaTags) }}</template></span><small>{{ entry.description }}</small></div>
+            <figure v-if="entry.media"><el-image class="libraryPortrait" :src="mediaUrl(entry.media.url)" :alt="entry.name" :previewSrcList="(entry.images?.length ? entry.images : [entry.media]).map((image: any) => mediaUrl(image.url))" :previewTeleported="true" fit="contain" /></figure>
+            <div class="libraryMeta"><strong>{{ entry.name }}</strong><span>{{ assetTypeLabel(entry.type) }} · {{ entry.images?.length || 1 }} 张参考图 · 复用 {{ entry.reuseCount }} 次<template v-if="hasPersonaTags(entry.personaTags)"> · {{ personaSummary(entry.personaTags) }}</template></span><details><summary>角色详情</summary><p>{{ entry.description }}</p><p v-for="(invariant, index) in entry.invariants" :key="index">{{ invariant }}</p></details></div>
             <button type="button" :aria-pressed="entry.favorite" @click="run(() => toggleFavorite(entry))">{{ entry.favorite ? '取消收藏' : '收藏' }}</button>
             <button type="button" @click="run(() => importLibraryAsset(entry))">导入本项目</button>
           </li></ul>
           <p v-if="librarySearched && !libraryAssets.length" class="reviewHint">角色库暂无匹配资产。</p>
+          <h3>本项目角色与资产</h3>
+          <ul class="projectAssetGrid"><li v-for="item in assets" :key="item.id">
+            <button class="assetCard" type="button" :aria-label="'查看角色：' + item.name" @click="run(() => editAsset(item))">
+              <img v-if="assetPortraits[item.attributes?.authoritativeReference]" :src="mediaUrl(assetPortraits[item.attributes.authoritativeReference])" :alt="item.name" loading="lazy" />
+              <strong>{{ item.name }}</strong><span>v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</span>
+            </button>
+            <button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button>
+            <button v-else-if="librarySourceVersions.get(item.id) !== item.version" type="button" @click="run(() => publishAsset(item.id))">{{ librarySourceVersions.has(item.id) ? "更新角色库" : "收藏到角色库" }}</button>
+          </li></ul>
+          <details ref="assetEditor" class="assetEditor">
+            <summary>{{ editingAsset ? "编辑角色：" + asset.name : "上传 / 生成新角色" }}</summary>
+            <div class="fieldGrid">
+              <label>类型<select v-model="asset.type"><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
+              <label>名称<input v-model="asset.name" /></label>
+              <label>几何、肤质、材质与空间说明<textarea v-model="asset.description" /></label>
+              <label>不可改变的特征（每行一项）<textarea v-model="asset.invariants" /></label>
+              <template v-if="asset.type === 'Character'">
+                <label>说话与演唱习惯<textarea v-model="asset.speech" /></label>
+                <label>表演与行为习惯<textarea v-model="asset.behavior" /></label>
+              </template>
+              <label>定妆参考图<select v-model="asset.authoritativeReference"><option value="">未选择</option><option v-for="image in assetImages" :key="image.id" :value="image.id">{{ image.source === 'upload' ? '上传' : '生成 / 导入' }} · {{ image.id.slice(-8) }}</option></select></label>
+              <label>上传角色照片<input type="file" accept="image/png,image/jpeg,image/webp" @change="run(() => uploadReference($event, true))" /></label>
+              <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="asset.personaTags[axis.key]"><option value="">未指定</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
+            </div>
+            <img v-if="assetImage" class="assetPortrait" :src="mediaUrl(assetImage.url)" :alt="`${asset.name || '角色'}定妆参考`" />
+            <details class="assetImagePicker">
+              <summary>从上传或生成结果中选图（{{ assetImages.length }}）</summary>
+              <button type="button" @click="run(refreshAssetLibrary)">刷新图片</button>
+              <div class="assetImageGrid"><button v-for="image in assetImages" :key="image.id" type="button" :aria-pressed="asset.authoritativeReference === image.id" :aria-label="`选择定妆图 ${image.id.slice(-8)}`" @click="asset.authoritativeReference = image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><span>{{ image.source === 'upload' ? '上传照片' : '生成 / 导入' }} · {{ image.id.slice(-5) }}</span></button></div>
+            </details>
+            <details class="assetImagePicker"><summary>角色参考组（正面、侧面、背面等）</summary>
+              <div class="assetImageGrid"><label v-for="image in assetImages" :key="image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><input v-model="asset.referenceMediaIds" type="checkbox" :value="image.id" :aria-label="`保留参考图 ${image.id.slice(-8)}`" />保留此参考</label></div>
+            </details>
+            <button type="button" :disabled="!asset.name.trim() || asset.type !== 'Character'" @click="run(generateCharacter)">生成角色设定图</button>
+            <p class="reviewHint">气质标签仅用于角色库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
+            <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
+            <ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
+          </details>
         </template>
         <template v-else-if="section !== 'edit'">
           <div class="shotNavigation">
@@ -234,7 +250,7 @@ const personaLabel: Record<string, string> = { poised: "沉稳", liveliness: "�
 const hasPersonaTags = (tags: any) => !!tags && Object.values(tags).some(Boolean);
 const personaSummary = (tags: any) => Object.values(tags ?? {}).filter(Boolean).map(v => personaLabel[v as string] ?? v).join(" / ");
 const assetTypeLabel = (type: string) => assetTypes.find(item => item[0] === type)?.[1] ?? type;
-const libraryAssets = ref<any[]>([]), librarySearched = ref(false), librarySourceIds = ref(new Set<string>());
+const libraryAssets = ref<any[]>([]), librarySearched = ref(false), librarySourceVersions = ref(new Map<string, number>());
 const libraryFilter = ref<Record<string, string>>({ type: "Character", q: "", favorite: "", bearing: "", gaze: "", focus: "", rapport: "" });
 const asBatch = ref(false), batchId = ref(""), batchAssetId = ref(""), candidateBatches = ref<any[]>([]);
 const candidatePool = ref<any[]>([]), candidateScores = ref<Record<string, number | null>>({});
@@ -245,9 +261,11 @@ const world = ref<Record<string, any>>({}), look = ref<Record<string, any>>({}),
 const assets = ref<any[]>([]), shots = ref<any[]>([]), sequences = ref<any[]>([]), references = ref<any[]>([]);
 const editingAsset = ref(""), assetVersions = ref<any[]>([]);
 const emptyPersona = () => ({ bearing: "", gaze: "", focus: "", rapport: "" });
-const asset = ref({ type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", personaTags: emptyPersona() });
+const asset = ref({ type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", referenceMediaIds: [] as string[], personaTags: emptyPersona() });
 let savedAsset = JSON.stringify(asset.value);
 const assetImages = ref<any[]>([]);
+const assetEditor = ref<HTMLDetailsElement>();
+const assetPortraits = computed(() => Object.fromEntries(assetImages.value.map(image => [image.id, image.url])));
 const assetImage = computed(() => assetImages.value.find(image => image.id === asset.value.authoritativeReference));
 let assetDetails: any = {};
 let pendingRequestId = "";
@@ -335,24 +353,33 @@ async function saveWorld() {
   await request(`/projects/${projectId}/looks/project`, "PUT", look.value);
   worldDirty.value = false; preview.value = null; message.value = "世界与影调已保存";
 }
-function clearAsset() { assetDetails = {}; editingAsset.value = ""; assetVersions.value = []; asset.value = { type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", personaTags: emptyPersona() }; savedAsset = JSON.stringify(asset.value); }
+function clearAsset() { assetDetails = {}; editingAsset.value = ""; assetVersions.value = []; asset.value = { type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", referenceMediaIds: [] as string[], personaTags: emptyPersona() }; savedAsset = JSON.stringify(asset.value); }
 async function editAsset(item: any) {
   if (JSON.stringify(asset.value) !== savedAsset) throw new Error("请先保存当前资产，再切换编辑对象");
   const value = await request(`/assets/${item.id}`); assetDetails = value; editingAsset.value = item.id; assetVersions.value = value.versions;
-  asset.value = { type: value.type, name: value.name, description: value.description, invariants: value.invariants.join("\n"), speech: value.attributes?.characterDirection?.speech ?? "", behavior: value.attributes?.characterDirection?.behavior ?? "", authoritativeReference: value.attributes?.authoritativeReference ?? "", personaTags: { ...emptyPersona(), ...(value.personaTags ?? {}) } };
+  asset.value = { type: value.type, name: value.name, description: value.description, invariants: value.invariants.join("\n"), speech: value.attributes?.characterDirection?.speech ?? "", behavior: value.attributes?.characterDirection?.behavior ?? "", authoritativeReference: value.attributes?.authoritativeReference ?? "", referenceMediaIds: references.value.filter(ref => value.references.includes(ref.id) && ref.mediaId).map(ref => ref.mediaId), personaTags: { ...emptyPersona(), ...(value.personaTags ?? {}) } };
   savedAsset = JSON.stringify(asset.value);
+  if (assetEditor.value) { assetEditor.value.open = true; assetEditor.value.scrollIntoView({ block: "start", behavior: "smooth" }); }
 }
 const personaPayload = (tags: Record<string, string>) => Object.fromEntries(Object.entries(tags).filter(([, v]) => v));
 async function createAsset() {
   if (editingAsset.value) await ElMessageBox.confirm("将建立新的资产版本，已采用镜头需重新检查。历史版本保留。", "建立版本", { confirmButtonText: "建立", cancelButtonText: "取消" });
   const tags = personaPayload(asset.value.personaTags);
-  const { speech, behavior, authoritativeReference, ...form } = asset.value;
+  const { speech, behavior, authoritativeReference, referenceMediaIds, ...form } = asset.value;
   const attributes = { ...(assetDetails.attributes ?? {}), ...(asset.value.type === "Character" ? { characterDirection: { ...assetDetails.attributes?.characterDirection, speech, behavior } } : {}) };
   if (authoritativeReference) attributes.authoritativeReference = authoritativeReference;
-  else delete attributes.authoritativeReference;
-  const selectedRef = references.value.find(ref => ref.mediaId === authoritativeReference);
+  else attributes.authoritativeReference = null;
+  const selectedReferences: string[] = [];
+  for (const mediaId of new Set([...referenceMediaIds, authoritativeReference].filter(Boolean))) {
+    let reference = references.value.find(ref => ref.mediaId === mediaId);
+    if (!reference) {
+      reference = await request(`/projects/${projectId}/references`, "POST", { kind: "image", name: asset.value.name, mediaId });
+      references.value.push(reference);
+    }
+    selectedReferences.push(reference.id);
+  }
   const item = await request(editingAsset.value ? `/assets/${editingAsset.value}/versions` : `/projects/${projectId}/assets`, "POST", {
-    ...form, attributes, personaTags: tags, references: [...new Set([...(assetDetails.references ?? []), ...(selectedRef ? [selectedRef.id] : [])])],
+    ...form, attributes, personaTags: tags, references: [...new Set([...(assetDetails.references ?? []).filter((id: string) => !references.value.some(ref => ref.id === id && ref.kind === "image")), ...selectedReferences])],
     invariants: asset.value.invariants.split(/\n/).map(value => value.trim()).filter(Boolean),
   });
   assets.value = editingAsset.value ? assets.value.map(value => value.id === item.id ? item : value) : [...assets.value, item]; clearAsset(); return item;
@@ -378,7 +405,7 @@ async function searchLibraryAssets() {
 }
 async function refreshLibrarySources() {
   const rows = await request("/library/assets?limit=500");
-  librarySourceIds.value = new Set(rows.map((row: any) => row.sourceAssetId).filter(Boolean));
+  librarySourceVersions.value = new Map(rows.filter((row: any) => row.sourceAssetId).map((row: any) => [row.sourceAssetId, row.sourceVersion]));
 }
 async function importLibraryAsset(entry: any) {
   const created = await request(`/projects/${projectId}/library/import/${entry.id}`, "POST", {});
@@ -457,7 +484,7 @@ async function uploadReference(event: Event, forAsset = false) {
   if (!response.ok) throw new Error(media.error?.message || "上传失败");
   const reference = await request(`/projects/${projectId}/references`, "POST", { kind: media.mime.split("/")[0], name: file.name, mediaId: media.id });
   references.value.push(reference);
-  if (forAsset) { assetImages.value.unshift(media); asset.value.authoritativeReference = media.id; }
+  if (forAsset) { assetImages.value.unshift(media); asset.value.authoritativeReference = media.id; asset.value.referenceMediaIds.push(media.id); }
   else binding.value.referenceId = reference.id;
   input.value = "";
 }
@@ -657,10 +684,18 @@ defineExpose({ flushSave, openShot, openLibrary });
   :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--studioDone); outline-offset: 2px; }
   .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
   .checkList { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; label { flex-direction: row; align-items: center; } input { width: 20px; min-height: 20px; } }
-  .assetList, .jobList { padding: 0; list-style: none; li { padding: 12px 0; border-bottom: 1px solid var(--studioBorder); display: flex; justify-content: space-between; gap: 16px; } small { display: block; } }
+  .jobList { padding: 0; list-style: none; li { padding: 12px 0; border-bottom: 1px solid var(--studioBorder); display: flex; justify-content: space-between; gap: 16px; } small { display: block; } }
   .assetPortrait { display: block; width: 180px; max-height: 240px; object-fit: contain; margin: 12px 0; border-radius: var(--ui-radius); }
-  .assetImagePicker { margin: 12px 0; summary { cursor: pointer; } .assetImageGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; max-height: 360px; overflow: auto; button { padding: 6px; display: flex; flex-direction: column; gap: 4px; &[aria-pressed="true"] { outline: 2px solid var(--el-color-primary); } img { width: 100%; height: 120px; object-fit: contain; } span { font-size: 11px; } } } }
-  .libraryList { padding: 0; list-style: none; li { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--studioBorder); } figure { width: 64px; flex: none; margin: 0; img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--ui-radius); } } .libraryMeta { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 2px; small { color: var(--studioMuted); } } button { flex: none; } }
+  .assetImagePicker { margin: 12px 0; summary { cursor: pointer; } .assetImageGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; max-height: 360px; overflow: auto; button, label { padding: 6px; display: flex; flex-direction: column; gap: 4px; &[aria-pressed="true"] { outline: 2px solid var(--el-color-primary); } img { width: 100%; height: 120px; object-fit: contain; } span { font-size: 11px; } } } }
+  .libraryFilters, .assetEditor { margin: 16px 0; summary { cursor: pointer; padding: 12px 0; } }
+  .libraryList, .projectAssetGrid {
+    padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 16px;
+    li { min-width: 0; padding: 12px; border: 1px solid var(--studioBorder); border-radius: var(--ui-radius); display: flex; flex-direction: column; gap: 12px;
+      figure { margin: 0; .libraryPortrait { display: block; width: 100%; aspect-ratio: 3 / 4; border-radius: var(--ui-radius); background: var(--studioRail); } }
+      .libraryMeta { display: flex; flex-direction: column; gap: 8px; overflow-wrap: anywhere; details { summary { cursor: pointer; } p { margin: 8px 0; } } }
+      .assetCard { display: flex; flex-direction: column; text-align: left; gap: 8px; padding: 0; border: 0; overflow-wrap: anywhere; img { width: 100%; aspect-ratio: 3 / 4; object-fit: contain; border-radius: var(--ui-radius); background: var(--studioRail); } }
+    }
+  }
   .candidateGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 12px; figure { margin: 0; border: 1px solid var(--studioBorder); border-radius: var(--ui-radius); padding: 8px; img, video { width: 100%; max-height: 220px; object-fit: contain; background: var(--studioRail); } &.promoted { border-color: var(--studioDone); border-width: 2px; } figcaption { font-size: 12px; margin: 8px 0; } .candidateActions { display: flex; gap: 8px; align-items: center; input { width: 64px; flex: none; min-height: 36px; } button { min-height: 36px; padding: 4px 10px; font-size: 12px; flex: none; } } } }
   .sentReferences { display: flex; flex-wrap: wrap; gap: 12px; figure { width: 180px; margin: 0; img, video, audio { width: 100%; max-height: 180px; object-fit: contain; } figcaption { overflow-wrap: anywhere; font-size: 12px; } } }
   .outputPreview { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--studioRail); margin: 16px 0; }
@@ -671,6 +706,6 @@ defineExpose({ flushSave, openShot, openLibrary });
   .reviewHint { margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: var(--studioMuted); }
   pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
   small { color: var(--studioMuted); }
-  @media (max-width: 640px) { .fieldGrid { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .fieldGrid { grid-template-columns: 1fr; } .productionTabs { position: static; } }
 }
 </style>

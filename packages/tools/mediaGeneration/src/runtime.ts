@@ -39,6 +39,7 @@ const sharedFields = {
   negativePrompt: z.string().max(100000).optional(),
   seed: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
   outputDirectory: relativePath.optional(),
+  outputName: z.string().trim().min(1).max(200).optional().describe("画布显示名称，如林宁·角色设定图、客厅·日景、取钥匙·视频；仅用于命名，不改变生成内容或触发重生成。"),
   images: z.array(imageReference).max(64).optional(),
   ratio: z.string().regex(/^[1-9]\d{0,3}:[1-9]\d{0,3}$/).optional(),
 };

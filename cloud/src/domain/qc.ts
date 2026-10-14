@@ -106,12 +106,13 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
 export function applyRepair(s: Scope, repairId: string, actor: string, target?: { assetId?: string; region: string }) {
     const r = s.get("repair_actions", repairId);
     if (!r) throw notFound("repair action");
+    if (r.status === "applied") return { applied: true, reused: true, repairActionId: r.id, message: "此修复已执行，复用已有结果，不重复生成" };
     const revisionActions: Record<string, string> = { directionRevise: "updateShot", performance_revise: "updateShot", imaging_revise: "updateShot", inspectDelivery: "inspectQuality", storyRevise: "readStoryImpact", dialogueRevise: "readVoice", editTrim: "readEdit", soundMix: "readEdit" };
     if (revisionActions[r.action]) return { applied: false, manual: true, nextOperation: revisionActions[r.action], shotId: r.shotId, source: s.get("shots", r.shotId)?.source, message: r.detail, repairActionId: r.id };
     const qc = s.get("qc_reports", r.qcReportId);
     const video = qc?.targetType === "take";
     const lock = ["identity_drift", "reference_replace"].includes(r.action) ? ["IDENTITY at weight 1.0 — do not alter facial geometry"] : r.action === "geometry_lock" || r.action === "environment_lock" ? ["geometry of environment and key props — do not alter layout"] : [];
-    const o = { repair: { addLock: lock, note: r.detail }, count: video ? 1 : 2 };
+    const o = { repair: { addLock: lock, note: r.detail }, count: 1 };
     const policy = r.action === "switch_model" ? { disabledModelIds: qc ? [(s.get(video ? "takes" : "keyframes", qc.targetId) as any)?.meta?.modelId].filter(Boolean) : [] } : undefined;
     let res: any;
     if (r.action === "look_normalization") return normalizeLook(s, r);

@@ -124,6 +124,7 @@ export interface MediaGenerationRequest {
   /** 固定随机种子；同种子同参数可复现，用于同机位变体对照。 */
   seed?: number;
   outputDirectory?: string;
+  outputName?: string;
   images?: MediaReference[];
   videos?: MediaReference[];
   audios?: MediaReference[];

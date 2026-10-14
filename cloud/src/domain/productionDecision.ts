@@ -5,7 +5,7 @@ import { run, tx, type Scope, type Row } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
 import { mediaView } from "../storage.ts";
 import { assetInput, worldSchema, lookSchema } from "./schema.ts";
-import { approveAsset, assetVersions, event, newAssetVersion, rollbackAsset, updateAsset } from "./assets.ts";
+import { approveAsset, assetVersions, event, mergeAssetPatch, newAssetVersion, rollbackAsset, updateAsset } from "./assets.ts";
 import { createBatch, promoteCandidate, registerCandidates } from "./candidates.ts";
 import { importFromLibrary, publishToLibrary, updateLibraryReference, libraryContent, findLibraryAsset } from "./library.ts";
 import { promoteHero } from "./lifecycle.ts";
@@ -206,7 +206,7 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
         for (const refId of action.data.patch.references ?? []) record("refs", refId);
         request.title = `修改资产：${asset.name}`;
         request.question += `\n\n拟修改：\n${describe(action.data.patch)}\n已批准资产会建立新版本，原版本保留。`;
-        completed = Object.entries(action.data.patch).every(([key, value]) => hash(asset[key] ?? null) === hash(value));
+        completed = hash(assetInput.parse(asset)) === hash(assetInput.parse(mergeAssetPatch(asset, action.data.patch)));
       } else if (action.operation === "rollbackAsset") {
         const versions = assetVersions(s, asset.id); records.push(versions);
         const version = versions.find(item => item.version === action.data.version);
@@ -217,7 +217,7 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       } else {
         request.title = `将「${asset.name}」加入工作区角色库`;
         request.question += "\n\n供本工作区的其他项目复用同一套设定和定妆图。";
-        const entry = s.list("library_assets", { sourceAssetId: asset.id })[0]; records.push(libraryContent(entry)); completed = !!entry;
+        const entry = s.list("library_assets", { sourceAssetId: asset.id })[0]; records.push(libraryContent(entry)); completed = entry?.sourceVersion === asset.version && Boolean(entry.favorite);
       }
       break;
     }

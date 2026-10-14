@@ -239,7 +239,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const brief = shot.creativeBrief as ShotInput["creativeBrief"];
     const assetName = (id: string) => projectAssets.get(id)?.name ?? id;
     const appearance = assets.flatMap(asset => {
-        const attributes = Object.fromEntries(Object.entries(asset.attributes ?? {}).filter(([key]) => !["characterDirection", "authoritativeReference", "importedFrom", "biography", "backstory", "relationships", "voice"].includes(key)));
+        const attributes = Object.fromEntries(Object.entries(asset.attributes ?? {}).filter(([key]) => !["characterDirection", "authoritativeReference", "authoritativePromotedAt", "importedFrom", "biography", "backstory", "relationships", "voice", "voiceId"].includes(key)));
         return Object.keys(attributes).length ? [`${asset.name}: ${JSON.stringify(attributes)}`] : [];
     });
 
@@ -249,11 +249,12 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             ...brief.combat.beats.map(beat => `${assetName(beat.attackerId)}对${assetName(beat.defenderId)}：${beat.action} → ${beat.reaction} → ${beat.endState}；其他人物：${beat.supportingAction}`)]) : "",
         dialogue: kind === "video" && brief?.dialogue.lines.length
             ? `${brief.dialogue.mode === "native" ? "生成以下原文对白及声音，并按要求同步人物口型" : "后期配音及口型处理计划，当前素材不代表声画同步已完成"}：\n${brief.dialogue.lines.map(line => `${musicTimecode(line.start)}–${musicTimecode(line.end)} ${assetName(line.speakerId)}${!visibleIds.has(line.speakerId) ? "（仅画外声音，不出镜）" : ""}说：${JSON.stringify(line.text)}；${line.delivery}；${line.lipSync === "visible" ? "可见嘴部与此句逐字同步" : "画外音，不要求画内人物说此句"}；${line.framing}`).join("\n")}` : "",
-        shotDesign: kind === "image" && cam.design ? J([cam.design.start && `Single starting frame: ${cam.design.start}`, ...cam.design.invariants]) : "",
+        // 整段动作的不变量可能含后续持物或落位；首帧只投影明确起点，视频保留完整约束。
+        shotDesign: kind === "image" && cam.design?.start ? `Single starting frame: ${cam.design.start}` : "",
         subject: J([kind === "image" && !!cam.design?.start && "Appearance references only; initial occupancy is defined exclusively by the starting frame, not by this list",
             ...assets.map(a => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)]),
         assetDetails: J(appearance),
-        action: kind === "image" && cam.design?.start ? "Render the specified starting frame only." : clean(shot.action || shot.title, "action"),
+        action: kind === "image" && cam.design?.start ? "Render the specified starting frame only, before subsequent actions and their results." : clean(shot.action || shot.title, "action"),
         performance: kind === "video" ? J([
             shot.performance?.gesture, shot.performance?.timing,
             shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`,

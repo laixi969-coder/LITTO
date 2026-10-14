@@ -13,7 +13,7 @@ export const librarySearchSchema = z.object({
 
 // 演员自身的习惯可以复用，项目人物关系、配音记录和来源标记不能成为下一部作品的事实。
 function reusableAttributes(attributes: Record<string, any> = {}) {
-  const { importedFrom, authoritativeReference, voice, voiceId, characterDirection, ...rest } = attributes;
+  const { importedFrom, authoritativeReference, authoritativePromotedAt, voice, voiceId, characterDirection, ...rest } = attributes;
   return { ...rest, ...(characterDirection ? { characterDirection: { speech: characterDirection.speech ?? "", behavior: characterDirection.behavior ?? "", relationships: "" } } : {}) };
 }
 
@@ -59,7 +59,7 @@ export async function publishToLibrary(s: Scope, assetId: string, actor: string,
   const asset = s.get("assets", assetId);
   if (!asset) throw notFound("asset");
   const existing = s.list("library_assets", { sourceAssetId: assetId })[0];
-  if (existing) { beforeWrite?.(); return setLibraryFavorite(s, existing.id, true, actor); }
+  if (existing?.sourceVersion === asset.version) { beforeWrite?.(); return setLibraryFavorite(s, existing.id, true, actor); }
   if (asset.approvalStatus !== "approved") throw conflict("资产须先采用才能收藏到角色库", "asset_not_approved");
   const authoritative = asset.attributes?.authoritativeReference;
   if (!authoritative || !s.get("media", authoritative)?.mime.startsWith("image/")) throw bad("请先选择可用的定妆参考图", "no_authoritative_reference");
@@ -69,19 +69,22 @@ export async function publishToLibrary(s: Scope, assetId: string, actor: string,
     beforeWrite?.(); unchanged(s, "assets", asset);
     if (!s.get("projects", asset.projectId)) throw notFound("project");
     const published = s.list("library_assets", { sourceAssetId: assetId })[0];
-    if (published) {
+    if (published?.sourceVersion === asset.version) {
       for (const id of copies.values()) s.softDelete("media", id);
       return setLibraryFavorite(s, published.id, true, actor);
     }
-    const entry = s.insert("library_assets", {
+    if (existing) unchanged(s, "library_assets", existing);
+    else if (published) throw conflict("复制期间角色库已改变，请重新读取", "stale");
+    const values = {
       source_asset_id: asset.id, type: asset.type, name: asset.name, persona_tags: tags,
       data: {
         description: asset.description ?? "", attributes: reusableAttributes(asset.attributes), references: [],
         invariants: asset.invariants ?? [], allowedVariations: asset.allowedVariations ?? [], forbiddenChanges: asset.forbiddenChanges ?? [],
-        authoritativeReference: copies.get(authoritative), sourceProjectId: asset.projectId, favorite: true,
+        authoritativeReference: copies.get(authoritative), sourceProjectId: asset.projectId, sourceVersion: asset.version, favorite: true,
         referenceSnapshots: references.map(ref => ({ ...ref, mediaId: ref.mediaId ? copies.get(ref.mediaId) : null })),
       },
-    });
+    };
+    const entry = existing ? s.update("library_assets", existing.id, values) : s.insert("library_assets", values);
     event(s, asset.projectId, "library_asset", entry.id, "publish", actor, `from asset ${asset.id}`);
     audit(actor, "library.publish", entry.id, { assetId }, s.workspaceId);
     return entry;
@@ -100,9 +103,10 @@ export function searchLibrary(s: Scope, input: z.input<typeof librarySearchSchem
       && wanted.every(([axis, value]) => entry.personaTags?.[axis] === value);
   }).slice(0, query.limit).map(entry => ({
     id: entry.id, name: entry.name, type: entry.type, personaTags: entry.personaTags ?? {}, favorite: Boolean(entry.favorite),
-    reuseCount: entry.reuseCount, sourceAssetId: entry.sourceAssetId, authoritativeReference: entry.authoritativeReference,
+    reuseCount: entry.reuseCount, sourceAssetId: entry.sourceAssetId, sourceVersion: entry.sourceVersion, authoritativeReference: entry.authoritativeReference,
     description: entry.description, invariants: entry.invariants ?? [], attributes: reusableAttributes(entry.attributes),
-    media: entry.authoritativeReference ? mediaView(s.get("media", entry.authoritativeReference)) : null, createdAt: entry.createdAt,
+    media: entry.authoritativeReference ? mediaView(s.get("media", entry.authoritativeReference)) : null,
+    images: [...new Set([entry.authoritativeReference, ...(entry.referenceSnapshots ?? (entry.references ?? []).map((id: string) => s.get("refs", id)).filter(Boolean)).map((ref: Row) => ref.mediaId)])].filter(Boolean).map(id => s.get("media", id)).filter(media => media?.mime.startsWith("image/")).map(media => mediaView(media)), createdAt: entry.createdAt,
   }));
 }
 

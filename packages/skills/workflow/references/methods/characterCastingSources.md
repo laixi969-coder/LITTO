@@ -4,7 +4,7 @@
 
 | 来源 | 固定版本/范围 | 取舍 |
 | --- | --- | --- |
-| 本地 character-casting-studio | 本次读取的 SKILL.md、original-spec.md、material-reference-library.md | 参考分工、面部辨识度、多人差异和完好摄影呈现；不复制图片库，不引入强制素材数量、默认单图或重复皮肤补丁；沿用 LITTO 已有三视图约定 |
+| 本地 character-casting-studio | 本次读取的 SKILL.md、original-spec.md、material-reference-library.md | 参考分工、面部辨识度、多人差异和完好摄影呈现；不复制图片库，不引入候选数量或重复皮肤补丁；交付版式统一遵循资产制作中的一张设定图约定 |
 | [O-Side Media / higgsfield-character-design](https://github.com/OSideMedia/higgsfield-ai-prompt-skill/blob/70754977d1884794963ac0a748eaaa85b6e9c82a/skills/higgsfield-character-design/SKILL.md) | MIT；角色设定及试镜部分；人物框架由上游注明参考 Vinca 的 Character Design 方法 | 借鉴角色目标、矛盾和按能力设计试镜；删除完整世界构建前置、平台锁定、固定台词数及默认胶片颗粒。表演实现复用 LITTO 原有方法 |
 | [南鸢 nuyoah / nuyoah-xiezhen-prompt](https://github.com/nuyoah-ai-works/nuyoah-xiezhen-prompt/tree/7482a14074bcffb9fed8eb8fe2ddcdc4ac2e980b) | MIT；SKILL.md 与 references/prompt-logic.md | 改编身份/表情/摄影分工、光源与机位关系、成像层次和回到原始参考核对；移除默认年轻女性、无身份图时放弃同脸检查、摄影图自动接管全部妆造等规则 |
 | [Naga Codex / Maurice Holda — character-continuity](https://github.com/Nagacash/character-continuity-skill/blob/97757802b607dbd1c1e850aca3ed1b1c9f362624/skills/character-continuity/SKILL.md) | 文档 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)，代码 MIT；本次只借鉴文档 | 改编回到人物主参考检查累积漂移、区分连续帧与身份基准；不采用固定候选数量、固定片长、多视图绝对禁令、默认伤疤与强制重生 |

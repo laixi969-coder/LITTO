@@ -8,13 +8,14 @@ import { nextCanvasPosition } from "./arrangeCanvas";
 
 type Lineage = {
   id: string;
+  label?: string;
   kind: "image" | "video" | "audio";
   request: Record<string, unknown>;
   outputPaths: string[];
   referencePaths: string[];
   mimeTypes?: Record<string, string>;
 };
-type MediaJob = { id: string; kind: Lineage["kind"]; status: string; inputRefs?: { sent?: boolean; mediaId?: string }[]; parameters?: { directory?: string; fingerprint?: string; request?: Record<string, unknown> }; outputs: string[]; files: { path: string; mimeType: string }[] };
+type MediaJob = { id: string; label?: string; kind: Lineage["kind"]; status: string; inputRefs?: { sent?: boolean; mediaId?: string }[]; parameters?: { directory?: string; fingerprint?: string; request?: Record<string, unknown> }; outputs: string[]; files: { path: string; mimeType: string }[] };
 type LineageSnapshot = { records: Lineage[]; mediaPaths: Record<string, string> };
 type CanvasFlow = ReturnType<typeof useVueFlow>;
 const active = new Map<string, () => void>();
@@ -36,16 +37,21 @@ export function applyCanvasLineage(flow: CanvasFlow, records: Lineage[]) {
         const position = nextCanvasPosition(flow);
         const mimeType = record.mimeTypes?.[path] ?? (record.kind === "image" ? "image/png" : record.kind === "video" ? "video/mp4" : "audio/mpeg");
         const id = `result${record.id}${record.outputPaths.indexOf(path)}`;
-        flow.addNodes({ id, type: `remote-${record.kind}Node`, position: { x: existing?.position.x ?? position.x + 460, y: existing ? existing.position.y + 260 : position.y }, data: { label: path.split("/").at(-1), sourcePath: path, outputs: { [record.kind]: { dataType: record.kind.toUpperCase(), value: { url: path, mimeType } } } } });
+        flow.addNodes({ id, type: `remote-${record.kind}Node`, position: { x: existing?.position.x ?? position.x + 460, y: existing ? existing.position.y + 260 : position.y }, data: { label: record.label ?? path.split("/").at(-1), sourcePath: path, outputs: { [record.kind]: { dataType: record.kind.toUpperCase(), value: { url: path, mimeType } } } } });
         result = flow.findNode(id)!;
         addedNodes++;
       }
-      if (!generator) {
-        const id = `generation${record.id}`;
-        const prompt = typeof record.request.prompt === "string" ? record.request.prompt : "";
-        flow.addNodes({ id, type: `remote-${record.kind}GenerationNode`, position: { x: result.position.x - 460, y: result.position.y }, data: { ...record.request, label: `生成记录 · ${path.split("/").at(-1)}`, model: JSON.stringify([record.request.providerId, record.request.modelId]), prompt, promptModel: prompt.split("\n").map(text => [{ type: "Write", text }]), generationLineage: record } });
-        generator = flow.findNode(id)!;
-        addedNodes++;
+      // ACT: 历史挂在结果上；仅清理未被编辑或手工连线的旧自动记录节点，不动真实生成节点。
+      if (generator?.id === `generation${record.id}` && generator.data.label === `生成记录 · ${path.split("/").at(-1)}`
+        && (!pathOf(generator) || pathOf(generator) === path)
+        && Object.entries(record.request).every(([key, value]) => JSON.stringify(generator!.data[key]) === JSON.stringify(value))
+        && !flow.edges.value.some(edge => (edge.source === generator!.id || edge.target === generator!.id) && !edge.data?.lineageKind)) {
+        flow.removeNodes([generator.id]);
+        generator = undefined;
+      }
+      if (record.label && (!result.data.label || result.data.label === path.split("/").at(-1) || result.data.label === result.data.lineageLabel || result.data.label === record.label)) {
+        result.data.label = record.label;
+        result.data.lineageLabel = record.label;
       }
       result.data.generationLineage = record;
       const connect = (source: string, target: string, kind: "reference" | "result") => {
@@ -58,9 +64,9 @@ export function applyCanvasLineage(flow: CanvasFlow, records: Lineage[]) {
       };
       for (const referencePath of record.referencePaths) {
         const reference = flow.nodes.value.find(node => pathOf(node) === referencePath);
-        if (reference) connect(reference.id, generator.id, "reference");
+        if (reference) connect(reference.id, generator?.id ?? result.id, "reference");
       }
-      connect(generator.id, result.id, "result");
+      if (generator) connect(generator.id, result.id, "result");
     }
   }
   return { addedNodes, addedEdges };
@@ -101,10 +107,11 @@ export function startCanvasLineage(flow: CanvasFlow) {
           const referencePaths = [...new Set([...(job.inputRefs ?? []).filter(input => input.sent && input.mediaId).map(input => snapshot.mediaPaths[input.mediaId!]).filter(Boolean), ...references])];
           const saved = snapshot.records.find(record => record.id === job.id);
           if (saved) {
+            if (job.label && saved.label !== job.label) { saved.label = job.label; changed = true; }
             const merged = [...new Set([...saved.referencePaths, ...referencePaths])];
             if (merged.length !== saved.referencePaths.length) { saved.referencePaths = merged; changed = true; }
           } else {
-            snapshot.records.push({ id: job.id, kind: job.kind, request, outputPaths: job.files.map(file => file.path), mimeTypes: Object.fromEntries(job.files.map(file => [file.path, file.mimeType])), referencePaths });
+            snapshot.records.push({ id: job.id, label: job.label, kind: job.kind, request, outputPaths: job.files.map(file => file.path), mimeTypes: Object.fromEntries(job.files.map(file => [file.path, file.mimeType])), referencePaths });
             changed = true;
           }
         }

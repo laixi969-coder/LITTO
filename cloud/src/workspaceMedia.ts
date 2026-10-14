@@ -62,6 +62,7 @@ export function enqueueWorkspaceMedia(input: {
     candidateBatchId?: string;
     negativePrompt?: string;
     requestId: string;
+    assetReferenceFingerprint?: string;
     production?: ReturnType<typeof prepareWorkspaceShot>;
 }) {
   const idempotencyKey = "workspaceMedia:" + input.requestId;
@@ -88,14 +89,17 @@ export function enqueueWorkspaceMedia(input: {
     capabilities: input.production?.capabilities ?? {},
   });
   const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt, input.request.purpose);
-  if (input.production) {
+  if (input.production || input.request.purpose === "asset") {
     const scope = scoped(input.workspaceId);
     const negativePrompt = input.negativePrompt ?? input.request.negativePrompt;
-    const signature = generationSignature({ ...input.request, seed: input.seed ?? input.request.seed }, prompt, negativePrompt, input.production.compiled.inputs, input.candidateBatchId);
-    // ACT: 单进程同步查找与入队之间没有 await；按镜头扫描历史以兼容已有任务，规模增长后改为索引列。
-    const matches = scope.list("generation_jobs", { projectId: input.projectId, targetType: "shot", targetId: input.production.shotId, kind: input.kind }, "created_at DESC")
-      .filter(job => job.providerId === "workspaceMedia" && job.parameters?.directory === input.directory && job.parameters?.fingerprint === input.production!.fingerprint
-        && generationSignature(job.parameters.request ?? {}, job.compiledPrompt, job.parameters.negativePrompt, job.inputRefs, job.parameters.candidateBatchId) === signature);
+    const references = (request: Record<string, unknown>) => [request.images, request.videos, request.audios, request.firstFrame, request.lastFrame];
+    const signature = generationSignature({ ...input.request, seed: input.seed ?? input.request.seed }, prompt, negativePrompt, input.production?.compiled.inputs ?? references(input.request), input.candidateBatchId);
+    // ACT: 单进程同步查找与入队之间没有 await；按项目/镜头扫描历史以兼容已有任务，规模增长后改为索引列。
+    const matches = scope.list("generation_jobs", { projectId: input.projectId, ...(input.production ? { targetType: "shot", targetId: input.production.shotId } : {}), kind: input.kind }, "created_at DESC")
+      .filter(job => job.providerId === "workspaceMedia" && job.parameters?.directory === input.directory && job.parameters?.fingerprint === input.production?.fingerprint
+        && (input.production || job.parameters?.assetReferenceFingerprint === input.assetReferenceFingerprint)
+        && (input.production || job.parameters?.request?.purpose === "asset")
+        && generationSignature(job.parameters.request ?? {}, job.compiledPrompt, job.parameters.negativePrompt, input.production ? job.inputRefs : references(job.parameters.request ?? {}), job.parameters.candidateBatchId) === signature);
     const previous = matches.find(job => job.status === "SUCCEEDED") ?? matches.find(job => ["QUEUED", "RUNNING"].includes(job.status)) ?? matches[0];
     if (previous) {
       const reused = { ...jobView(previous), reused: true };
@@ -113,7 +117,7 @@ export function enqueueWorkspaceMedia(input: {
     modelId,
     compiledPrompt: prompt,
     negativePrompt: input.negativePrompt ?? input.request.negativePrompt,
-    parameters: { directory: input.directory, request: { ...input.request, prompt, seed: input.seed ?? input.request.seed }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint, ...input.production.repairParameters } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
+    parameters: { directory: input.directory, assetReferenceFingerprint: input.assetReferenceFingerprint, request: { ...input.request, prompt, seed: input.seed ?? input.request.seed }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint, ...input.production.repairParameters } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
     seed: input.seed ?? input.request.seed,
     inputRefs: input.production?.compiled.inputs ?? [],
     fallbackAllowed: false,
@@ -124,7 +128,7 @@ export function enqueueWorkspaceMedia(input: {
 function generationSignature(request: Record<string, unknown>, prompt: string, negativePrompt: unknown, inputs: unknown, candidateBatchId: unknown) {
   // ACT: 旧记录保存了压缩前说明；按真正发送的提示词比较，升级预览后仍复用已付费结果。
   if (request.providerId === "meta" && request.modelId === "MiniMax-H3") prompt = compactVideoPrompt(prompt);
-  const { prompt: ignoredPrompt, productionFingerprint, outputDirectory, shotId, images, videos, audios, firstFrame, lastFrame, negativePrompt: ignoredNegative, ...parameters } = request;
+  const { prompt: ignoredPrompt, productionFingerprint, outputDirectory, outputName, shotId, images, videos, audios, firstFrame, lastFrame, negativePrompt: ignoredNegative, ...parameters } = request;
   return JSON.stringify([parameters, prompt, negativePrompt || null, inputs, candidateBatchId ?? null], (_key, value) =>
     value && typeof value === "object" && !Array.isArray(value)
       ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))) : value);

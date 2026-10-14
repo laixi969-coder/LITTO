@@ -65,7 +65,16 @@ export function enqueue(spec: JobSpec) {
     return created;
 }
 
-export const jobView = (r: any) => r && {
+export const jobView = (r: any) => {
+    if (!r) return r;
+    const s = scoped(r.workspaceId);
+    const request = r.parameters?.request ?? {};
+    const assetId = /^assets\/characters\/([^/]+)\/?$/.exec(request.outputDirectory ?? "")?.[1];
+    const asset = assetId ? s.get("assets", assetId) : undefined;
+    const shot = r.targetType === "shot" ? s.get("shots", r.targetId) : undefined;
+    const label = request.outputName || (shot && shot.projectId === r.projectId ? `${shot.title || `镜头 ${shot.ord + 1}`} · ${r.kind === "video" ? "视频" : "关键帧"}` : asset && asset.projectId === r.projectId ? `${asset.name} · 角色参考` : undefined);
+    return {
+    label,
     id: r.id, projectId: r.projectId, kind: r.kind, targetType: r.targetType, targetId: r.targetId, providerId: r.providerId, modelId: r.modelId, status: r.status, attempts: r.attempts,
     compiledPrompt: r.compiledPrompt, parameters: { ...r.parameters, negativePrompt: undefined }, seed: r.seed, estimatedCost: r.estimatedCost, actualCost: r.actualCost, userCharge: r.userCharge, durationMs: r.durationMs,
     error: r.error, parentJobId: r.parentJobId, fallbackChain: r.fallbackChain, createdAt: r.createdAt, finishedAt: r.finishedAt,
@@ -73,6 +82,7 @@ export const jobView = (r: any) => r && {
     inputRefs: r.inputRefs ?? [],
     files: all("SELECT meta FROM generation_outputs WHERE job_id=? ORDER BY idx", r.id).flatMap(o => { const m = JSON.parse(o.meta); return m.workspacePath ? [{ path: m.workspacePath, mimeType: m.mime, mediaType: r.kind }] : []; }),
     outputs: all("SELECT media_id, idx FROM generation_outputs WHERE job_id=? ORDER BY idx", r.id).map((o) => o.media_id),
+    };
 };
 
 // ---------------- worker ----------------
