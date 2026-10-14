@@ -58,18 +58,32 @@ export function needsLipSync(shot: Record<string, any>) {
   // ACT: 兼容旧MV明确的演唱段，新规格用显式字段；普通背景人声不推断为口型需求。
   return shot.musicVideo?.audioMode === "sourceTrack" && /演唱段|本人唱/.test(shot.musicVideo.audioDirection ?? "");
 }
+export function physicalInteractionPlan(shot: Record<string, any>) {
+  // ACT: 文本启发式只安排约束与观察，不证明物理可行；复杂动作仍需实际播放，后续可接结构化接触事件。
+  const interaction = /放[进入回到在]|插[进入回]|塞[进入回]|取出|抽出|拔出|装入|倒入|倒出|倾倒|递给|递交|接过|放下|摆放|搁在|穿过|\b(?:insert|pour|place|grasp|handover)\b|\b(?:put|slide|push|pull|take|hand)\b.{0,40}\b(?:into|inside|onto|out of|over|to)\b/i;
+  const timeline = Array.isArray(shot.musicVideo?.timeline) ? shot.musicVideo.timeline : [];
+  const required = interaction.test([shot.action, shot.performance?.gesture, ...timeline.map((beat: any) => beat.description)].join(" "));
+  const duration = Number(shot.generationDuration ?? shot.duration);
+  const ranges: { start: number; end: number }[] = timeline.filter((beat: any) => interaction.test(beat.description ?? "") && Number.isFinite(beat.start) && Number.isFinite(beat.end)
+    && beat.start >= 0 && beat.end > beat.start && Number.isFinite(duration) && beat.start < duration)
+    .map((beat: any) => ({ start: beat.start as number, end: Math.min(beat.end, duration) }));
+  const instruction = required ? "Follow the specified action and world physics. Establish the actual opening or supporting surface before contact. Keep its location, shape and scale consistent with the reference and earlier frames, including across cuts and occlusion. Align the object with that existing opening or surface; show approach, contact, passage or transfer, then supported settling before release. Preserve grip and object continuity. Do not invent or move an opening, pass through a closed wall, teleport an object, or hide a geometry change with a cut. Apply only explicitly planned transformations." : "";
+  return { required, ranges, instruction };
+}
+
 export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | "take" = "take") {
   const duration = Number(shot.generationDuration ?? shot.duration);
   const lines = shot.creativeBrief?.dialogue?.lines ?? [];
   const speech = type === "take" && (needsLipSync(shot) || lines.length > 0);
-  const motion = shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|hand|grasp|fight/i.test([shot.action, shot.performance?.gesture].join(" "));
+  const interaction = physicalInteractionPlan(type === "keyframe" ? { ...shot, musicVideo: undefined } : shot);
+  const motion = interaction.required || shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|hand|grasp|fight/i.test([shot.action, shot.performance?.gesture].join(" "));
   const visual = motion || !shot.camera?.shotSize || /^(?:ECU|CU|MCU)$/i.test(shot.camera?.shotSize ?? "") || /近景|特写/.test(shot.camera?.shotSize ?? "")
     || !!shot.inspectionRegion;
   // ACT: 分级只安排检查投入，不据此宣称质量通过；未知景别进入重点档。明确的演唱无逐句时间时覆盖整段。
   const tier = speech ? "speech" : visual || !shot.camera?.shotSize ? "visual" : "basic";
   const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
   return { tier, sampleCount: tier === "basic" ? 3 : 8, fullPlayback: type === "take" && motion,
-    checks: tier === "basic" ? ["imaging", "world", "cinematic"] : type === "keyframe" || !motion ? ["surface", "imaging", "world", "cinematic"] : ["surface", "imaging", "world", "motion", "cinematic"], speechRanges };
+    checks: tier === "basic" ? ["imaging", "world", "cinematic"] : type === "keyframe" || !motion ? ["surface", "imaging", "world", "cinematic"] : ["surface", "imaging", "world", "motion", "cinematic"], speechRanges, interaction };
 }
 
 export const reviewedSegmentsSchema = z.array(z.strictObject({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).refine(range => range.end > range.start)).max(80).default([]);

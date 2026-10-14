@@ -59,7 +59,7 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
   const frames: { data: Buffer; mime: string }[] = [];
   const timestamps: number[] = [];
   const plan = qualityReviewPlan(shot, type);
-  const inspectionKey = model ? createHash("sha256").update(JSON.stringify(["tieredVision1", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
+  const inspectionKey = model ? createHash("sha256").update(JSON.stringify([plan.interaction.required ? "physicalInteraction1" : "tieredVision1", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
   const cached = inspectionKey && s.list("qc_reports", { targetType: type, targetId: id }, "created_at DESC, rowid DESC")
     .find(report => report.evidence?.vision?.inspectionKey === inspectionKey)?.evidence?.vision;
   if (cached?.used) return cached;
@@ -98,6 +98,12 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
       if (!probe?.duration || !probe.hasVideo) return { used: false, reason: "无法读取视频时长或缺少 ffprobe，请人工播放检查" };
       const sampleCount = plan.sampleCount;
       const sampleTimes = Array.from({ length: sampleCount }, (_, index) => probe.duration! * index / (sampleCount - 1));
+      // ACT: 最多补六帧覆盖接触段，连同八张全帧和两张局部不超过十六张；抽帧不替代动作播放。
+      const contactTimes = plan.interaction.ranges.flatMap(range => [range.start, (range.start + range.end) / 2, range.end]);
+      const candidates = [...new Set(contactTimes)].filter(time => time >= 0 && time <= probe.duration! && !sampleTimes.some(sample => Math.abs(sample - time) < 0.05)).sort((a, b) => a - b);
+      const selected = candidates.length <= 6 ? candidates : Array.from({ length: 6 }, (_, index) => candidates[Math.round(index * (candidates.length - 1) / 5)]!);
+      sampleTimes.push(...selected);
+      sampleTimes.sort((a, b) => a - b);
       frames.push(...await sampleVideoFrames(source, directory, sampleTimes, probe.duration));
       timestamps.push(...sampleTimes.map(seconds => Number(seconds.toFixed(3))));
       await addRegion(source, directory, probe, ["-ss", String(probe.duration / 2)], probe.duration / 2);
@@ -113,6 +119,8 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
   const input = { workspaceId: s.workspaceId, projectId: shot.projectId, actor, frames, imageMediaIds: references,
     json: true, label: "qc.observe", system: `Inspect actual film imagery, not prompt quality. First ${frames.length} images are output images; full frames are in temporal order, with additional native-resolution regions indexed in the prompt; remaining images are references. Report only visible defects using ${kinds.join(", ")}. Explicitly count visible limbs and track them through occlusion; duplicated arms/legs or impossible mirror anatomy are anatomy_failure. Compare wardrobe/product length, seams and shape against references and earlier frames; unexplained changes are wardrobe_drift. Check waxy/plastic skin, erased texture, implausible material highlights, exposure and focus, spatial contact, temporal identity/layout drift, performance. Sampled frames cannot prove biomechanics, lip sync or sound quality. Cite frame/time and visible evidence. Return JSON {"observations":[{"kind":"...","note":"..."}]}; do not claim a complete pass.`,
     prompt: JSON.stringify({ shot: { action: shot.action, camera: shot.camera, lighting: shot.lighting, realism: shot.realism, performance: shot.performance }, world: s.list("worlds", { projectId: shot.projectId }), looks: s.list("looks", { projectId: shot.projectId }).filter(look => look.scope === "project" || look.scope === "sequence" && look.scopeId === shot.sequenceId || look.scope === "shot" && look.scopeId === shotId),
+      objectInteractionReview: plan.interaction.required ? { instruction: plan.interaction.instruction, ranges: plan.interaction.ranges,
+        evidence: "Track the actual opening/support location and object through approach, contact, passage/transfer, release and settling. Compare earlier frames and references, including both sides of cuts. Visible entry through a closed surface or unsupported objects are motion_physics; an invented/moved opening or changing object geometry is scene_structure. Cite visible frame/time evidence. If the contact or opening is obscured or falls between samples, do not infer success from the final pose or prompt. Sampled images cannot establish complete physical correctness." } : undefined,
       surfaceReview: "Inspect the whole frame, not just faces: foliage, soil, walls, mountains, sky, water and props. Look for uniform waxy/glossy response across different materials, repeated or melted texture, implausibly equal foreground/background sharpness, HDR halos, flattened atmospheric depth and mismatched subject/environment lighting or contact shadows. Compare to the specified medium and references; intentional stylization, makeup, soft light or clean surfaces alone are not defects. Natural skin texture must be age- and shot-scale-appropriate; do not demand wrinkles, dirt or grain. Cite visible locations and evidence; a matching color palette is not proof of matching photographic texture.",
       timestamps, regions, referenceCount: references.length }),
   };

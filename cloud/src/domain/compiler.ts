@@ -10,6 +10,7 @@ import type { ShotInput } from "./schema.ts";
 import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
+import { physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -236,7 +237,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         constraints: J(shot.constraints ?? []),
         physicalContinuity: J([
             assets.some(a => a.type === "Character") && "Preserve each character's reference anatomy and limb count through the entire action, including occlusions and mirror reflections; movement has preparation, contact, weight transfer and settling",
-            assets.some(a => a.type === "Product" || a.type === "Wardrobe") && "Preserve the referenced garment/product silhouette, length, seams, fastening and marks except for explicitly planned changes at their specified action or timeline beat; preserve unaffected details and identity. Cloth deforms locally under actual contact rather than changing design",
+            assets.some(a => a.type === "Product" || a.type === "Wardrobe" || a.type === "Prop") && "Preserve the referenced garment/product/prop silhouette, length, seams, fastening, openings and marks except for explicitly planned changes at their specified action or timeline beat; preserve unaffected details and identity. Cloth deforms locally under actual contact rather than changing design",
             "Keep surface response specific to each material and visible at this shot scale; preserve source-motivated light and contact shadows; do not replace missing texture with sharpening or artificial grain",
         ]),
         state: J([...Object.entries<any>(start.props).filter(([, p]) => p.present).map(([id, p]) => `${p.name ?? id}${p.heldBy ? ` held by ${start.characters[p.heldBy]?.name ?? p.heldBy}` : ""}`), ...Object.entries<any>(start.characters).map(([id, c]) => c.wardrobeId ? `${c.name ?? id} wearing ${start.wardrobe[c.wardrobeId]?.name ?? c.wardrobeId}` : "")]),
@@ -345,6 +346,11 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             forbiddenChanges: sections.forbiddenChanges,
             variations: J([...(shot.freedomMap?.CONTROL ?? []), sections.allow, sections.random]),
         };
+    }
+    const interaction = physicalInteractionPlan(kind === "image" ? { ...shot, musicVideo: undefined } : shot);
+    if (interaction.required) {
+        sections.objectInteraction = kind === "video" ? interaction.instruction : "Preserve the reference object's geometry, openings and support surfaces. Show the actual interaction opening or contact surface clearly enough to establish the planned action; do not invent an opening or hide impossible contact.";
+        warnings.push("物体交互预检：核对参考与起始画面中的真实入口、承托面、尺寸和动作路径；文字约束不代表视觉已核实。结果需检查接近、接触、进入或交接及释放后的承托，无法看清时不得记为通过。");
     }
     // 在模型专用重排之后加入，所有模型都保留整片导演意图。
     if (advertising) sections.adDirection = JSON.stringify({
