@@ -59,10 +59,10 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
   const frames: { data: Buffer; mime: string }[] = [];
   const timestamps: number[] = [];
   const plan = qualityReviewPlan(shot, type);
-  const inspectionKey = model ? createHash("sha256").update(JSON.stringify([plan.interaction.required ? "physicalInteraction1" : "tieredVision1", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
+  const inspectionKey = model ? createHash("sha256").update(JSON.stringify([plan.interaction.required ? "physicalInteraction2" : "tieredVision2", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
   const cached = inspectionKey && s.list("qc_reports", { targetType: type, targetId: id }, "created_at DESC, rowid DESC")
     .find(report => report.evidence?.vision?.inspectionKey === inspectionKey)?.evidence?.vision;
-  if (cached?.used) return cached;
+  if (cached?.used) return { ...cached, reused: true };
   const regions: { frameIndex: number; seconds: number | null; region: unknown }[] = [];
   const region = shot.inspectionRegion ? referenceCropSchema.parse(shot.inspectionRegion) : null;
   const cropFilter = region ? region.unit === "normalized"
@@ -117,7 +117,7 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     .map(binding => s.get("refs", binding.referenceId)?.mediaId)
     .filter((id): id is string => !!id && /^image\/(png|jpeg|webp)$/.test(s.get("media", id)?.mime ?? "")).slice(0, 4);
   const input = { workspaceId: s.workspaceId, projectId: shot.projectId, actor, frames, imageMediaIds: references,
-    json: true, label: "qc.observe", system: `Inspect actual film imagery, not prompt quality. First ${frames.length} images are output images; full frames are in temporal order, with additional native-resolution regions indexed in the prompt; remaining images are references. Report only visible defects using ${kinds.join(", ")}. Explicitly count visible limbs and track them through occlusion; duplicated arms/legs or impossible mirror anatomy are anatomy_failure. Compare wardrobe/product length, seams and shape against references and earlier frames; unexplained changes are wardrobe_drift. Check waxy/plastic skin, erased texture, implausible material highlights, exposure and focus, spatial contact, temporal identity/layout drift, performance. Sampled frames cannot prove biomechanics, lip sync or sound quality. Cite frame/time and visible evidence. Return JSON {"observations":[{"kind":"...","note":"..."}]}; do not claim a complete pass.`,
+    json: true, label: "qc.observe", system: `Inspect actual film imagery, not prompt quality. First ${frames.length} images are output images; full frames are in temporal order, with additional native-resolution regions indexed in the prompt; remaining images are references. Report only visible defects using ${kinds.join(", ")}. Explicitly count visible limbs and track them through occlusion; duplicated arms/legs or impossible mirror anatomy are anatomy_failure. Compare wardrobe/product length, seams and shape against references and earlier frames; unexplained changes are wardrobe_drift. Check waxy/plastic skin, erased texture, implausible material highlights, exposure and focus, spatial contact, temporal identity/layout drift, performance. Sampled frames cannot prove biomechanics, lip sync or sound quality. Cite frame/time and visible evidence. Separate confirmed visible defects from uncertainty caused by occlusion, missing references, sampling gaps or perspective. Do not treat plausible motion blur, lighting or foreshortening alone as defects. Return JSON {"observations":[{"kind":"...","note":"...","certainty":"defect or uncertain or clear"}]}; Use defect only for a confirmed visible defect, uncertain for insufficient evidence, and clear for normal behavior or absent defects. Normal motion, correct composition and no anomaly must never use defect. Do not claim a complete pass.`,
     prompt: JSON.stringify({ shot: { action: shot.action, camera: shot.camera, lighting: shot.lighting, realism: shot.realism, performance: shot.performance }, world: s.list("worlds", { projectId: shot.projectId }), looks: s.list("looks", { projectId: shot.projectId }).filter(look => look.scope === "project" || look.scope === "sequence" && look.scopeId === shot.sequenceId || look.scope === "shot" && look.scopeId === shotId),
       objectInteractionReview: plan.interaction.required ? { instruction: plan.interaction.instruction, ranges: plan.interaction.ranges,
         evidence: "Track the actual opening/support location and object through approach, contact, passage/transfer, release and settling. Compare earlier frames and references, including both sides of cuts. Visible entry through a closed surface or unsupported objects are motion_physics; an invented/moved opening or changing object geometry is scene_structure. Cite visible frame/time evidence. If the contact or opening is obscured or falls between samples, do not infer success from the final pose or prompt. Sampled images cannot establish complete physical correctness." } : undefined,
@@ -129,12 +129,12 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     input.frames.push({ data: await storage.get(media.storageKey), mime: media.mime });
   }
   if (model && !workspaceVision) return { used: false, reason: "当前服务未连接工作区视觉模型" };
-  const observationSchema = z.object({ observations: z.array(z.object({ kind: z.string().refine(kind => kinds.includes(kind)), note: z.string().min(1).max(4000) })).max(40) });
+  const observationSchema = z.object({ observations: z.array(z.object({ kind: z.string().min(1).max(200), note: z.string().min(1).max(4000), certainty: z.enum(["defect", "uncertain", "clear"]) })).max(40) });
   let result;
   try {
     result = model ? await inspectVision(input, model, text => observationSchema.parse(parseJson(text))) : await runText(input);
     if (!result) return { used: false, reason: "未配置可用的视觉模型，须人工检查" };
     const parsed = observationSchema.parse(parseJson(result.text));
-    return { used: true, inspectionKey, reused: false, model: result.modelId, jobId: result.jobId, coverage: timestamps.length ? "sampledFrames" : "stillImage", timestamps, regions, observations: parsed.observations };
+    return { used: true, inspectionKey, reused: false, model: result.modelId, jobId: result.jobId, coverage: timestamps.length ? "sampledFrames" : "stillImage", timestamps, regions, observations: parsed.observations.filter(item => item.certainty === "defect" && kinds.includes(item.kind)), uncertainties: parsed.observations.filter(item => item.certainty === "uncertain" || item.certainty === "defect" && !kinds.includes(item.kind)) };
   } catch (error) { return { used: false, model: result?.modelId, reason: `视觉检查未完成，不能作为通过依据：${error instanceof Error ? error.message : String(error)}` }; }
 }

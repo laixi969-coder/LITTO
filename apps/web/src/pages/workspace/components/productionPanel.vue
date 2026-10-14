@@ -132,7 +132,7 @@
               <p v-if="targetReports[0]?.current">当前素材与规格的检查可复用，无需重新勾选。</p>
               <p v-if="speechReviewRequired">需看听区间：{{ qualityPlan.speechRanges.map(range => range.start + "–" + range.end + " 秒").join("、") }}</p>
               <label>检查模型<select v-model="visionModelKey"><option value="">选择支持图片输入的模型</option><option v-for="item in visualModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label><button type="button" :disabled="!visionModelKey" @click="run(autoReview)">视觉模型辅助检查</button>
-              <p>辅助检查可能产生模型费用。普通镜头采样 3 帧，重点镜头采样 8 帧；相同素材与规格复用已完成的检查。采样不能证明声音与口型同步。</p>
+              <p>辅助检查可能产生模型费用。普通镜头采样 3 帧，重点镜头采样 8 帧，物体交互最多补 6 帧；相同素材与规格复用已完成的检查。采样不能证明声音与口型同步。</p>
               <p class="reviewHint">确认前请对照画面看：{{ reviewFields.map(field => field[1]).join("、") }}{{ qualityPlan.fullPlayback ? "；复杂动作请完整播放一遍" : "；集中预览一次即可" }}。</p>
               <label v-for="field in reviewFields" :key="field[0]"><input v-model="reviewedFields" type="checkbox" :value="field[0]" />已检查 {{ field[1] }}</label>
               <label v-if="qualityPlan.fullPlayback"><input v-model="fullPlayback" type="checkbox" />已完整播放，检查肢体增减、遮挡、手物接触及动作收势</label>
@@ -151,7 +151,7 @@
               </template>
               <button v-if="observation" type="button" :disabled="!reviewNote.trim()" @click="run(saveReview)">记录问题</button>
               <button v-else type="button" :disabled="!reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && ((qualityPlan.fullPlayback && !fullPlayback) || speechReviewRequired && (!speechChecked || needsLipSync(detail) && !lipSyncChecked || speechNote.trim().length < 10)))" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "已检查，批准此 Take" }}</button>
-              <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="finding in report.findings" :key="finding.kind">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
+              <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? report.evidence?.vision?.used ? '辅助检查已完成 · 待实际复核' : '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="(item, index) in report.evidence?.vision?.uncertainties ?? []" :key="index">待核实：{{ item.note }}（证据不足，未记为确定缺陷）</p><p v-for="(finding, index) in report.findings" :key="index">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
             </template>
             <template v-if="candidatePool.length">
               <h3>抽卡批次对比</h3>

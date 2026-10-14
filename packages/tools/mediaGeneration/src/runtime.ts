@@ -60,7 +60,7 @@ export function needsLipSync(shot: Record<string, any>) {
 }
 export function physicalInteractionPlan(shot: Record<string, any>) {
   // ACT: 文本启发式只安排约束与观察，不证明物理可行；复杂动作仍需实际播放，后续可接结构化接触事件。
-  const interaction = /放[进入回到在]|插[进入回]|塞[进入回]|取出|抽出|拔出|装入|倒入|倒出|倾倒|递给|递交|接过|放下|摆放|搁在|穿过|\b(?:insert|pour|place|grasp|handover)\b|\b(?:put|slide|push|pull|take|hand)\b.{0,40}\b(?:into|inside|onto|out of|over|to)\b/i;
+  const interaction = /放[进入回到在]|插[进入回在]|塞[进入回]|收[进入回]|取出|拿[起出]|抽出|拔出|装入|倒入|倒出|倾倒|递给|递交|接过|放下|摆放|搁在|立在|铺平|展开|对折|折叠|撕|剥|拧开|调整肩带|拉着.{0,8}行李|\b(?:insert|pour|place|grasp|handover|fold|unfold|peel|tear)\b|\b(?:put|slide|push|pull|take|hand)\b.{0,40}\b(?:into|inside|onto|out of|over|to)\b/i;
   const timeline = Array.isArray(shot.musicVideo?.timeline) ? shot.musicVideo.timeline : [];
   const required = interaction.test([shot.action, shot.performance?.gesture, ...timeline.map((beat: any) => beat.description)].join(" "));
   const duration = Number(shot.generationDuration ?? shot.duration);
