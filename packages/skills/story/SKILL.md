@@ -2,10 +2,11 @@
 name: story
 description: 从想法或已有素材发展故事与剧本，比较少量创意方向，保存人物事实、因果与伏笔、版本和证据审稿；采用后衔接场次表、分镜预演和制作。支持电影、剧集、短剧分集、局部改写与续作；按作品选择编剧方法。广告用 adfilm，已有定稿只做制作提取时不重写。
 metadata:
-  version: "1.4.0"
+  version: "1.5.0"
   displayName: 故事与剧本
   author: MILI MILI
   basedOn: hiccai-story 2.3.0
+  methodology: hiccai-story 2.0
 ---
 
 # 故事与剧本
@@ -68,3 +69,20 @@ MV 由 [musicfilm](../musicfilm/SKILL.md) 组织本流程：剧情与混合型�
 - 故事检查理解、人物选择与继续观看的理由；连载额外检查承诺与兑现、历史一致性。效果广告检查卖点证据和行动路径，品牌片检查品牌记忆；剧情 MV 同时检查行动因果、可见变化及音乐与画面关系，纯表演段按其音乐与表演目标审读。
 - 每条审稿结论提供依据。模型判断不能冒充观众实验；没有真实对照就不把完播变化归因于某一次改稿。
 - 给用户看可读剧本与必要的取舍；内部结构化保存由工具完成。镜头规格、资产和画布操作继续复用现有制作工作流。
+
+## 方法论参考库
+
+以下资料按当前遇到的具体问题取用，不要求通读，也不作为验收清单。作品目标与已采用内容始终优先于任何模板。
+
+| 当前问题 | 参考 |
+| --- | --- |
+| 不确定该用哪种方法讲这个故事 | [核心方法论](references/core-methodology.md)、[故事引擎](references/story-engines.md) |
+| 需要更多叙事手法与桥段 | [叙事军火库](references/narrative-arsenal.md) |
+| 对白不像人说话 | [对白美学](references/dialogue-aesthetics.md) |
+| 判断这个体量该用哪种格式 | [长片](references/format-feature.md)、[短片](references/format-short.md)、[剧集](references/format-series.md)、[微短剧](references/format-duanju.md)、[信息流](references/format-feed.md)、[超短](references/format-ultrashort.md) |
+| 高概念不够锋利 | [高概念](references/high-concept.md) |
+| 想对照同类作品的处理 | [长片案例](references/cases-features.md)、[短片案例](references/cases-shorts.md)、[高概念案例](references/cases-high-concept.md) |
+| 需要自检或评估当前版本 | [行为自检](references/behavior-checks.md)、[评估](references/evaluation.md) |
+| 语言与用词规范 | [语言政策](references/language-policy.md) |
+| 短剧专项：情绪曲线、标志性场景、分集工厂与尺度 | [情绪曲线](references/emotionCurves.md)、[标志性场景](references/iconicScenes.md)、[分集工厂](references/shortDramaFactory.md)、[短剧尺度](references/shortDramaLicense.md) |
+| 跨会话恢复项目状态 | [项目状态](references/project-state.md)、[维护说明](references/maintenance-notes.md) |
