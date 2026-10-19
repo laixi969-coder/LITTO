@@ -1,0 +1,71 @@
+FROM oven/bun:1.3.14
+
+# LITTO-DEPLOY-ADAPT v4 —— 本行为适配版本标记，deploy.sh 据此判断是否需要覆盖上游 Dockerfile。
+# 改动本文件时必须同步递增版本号，否则已有部署不会更新。
+# 本版本包含的适配（按 Dockerfile 顺序）：
+#   v1: apt 源切腾讯云镜像
+#   v2: install 降级 + 补齐 workspace 软链 + 安装 cloud/ 独立依赖
+#   v3: 把 ENV NODE_ENV=production 提到 build 之前（安全修复：否则 production 被折叠成 false，
+#       验证码接口会直接把验证码返回给请求方，会话 Cookie 也不带 Secure）
+#   v4: 构建后统一放开读权限（仓库里存在大量 600 权限源文件，容器以非 root 用户 bun 运行会 EACCES）
+#   v5: 同上，但改为「COPY 之后 + 构建之后」两次放开（v4 只覆盖 build/cloud，
+#       漏了 /app/package.json 等根目录文件；COPY 后此时还没有 node_modules，这一步很便宜）
+
+WORKDIR /app
+
+# ACT(部署适配): 基础镜像的 Debian 源指向 deb.debian.org（Fastly，走 80 端口），
+# 大陆服务器访问几乎必然超时并长时间重试，会卡死整个构建（实测卡 8 分钟以上、近乎零吞吐）。
+# 先切到腾讯云内网镜像再装 ffmpeg。
+RUN sed -i 's|deb.debian.org|mirrors.cloud.tencent.com|g' /etc/apt/sources.list.d/debian.sources; \
+    apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+# ACT(部署适配)【v5】: 本仓库存在大量 600 权限的源文件（例如 package.json、apps/server/src/app.ts）。
+# 容器以非 root 用户 bun(uid 1000) 运行，读不到就会启动即崩：EACCES ... open '/app/package.json'。
+# 此处紧跟 COPY，尚未安装依赖，开销很小；构建产物另在最后再放开一次。
+RUN chmod -R a+rX /app
+
+# ACT: 保留工作区与依赖以兼容运行时动态加载；需要缩减镜像时再拆分构建阶段。
+# ACT(部署适配): 上游 lockfile 与 package.json 存在轻微漂移，冻结安装失败时降级为普通安装。
+# 注意：此处不能先设 NODE_ENV=production，否则 bun install 会跳过 devDependencies，构建必失败。
+RUN bun install --frozen-lockfile || bun install
+
+# ACT(部署适配): 在根 node_modules/@toonflow 补齐 workspace 软链，否则 workspace 之外的
+# cloud/src 解析不到 `@toonflow/*`。脚本由 deploy.sh 写入 deployAdapt/，原因见其注释。
+RUN bun deployAdapt/linkWorkspaces.ts
+
+# ACT(部署适配): cloud/ 是独立包（不在 package.json 的 workspaces 内，且 cloud/node_modules 被 gitignore），
+# 但 apps/server 通过相对路径直接 import 其源码。上游 Dockerfile 没装它的依赖，
+# 干净检出时必然报 `Could not resolve "@hono/node-server"`，这里单独安装一次。
+RUN cd cloud && bun install --production
+
+# ACT(部署适配)【安全修复，重要】: NODE_ENV=production 必须在 build 之前生效。
+# Bun 的打包器会把 `process.env.NODE_ENV === "production"` 在构建期做常量折叠；
+# 上游把 ENV 写在 build 之后，导致产物里 cloud 的 config.production 被硬编码成 false：
+#     a6={dataDir:yj,production:!1,port:...}
+# 即便运行时容器里 NODE_ENV=production 也无效。后果：
+#   1) POST /cloud/auth/request-code 会把 6 位验证码直接放进响应返回
+#      （production:false 时才返回 devCode）→ 任何人可注册，且可直接接管未设密码的账号；
+#   2) 会话 Cookie 不带 Secure（setSessionCookie 里 secure: config.production）。
+ENV NODE_ENV=production
+
+RUN bun run build:server \
+    && mkdir -p data/workspaces/myProject \
+    && chown -R bun:bun data
+
+# ACT(部署适配)【v4】: 上游仓库里存在大量 600 权限的源文件。用 git archive 打包会被规范成 644，
+# 用 tar 打包工作区则保留原样，构建脚本里的 `cp` 也会把 600 继承到 build/ 下。
+# 容器以非 root 用户 bun 运行，启动时读 builtin 技能即 EACCES：
+#     EACCES: permission denied, open '/app/build/skills/story/references/shortDramaLicense.md'
+# 统一放开只读位（a+rX 的 X 只给目录和原本可执行的文件加执行位）。
+RUN chmod -R a+rX /app/build /app/cloud
+
+ENV TOONFLOW_DATA_DIR=/app/data
+
+USER bun
+EXPOSE 3000
+
+CMD ["bun", "build/server/index.js"]

@@ -1,0 +1,33 @@
+# LITTO 生产部署（腾讯云 162.14.110.219 / Ubuntu 24.04）
+# 用法：docker compose -f docker-compose.prod.yml --env-file litto.env up -d --build
+services:
+  litto:
+    build:
+      context: ./repo
+      dockerfile: Dockerfile
+    image: litto:local
+    container_name: litto
+    init: true
+    restart: unless-stopped
+    # 只监听本机回环，外面由 Nginx 反代 + TLS；容器端口不对公网暴露
+    ports:
+      - "127.0.0.1:13000:3000"
+    env_file:
+      - ./litto.env
+    environment:
+      NODE_ENV: production
+      TOONFLOW_DATA_DIR: /app/data
+      LITTO_TRUST_PROXY: "1"
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
