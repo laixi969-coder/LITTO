@@ -16,7 +16,12 @@ export const cloud = () => embed;
 export async function mountCloud(app: Express) {
   if (!authEnabled()) return;
   // The cloud keeps its own data under data/cloud unless told otherwise.
-  process.env.MILIMILI_DATA_DIR ??= join(process.env.TOONFLOW_DATA_DIR as string, "cloud");
+  // 宁可启动失败也不能静默连到 cwd 下的空库：数据目录缺失会让所有账号"消失"，表现为密码不对。
+  if (!process.env.MILIMILI_DATA_DIR) {
+    const root = process.env.TOONFLOW_DATA_DIR;
+    if (!root) throw new Error("缺少数据目录环境变量（TOONFLOW_DATA_DIR 或 MILIMILI_DATA_DIR），拒绝以空数据库启动");
+    process.env.MILIMILI_DATA_DIR = join(root, "cloud");
+  }
   embed = await import("../../../../cloud/src/embed");
   const { executeMediaJob } = await import("@/utils/media/jobs");
   embed.configureWorkspaceMedia(executeMediaJob);

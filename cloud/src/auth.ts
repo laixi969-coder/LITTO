@@ -176,12 +176,13 @@ export function logout(c: Context) {
     const t = tokenOf(c);
     if (t) run("DELETE FROM sessions WHERE token_hash=?", sha256(t));
     deleteCookie(c, "milimili_session", { path: "/" });
+    deleteCookie(c, "litto_session", { path: "/" });
 }
 
 function tokenOf(c: Context): string | null {
     const h = c.req.header("authorization");
     if (h?.startsWith("Bearer ")) return h.slice(7);
-    return getCookie(c, "milimili_session") ?? null;
+    return getCookie(c, "milimili_session") ?? getCookie(c, "litto_session") ?? null;
 }
 
 /**

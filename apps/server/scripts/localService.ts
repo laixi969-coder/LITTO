@@ -54,7 +54,7 @@ if (action === "start") {
     const args = service.name === "milimiliServer"
       ? [bunPath, "--watch", "src/index.ts"]
       : [nodePath, join(root, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(service.port), "--strictPort"];
-    const environment = { NODE_ENV: "dev", TOONFLOW_DATA_DIR: join(root, "data"), PATH: [...new Set([dirname(bunPath), dirname(nodePath), ...mediaPaths, "/usr/bin", "/bin", "/usr/sbin", "/sbin"])].join(":") };
+    const environment = { NODE_ENV: "dev", TOONFLOW_DATA_DIR: join(root, "data"), MILIMILI_DATA_DIR: join(root, "data", "cloud"), PATH: [...new Set([dirname(bunPath), dirname(nodePath), ...mediaPaths, "/usr/bin", "/bin", "/usr/sbin", "/sbin"])].join(":") };
     const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>

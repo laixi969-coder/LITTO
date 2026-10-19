@@ -41,3 +41,6 @@ cloud/node_modules/
 
 # 本地运行时数据：含主密钥与租户库，禁止入库
 apps/server/data/
+
+# 本地临时目录（测试库探针等）
+.tmp/
