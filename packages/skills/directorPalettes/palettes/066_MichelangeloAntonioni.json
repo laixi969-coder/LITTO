@@ -1,0 +1,104 @@
+{
+ "id": "066",
+ "name": "安东尼奥尼",
+ "nameEn": "MichelangeloAntonioni",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "意大利",
+ "years": "1912-2007",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8A9098",
+    "name": "工业灰",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#B4B0A8",
+    "name": "水泥米灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5C6672",
+    "name": "钢蓝灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#D4CFC4",
+    "name": "尘灰白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#E84A5F",
+    "name": "欲望红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A424C",
+    "name": "深钢蓝",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#C8C4BC",
+    "name": null,
+    "emotion": "疏离空虚"
+   },
+   {
+    "hex": "#DC143C",
+    "name": null,
+    "emotion": "压抑欲望"
+   },
+   {
+    "hex": "#708090",
+    "name": null,
+    "emotion": "现代焦虑"
+   },
+   {
+    "hex": "#2C3640",
+    "name": null,
+    "emotion": "存在困境"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光散射",
+  "highlight_bias": "工业冷光",
+  "shadow_bias": "建筑阴影",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "建筑与人物",
+  "空旷构图",
+  "几何线条",
+  "前景遮挡",
+  "风景异化",
+  "色彩心理"
+ ],
+ "colorKeywords": [
+  "工业灰调",
+  "建筑色彩",
+  "沙漠赭色",
+  "心理色彩",
+  "低饱和",
+  "现代主义色"
+ ],
+ "mood": [
+  "疏离",
+  "异化",
+  "空虚",
+  "焦虑",
+  "情感无能",
+  "现代性困境"
+ ],
+ "profile": {
+  "definition": "安东尼奥尼的视觉风格以柔光散射为主，工业灰调、建筑色彩、沙漠赭色，营造出疏离的氛围。",
+  "lighting": "柔光散射，高光偏工业冷光，阴影偏建筑阴影，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "建筑与人物、空旷构图、几何线条，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩工业灰调、建筑色彩、沙漠赭色。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

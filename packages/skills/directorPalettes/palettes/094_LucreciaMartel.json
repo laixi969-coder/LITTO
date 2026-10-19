@@ -1,0 +1,104 @@
+{
+ "id": "094",
+ "name": "卢克雷西亚·马特尔",
+ "nameEn": "LucreciaMartel",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "阿根廷",
+ "years": "1966-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#6B8E23",
+    "name": "橄榄绿",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8B4513",
+    "name": "腐朽棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#B8860B",
+    "name": "暗金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗青灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#D2B48C",
+    "name": "棕绸色",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#6B8E23",
+    "name": null,
+    "emotion": "潮湿压抑"
+   },
+   {
+    "hex": "#B8860B",
+    "name": null,
+    "emotion": "殖民腐朽"
+   },
+   {
+    "hex": "#8B4513",
+    "name": null,
+    "emotion": "欲望秘密"
+   },
+   {
+    "hex": "#2F2F2F",
+    "name": null,
+    "emotion": "道德暗区"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "漫射暖光",
+  "highlight_bias": "树影斑驳",
+  "shadow_bias": "室内暗光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "空间迷宫",
+  "听觉主导",
+  "水意象",
+  "殖民空间",
+  "女性心理",
+  "家族秘密"
+ ],
+ "colorKeywords": [
+  "潮湿绿调",
+  "殖民暗金",
+  "南美色彩",
+  "水色反光",
+  "腐朽华丽",
+  "热带闷色"
+ ],
+ "mood": [
+  "感官迷宫",
+  "殖民遗产",
+  "女性心理",
+  "家族秘密",
+  "潮湿压抑",
+  "社会批判"
+ ],
+ "profile": {
+  "definition": "卢克雷西亚·马特尔的视觉风格以漫射暖光为主，潮湿绿调、殖民暗金、南美色彩，营造出感官迷宫的氛围。",
+  "lighting": "漫射暖光，高光偏树影斑驳，阴影偏室内暗光，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "空间迷宫、听觉主导、水意象，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩潮湿绿调、殖民暗金、南美色彩。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

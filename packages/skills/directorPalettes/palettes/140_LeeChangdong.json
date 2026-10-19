@@ -1,0 +1,105 @@
+{
+ "id": "140",
+ "name": "李沧东",
+ "nameEn": "LeeChang-dong",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "韩国",
+ "years": "1954-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#2E7D32",
+    "name": "诗之绿",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#78909C",
+    "name": "冷灰蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "土地棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "米白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#C62828",
+    "name": "隐忍红",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#2E7D32",
+    "name": "诗意生命力",
+    "emotion": "诗意生命力"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖悲悯",
+    "emotion": "温暖悲悯"
+   },
+   {
+    "hex": "#78909C",
+    "name": "存在压抑",
+    "emotion": "存在压抑"
+   },
+   {
+    "hex": "#C62828",
+    "name": "隐忍愤怒",
+    "emotion": "隐忍愤怒"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然柔光",
+  "highlight_tint": "绿色绿意",
+  "highlight_bias": "绿色绿意",
+  "shadow_tint": "黄昏暖光",
+  "shadow_bias": "黄昏暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "文学影像",
+  "绿色意象",
+  "底层人物",
+  "长镜头",
+  "存在困境",
+  "燃烧美学"
+ ],
+ "colorKeywords": [
+  "李沧东绿",
+  "诗意暖调",
+  "文学电影色",
+  "隐忍色彩",
+  "韩国乡村色",
+  "存在灰调"
+ ],
+ "mood": [
+  "诗意暴力",
+  "存在主义",
+  "文学质感",
+  "底层悲悯",
+  "韩国社会",
+  "燃烧之谜"
+ ],
+ "profile": {
+  "definition": "李沧东的视觉风格：自然柔光，李沧东绿, 诗意暖调, 文学电影色。",
+  "lighting": "自然柔光，绿色绿意，黄昏暖光",
+  "framing": "文学影像、绿色意象、底层人物。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

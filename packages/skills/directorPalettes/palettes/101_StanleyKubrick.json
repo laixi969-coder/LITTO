@@ -1,0 +1,105 @@
+{
+ "id": "101",
+ "name": "库布里克",
+ "nameEn": "StanleyKubrick",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国/英国",
+ "years": "1928-1999",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1A237E",
+    "name": "深空蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#212121",
+    "name": "炭黑",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "暖金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#006064",
+    "name": "暗青",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#1A237E",
+    "name": "理性冷酷",
+    "emotion": "理性冷酷"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "暴力恐惧",
+    "emotion": "暴力恐惧"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "神性启示",
+    "emotion": "神性启示"
+   },
+   {
+    "hex": "#212121",
+    "name": "虚无深渊",
+    "emotion": "虚无深渊"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "单点透视光",
+  "highlight_tint": "对称照明",
+  "highlight_bias": "对称照明",
+  "shadow_tint": "冷色基调",
+  "shadow_bias": "冷色基调",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "对称强迫",
+  "单点透视",
+  "广角畸变",
+  "慢推镜头",
+  "上帝视角",
+  "凝视长镜"
+ ],
+ "colorKeywords": [
+  "冷红蓝对比",
+  "对称色光",
+  "高饱和点缀",
+  "黑白交替",
+  "太空冷色",
+  "古典暖色"
+ ],
+ "mood": [
+  "存在恐惧",
+  "理性癫狂",
+  "凝视深渊",
+  "黑色幽默",
+  "超验体验",
+  "人类渺小"
+ ],
+ "profile": {
+  "definition": "库布里克的视觉风格：单点透视光，冷红蓝对比, 对称色光, 高饱和点缀。",
+  "lighting": "单点透视光，对称照明，冷色基调",
+  "framing": "对称强迫、单点透视、广角畸变。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

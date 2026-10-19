@@ -1,0 +1,105 @@
+{
+ "id": "162",
+ "name": "弗朗索瓦·特吕弗",
+ "nameEn": "FrancoisTruffaut",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "法国",
+ "years": "1932-1984",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#000000",
+    "name": "新浪潮黑",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "巴黎棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "怀旧黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#78909C",
+    "name": "巴黎灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#C62828",
+    "name": "朱尔红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "电影白",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#000000",
+    "name": "少年叛逆",
+    "emotion": "少年叛逆"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "浪漫怀旧",
+    "emotion": "浪漫怀旧"
+   },
+   {
+    "hex": "#C62828",
+    "name": "爱情热烈",
+    "emotion": "爱情热烈"
+   },
+   {
+    "hex": "#78909C",
+    "name": "巴黎忧郁",
+    "emotion": "巴黎忧郁"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "黑白高对比",
+  "highlight_tint": "彩色暖调",
+  "highlight_bias": "彩色暖调",
+  "shadow_tint": "巴黎街光",
+  "shadow_bias": "巴黎街光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "四百击定格",
+  "安托万系列",
+  "新浪潮镜头",
+  "巴黎街景",
+  "爱情三角",
+  "电影迷影"
+ ],
+ "colorKeywords": [
+  "新浪潮黑白",
+  "特吕弗暖调",
+  "巴黎棕黄",
+  "四百击灰",
+  "法国电影色",
+  "怀旧电影色"
+ ],
+ "mood": [
+  "新浪潮",
+  "少年成长",
+  "爱情浪漫",
+  "电影迷影",
+  "巴黎情调",
+  "作者电影"
+ ],
+ "profile": {
+  "definition": "弗朗索瓦·特吕弗的视觉风格：黑白高对比，新浪潮黑白, 特吕弗暖调, 巴黎棕黄。",
+  "lighting": "黑白高对比，彩色暖调，巴黎街光",
+  "framing": "四百击定格、安托万系列、新浪潮镜头。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

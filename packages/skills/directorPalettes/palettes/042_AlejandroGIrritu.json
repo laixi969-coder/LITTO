@@ -1,0 +1,108 @@
+{
+ "id": "042",
+ "name": "伊纳里图",
+ "nameEn": "Alejandro G. Iñárritu",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "墨西哥",
+ "years": "2000-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#6B4423",
+    "name": "泥土棕",
+    "ratio": 0.25
+   },
+   {
+    "hex": "#A87C50",
+    "name": "兽皮黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8B261A",
+    "name": "凝血红",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#D9C4A3",
+    "name": "暖米肤",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#4A5D6B",
+    "name": "冷雾灰蓝",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#E8A84C",
+    "name": "夕照金",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#C0392B",
+    "name": "赤红痛楚",
+    "emotion": "生存挣扎"
+   },
+   {
+    "hex": "#F4D03F",
+    "name": "金色救赎",
+    "emotion": "命运转机"
+   },
+   {
+    "hex": "#566573",
+    "name": "灰蓝孤寂",
+    "emotion": "存在疏离"
+   },
+   {
+    "hex": "#6E2C00",
+    "name": "深棕大地",
+    "emotion": "根脉归属"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "natural available light, long take practical lighting, soft window fill",
+  "highlight_tint": "warm amber / dirty gold",
+  "shadow_tint": "earthy brown / muted cool gray",
+  "contrast_ratio": "medium-high 60-75%, natural depth preserved",
+  "overall_tone": "warm earth and blood, 65% warm + 35% cool"
+ },
+ "composition": [
+  "long take roving camera",
+  "handheld intimate",
+  "wide-angle immersive",
+  "natural framing",
+  "continuous shot choreography",
+  "low angle grit",
+  "mirror/reflection framing",
+  "visceral close-up"
+ ],
+ "colorKeywords": [
+  "mud and blood warm tones",
+  "natural available light",
+  "amber interior glow",
+  "cold winter grey-blue",
+  "warm skin under stress",
+  "dirt and sweat",
+  "firelight flicker",
+  "dust in air"
+ ],
+ "mood": [
+  "existential weight",
+  "human survival",
+  "interconnected fate",
+  "visceral physicality",
+  "cultural collision",
+  "spiritual longing",
+  "bitter triumph",
+  "breath and exhaustion"
+ ],
+ "profile": {
+  "definition": "自然金、寒冷蓝与泥土黑把肉身置于极端环境。",
+  "lighting": "自然逆光、火光、低温环境光；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "贴身长镜、广角环境、连续移动；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "低饱和冷环境，肤色和火光保留温度；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "旅游风景色、肤色灰死、无重量稳定器、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

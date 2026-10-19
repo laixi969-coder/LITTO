@@ -1,0 +1,108 @@
+{
+ "id": "045",
+ "name": "李安",
+ "nameEn": "Ang Lee",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "中国台湾 / 美国",
+ "years": "1991-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C2A676",
+    "name": "温润玉黄",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#5A6B4A",
+    "name": "竹林青灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8B7355",
+    "name": "大地赭棕",
+    "ratio": 0.17
+   },
+   {
+    "hex": "#E8D5B7",
+    "name": "暖沙米白",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#3D4F3F",
+    "name": "深松绿",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#D68C45",
+    "name": "暖阳橙",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#98D8C8",
+    "name": "翡翠青",
+    "emotion": "东方诗意"
+   },
+   {
+    "hex": "#F4A460",
+    "name": "夕阳橙",
+    "emotion": "禁忌爱恋"
+   },
+   {
+    "hex": "#1E3A5F",
+    "name": "深海蓝",
+    "emotion": "命运孤独"
+   },
+   {
+    "hex": "#DEB887",
+    "name": "暖棕茶",
+    "emotion": "家庭温情"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "soft diffused natural light, gentle side lighting, warm window fill",
+  "highlight_tint": "warm sand yellow / pale gold",
+  "shadow_tint": "earth brown / muted green (never harsh)",
+  "contrast_ratio": "low-medium 40-55%, gentle and soft",
+  "overall_tone": "warm earth and soft green, 65% warm + 35% cool"
+ },
+ "composition": [
+  "soft diffused light",
+  "landscape meditation",
+  "static balanced frame",
+  "gentle tracking",
+  "nature as emotional mirror",
+  "martial arts poetry",
+  "family interior warmth",
+  "water surface reflection"
+ ],
+ "colorKeywords": [
+  "warm earth natural palette",
+  "soft jade green",
+  "bamboo forest light",
+  "golden hour meadow",
+  "warm family interior",
+  "ocean twilight blue",
+  "tea brown nostalgia",
+  "pastel restraint"
+ ],
+ "mood": [
+  "quiet restraint",
+  "eastern-western fusion",
+  "forbidden longing",
+  "family duty vs freedom",
+  "poetic nature",
+  "gentle melancholy",
+  "spiritual journey",
+  "compassionate humanity"
+ ],
+ "profile": {
+  "definition": "礼法秩序与压抑欲望通过自然景观、人物距离和材质显现",
+  "lighting": "柔和自然天光、室内窗光与克制月夜冷光；肤色保持自然可读，高光和黑位保留材质。",
+  "framing": "古典平衡构图、门窗层次与山水远景",
+  "grading": "竹青、瓦灰、木棕、丝绸白与少量朱红；局部强调色不污染整幅画面。",
+  "avoid": "统一滤镜替代真实材质、无动机环绕和随机变焦、人物身份与空间轴漂移、肤色污染、死黑和爆白、只模仿颜色不执行镜头语言。"
+ }
+}

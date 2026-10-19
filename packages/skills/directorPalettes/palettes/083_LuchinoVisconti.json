@@ -1,0 +1,102 @@
+{
+ "id": "083",
+ "name": "维斯康蒂",
+ "nameEn": "LuchinoVisconti",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "意大利",
+ "years": "1906-1976",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B0000",
+    "name": "暗红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金菊色",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "墨绿青",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#D2B48C",
+    "name": "棕绸色",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#4A0E1A",
+    "name": "酒红深",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#B8860B",
+    "name": null,
+    "emotion": "贵族荣耀"
+   },
+   {
+    "hex": "#800000",
+    "name": null,
+    "emotion": "衰败悲伤"
+   },
+   {
+    "hex": "#556B2F",
+    "name": null,
+    "emotion": "自然宁静"
+   },
+   {
+    "hex": "#2F2F2F",
+    "name": null,
+    "emotion": "历史沉重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "油画侧光",
+  "highlight_bias": "烛火暖调",
+  "shadow_bias": "宫殿光影",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "歌剧式构图",
+  "贵族空间",
+  "长镜头静观",
+  "家族群像",
+  "威尼斯水色",
+  "历史画卷"
+ ],
+ "colorKeywords": [
+  "贵族金红",
+  "油画质感",
+  "威尼斯水色",
+  "烛光影调",
+  "丝绒质感",
+  "衰败华丽"
+ ],
+ "mood": [
+  "贵族衰败",
+  "历史史诗",
+  "家族悲剧",
+  "意大利新现实主义",
+  "歌剧美学",
+  "宿命感"
+ ],
+ "profile": {
+  "definition": "维斯康蒂的视觉风格以油画侧光为主，贵族金红、油画质感，营造出贵族衰败的氛围。",
+  "lighting": "油画侧光，高光偏烛火暖调，阴影偏宫殿光影，整体暖调。",
+  "framing": "歌剧式构图、贵族空间、长镜头静观。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

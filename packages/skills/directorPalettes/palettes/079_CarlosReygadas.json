@@ -1,0 +1,104 @@
+{
+ "id": "079",
+ "name": "卡洛斯·雷加达斯",
+ "nameEn": "CarlosReygadas",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "墨西哥",
+ "years": "1971-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7A8A7A",
+    "name": "墨西哥乡村绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#9A9080",
+    "name": "土棕灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5A6A5A",
+    "name": "深林绿灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B8A890",
+    "name": "干土米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#D4C8A8",
+    "name": "阳光麦",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A4A3A",
+    "name": "暗绿黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8A9A8A",
+    "name": null,
+    "emotion": "神圣自然"
+   },
+   {
+    "hex": "#6A5A4A",
+    "name": null,
+    "emotion": "原始欲望"
+   },
+   {
+    "hex": "#A89878",
+    "name": null,
+    "emotion": "乡村静谧"
+   },
+   {
+    "hex": "#2A3A2A",
+    "name": null,
+    "emotion": "死亡神秘"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光神圣",
+  "highlight_bias": "黄金时刻",
+  "shadow_bias": "雾中柔光",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "自然风景",
+  "极端长镜",
+  "宗教意象",
+  "乡村空间",
+  "性与死亡",
+  "手持跟拍"
+ ],
+ "colorKeywords": [
+  "墨西哥乡村色",
+  "自然光神圣",
+  "土棕色调",
+  "雾林绿",
+  "金色阳光",
+  "低饱和"
+ ],
+ "mood": [
+  "宗教迷思",
+  "自然神性",
+  "存在主义",
+  "原始欲望",
+  "死亡主题",
+  "诗意缓慢"
+ ],
+ "profile": {
+  "definition": "卡洛斯·雷加达斯的视觉风格以自然光神圣为主，墨西哥乡村色、自然光神圣、土棕色调，营造出宗教迷思的氛围。",
+  "lighting": "自然光神圣，高光偏黄金时刻，阴影偏雾中柔光，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "自然风景、极端长镜、宗教意象，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩墨西哥乡村色、自然光神圣、土棕色调。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

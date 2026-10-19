@@ -1,0 +1,108 @@
+{
+ "id": "059",
+ "name": "卢贝兹基",
+ "nameEn": "Emmanuel Lubezki",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "墨西哥",
+ "years": "1990-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E6B86A",
+    "name": "黄金时刻",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#4A6B5C",
+    "name": "苔原冷绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2E3138",
+    "name": "黎明深灰",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#D9C2A0",
+    "name": "暖沙肤色",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#6B8E9A",
+    "name": "冰湖蓝灰",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#9B7E5C",
+    "name": "大地赭石",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF7F50",
+    "name": "日出火",
+    "emotion": "生命觉醒"
+   },
+   {
+    "hex": "#9370DB",
+    "name": "极光紫",
+    "emotion": "神秘超越"
+   },
+   {
+    "hex": "#E0FFFF",
+    "name": "霜雾白",
+    "emotion": "寒冷纯净"
+   },
+   {
+    "hex": "#8B4513",
+    "name": "土地棕",
+    "emotion": "原始生存"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "natural light only, golden hour magic hour, soft overcast diffusion",
+  "highlight_tint": "golden amber / sunrise orange",
+  "shadow_tint": "cool forest green / blue-grey",
+  "contrast_ratio": "medium 55-70%",
+  "overall_tone": "warm natural light, 60% warm + 40% cool"
+ },
+ "composition": [
+  "long continuous take",
+  "360-degree camera movement",
+  "natural light only",
+  "golden hour magic hour",
+  "handheld intimacy",
+  "wide-angle immersion",
+  "breathing camera",
+  "nature as character"
+ ],
+ "colorKeywords": [
+  "golden hour sunrise",
+  "tundra moss green",
+  "frosty blue-grey",
+  "warm skin tones",
+  "earth ochre brown",
+  "dawn twilight purple",
+  "firelight orange",
+  "snowy white purity"
+ ],
+ "mood": [
+  "spiritual transcendence",
+  "primal survival",
+  "theatrical intimacy",
+  "cosmic wonder",
+  "breathing existence",
+  "raw nature power",
+  "human vulnerability",
+  "dreamlike flow"
+ ],
+ "profile": {
+  "definition": "金辉、苔绿与冰蓝的自然光谱，长镜头与呼吸感把光影化为生命之流。",
+  "lighting": "完全依赖自然光，黄金时刻为主，阴天柔光为辅；肤色在自然中真实呈现，不补光不打板。",
+  "framing": "长镜头跟拍、广角沉浸、360°环绕；让摄影机成为观察者，也成为呼吸本身。",
+  "grading": "保留光线的真实变化，高光暖金，阴影冷绿；随时间推移色温变化，营造生命流逝感。",
+  "avoid": "人工打光痕迹、统一调色滤镜、快速剪辑碎切、稳定器过度平滑、用棚拍光效替代真实自然光影"
+ }
+}

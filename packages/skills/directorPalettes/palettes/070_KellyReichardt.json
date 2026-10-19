@@ -1,0 +1,75 @@
+{
+ "id": "070",
+ "name": "KellyReichardt 凯莉·雷查德",
+ "nameEn": "",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#6B7D6B",
+    "name": "22%",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B9A8B",
+    "name": "18%",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#A89F8A",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#4A5A4A",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#C4BCA8",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A4A3A",
+    "name": "16%",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#7D8F7D",
+    "name": "",
+    "emotion": "孤独隐忍"
+   },
+   {
+    "hex": "#5A6A5A",
+    "name": "",
+    "emotion": "自然沉思"
+   },
+   {
+    "hex": "#B0A896",
+    "name": "",
+    "emotion": "温情默默"
+   },
+   {
+    "hex": "#2A3A2A",
+    "name": "",
+    "emotion": "生存坚韧"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "阴散射光",
+  "highlight_tint": "森林柔光",
+  "shadow_tint": "西北雨雾",
+  "contrast_ratio": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

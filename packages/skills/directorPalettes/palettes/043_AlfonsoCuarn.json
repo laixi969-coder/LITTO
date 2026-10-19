@@ -1,0 +1,108 @@
+{
+ "id": "043",
+ "name": "阿方索·卡隆",
+ "nameEn": "Alfonso Cuarón",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "墨西哥",
+ "years": "1991-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#D4A574",
+    "name": "暖金回忆",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#B89968",
+    "name": "土黄街景",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2C2C2C",
+    "name": "深空黑",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#6B8E9A",
+    "name": "冷钢蓝灰",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#8B7355",
+    "name": "橄榄棕",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#E8D5B7",
+    "name": "柔光米白",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F4C430",
+    "name": "记忆金",
+    "emotion": "童年回望"
+   },
+   {
+    "hex": "#4A6FA5",
+    "name": "太空蓝",
+    "emotion": "孤独浩瀚"
+   },
+   {
+    "hex": "#A0522D",
+    "name": "赭石红",
+    "emotion": "末世苦难"
+   },
+   {
+    "hex": "#DCDCDC",
+    "name": "银白",
+    "emotion": "失重漂浮"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "natural available light, long take continuous lighting, soft window bounce",
+  "highlight_tint": "warm gold / amber memory",
+  "shadow_tint": "cool steel blue / warm umber",
+  "contrast_ratio": "medium 50-65%, wide range by scene",
+  "overall_tone": "warm memory + cold reality, 60% warm + 40% cool"
+ },
+ "composition": [
+  "long take immersion",
+  "zero-gravity fluid camera",
+  "wide-angle depth",
+  "handheld documentary",
+  "child's eye low angle",
+  "360-degree spatial camera",
+  "natural framing",
+  "silent long shot"
+ ],
+ "colorKeywords": [
+  "warm golden memory tones",
+  "black and white stark realism",
+  "cool steel blue space",
+  "earth brown post-apocalypse",
+  "soft morning light",
+  "dust motes in sunbeam",
+  "rain-washed street",
+  "fire in darkness"
+ ],
+ "mood": [
+  "memory and longing",
+  "isolation in vastness",
+  "childhood innocence lost",
+  "human connection",
+  "gravity and weightlessness",
+  "political urgency",
+  "poetic realism",
+  "quiet resilience"
+ ],
+ "profile": {
+  "definition": "长镜自然主义在灰白、土色与单一环境主色中保持现场感。",
+  "lighting": "自然光、实景光、长镜曝光连续；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "复杂长镜、人物与环境同步变化；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "写实低饱和，主色随环境统一；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "炫彩LUT、切碎长动作、不连续曝光、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

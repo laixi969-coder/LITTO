@@ -1,0 +1,104 @@
+{
+ "id": "061",
+ "name": "塔可夫斯基",
+ "nameEn": "AndreiTarkovsky",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "俄罗斯",
+ "years": "1932-1986",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#4A5D52",
+    "name": "雾灰绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#6B7B6E",
+    "name": "苔藓灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8B9A8D",
+    "name": "晨雾绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#C4B8A3",
+    "name": "旧木米",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#5A5248",
+    "name": "大地棕灰",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#2D3A34",
+    "name": "深林暗绿",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#D4CFBE",
+    "name": null,
+    "emotion": "神圣与冥想"
+   },
+   {
+    "hex": "#3D4F46",
+    "name": null,
+    "emotion": "存在与沉思"
+   },
+   {
+    "hex": "#8BA395",
+    "name": null,
+    "emotion": "自然与永恒"
+   },
+   {
+    "hex": "#1F2825",
+    "name": null,
+    "emotion": "时间与消逝"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光散射",
+  "highlight_bias": "雾气弥漫",
+  "shadow_bias": "窗光神圣",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "长镜头静观",
+  "自然风景构图",
+  "水元素意象",
+  "建筑与人物关系",
+  "缓慢平移",
+  "深焦纵深"
+ ],
+ "colorKeywords": [
+  "雾灰绿调",
+  "自然柔光",
+  "水反光",
+  "大地色系",
+  "低饱和",
+  "空气透视"
+ ],
+ "mood": [
+  "诗意沉思",
+  "灵魂升华",
+  "时间重量",
+  "自然神性",
+  "存在主义",
+  "梦幻记忆"
+ ],
+ "profile": {
+  "definition": "塔可夫斯基的视觉风格以柔光散射为主，雾灰绿调、自然柔光、水反光，营造出诗意沉思的氛围。",
+  "lighting": "柔光散射，高光偏雾气弥漫，阴影偏窗光神圣，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "长镜头静观、自然风景构图、水元素意象，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩雾灰绿调、自然柔光、水反光。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

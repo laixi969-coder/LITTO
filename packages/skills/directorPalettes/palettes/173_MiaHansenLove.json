@@ -1,0 +1,105 @@
+{
+ "id": "173",
+ "name": "米娅·汉森-洛夫",
+ "nameEn": "MiaHansen-Love",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "法国",
+ "years": "1981-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#90CAF9",
+    "name": "巴黎蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "生活绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "巴黎米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#EF9A9A",
+    "name": "温柔粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "知性灰",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#90CAF9",
+    "name": "知性清明",
+    "emotion": "知性清明"
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "生活温柔",
+    "emotion": "生活温柔"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "时间暖光",
+    "emotion": "时间暖光"
+   },
+   {
+    "hex": "#78909C",
+    "name": "存在忧郁",
+    "emotion": "存在忧郁"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "巴黎自然光",
+  "highlight_tint": "柔光漫射",
+  "highlight_bias": "柔光漫射",
+  "shadow_tint": "窗光侧光",
+  "shadow_bias": "窗光侧光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "巴黎街景",
+  "人生岔路",
+  "知识分子",
+  "父女关系",
+  "时间流逝",
+  "日常诗意"
+ ],
+ "colorKeywords": [
+  "汉森洛夫蓝绿",
+  "法国知性色",
+  "巴黎日常光",
+  "时间暖调",
+  "人生岔路色",
+  "温柔电影色"
+ ],
+ "mood": [
+  "时间流逝",
+  "人生选择",
+  "法国知性",
+  "女性视角",
+  "日常诗意",
+  "父女关系"
+ ],
+ "profile": {
+  "definition": "米娅·汉森-洛夫的视觉风格：巴黎自然光，汉森洛夫蓝绿, 法国知性色, 巴黎日常光。",
+  "lighting": "巴黎自然光，柔光漫射，窗光侧光",
+  "framing": "巴黎街景、人生岔路、知识分子。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

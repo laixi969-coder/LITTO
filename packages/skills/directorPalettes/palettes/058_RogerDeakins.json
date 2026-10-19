@@ -1,0 +1,108 @@
+{
+ "id": "058",
+ "name": "罗杰·迪金斯",
+ "nameEn": "Roger Deakins",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "英国",
+ "years": "1973-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#6B7B8C",
+    "name": "雾霭蓝灰",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#C49A5C",
+    "name": "琥珀暖黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2A2E33",
+    "name": "深炭暗影",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#D9CDB8",
+    "name": "羊皮纸米",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#4A5568",
+    "name": "钢蓝冷调",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#8B6F47",
+    "name": "沙土金棕",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#D4AF37",
+    "name": "窗光金",
+    "emotion": "宁静启示"
+   },
+   {
+    "hex": "#00BFFF",
+    "name": "赛博蓝",
+    "emotion": "未来疏离"
+   },
+   {
+    "hex": "#708090",
+    "name": "雾都灰",
+    "emotion": "战争虚无"
+   },
+   {
+    "hex": "#CD853F",
+    "name": "落日铜",
+    "emotion": "宿命苍凉"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "natural window light, precise silhouette framing, foggy blue-grey diffusion",
+  "highlight_tint": "warm amber gold / pale cream",
+  "shadow_tint": "cool slate blue / deep charcoal",
+  "contrast_ratio": "high 70-85%",
+  "overall_tone": "balanced naturalism, 50% warm + 50% cool"
+ },
+ "composition": [
+  "precision framing",
+  "natural window light",
+  "foggy atmosphere",
+  "silhouette against light",
+  "long takes (1917)",
+  "negative space",
+  "geometric composition",
+  "painterly chiaroscuro"
+ ],
+ "colorKeywords": [
+  "foggy slate blue",
+  "amber tungsten warm",
+  "charcoal deep shadow",
+  "parchment skin tone",
+  "desert sand gold",
+  "cyberpunk neon blue",
+  "window rim light",
+  "natural daylight precision"
+ ],
+ "mood": [
+  "quiet contemplation",
+  "existential precision",
+  "dystopian beauty",
+  "wartime desolation",
+  "western stoicism",
+  "visual poetry",
+  "moral ambiguity",
+  "cinematic meditation"
+ ],
+ "profile": {
+  "definition": "雾蓝、琥珀与炭灰构成的精准世界，窗光与剪影把每个镜头炼成油画。",
+  "lighting": "自然光为主，窗光勾勒轮廓，雾霭柔化边界；肤色自然不偏色，明暗关系精准如古典绘画。",
+  "framing": "几何对称、负空间、精准分割；先建立空间秩序，再让人物在秩序中寻找位置。",
+  "grading": "蓝灰与暖黄两极平衡；冷调场景偏雾蓝，暖调场景偏琥珀，但始终保留中间调的真实感。",
+  "avoid": "色偏过重、过度饱和、无动机光源、炫光滥用、用统一滤镜替代精心设计的自然光效"
+ }
+}

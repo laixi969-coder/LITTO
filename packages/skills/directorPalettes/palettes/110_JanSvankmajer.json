@@ -1,0 +1,105 @@
+{
+ "id": "110",
+ "name": "杨·史云梅耶",
+ "nameEn": "JanSvankmajer",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "捷克",
+ "years": "1934-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#6D4C41",
+    "name": "旧木棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#827717",
+    "name": "橄榄黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#37474F",
+    "name": "暗青灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#BF360C",
+    "name": "锈红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A1887F",
+    "name": "尘土棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1B1B1B",
+    "name": "墨黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#6D4C41",
+    "name": "物质记忆",
+    "emotion": "物质记忆"
+   },
+   {
+    "hex": "#BF360C",
+    "name": "肉身焦虑",
+    "emotion": "肉身焦虑"
+   },
+   {
+    "hex": "#827717",
+    "name": "自然荒诞",
+    "emotion": "自然荒诞"
+   },
+   {
+    "hex": "#37474F",
+    "name": "暗黑童话",
+    "emotion": "暗黑童话"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光写实",
+  "highlight_tint": "静物侧光",
+  "highlight_bias": "静物侧光",
+  "shadow_tint": "自然天光",
+  "shadow_bias": "自然天光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "定格动画",
+  "物件拟人",
+  "食物变形",
+  "身体恐怖",
+  "捷克超现实",
+  "触觉质感"
+ ],
+ "colorKeywords": [
+  "旧物棕黄",
+  "暗黑童话色",
+  "物质色彩",
+  "泥土色调",
+  "低饱和",
+  "质感色彩"
+ ],
+ "mood": [
+  "暗黑童话",
+  "物质恋物",
+  "身体恐怖",
+  "捷克超现实",
+  "触感电影",
+  "荒诞不经"
+ ],
+ "profile": {
+  "definition": "杨·史云梅耶的视觉风格：柔光写实，旧物棕黄, 暗黑童话色, 物质色彩。",
+  "lighting": "柔光写实，静物侧光，自然天光",
+  "framing": "定格动画、物件拟人、食物变形。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

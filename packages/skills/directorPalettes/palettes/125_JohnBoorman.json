@@ -1,0 +1,75 @@
+{
+ "id": "125",
+ "name": "JohnBoorman 约翰·布尔曼",
+ "nameEn": "",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1B5E20",
+    "name": "22%",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "20%",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A237E",
+    "name": "14%",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#1B5E20",
+    "name": "",
+    "emotion": "自然原力"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "",
+    "emotion": "神话荣光"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "",
+    "emotion": "神秘湖水"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "",
+    "emotion": "暴力血腥"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "森林光斑",
+  "highlight_tint": "水光反射",
+  "shadow_tint": "黄金时刻",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

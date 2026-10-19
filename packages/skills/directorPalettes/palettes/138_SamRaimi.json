@@ -1,0 +1,105 @@
+{
+ "id": "138",
+ "name": "山姆·雷米",
+ "nameEn": "SamRaimi",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "美国",
+ "years": "1959-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1B5E20",
+    "name": "鬼林绿",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血浆红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "地窖蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#5D4037",
+    "name": "木屋棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "闪电金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "黑暗",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#1B5E20",
+    "name": "森林恐惧",
+    "emotion": "森林恐惧"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血腥恐怖",
+    "emotion": "血腥恐怖"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "超自然恶",
+    "emotion": "超自然恶"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "惊魂瞬间",
+    "emotion": "惊魂瞬间"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "恐怖色光",
+  "highlight_tint": "动感补光",
+  "highlight_bias": "动感补光",
+  "shadow_tint": "地窖暗光",
+  "shadow_bias": "地窖暗光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "动感镜头",
+  "POV视角",
+  "血浆恐怖",
+  "木屋地窖",
+  "漫画英雄",
+  "邪典幽默"
+ ],
+ "colorKeywords": [
+  "鬼玩人绿红",
+  "血浆恐怖色",
+  "地窖蓝暗",
+  "木屋棕调",
+  "邪典色彩",
+  "漫画英雄色"
+ ],
+ "mood": [
+  "邪典恐怖",
+  "血浆幽默",
+  "动感镜头",
+  "鬼玩人系列",
+  "漫画英雄",
+  "B级片美学"
+ ],
+ "profile": {
+  "definition": "山姆·雷米的视觉风格：恐怖色光，鬼玩人绿红, 血浆恐怖色, 地窖蓝暗。",
+  "lighting": "恐怖色光，动感补光，地窖暗光",
+  "framing": "动感镜头、POV视角、血浆恐怖。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "154",
+ "name": "布拉德·伯德",
+ "nameEn": "BradBird",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "美国",
+ "years": "1957-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E53935",
+    "name": "超人红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#1565C0",
+    "name": "英雄蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFA000",
+    "name": "复古橙黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#78909C",
+    "name": "金属灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "英雄绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "暖黄",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#E53935",
+    "name": "英雄正义",
+    "emotion": "英雄正义"
+   },
+   {
+    "hex": "#1565C0",
+    "name": "责任担当",
+    "emotion": "责任担当"
+   },
+   {
+    "hex": "#FFA000",
+    "name": "复古怀旧",
+    "emotion": "复古怀旧"
+   },
+   {
+    "hex": "#78909C",
+    "name": "机械美学",
+    "emotion": "机械美学"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "复古暖光",
+  "highlight_tint": "金属冷光",
+  "highlight_bias": "金属冷光",
+  "shadow_tint": "50年代色",
+  "shadow_bias": "50年代色",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "复古未来",
+  "超人家庭",
+  "黄金时代",
+  "动作流畅",
+  "城市英雄",
+  "家庭温情"
+ ],
+ "colorKeywords": [
+  "超人红蓝",
+  "复古未来色",
+  "50年代暖调",
+  "金属英雄色",
+  "动作片色彩",
+  "黄金时代色"
+ ],
+ "mood": [
+  "英雄主义",
+  "家庭温情",
+  "复古未来",
+  "黄金时代",
+  "动作美学",
+  "天才动画"
+ ],
+ "profile": {
+  "definition": "布拉德·伯德的视觉风格：复古暖光，超人红蓝, 复古未来色, 50年代暖调。",
+  "lighting": "复古暖光，金属冷光，50年代色",
+  "framing": "复古未来、超人家庭、黄金时代。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "102",
+ "name": "特瑞·吉列姆",
+ "nameEn": "TerryGilliam",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国/英国",
+ "years": "1940-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#5D4037",
+    "name": "脏棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#37474F",
+    "name": "工业灰蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FF6F00",
+    "name": "橙黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#4A148C",
+    "name": "深紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#827717",
+    "name": "橄榄黄绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "污黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF6F00",
+    "name": "荒诞狂想",
+    "emotion": "荒诞狂想"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "脏乱现实",
+    "emotion": "脏乱现实"
+   },
+   {
+    "hex": "#4A148C",
+    "name": "梦幻逃离",
+    "emotion": "梦幻逃离"
+   },
+   {
+    "hex": "#37474F",
+    "name": "官僚压抑",
+    "emotion": "官僚压抑"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "低照度暖光",
+  "highlight_tint": "蒸汽朋克光",
+  "highlight_bias": "蒸汽朋克光",
+  "shadow_tint": "彩色色光",
+  "shadow_bias": "彩色色光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "广角畸变",
+  "拼贴美学",
+  "脏乱空间",
+  "童话黑暗",
+  "机械装置",
+  "倾斜构图"
+ ],
+ "colorKeywords": [
+  "蒸汽朋克色",
+  "脏乱质感",
+  "高饱和点缀",
+  "拼贴色彩",
+  "橙紫对比",
+  "工业脏色"
+ ],
+ "mood": [
+  "反乌托邦",
+  "黑色童话",
+  "荒诞不经",
+  "逃离现实",
+  "官僚讽刺",
+  "混乱诗意"
+ ],
+ "profile": {
+  "definition": "特瑞·吉列姆的视觉风格：低照度暖光，蒸汽朋克色, 脏乱质感, 高饱和点缀。",
+  "lighting": "低照度暖光，蒸汽朋克光，彩色色光",
+  "framing": "广角畸变、拼贴美学、脏乱空间。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

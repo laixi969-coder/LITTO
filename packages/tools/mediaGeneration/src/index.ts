@@ -8,6 +8,25 @@ const configSchema = z.strictObject({
   allowAudio: z.boolean().default(true),
 });
 
+const mediaPath = z.string().min(1).max(2048).refine(
+  value => !/^[\\/]|[:\u0000-\u001f]/.test(value) && value.split(/[\\/]/).every(part => part && part !== "." && part !== ".."),
+  "路径必须是工作区内的相对路径，不能包含 .. 或空路径段",
+);
+
+const composeFilmSchema = z.strictObject({
+  clips: z.array(mediaPath).min(1).max(400).describe("按成片顺序排列的工作区视频路径，来自实际生成结果"),
+  output: mediaPath.describe("成片输出路径，如 assets/generated/成片.mp4"),
+  grade: z.strictObject({
+    contrast: z.number().min(0.5).max(2).optional(),
+    saturation: z.number().min(0).max(2).optional(),
+    brightness: z.number().min(-1).max(1).optional(),
+    grain: z.number().min(0).max(40).optional(),
+  }).optional().describe("统一调色；grain 在调色之后叠加，超过 12 会明显噪"),
+  targetLufs: z.number().min(-40).max(-5).optional().describe("整片响度目标，默认 -16 LUFS"),
+  headTail: z.array(z.object({ start: z.number().nonnegative(), end: z.number().positive() })).max(8).optional().describe("片头片尾黑场豁免区间，只影响自检判定"),
+  verify: z.boolean().optional().describe("合成后是否自动跑整片自检，默认开启"),
+});
+
 const plugin: ToolPlugin = {
   validateConfig: config => configSchema.parse(config),
   createTools({ media, config }) {
@@ -129,7 +148,18 @@ const plugin: ToolPlugin = {
         },
       });
     }
-    return [...(generationTools.length ? [listTool] : []), ...productionTools, ...generationTools.map<ToolDefinition>(operation => ({
+    return [...(generationTools.length ? [listTool] : []), ...(media.compose ? [{
+      name: "composeFilm",
+      label: "合成成片",
+      description: "把已生成的工作区视频按给定顺序合成为一支片子：先拼轨（不重编码），再统一做一次调色与响度归一。只编码一次，因此不会出现段间黑闪或音量跳变。",
+      promptSnippet: "全部镜头采用之后再合成。clips 按成片顺序排列，路径取自实际生成结果，不猜路径。默认 grade 控制在对比 1.05、饱和 0.9、颗粒 4 以内，目标是电影感而不是做旧；targetLufs 默认 -16。合成只完成技术拼装，仍需实际完整看听再验收，不能把已合成当作已验收。",
+      parameters: z.toJSONSchema(composeFilmSchema, { io: "input", target: "draft-07" }),
+      async execute(_id, params, signal) {
+        const parsed = composeFilmSchema.parse(params);
+        const result = await media.compose!(parsed, signal);
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      },
+    } as ToolDefinition] : []), ...productionTools, ...generationTools.map<ToolDefinition>(operation => ({
       name: operation.name,
       label: operation.label,
       description: `${operation.description}providerId 和 modelId 必须来自 listMediaModels。引用素材的 path 及 outputDirectory 均为工作区相对路径；省略输出目录使用默认媒体目录。等待生成完成后返回已保存的文件路径，不返回 Base64。`,

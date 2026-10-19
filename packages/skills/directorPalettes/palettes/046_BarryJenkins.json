@@ -1,0 +1,108 @@
+{
+ "id": "046",
+ "name": "巴里·詹金斯",
+ "nameEn": "Barry Jenkins",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "美国",
+ "years": "2008-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C68642",
+    "name": "暖金褐肤",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#3A2E5F",
+    "name": "暮光紫蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8B5A2B",
+    "name": "深棕暖肤",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#D4A574",
+    "name": "阳光金棕",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#2E5E4E",
+    "name": "墨绿青蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#E8C99B",
+    "name": "暖沙金",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8C42",
+    "name": "橙红热情",
+    "emotion": "爱与渴望"
+   },
+   {
+    "hex": "#7B68EE",
+    "name": "靛蓝紫梦",
+    "emotion": "梦幻少年"
+   },
+   {
+    "hex": "#F0E68C",
+    "name": "柔黄希望",
+    "emotion": "温柔未来"
+   },
+   {
+    "hex": "#4A0E0E",
+    "name": "深酒红",
+    "emotion": "苦难深情"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "soft warm key with color fill, practical neon/tungsten, natural window light",
+  "highlight_tint": "warm gold / orange sunset",
+  "shadow_tint": "deep purple-blue / teal green",
+  "contrast_ratio": "medium-high 60-75%, skin always warm",
+  "overall_tone": "warm skin + cool purple/teal environment, 55% warm + 45% cool"
+ },
+ "composition": [
+  "slow push-in intimacy",
+  "centered portrait",
+  "circular camera movement",
+  "soft shallow focus",
+  "negative space loneliness",
+  "streetlamp silhouette",
+  "tender close-up",
+  "mirror/glass reflection"
+ ],
+ "colorKeywords": [
+  "saturated warm brown skin",
+  "twilight purple-blue",
+  "teal pool water",
+  "golden hour beach",
+  "warm tungsten streetlight",
+  "deep blue night",
+  "orange sunset haze",
+  "yellow memory glow"
+ ],
+ "mood": [
+  "tender black masculinity",
+  "queer love and longing",
+  "urban poetry",
+  "childhood memory",
+  "racial injustice",
+  "gentle intimacy",
+  "dreamlike memory",
+  "resilience and hope"
+ ],
+ "profile": {
+  "definition": "月夜蓝、紫黑与温暖肤色让亲密关系在暗处仍有触感。",
+  "lighting": "柔软侧光、彩色夜光、皮肤轮廓光；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "贴近面部、流动圆弧、触觉特写；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "蓝色阴影丰富，肤色不被吞没；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "肤色发灰、全屏紫蓝、商业美颜、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

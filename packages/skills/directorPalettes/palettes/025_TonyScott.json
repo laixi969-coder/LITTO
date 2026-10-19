@@ -1,0 +1,108 @@
+{
+ "id": "025",
+ "name": "托尼·斯科特",
+ "nameEn": "Tony Scott",
+ "category": "02_霓虹黑色与赛博未来",
+ "nationality": "英国",
+ "years": "1983-2012",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0D1B2A",
+    "name": "深蓝夜幕",
+    "ratio": 0.25
+   },
+   {
+    "hex": "#FF6B00",
+    "name": "烈焰橙",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#1E90FF",
+    "name": "电光蓝",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#DAA520",
+    "name": "暖金阳光",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#8B0000",
+    "name": "深红行动",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#F5DEB3",
+    "name": "小麦肤",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF4500",
+    "name": "速度橙",
+    "emotion": "速度动作"
+   },
+   {
+    "hex": "#00BFFF",
+    "name": "高空蓝",
+    "emotion": "飞翔自由"
+   },
+   {
+    "hex": "#FFD700",
+    "name": "英雄金",
+    "emotion": "荣耀英雄"
+   },
+   {
+    "hex": "#DC143C",
+    "name": "激情红",
+    "emotion": "爱情危险"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "backlit golden hour, overexposed highlights, strong orange-blue",
+  "highlight_tint": "orange-gold sunset backlight explosion",
+  "shadow_tint": "deep navy blue",
+  "contrast_ratio": "high 75-85%",
+  "overall_tone": "high-saturation orange-blue 50/50"
+ },
+ "composition": [
+  "rapid montage editing",
+  "helicopter aerial shots",
+  "backlit silhouettes",
+  "slow motion action",
+  "360 degree orbits",
+  "low angle hero",
+  "lens flares",
+  "smoke steam"
+ ],
+ "colorKeywords": [
+  "orange-blue complementary",
+  "backlit golden hour",
+  "overexposed highlights",
+  "teal and orange grade",
+  "lens flare streaks",
+  "sunset orange glow",
+  "navy blue night",
+  "saturated commercial"
+ ],
+ "mood": [
+  "high-octane action",
+  "commercial slickness",
+  "heroic masculinity",
+  "romantic tension",
+  "adrenaline rush",
+  "patriotic americana",
+  "glamorous danger",
+  "pop entertainment"
+ ],
+ "profile": {
+  "definition": "托尼·斯科特的视觉风格以backlit golden hour, overexposed highlights, strong orange-blue为主，orange-blue complementary、backlit golden hour，营造出high-octane action的氛围。",
+  "lighting": "backlit golden hour, overexposed highlights, strong orange-blue，高光偏orange-gold sunset backlight explosion，阴影偏deep navy blue，整体high-saturation orange-blue 50/50。",
+  "framing": "rapid montage editing、helicopter aerial shots、backlit silhouettes。",
+  "grading": "对比度high 75-85%，色调high-saturation orange-blue 50/50。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

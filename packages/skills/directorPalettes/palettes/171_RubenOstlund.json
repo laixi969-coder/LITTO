@@ -1,0 +1,105 @@
+{
+ "id": "171",
+ "name": "鲁本·奥斯特伦德",
+ "nameEn": "RubenOstlund",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "瑞典",
+ "years": "1974-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#78909C",
+    "name": "北欧灰",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "雪国白",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#0288D1",
+    "name": "峡湾蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "木棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "冷杉绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#546E7A",
+    "name": "冷蓝灰",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#78909C",
+    "name": "阶级冷漠",
+    "emotion": "阶级冷漠"
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "北欧冷静",
+    "emotion": "北欧冷静"
+   },
+   {
+    "hex": "#0288D1",
+    "name": "自然辽阔",
+    "emotion": "自然辽阔"
+   },
+   {
+    "hex": "#546E7A",
+    "name": "尴尬不安",
+    "emotion": "尴尬不安"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "北欧冷光",
+  "highlight_tint": "自然散射光",
+  "highlight_bias": "自然散射光",
+  "shadow_tint": "雪国白光",
+  "shadow_bias": "雪国白光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "长镜头观察",
+  "阶级讽刺",
+  "北欧风光",
+  "博物馆空间",
+  "群体行为",
+  "三角构图"
+ ],
+ "colorKeywords": [
+  "北欧冷灰",
+  "雪国白色",
+  "奥斯特伦德冷调",
+  "阶级讽刺色",
+  "博物馆光色",
+  "峡湾蓝调"
+ ],
+ "mood": [
+  "阶级批判",
+  "尴尬美学",
+  "北欧冷静",
+  "长镜头观察",
+  "社会实验",
+  "人性剖析"
+ ],
+ "profile": {
+  "definition": "鲁本·奥斯特伦德的视觉风格：北欧冷光，北欧冷灰, 雪国白色, 奥斯特伦德冷调。",
+  "lighting": "北欧冷光，自然散射光，雪国白光",
+  "framing": "长镜头观察、阶级讽刺、北欧风光。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

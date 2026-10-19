@@ -1,0 +1,105 @@
+{
+ "id": "136",
+ "name": "马修·沃恩",
+ "nameEn": "MatthewVaughn",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "英国",
+ "years": "1971-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0D47A1",
+    "name": "西装蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#C62828",
+    "name": "绅士血",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD600",
+    "name": "金士曼金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#4A148C",
+    "name": "王牌紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#000000",
+    "name": "燕尾黑",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "冷钢灰",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#0D47A1",
+    "name": "绅士风度",
+    "emotion": "绅士风度"
+   },
+   {
+    "hex": "#C62828",
+    "name": "暴力优雅",
+    "emotion": "暴力优雅"
+   },
+   {
+    "hex": "#FFD600",
+    "name": "金士荣耀",
+    "emotion": "金士荣耀"
+   },
+   {
+    "hex": "#4A148C",
+    "name": "酷感神秘",
+    "emotion": "酷感神秘"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "漫画色光",
+  "highlight_tint": "西装冷光",
+  "highlight_bias": "西装冷光",
+  "shadow_tint": "动作补光",
+  "shadow_bias": "动作补光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "漫画分镜",
+  "西装动作",
+  "英式幽默",
+  "慢镜爆头",
+  "绅士特工",
+  "色彩分区"
+ ],
+ "colorKeywords": [
+  "金士曼蓝金",
+  "西装色调",
+  "漫画风高饱和",
+  "英式酷感色",
+  "暴力美学色",
+  "紫蓝对比"
+ ],
+ "mood": [
+  "绅士特工",
+  "暴力优雅",
+  "英式幽默",
+  "漫画改编",
+  "酷感十足",
+  "类型颠覆"
+ ],
+ "profile": {
+  "definition": "马修·沃恩的视觉风格：漫画色光，金士曼蓝金, 西装色调, 漫画风高饱和。",
+  "lighting": "漫画色光，西装冷光，动作补光",
+  "framing": "漫画分镜、西装动作、英式幽默。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

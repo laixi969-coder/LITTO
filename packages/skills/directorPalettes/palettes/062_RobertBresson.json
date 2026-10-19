@@ -1,0 +1,104 @@
+{
+ "id": "062",
+ "name": "罗伯特·布列松",
+ "nameEn": "RobertBresson",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "法国",
+ "years": "1901-1999",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E8E6E0",
+    "name": "冷灰白",
+    "ratio": 0.24
+   },
+   {
+    "hex": "#B8B5AE",
+    "name": "石灰",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8A8780",
+    "name": "暗灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#5C5A55",
+    "name": "铁灰褐",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A3835",
+    "name": "深炭灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#C9C2B2",
+    "name": "旧米灰",
+    "ratio": 0.12
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F0EDE6",
+    "name": null,
+    "emotion": "神圣与纯洁"
+   },
+   {
+    "hex": "#6B6863",
+    "name": null,
+    "emotion": "存在困境"
+   },
+   {
+    "hex": "#9E9A91",
+    "name": null,
+    "emotion": "克制与隐忍"
+   },
+   {
+    "hex": "#2A2825",
+    "name": null,
+    "emotion": "苦难与超越"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光为主",
+  "highlight_bias": "窗光侧照",
+  "shadow_bias": "无装饰打光",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "极简构图",
+  "手部特写",
+  "人物侧面",
+  "门与框景",
+  "日常物件",
+  "几何空间"
+ ],
+ "colorKeywords": [
+  "冷灰调",
+  "去饱和",
+  "自然光",
+  "黑白质感",
+  "素色服装",
+  "石墙质感"
+ ],
+ "mood": [
+  "精神性",
+  "存在主义",
+  "禁欲美学",
+  "救赎主题",
+  "静默力量",
+  "日常神圣"
+ ],
+ "profile": {
+  "definition": "罗伯特·布列松的视觉风格以自然光为主为主，冷灰调、去饱和、自然光，营造出精神性的氛围。",
+  "lighting": "自然光为主，高光偏窗光侧照，阴影偏无装饰打光，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "极简构图、手部特写、人物侧面，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩冷灰调、去饱和、自然光。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

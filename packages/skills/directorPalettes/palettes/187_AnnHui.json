@@ -1,0 +1,75 @@
+{
+ "id": "187",
+ "name": "AnnHui 许鞍华",
+ "nameEn": "",
+ "category": "10_东方美学与留白意境",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8D6E63",
+    "name": "18%",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#78909C",
+    "name": "18%",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A1887F",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "20%",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8D6E63",
+    "name": "",
+    "emotion": "岁月沧桑"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "",
+    "emotion": "人文温暖"
+   },
+   {
+    "hex": "#78909C",
+    "name": "",
+    "emotion": "香港记忆"
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "",
+    "emotion": "女性坚韧"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然柔光",
+  "highlight_tint": "香港街光",
+  "shadow_tint": "室内暖光",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

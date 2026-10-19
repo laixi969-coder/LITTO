@@ -1,0 +1,102 @@
+{
+ "id": "063",
+ "name": "安哲罗普洛斯",
+ "nameEn": "TheoAngelopoulos",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "希腊",
+ "years": "1935-2012",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7D8A8F",
+    "name": "雾灰蓝",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#5D6B70",
+    "name": "深海灰蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#9DA8AB",
+    "name": "银雾灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B8B09E",
+    "name": "废墟米灰",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#4A5558",
+    "name": "暗石青",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#C9C4B5",
+    "name": "旧石米",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#BFC7CB",
+    "name": null,
+    "emotion": "历史苍茫"
+   },
+   {
+    "hex": "#3E484B",
+    "name": null,
+    "emotion": "流亡孤寂"
+   },
+   {
+    "hex": "#8D989C",
+    "name": null,
+    "emotion": "时间流逝"
+   },
+   {
+    "hex": "#D4D0C5",
+    "name": null,
+    "emotion": "记忆微光"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "阴散射光",
+  "highlight_bias": "雾气弥漫",
+  "shadow_bias": "黄昏微光",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "超长镜头",
+  "横向移动",
+  "废墟构图",
+  "边境意象",
+  "雨雪天气",
+  "历史与个人"
+ ],
+ "colorKeywords": [
+  "雾灰蓝调",
+  "希腊冷光",
+  "废墟色调",
+  "冬季灰白",
+  "阴天气氛",
+  "海水冷色"
+ ],
+ "mood": [
+  "历史重量",
+  "流亡主题",
+  "时间缓慢",
+  "诗意悲伤",
+  "家国记忆",
+  "边境徘徊"
+ ],
+ "profile": {
+  "definition": "安哲罗普洛斯的视觉风格以阴散射光为主，雾灰蓝调、希腊冷光，营造出历史重量的氛围。",
+  "lighting": "阴散射光，高光偏雾气弥漫，阴影偏黄昏微光，整体冷调。",
+  "framing": "超长镜头、横向移动、废墟构图。",
+  "grading": "对比度中高对比，色调冷调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "151",
+ "name": "特拉维斯·奈特",
+ "nameEn": "TravisKnight",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "美国",
+ "years": "1973-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#4A148C",
+    "name": "魔法紫",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "森林绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5D4037",
+    "name": "木质棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "魔金光",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#4A148C",
+    "name": "魔法奇幻",
+    "emotion": "魔法奇幻"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "自然神秘",
+    "emotion": "自然神秘"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "手工温度",
+    "emotion": "手工温度"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "金色希望",
+    "emotion": "金色希望"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "哥特色光",
+  "highlight_tint": "森林暗光",
+  "highlight_bias": "森林暗光",
+  "shadow_tint": "暖光点缀",
+  "shadow_bias": "暖光点缀",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "定格动画",
+  "莱卡质感",
+  "暗黑童话",
+  "自然森林",
+  "日本武士",
+  "机械融合"
+ ],
+ "colorKeywords": [
+  "莱卡定格色",
+  "暗黑童话紫绿",
+  "手工质感色",
+  "哥特森林色",
+  "魔法金光",
+  "武士色调"
+ ],
+ "mood": [
+  "定格动画",
+  "暗黑童话",
+  "手工艺术",
+  "成长冒险",
+  "莱卡工作室",
+  "哥特美学"
+ ],
+ "profile": {
+  "definition": "特拉维斯·奈特的视觉风格：哥特色光，莱卡定格色, 暗黑童话紫绿, 手工质感色。",
+  "lighting": "哥特色光，森林暗光，暖光点缀",
+  "framing": "定格动画、莱卡质感、暗黑童话。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

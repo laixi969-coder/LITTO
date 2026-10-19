@@ -1,0 +1,105 @@
+{
+ "id": "122",
+ "name": "吴宇森",
+ "nameEn": "JohnWoo",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "中国香港/美国",
+ "years": "1946-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#B71C1C",
+    "name": "英雄血",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "深夜蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "圣光金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "白鸽白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#4A148C",
+    "name": "夜紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "暗黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#B71C1C",
+    "name": "兄弟情义",
+    "emotion": "兄弟情义"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "圣光救赎",
+    "emotion": "圣光救赎"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "宿命悲剧",
+    "emotion": "宿命悲剧"
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯洁希望",
+    "emotion": "纯洁希望"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "教堂彩光",
+  "highlight_tint": "霓虹夜色",
+  "highlight_bias": "霓虹夜色",
+  "shadow_tint": "火焰逆光",
+  "shadow_bias": "火焰逆光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "双枪对峙",
+  "白鸽慢镜",
+  "教堂枪战",
+  "兄弟情义",
+  "风衣墨镜",
+  "子弹时间"
+ ],
+ "colorKeywords": [
+  "英雄血色",
+  "教堂圣光",
+  "夜色蓝紫",
+  "白鸽纯白",
+  "火焰金光",
+  "港式枪战色"
+ ],
+ "mood": [
+  "英雄本色",
+  "兄弟情义",
+  "暴力美学",
+  "宿命悲剧",
+  "港式黑帮",
+  "仪式感"
+ ],
+ "profile": {
+  "definition": "吴宇森的视觉风格：教堂彩光，英雄血色, 教堂圣光, 夜色蓝紫。",
+  "lighting": "教堂彩光，霓虹夜色，火焰逆光",
+  "framing": "双枪对峙、白鸽慢镜、教堂枪战。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "163",
+ "name": "让-吕克·戈达尔",
+ "nameEn": "Jean-LucGodard",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "法国/瑞士",
+ "years": "1930-2022",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0D47A1",
+    "name": "法国蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#C62828",
+    "name": "革命红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFD600",
+    "name": "宣言黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#000000",
+    "name": "新浪潮黑",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "概念白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "政治绿",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#C62828",
+    "name": "革命激情",
+    "emotion": "革命激情"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "理性思辨",
+    "emotion": "理性思辨"
+   },
+   {
+    "hex": "#FFD600",
+    "name": "挑衅宣言",
+    "emotion": "挑衅宣言"
+   },
+   {
+    "hex": "#000000",
+    "name": "冷酷批判",
+    "emotion": "冷酷批判"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "街头自然光",
+  "highlight_tint": "高对比黑白",
+  "highlight_bias": "高对比黑白",
+  "shadow_tint": "彩色色块",
+  "shadow_bias": "彩色色块",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "跳切剪辑",
+  "直视镜头",
+  "文字插入",
+  "拼贴美学",
+  "政治宣言",
+  "电影论文"
+ ],
+ "colorKeywords": [
+  "戈达尔三原色",
+  "革命红蓝白",
+  "拼贴色块",
+  "新浪潮撞色",
+  "政治色彩",
+  "实验电影色"
+ ],
+ "mood": [
+  "革命美学",
+  "电影论文",
+  "政治宣言",
+  "新浪潮先锋",
+  "拼贴艺术",
+  "哲学思辨"
+ ],
+ "profile": {
+  "definition": "让-吕克·戈达尔的视觉风格：街头自然光，戈达尔三原色, 革命红蓝白, 拼贴色块。",
+  "lighting": "街头自然光，高对比黑白，彩色色块",
+  "framing": "跳切剪辑、直视镜头、文字插入。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

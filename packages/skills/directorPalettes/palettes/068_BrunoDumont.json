@@ -1,0 +1,104 @@
+{
+ "id": "068",
+ "name": "布鲁诺·杜蒙",
+ "nameEn": "BrunoDumont",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "法国",
+ "years": "1958-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7A8690",
+    "name": "北方灰蓝",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#5A6670",
+    "name": "铸铁灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#9DA5AC",
+    "name": "铅白灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#8B8378",
+    "name": "荒地棕灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B8B0A4",
+    "name": "枯草原色",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A424A",
+    "name": "深青灰",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#6A7680",
+    "name": null,
+    "emotion": "道德冷峻"
+   },
+   {
+    "hex": "#4A525A",
+    "name": null,
+    "emotion": "存在暴力"
+   },
+   {
+    "hex": "#90989E",
+    "name": null,
+    "emotion": "自然无情"
+   },
+   {
+    "hex": "#2A323A",
+    "name": null,
+    "emotion": "深渊凝视"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "阴散射光",
+  "highlight_bias": "北方冷光",
+  "shadow_bias": "自然写实",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "自然风景",
+  "人物渺小",
+  "北方地貌",
+  "宗教意象",
+  "暴力场面",
+  "静默对峙"
+ ],
+ "colorKeywords": [
+  "北方灰调",
+  "粗粝质感",
+  "荒地棕",
+  "阴天散射",
+  "冷白天光",
+  "泥土色"
+ ],
+ "mood": [
+  "道德困境",
+  "存在主义",
+  "暴力冷观",
+  "宗教神秘",
+  "北方荒凉",
+  "人性深渊"
+ ],
+ "profile": {
+  "definition": "布鲁诺·杜蒙的视觉风格以阴散射光为主，北方灰调、粗粝质感、荒地棕，营造出道德困境的氛围。",
+  "lighting": "阴散射光，高光偏北方冷光，阴影偏自然写实，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "自然风景、人物渺小、北方地貌，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩北方灰调、粗粝质感、荒地棕。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

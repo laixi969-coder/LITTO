@@ -1,0 +1,105 @@
+{
+ "id": "155",
+ "name": "石之予",
+ "nameEn": "DomeeShi",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "加拿大/中国",
+ "years": "1989-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E91E63",
+    "name": "熊猫红",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#F8BBD0",
+    "name": "少女粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#81C784",
+    "name": "青春绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BA68C8",
+    "name": "梦幻紫",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "熊猫白",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#E91E63",
+    "name": "青春躁动",
+    "emotion": "青春躁动"
+   },
+   {
+    "hex": "#F8BBD0",
+    "name": "少女心事",
+    "emotion": "少女心事"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "家庭温暖",
+    "emotion": "家庭温暖"
+   },
+   {
+    "hex": "#81C784",
+    "name": "成长蜕变",
+    "emotion": "成长蜕变"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "暖粉柔光",
+  "highlight_tint": "少女彩光",
+  "highlight_bias": "少女彩光",
+  "shadow_tint": "多伦多阳光",
+  "shadow_bias": "多伦多阳光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "红熊猫",
+  "亚裔家庭",
+  "少女成长",
+  "多伦多城",
+  "2000年代",
+  "母女关系"
+ ],
+ "colorKeywords": [
+  "青春红粉",
+  "少女色彩",
+  "熊猫红白色",
+  "亚裔家庭暖调",
+  "多伦多秋色",
+  "成长粉紫"
+ ],
+ "mood": [
+  "少女成长",
+  "母女关系",
+  "亚裔文化",
+  "可爱治愈",
+  "青春躁动",
+  "家庭温情"
+ ],
+ "profile": {
+  "definition": "石之予的视觉风格：暖粉柔光，青春红粉, 少女色彩, 熊猫红白色。",
+  "lighting": "暖粉柔光，少女彩光，多伦多阳光",
+  "framing": "红熊猫、亚裔家庭、少女成长。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

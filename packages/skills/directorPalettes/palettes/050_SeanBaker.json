@@ -1,0 +1,108 @@
+{
+ "id": "050",
+ "name": "肖恩·贝克",
+ "nameEn": "Sean Baker",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "美国",
+ "years": "2004-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF8C42",
+    "name": "佛罗里达橙",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#F7C59F",
+    "name": "肌肤蜜桃",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD166",
+    "name": "阳光柠檬黄",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#2E4057",
+    "name": "暮光蓝灰",
+    "ratio": 0.13
+   },
+   {
+    "hex": "#C73E1D",
+    "name": "落日烧红",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#E8A87C",
+    "name": "晚霞粉橘",
+    "ratio": 0.17
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFB347",
+    "name": "蜜罐黄",
+    "emotion": "童真活力"
+   },
+   {
+    "hex": "#5D4E6D",
+    "name": "暮色紫",
+    "emotion": "夜晚暧昧"
+   },
+   {
+    "hex": "#FF6B6B",
+    "name": "霓虹珊瑚",
+    "emotion": "欲望炽热"
+   },
+   {
+    "hex": "#A8A39D",
+    "name": "旧墙灰",
+    "emotion": "生存疲惫"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "harsh daylight sun, golden hour warm side light, neon night practicals",
+  "highlight_tint": "orange-yellow / warm pink",
+  "shadow_tint": "desaturated blue-purple, low detail",
+  "contrast_ratio": "high 70-85%, harsh daylight contrast",
+  "overall_tone": "warm saturated oranges, 75% warm + 25% cool"
+ },
+ "composition": [
+  "iPhone cinematography",
+  "handheld vérité",
+  "wide anamorphic look",
+  "neon practical lighting",
+  "saturated warm palette",
+  "street-level framing",
+  "non-professional cast",
+  "motel room intimacy"
+ ],
+ "colorKeywords": [
+  "florida orange",
+  "neon pink motel",
+  "harsh daylight sun",
+  "sunset coral pink",
+  "trans skin warmth",
+  "motel laundry blues",
+  "fast food yellow",
+  "dusk purple sky"
+ ],
+ "mood": [
+  "marginal lives joy",
+  "working class warmth",
+  "childhood innocence in poverty",
+  "sex trade humanity",
+  "florida dream kitsch",
+  "bittersweet survival",
+  "loud color quiet despair",
+  "rainbow coalition tenderness"
+ ],
+ "profile": {
+  "definition": "鲜艳廉价景观与边缘人物生存压力保持同一现实温度",
+  "lighting": "硬日光、城市实景光与廉价室内照明；肤色保持自然可读，高光和黑位保留材质。",
+  "framing": "人物高度广角、汽车旅馆走廊和街头轻手持",
+  "grading": "旅馆紫、泳池蓝、草绿、日落橙和混凝土灰；局部强调色不污染整幅画面。",
+  "avoid": "统一滤镜替代真实材质、无动机环绕和随机变焦、人物身份与空间轴漂移、肤色污染、死黑和爆白、只模仿颜色不执行镜头语言。"
+ }
+}

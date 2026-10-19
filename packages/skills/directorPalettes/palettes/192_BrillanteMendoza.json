@@ -1,0 +1,105 @@
+{
+ "id": "192",
+ "name": "布里兰特·门多萨",
+ "nameEn": "BrillanteMendoza",
+ "category": "10_东方美学与留白意境",
+ "nationality": "菲律宾",
+ "years": "1960-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#37474F",
+    "name": "马尼拉灰",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#5D4037",
+    "name": "贫民窟棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#C62828",
+    "name": "暴力红",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "街灯黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "热带绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "暗黑夜",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#37474F",
+    "name": "都市压抑",
+    "emotion": "都市压抑"
+   },
+   {
+    "hex": "#C62828",
+    "name": "暴力恐惧",
+    "emotion": "暴力恐惧"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "贫穷沉重",
+    "emotion": "贫穷沉重"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "生存微光",
+    "emotion": "生存微光"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光效",
+  "highlight_tint": "荧光冷光",
+  "highlight_bias": "荧光冷光",
+  "shadow_tint": "街头灯光",
+  "shadow_bias": "街头灯光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "手持纪实",
+  "马尼拉贫民窟",
+  "社会暴力",
+  "真实质感",
+  "政治批判",
+  "长镜头"
+ ],
+ "colorKeywords": [
+  "门多萨灰棕",
+  "菲律宾贫民窟色",
+  "手持纪实色",
+  "暴力暗调",
+  "马尼拉街景色",
+  "社会真实色"
+ ],
+ "mood": [
+  "社会批判",
+  "手持纪实",
+  "菲律宾现实",
+  "暴力贫穷",
+  "戛纳导演",
+  "真实电影"
+ ],
+ "profile": {
+  "definition": "布里兰特·门多萨的视觉风格：自然光效，门多萨灰棕, 菲律宾贫民窟色, 手持纪实色。",
+  "lighting": "自然光效，荧光冷光，街头灯光",
+  "framing": "手持纪实、马尼拉贫民窟、社会暴力。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

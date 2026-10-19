@@ -1,0 +1,105 @@
+{
+ "id": "165",
+ "name": "关锦鹏",
+ "nameEn": "StanleyKwan",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "中国香港",
+ "years": "1957-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C62828",
+    "name": "胭脂红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "怀旧黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5D4037",
+    "name": "老香港棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "岁月棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "胭脂粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "深棕",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#C62828",
+    "name": "情欲燃烧",
+    "emotion": "情欲燃烧"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "怀旧追忆",
+    "emotion": "怀旧追忆"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "岁月沧桑",
+    "emotion": "岁月沧桑"
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "温柔女性",
+    "emotion": "温柔女性"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "怀旧暖光",
+  "highlight_tint": "红色点缀",
+  "highlight_bias": "红色点缀",
+  "shadow_tint": "柔光漫射",
+  "shadow_bias": "柔光漫射",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "女性群像",
+  "怀旧香港",
+  "红色意象",
+  "镜像构图",
+  "戏曲元素",
+  "时空交错"
+ ],
+ "colorKeywords": [
+  "胭脂红",
+  "怀旧暖黄",
+  "老香港棕调",
+  "女性柔光色",
+  "红玫瑰白玫瑰",
+  "上海怀旧色"
+ ],
+ "mood": [
+  "女性视角",
+  "怀旧香港",
+  "胭脂扣情",
+  "红玫瑰白玫瑰",
+  "同志身份",
+  "岁月如歌"
+ ],
+ "profile": {
+  "definition": "关锦鹏的视觉风格：怀旧暖光，胭脂红, 怀旧暖黄, 老香港棕调。",
+  "lighting": "怀旧暖光，红色点缀，柔光漫射",
+  "framing": "女性群像、怀旧香港、红色意象。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

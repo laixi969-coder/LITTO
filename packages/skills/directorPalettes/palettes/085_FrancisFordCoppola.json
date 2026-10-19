@@ -1,0 +1,104 @@
+{
+ "id": "085",
+ "name": "科波拉",
+ "nameEn": "FrancisFordCoppola",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "美国",
+ "years": "1939-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B4513",
+    "name": "马鞍棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金菊黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2F2F2F",
+    "name": "暗炭灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#800000",
+    "name": "栗色红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#556B2F",
+    "name": "暗橄榄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#D4AF37",
+    "name": null,
+    "emotion": "权力与荣耀"
+   },
+   {
+    "hex": "#8B0000",
+    "name": null,
+    "emotion": "暴力与死亡"
+   },
+   {
+    "hex": "#CD853F",
+    "name": null,
+    "emotion": "家族温暖"
+   },
+   {
+    "hex": "#0F0F0F",
+    "name": null,
+    "emotion": "黑暗阴谋"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "暗调侧光",
+  "highlight_bias": "烛火暖金",
+  "shadow_bias": "烟雾光束",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "教父式构图",
+  "家族群像",
+  "烟雾光影",
+  "历史史诗",
+  "门与框景",
+  "明暗对比"
+ ],
+ "colorKeywords": [
+  "暗金烛光",
+  "棕木色调",
+  "烟雾阴影",
+  "教父调色",
+  "暖调室内",
+  "暗色史诗"
+ ],
+ "mood": [
+  "家族荣耀",
+  "美国梦碎",
+  "暴力循环",
+  "史诗感",
+  "新好莱坞",
+  "父权与继承"
+ ],
+ "profile": {
+  "definition": "科波拉的视觉风格以暗调侧光为主，暗金烛光、棕木色调、烟雾阴影，营造出家族荣耀的氛围。",
+  "lighting": "暗调侧光，高光偏烛火暖金，阴影偏烟雾光束，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "教父式构图、家族群像、烟雾光影，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩暗金烛光、棕木色调、烟雾阴影。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

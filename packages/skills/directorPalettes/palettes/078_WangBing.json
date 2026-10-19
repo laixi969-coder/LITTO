@@ -1,0 +1,75 @@
+{
+ "id": "078",
+ "name": "WangBing 王兵",
+ "nameEn": "",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#6A6A60",
+    "name": "24%",
+    "ratio": 0.24
+   },
+   {
+    "hex": "#4A4A42",
+    "name": "20%",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8A8A7A",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B8A888",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A3A32",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#AAA088",
+    "name": "12%",
+    "ratio": 0.12
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#5A5A50",
+    "name": "",
+    "emotion": "历史沉重"
+   },
+   {
+    "hex": "#8A806A",
+    "name": "",
+    "emotion": "工人苦难"
+   },
+   {
+    "hex": "#707068",
+    "name": "",
+    "emotion": "时间重量"
+   },
+   {
+    "hex": "#2A2A22",
+    "name": "",
+    "emotion": "时代遗忘"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光纪实",
+  "highlight_tint": "工厂暗光",
+  "shadow_tint": "室外天光",
+  "contrast_ratio": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

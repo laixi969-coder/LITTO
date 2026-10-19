@@ -1,0 +1,108 @@
+{
+ "id": "055",
+ "name": "徐克",
+ "nameEn": "Tsui Hark",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "中国香港",
+ "years": "1979-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C8964A",
+    "name": "大漠金沙",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#7A3B1F",
+    "name": "朱砂赤红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2D3A2E",
+    "name": "青竹墨绿",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#E8D5A8",
+    "name": "宣纸米白",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#5C5448",
+    "name": "青灰瓦黛",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#D6B98A",
+    "name": "土黄赭石",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF4500",
+    "name": "烈火红",
+    "emotion": "江湖热血"
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金箔黄",
+    "emotion": "豪情壮志"
+   },
+   {
+    "hex": "#4B0082",
+    "name": "靛蓝夜",
+    "emotion": "神秘阴谋"
+   },
+   {
+    "hex": "#F5F5DC",
+    "name": "飞雪白",
+    "emotion": "飘逸超脱"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "warm backlit dust, ink-wash smoke haze, natural daylight with gold rim",
+  "highlight_tint": "golden amber / warm ochre",
+  "shadow_tint": "deep umber / teal-green",
+  "contrast_ratio": "high 70-85%",
+  "overall_tone": "warm earth + ink wash, 65% warm + 35% cool"
+ },
+ "composition": [
+  "wire-fu flying motion",
+  "quick-cut montage",
+  "ink-wash smoke haze",
+  "low-angle heroic framing",
+  "dust and debris in light",
+  "extreme wide martial arts",
+  "dynamic tracking shot",
+  "Chinese classical composition"
+ ],
+ "colorKeywords": [
+  "desert golden sand",
+  "vermilion red blood",
+  "bamboo ink green",
+  "rice-paper pale cream",
+  "flying silk white",
+  "golden hour kung fu",
+  "ink-wash monochrome",
+  "earth-tone wuxia"
+ ],
+ "mood": [
+  "martial heroism",
+  "ink-wash poetry",
+  "jianghu wanderlust",
+  "chivalric romance",
+  "dynastic intrigue",
+  "flying transcendence",
+  "hot desert passion",
+  "ancient Chinese mystery"
+ ],
+ "profile": {
+  "definition": "历史空间、工业现代性和群体运动在高速奇观中碰撞",
+  "lighting": "硬侧光、烟尘、火光和变化迅速的自然光；肤色保持自然可读，高光和黑位保留材质。",
+  "framing": "广角群像、斜线建筑和多层前景组织复杂动作",
+  "grading": "木棕、布蓝、工业黑、火橙和旗帜红；局部强调色不污染整幅画面。",
+  "avoid": "统一滤镜替代真实材质、无动机环绕和随机变焦、人物身份与空间轴漂移、肤色污染、死黑和爆白、只模仿颜色不执行镜头语言。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "161",
+ "name": "埃里克·侯麦",
+ "nameEn": "EricRohmer",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "法国",
+ "years": "1920-2010",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#81C784",
+    "name": "春夏绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "秋日黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "天空蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "巴黎米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#EF9A9A",
+    "name": "玫瑰粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "草地绿",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#81C784",
+    "name": "自然生机",
+    "emotion": "自然生机"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖暧昧",
+    "emotion": "温暖暧昧"
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "理智清明",
+    "emotion": "理智清明"
+   },
+   {
+    "hex": "#EF9A9A",
+    "name": "爱情微妙",
+    "emotion": "爱情微妙"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然柔光",
+  "highlight_tint": "窗光漫射",
+  "highlight_bias": "窗光漫射",
+  "shadow_tint": "阳光斑驳",
+  "shadow_bias": "阳光斑驳",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "对话场景",
+  "四季自然",
+  "巴黎街景",
+  "海滨度假",
+  "道德抉择",
+  "男女关系"
+ ],
+ "colorKeywords": [
+  "侯麦四季色",
+  "自然光效",
+  "法国乡村色",
+  "巴黎米色",
+  "对话暖调",
+  "四季色彩"
+ ],
+ "mood": [
+  "对话哲学",
+  "道德故事",
+  "四季人生",
+  "法国情调",
+  "爱情微妙",
+  "知识分子"
+ ],
+ "profile": {
+  "definition": "埃里克·侯麦的视觉风格：自然柔光，侯麦四季色, 自然光效, 法国乡村色。",
+  "lighting": "自然柔光，窗光漫射，阳光斑驳",
+  "framing": "对话场景、四季自然、巴黎街景。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

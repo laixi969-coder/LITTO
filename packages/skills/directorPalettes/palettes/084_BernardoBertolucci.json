@@ -1,0 +1,104 @@
+{
+ "id": "084",
+ "name": "贝托鲁奇",
+ "nameEn": "BernardoBertolucci",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "意大利",
+ "years": "1941-2018",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#B8860B",
+    "name": "暗金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8B0000",
+    "name": "帝国红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#CD853F",
+    "name": "秘鲁棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "墨绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#F4A460",
+    "name": "沙橙",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3D2B1F",
+    "name": "深棕木",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#DAA520",
+    "name": null,
+    "emotion": "权力辉煌"
+   },
+   {
+    "hex": "#A52A2A",
+    "name": null,
+    "emotion": "情欲热烈"
+   },
+   {
+    "hex": "#8B7355",
+    "name": null,
+    "emotion": "怀旧忧郁"
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": null,
+    "emotion": "政治黑暗"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "暖金侧光",
+  "highlight_bias": "宫殿烛火",
+  "shadow_bias": "黄昏柔光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "宫殿空间",
+  "政治隐喻",
+  "身体叙事",
+  "长镜头运动",
+  "东西方交融",
+  "历史与个人"
+ ],
+ "colorKeywords": [
+  "红金帝国",
+  "东方宫殿色",
+  "暖金黄昏",
+  "丝绸质感",
+  "油画光",
+  "殖民色彩"
+ ],
+ "mood": [
+  "政治与情欲",
+  "东方主义",
+  "历史史诗",
+  "青春觉醒",
+  "革命理想",
+  "华丽忧伤"
+ ],
+ "profile": {
+  "definition": "贝托鲁奇的视觉风格以暖金侧光为主，红金帝国、东方宫殿色、暖金黄昏，营造出政治与情欲的氛围。",
+  "lighting": "暖金侧光，高光偏宫殿烛火，阴影偏黄昏柔光，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "宫殿空间、政治隐喻、身体叙事，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩红金帝国、东方宫殿色、暖金黄昏。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

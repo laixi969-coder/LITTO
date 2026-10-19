@@ -1,0 +1,105 @@
+{
+ "id": "175",
+ "name": "瑟琳·席安玛",
+ "nameEn": "CelineSciamma",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "法国",
+ "years": "1978-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#4FC3F7",
+    "name": "水彩蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "水彩绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#F8BBD0",
+    "name": "水彩粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "肖像棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "画布白",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#4FC3F7",
+    "name": "温柔凝视",
+    "emotion": "温柔凝视"
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "自然生长",
+    "emotion": "自然生长"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖记忆",
+    "emotion": "温暖记忆"
+   },
+   {
+    "hex": "#F8BBD0",
+    "name": "初恋心动",
+    "emotion": "初恋心动"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "油画侧光",
+  "highlight_tint": "窗光漫射",
+  "highlight_bias": "窗光漫射",
+  "shadow_tint": "自然柔光",
+  "shadow_bias": "自然柔光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "女性凝视",
+  "肖像油画",
+  "水彩质感",
+  "女同爱情",
+  "女孩成长",
+  "时间温柔"
+ ],
+ "colorKeywords": [
+  "肖像油画色",
+  "水彩柔调",
+  "女同电影色",
+  "席安玛蓝绿",
+  "时间温柔色",
+  "少女成长色"
+ ],
+ "mood": [
+  "女性凝视",
+  "温柔时光",
+  "女同爱情",
+  "油画美学",
+  "少女成长",
+  "水彩诗意"
+ ],
+ "profile": {
+  "definition": "瑟琳·席安玛的视觉风格：油画侧光，肖像油画色, 水彩柔调, 女同电影色。",
+  "lighting": "油画侧光，窗光漫射，自然柔光",
+  "framing": "女性凝视、肖像油画、水彩质感。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,104 @@
+{
+ "id": "067",
+ "name": "考里斯马基",
+ "nameEn": "AkiKaurismaki",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "芬兰",
+ "years": "1957-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#4A6B8A",
+    "name": "工人蓝",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B9DAF",
+    "name": "芬兰灰蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#C4B896",
+    "name": "复古米黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#6B7D8E",
+    "name": "钢灰蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#D4C8A8",
+    "name": "旧墙米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E4A66",
+    "name": "深海蓝",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#5B7D9E",
+    "name": null,
+    "emotion": "工人尊严"
+   },
+   {
+    "hex": "#B8A882",
+    "name": null,
+    "emotion": "温情默默"
+   },
+   {
+    "hex": "#7A8B9C",
+    "name": null,
+    "emotion": "冷面幽默"
+   },
+   {
+    "hex": "#1E3A56",
+    "name": null,
+    "emotion": "生活重压"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光平光",
+  "highlight_bias": "复古影棚光",
+  "shadow_bias": "冷色调为主",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "对称构图",
+  "平面感",
+  "复古影棚",
+  "工人空间",
+  "酒吧场景",
+  "音乐表演"
+ ],
+ "colorKeywords": [
+  "低饱和蓝",
+  "复古色调",
+  "工人阶级色",
+  "芬兰冷调",
+  "米黄暖调",
+  "黑白感色彩"
+ ],
+ "mood": [
+  "冷面幽默",
+  "工人诗意",
+  "静默温情",
+  "生存尊严",
+  "复古怀旧",
+  "芬兰式忧郁"
+ ],
+ "profile": {
+  "definition": "考里斯马基的视觉风格以柔光平光为主，低饱和蓝、复古色调、工人阶级色，营造出冷面幽默的氛围。",
+  "lighting": "柔光平光，高光偏复古影棚光，阴影偏冷色调为主，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "对称构图、平面感、复古影棚，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩低饱和蓝、复古色调、工人阶级色。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

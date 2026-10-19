@@ -1,0 +1,105 @@
+{
+ "id": "182",
+ "name": "沟口健二",
+ "nameEn": "KenjiMizoguchi",
+ "category": "10_东方美学与留白意境",
+ "nationality": "日本",
+ "years": "1898-1956",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#5D4037",
+    "name": "卷轴棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#78909C",
+    "name": "雨雾灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "纸灯金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "悲壮红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "墨黑",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#D7CCC8",
+    "name": "绢米",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#5D4037",
+    "name": "历史厚重",
+    "emotion": "历史厚重"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "女性悲剧",
+    "emotion": "女性悲剧"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "人性微光",
+    "emotion": "人性微光"
+   },
+   {
+    "hex": "#78909C",
+    "name": "命运无常",
+    "emotion": "命运无常"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "卷轴画侧光",
+  "highlight_tint": "日式纸窗光",
+  "highlight_bias": "日式纸窗光",
+  "shadow_tint": "高反差",
+  "shadow_bias": "高反差",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "一卷一场",
+  "卷轴画构图",
+  "女性受难",
+  "历史剧",
+  "长镜头",
+  "雨雾场景"
+ ],
+ "colorKeywords": [
+  "沟口卷轴棕",
+  "女性悲歌色",
+  "日本古典色",
+  "雨雾灰调",
+  "纸灯金色",
+  "历史剧色调"
+ ],
+ "mood": [
+  "女性悲歌",
+  "卷轴画美学",
+  "长镜头诗",
+  "日本古典",
+  "命运悲剧",
+  "人道主义"
+ ],
+ "profile": {
+  "definition": "沟口健二的视觉风格：卷轴画侧光，沟口卷轴棕, 女性悲歌色, 日本古典色。",
+  "lighting": "卷轴画侧光，日式纸窗光，高反差",
+  "framing": "一卷一场、卷轴画构图、女性受难。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

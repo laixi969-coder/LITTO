@@ -1,0 +1,105 @@
+{
+ "id": "123",
+ "name": "姜文",
+ "nameEn": "JiangWen",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "中国",
+ "years": "1963-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C62828",
+    "name": "中国红",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FF8F00",
+    "name": "黄土金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#5D4037",
+    "name": "大地棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "阳光金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "军绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "深土棕",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#C62828",
+    "name": "雄性激情",
+    "emotion": "雄性激情"
+   },
+   {
+    "hex": "#FF8F00",
+    "name": "荒诞狂欢",
+    "emotion": "荒诞狂欢"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "大地厚重",
+    "emotion": "大地厚重"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "阳光灿烂",
+    "emotion": "阳光灿烂"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "强烈侧光",
+  "highlight_tint": "暖红顶光",
+  "highlight_bias": "暖红顶光",
+  "shadow_tint": "黄土漫反射",
+  "shadow_bias": "黄土漫反射",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "雄性群像",
+  "黄土大地",
+  "荒诞叙事",
+  "红色意象",
+  "民国/建国初期",
+  "独白旁白"
+ ],
+ "colorKeywords": [
+  "中国红",
+  "黄土高原色",
+  "高饱和暖调",
+  "雄性荷尔蒙色",
+  "阳光金",
+  "军绿年代色"
+ ],
+ "mood": [
+  "雄性荷尔蒙",
+  "荒诞史诗",
+  "中国往事",
+  "黑色幽默",
+  "理想主义",
+  "时代记忆"
+ ],
+ "profile": {
+  "definition": "姜文的视觉风格：强烈侧光，中国红, 黄土高原色, 高饱和暖调。",
+  "lighting": "强烈侧光，暖红顶光，黄土漫反射",
+  "framing": "雄性群像、黄土大地、荒诞叙事。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,108 @@
+{
+ "id": "049",
+ "name": "赵婷",
+ "nameEn": "Chloé Zhao",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "中国/美国",
+ "years": "2015-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C4AE78",
+    "name": "大地金灰",
+    "ratio": 0.25
+   },
+   {
+    "hex": "#8A7E66",
+    "name": "枯石褐",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#D9C8A0",
+    "name": "枯草黄",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#6B7366",
+    "name": "旷野灰绿",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#E8DCC4",
+    "name": "薄暮肤",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#A68C6B",
+    "name": "荒原棕",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F2E6CC",
+    "name": "晨光米",
+    "emotion": "温柔希望"
+   },
+   {
+    "hex": "#70685A",
+    "name": "旧铁灰",
+    "emotion": "漂泊孤独"
+   },
+   {
+    "hex": "#B8956A",
+    "name": "落日砂",
+    "emotion": "尊严暖意"
+   },
+   {
+    "hex": "#4A5145",
+    "name": "苔原青",
+    "emotion": "静默沉思"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "magic hour natural light, soft side lighting, minimal fill",
+  "highlight_tint": "warm golden dust / pale yellow",
+  "shadow_tint": "cool blue-gray / desaturated green",
+  "contrast_ratio": "low-medium 40-55%, soft cinematic rolloff",
+  "overall_tone": "warm dusty earth, 60% warm + 40% cool, low saturation"
+ },
+ "composition": [
+  "static long takes",
+  "wide open landscapes",
+  "golden hour magic light",
+  "shallow depth of field portrait",
+  "naturalistic non-professional cast",
+  "road movie framing",
+  "dust and haze",
+  "horizon composition"
+ ],
+ "colorKeywords": [
+  "dusty earth palette",
+  "desert golden hour",
+  "sagebrush green",
+  "prairie wheat yellow",
+  "muted skin tone",
+  "overcast soft grey",
+  "twilight lavender",
+  "dust motes in sunlight"
+ ],
+ "mood": [
+  "quiet dignity of nomads",
+  "meditative stillness",
+  "american west elegy",
+  "transient life poetry",
+  "spiritual landscape",
+  "gentle melancholy",
+  "vastness and solitude",
+  "human connection in wilderness"
+ ],
+ "profile": {
+  "definition": "真实地貌、非职业表演和流动生活在自然时间中互相倾听",
+  "lighting": "黄金时刻、阴天漫射和实景火光；肤色保持自然可读，高光和黑位保留材质。",
+  "framing": "宽阔地貌远景与贴近人物的轻手持中景",
+  "grading": "沙土、旧车灰、牛仔蓝、落日金和夜火橙；局部强调色不污染整幅画面。",
+  "avoid": "统一滤镜替代真实材质、无动机环绕和随机变焦、人物身份与空间轴漂移、肤色污染、死黑和爆白、只模仿颜色不执行镜头语言。"
+ }
+}

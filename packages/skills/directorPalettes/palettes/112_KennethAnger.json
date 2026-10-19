@@ -1,0 +1,105 @@
+{
+ "id": "112",
+ "name": "肯尼斯·安格",
+ "nameEn": "KennethAnger",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国",
+ "years": "1927-2023",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF1744",
+    "name": "火焰红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00B0FF",
+    "name": "霓虹蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#EA80FC",
+    "name": "迷幻紫",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFEA00",
+    "name": "霹雳黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#000000",
+    "name": "深黑",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FF9100",
+    "name": "橙焰",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF1744",
+    "name": "欲望反叛",
+    "emotion": "欲望反叛"
+   },
+   {
+    "hex": "#00B0FF",
+    "name": "酷儿梦幻",
+    "emotion": "酷儿梦幻"
+   },
+   {
+    "hex": "#EA80FC",
+    "name": "迷幻仪式",
+    "emotion": "迷幻仪式"
+   },
+   {
+    "hex": "#FFEA00",
+    "name": "挑衅光芒",
+    "emotion": "挑衅光芒"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "霓虹色光",
+  "highlight_tint": "火焰光",
+  "highlight_bias": "火焰光",
+  "shadow_tint": "月光冷蓝",
+  "shadow_bias": "月光冷蓝",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "地下电影",
+  "8mm颗粒",
+  "酷儿身体",
+  "神秘仪式",
+  "摩托车",
+  "火焰意象"
+ ],
+ "colorKeywords": [
+  "霓虹迷幻色",
+  "8mm颗粒感",
+  "酷儿霓虹",
+  "火焰光色",
+  "彩色色片",
+  "地下电影色"
+ ],
+ "mood": [
+  "酷儿先锋",
+  "神秘学",
+  "地下电影",
+  "叛逆美学",
+  "迷幻体验",
+  "洛杉矶霓虹"
+ ],
+ "profile": {
+  "definition": "肯尼斯·安格的视觉风格：霓虹色光，霓虹迷幻色, 8mm颗粒感, 酷儿霓虹。",
+  "lighting": "霓虹色光，火焰光，月光冷蓝",
+  "framing": "地下电影、8mm颗粒、酷儿身体。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

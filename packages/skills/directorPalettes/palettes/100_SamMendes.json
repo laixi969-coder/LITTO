@@ -1,0 +1,102 @@
+{
+ "id": "100",
+ "name": "萨姆·门德斯",
+ "nameEn": "SamMendes",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "英国",
+ "years": "1965-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#2C3E50",
+    "name": "深蓝灰",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B4513",
+    "name": "暖木棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#7F8C8D",
+    "name": "银雾灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金菊黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#556B2F",
+    "name": "暗橄榄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "炭黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#2C3E50",
+    "name": null,
+    "emotion": "疏离冷漠"
+   },
+   {
+    "hex": "#DAA520",
+    "name": null,
+    "emotion": "回忆温暖"
+   },
+   {
+    "hex": "#7F8C8D",
+    "name": null,
+    "emotion": "存在虚无"
+   },
+   {
+    "hex": "#8B4513",
+    "name": null,
+    "emotion": "家庭压抑"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "舞台式布光",
+  "highlight_bias": "侧光雕刻",
+  "shadow_bias": "冷调自然光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "长镜头一镜到底",
+  "舞台空间感",
+  "家庭戏剧",
+  "战争史诗",
+  "英伦冷调",
+  "精确构图"
+ ],
+ "colorKeywords": [
+  "英伦冷蓝",
+  "舞台暖棕",
+  "战争灰调",
+  "郊区暗色",
+  "精确色彩",
+  "戏剧光感"
+ ],
+ "mood": [
+  "家庭危机",
+  "存在主义",
+  "战争反思",
+  "舞台美学",
+  "英伦冷美",
+  "中年危机"
+ ],
+ "profile": {
+  "definition": "萨姆·门德斯的视觉风格以舞台式布光为主，英伦冷蓝、舞台暖棕，营造出家庭危机的氛围。",
+  "lighting": "舞台式布光，高光偏侧光雕刻，阴影偏冷调自然光，整体暖调。",
+  "framing": "长镜头一镜到底、舞台空间感、家庭戏剧。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "181",
+ "name": "小津安二郎",
+ "nameEn": "YasujiroOzu",
+ "category": "10_东方美学与留白意境",
+ "nationality": "日本",
+ "years": "1903-1963",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8D6E63",
+    "name": "榻榻米棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "和纸米",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#78909C",
+    "name": "庭院灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#A1887F",
+    "name": "木造棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "暖灯黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#546E7A",
+    "name": "暮蓝灰",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8D6E63",
+    "name": "日常禅意",
+    "emotion": "日常禅意"
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "温暖亲情",
+    "emotion": "温暖亲情"
+   },
+   {
+    "hex": "#78909C",
+    "name": "物哀之美",
+    "emotion": "物哀之美"
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "时光温柔",
+    "emotion": "时光温柔"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "室内柔光",
+  "highlight_tint": "窗格光影",
+  "highlight_bias": "窗格光影",
+  "shadow_tint": "纸灯笼暖光",
+  "shadow_bias": "纸灯笼暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "低角度固定镜头",
+  "榻榻米构图",
+  "留白空间",
+  "父女关系",
+  "茶碗日常",
+  "空镜头转场"
+ ],
+ "colorKeywords": [
+  "小津棕米",
+  "和纸暖调",
+  "禅意留白色",
+  "榻榻米色调",
+  "日式极简色",
+  "物哀美学色"
+ ],
+ "mood": [
+  "禅意日常",
+  "物哀之美",
+  "家庭温情",
+  "留白意境",
+  "日式美学",
+  "低角度静帧"
+ ],
+ "profile": {
+  "definition": "小津安二郎的视觉风格：室内柔光，小津棕米, 和纸暖调, 禅意留白色。",
+  "lighting": "室内柔光，窗格光影，纸灯笼暖光",
+  "framing": "低角度固定镜头、榻榻米构图、留白空间。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

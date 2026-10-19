@@ -1,0 +1,108 @@
+{
+ "id": "060",
+ "name": "安东尼·明格拉",
+ "nameEn": "Anthony Minghella",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "英国",
+ "years": "1978-2008",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#D4A76A",
+    "name": "沙漠流金",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B6914",
+    "name": "橄榄暗金",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5C4A3D",
+    "name": "深褐木影",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#E8D4B0",
+    "name": "柔光米色",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#6B7A5A",
+    "name": "橄榄灰绿",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#A0673D",
+    "name": "陶土砖红",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8C00",
+    "name": "沙漠橙",
+    "emotion": "炽热爱情"
+   },
+   {
+    "hex": "#708090",
+    "name": "战争灰",
+    "emotion": "生离死别"
+   },
+   {
+    "hex": "#DDA0DD",
+    "name": "梅香紫",
+    "emotion": "回忆温柔"
+   },
+   {
+    "hex": "#006400",
+    "name": "深林绿",
+    "emotion": "隐忍思念"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "golden desert haze, soft memory diffusion, romantic natural light",
+  "highlight_tint": "warm honey gold / sand amber",
+  "shadow_tint": "umber brown / olive green",
+  "contrast_ratio": "medium-low 50-65%",
+  "overall_tone": "warm golden romantic, 70% warm + 30% cool"
+ },
+ "composition": [
+  "sweeping desert vistas",
+  "soft focus memory",
+  "romantic close-up",
+  "period costume detail",
+  "window light portrait",
+  "epic landscape framing",
+  "slow dissolve transition",
+  "mirrored reflections"
+ ],
+ "colorKeywords": [
+  "sahara desert gold",
+  "tuscan olive green",
+  "soft cream memory",
+  "terracotta warm red",
+  "honey amber sunset",
+  "dusty golden haze",
+  "warm skin tones",
+  "literary romantic palette"
+ ],
+ "mood": [
+  "epic romance",
+  "wartime longing",
+  "memory and nostalgia",
+  "literary tragedy",
+  "mediterranean warmth",
+  "unspoken desire",
+  "soulful melancholy",
+  "grand human drama"
+ ],
+ "profile": {
+  "definition": "沙金、橄榄与柔光米色的文学世界，慢溶与长镜把回忆化为流动的情书。",
+  "lighting": "黄金时刻侧光与窗纱漫射；肤色柔暖，高光晕染，尘埃在光束中轻舞如回忆。",
+  "framing": "沙漠远景、窗光肖像、慢溶转场；先铺展时代画卷，再沉入个人内心。",
+  "grading": "高光金暖，阴影橄榄绿；回忆片段柔焦增暖，现实片段清晰稍冷，虚实交替推动情感。",
+  "avoid": "冷白硬光、快速切镜、过度饱和、现代锐利调色、用统一滤镜替代精心营造的柔光与空气感"
+ }
+}

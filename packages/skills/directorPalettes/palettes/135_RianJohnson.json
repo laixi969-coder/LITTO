@@ -1,0 +1,105 @@
+{
+ "id": "135",
+ "name": "里安·约翰逊",
+ "nameEn": "RianJohnson",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "美国",
+ "years": "1973-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF8F00",
+    "name": "复古橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#6A1B9A",
+    "name": "悬疑紫",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#C62828",
+    "name": "推理红",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "庄园绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "暖金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#5D4037",
+    "name": "木质棕",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8F00",
+    "name": "复古怀旧",
+    "emotion": "复古怀旧"
+   },
+   {
+    "hex": "#6A1B9A",
+    "name": "悬疑迷雾",
+    "emotion": "悬疑迷雾"
+   },
+   {
+    "hex": "#C62828",
+    "name": "罪案血色",
+    "emotion": "罪案血色"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "庄园秘密",
+    "emotion": "庄园秘密"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "复古暖光",
+  "highlight_tint": "推理阴影",
+  "highlight_bias": "推理阴影",
+  "shadow_tint": "彩色玻璃光",
+  "shadow_bias": "彩色玻璃光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "推理构图",
+  "庄园密室",
+  "复古美学",
+  "类型解构",
+  "玻璃洋葱",
+  "侦探形象"
+ ],
+ "colorKeywords": [
+  "复古暖橙",
+  "推理色调",
+  "庄园色彩",
+  "高饱和暖调",
+  "悬疑紫",
+  "侦探片色"
+ ],
+ "mood": [
+  "推理悬疑",
+  "复古美学",
+  "类型解构",
+  "黑色幽默",
+  "阶级批判",
+  "侦探故事"
+ ],
+ "profile": {
+  "definition": "里安·约翰逊的视觉风格：复古暖光，复古暖橙, 推理色调, 庄园色彩。",
+  "lighting": "复古暖光，推理阴影，彩色玻璃光",
+  "framing": "推理构图、庄园密室、复古美学。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

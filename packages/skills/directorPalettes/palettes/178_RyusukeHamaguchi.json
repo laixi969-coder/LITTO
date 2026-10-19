@@ -1,0 +1,105 @@
+{
+ "id": "178",
+ "name": "滨口龙介",
+ "nameEn": "RyusukeHamaguchi",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "日本",
+ "years": "1978-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#90CAF9",
+    "name": "日常蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "偶然绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "生活米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#F8BBD0",
+    "name": "想象粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "车中灰",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#90CAF9",
+    "name": "日常清澈",
+    "emotion": "日常清澈"
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "偶然生机",
+    "emotion": "偶然生机"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖理解",
+    "emotion": "温暖理解"
+   },
+   {
+    "hex": "#F8BBD0",
+    "name": "想象温柔",
+    "emotion": "想象温柔"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光效",
+  "highlight_tint": "室内柔光",
+  "highlight_bias": "室内柔光",
+  "shadow_tint": "窗外景色",
+  "shadow_bias": "窗外景色",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "对话长镜",
+  "日常空间",
+  "偶然与想象",
+  "车内场景",
+  "女性关系",
+  "文学改编"
+ ],
+ "colorKeywords": [
+  "滨口龙介蓝绿",
+  "日常对话色",
+  "偶然与想象色",
+  "驾驶我的车灰",
+  "日常魔幻色",
+  "文学电影色"
+ ],
+ "mood": [
+  "对话电影",
+  "偶然想象",
+  "日常魔幻",
+  "文学改编",
+  "女性关系",
+  "日本当代"
+ ],
+ "profile": {
+  "definition": "滨口龙介的视觉风格：自然光效，滨口龙介蓝绿, 日常对话色, 偶然与想象色。",
+  "lighting": "自然光效，室内柔光，窗外景色",
+  "framing": "对话长镜、日常空间、偶然与想象。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

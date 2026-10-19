@@ -1,0 +1,75 @@
+{
+ "id": "118",
+ "name": "NagisaOshima 大岛渚",
+ "nameEn": "",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#B71C1C",
+    "name": "22%",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "18%",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5D4037",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "16%",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#B71C1C",
+    "name": "",
+    "emotion": "禁忌情欲"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "",
+    "emotion": "社会压抑"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "",
+    "emotion": "仪式温暖"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "",
+    "emotion": "肉身沉重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高对比暖光",
+  "highlight_tint": "红色重点光",
+  "shadow_tint": "日式纸窗光",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

@@ -1,0 +1,102 @@
+{
+ "id": "093",
+ "name": "特伦斯·戴维斯",
+ "nameEn": "TerenceDavies",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "英国",
+ "years": "1945-2023",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B7355",
+    "name": "灰金棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#B8860B",
+    "name": "暗金",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#556B2F",
+    "name": "暗橄榄绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#CD853F",
+    "name": "秘鲁棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗青灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "炭黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#B8860B",
+    "name": null,
+    "emotion": "记忆温暖"
+   },
+   {
+    "hex": "#556B2F",
+    "name": null,
+    "emotion": "自然宁静"
+   },
+   {
+    "hex": "#8B7355",
+    "name": null,
+    "emotion": "怀旧忧伤"
+   },
+   {
+    "hex": "#2F2F2F",
+    "name": null,
+    "emotion": "压抑痛苦"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光散射",
+  "highlight_bias": "窗光侧照",
+  "shadow_bias": "油画质感",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "缓慢长镜",
+  "记忆碎片",
+  "室内空间",
+  "利物浦风景",
+  "文学改编",
+  "家庭记忆"
+ ],
+ "colorKeywords": [
+  "油画暖调",
+  "利物浦灰金",
+  "记忆柔光",
+  "古典质感",
+  "低饱和暖色",
+  "室内光"
+ ],
+ "mood": [
+  "记忆诗学",
+  "利物浦乡愁",
+  "家庭创伤",
+  "文学气质",
+  "缓慢诗意",
+  "宗教与性"
+ ],
+ "profile": {
+  "definition": "特伦斯·戴维斯的视觉风格以柔光散射为主，油画暖调、利物浦灰金，营造出记忆诗学的氛围。",
+  "lighting": "柔光散射，高光偏窗光侧照，阴影偏油画质感，整体暖调。",
+  "framing": "缓慢长镜、记忆碎片、室内空间。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

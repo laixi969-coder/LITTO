@@ -1,0 +1,104 @@
+{
+ "id": "082",
+ "name": "费里尼",
+ "nameEn": "FedericoFellini",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "意大利",
+ "years": "1920-1993",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E8E0D0",
+    "name": "银灰白",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#D4A058",
+    "name": "暖金",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8B0000",
+    "name": "深红",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗青灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金菊黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "炭黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F5E6C8",
+    "name": null,
+    "emotion": "梦幻回忆"
+   },
+   {
+    "hex": "#B22222",
+    "name": null,
+    "emotion": "热情与欲望"
+   },
+   {
+    "hex": "#D2B48C",
+    "name": null,
+    "emotion": "怀旧温暖"
+   },
+   {
+    "hex": "#2C2C2C",
+    "name": null,
+    "emotion": "荒诞与迷思"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光梦幻",
+  "highlight_bias": "舞台聚光",
+  "shadow_bias": "暖金回忆",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "马戏团构图",
+  "夸张广角",
+  "梦幻场景",
+  "记忆碎片",
+  "小丑意象",
+  "人群涌动"
+ ],
+ "colorKeywords": [
+  "银白梦幻",
+  "暖金回忆",
+  "马戏团色",
+  "高饱和装饰",
+  "黑白/彩色交替",
+  "罗马暖调"
+ ],
+ "mood": [
+  "梦幻荒诞",
+  "记忆迷宫",
+  "意式狂欢",
+  "自传色彩",
+  "马戏团美学",
+  "生命热情"
+ ],
+ "profile": {
+  "definition": "费里尼的视觉风格以柔光梦幻为主，银白梦幻、暖金回忆、马戏团色，营造出梦幻荒诞的氛围。",
+  "lighting": "柔光梦幻，高光偏舞台聚光，阴影偏暖金回忆，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "马戏团构图、夸张广角、梦幻场景，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩银白梦幻、暖金回忆、马戏团色。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

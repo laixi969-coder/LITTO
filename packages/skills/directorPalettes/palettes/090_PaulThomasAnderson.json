@@ -1,0 +1,102 @@
+{
+ "id": "090",
+ "name": "P·T·安德森",
+ "nameEn": "PaulThomasAnderson",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "美国",
+ "years": "1970-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B4513",
+    "name": "70年代棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金盏花",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗青绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#CD853F",
+    "name": "秘鲁棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#556B2F",
+    "name": "暗橄榄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#DAA520",
+    "name": null,
+    "emotion": "野心与梦想"
+   },
+   {
+    "hex": "#8B4513",
+    "name": null,
+    "emotion": "怀旧与失落"
+   },
+   {
+    "hex": "#556B2F",
+    "name": null,
+    "emotion": "自然与救赎"
+   },
+   {
+    "hex": "#0F0F0F",
+    "name": null,
+    "emotion": "黑暗与挣扎"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "侧光雕刻",
+  "highlight_bias": "暖金柔光",
+  "shadow_bias": "自然窗光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "长镜头自由",
+  "群像调度",
+  "70年代质感",
+  "父子关系",
+  "美国梦",
+  "胶片美学"
+ ],
+ "colorKeywords": [
+  "70年代暖棕",
+  "胶片颗粒",
+  "油画光比",
+  "暖金侧光",
+  "复古色调",
+  "加州阳光"
+ ],
+ "mood": [
+  "美国梦碎",
+  "父子关系",
+  "野心与失落",
+  "灵性探索",
+  "人类联系",
+  "存在焦虑"
+ ],
+ "profile": {
+  "definition": "P·T·安德森的视觉风格以侧光雕刻为主，70年代暖棕、胶片颗粒，营造出美国梦碎的氛围。",
+  "lighting": "侧光雕刻，高光偏暖金柔光，阴影偏自然窗光，整体暖调。",
+  "framing": "长镜头自由、群像调度、70年代质感。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

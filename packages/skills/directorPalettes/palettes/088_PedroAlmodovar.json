@@ -1,0 +1,104 @@
+{
+ "id": "088",
+ "name": "阿莫多瓦",
+ "nameEn": "PedroAlmodovar",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "西班牙",
+ "years": "1949-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E30613",
+    "name": "阿莫多瓦红",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFB347",
+    "name": "橙黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#4169E1",
+    "name": "皇家蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#32CD32",
+    "name": "酸橙绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FF69B4",
+    "name": "热粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#8B4513",
+    "name": "木棕",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#E30613",
+    "name": null,
+    "emotion": "热情欲望"
+   },
+   {
+    "hex": "#FFB347",
+    "name": null,
+    "emotion": "温暖亲情"
+   },
+   {
+    "hex": "#4169E1",
+    "name": null,
+    "emotion": "忧郁秘密"
+   },
+   {
+    "hex": "#FF69B4",
+    "name": null,
+    "emotion": "女性力量"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "饱和色光",
+  "highlight_bias": "室内暖光",
+  "shadow_bias": "色彩分层",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "女性群像",
+  "室内空间",
+  "色彩构图",
+  "家庭戏剧",
+  "身份认同",
+  "黑色幽默"
+ ],
+ "colorKeywords": [
+  "阿莫多瓦红",
+  "高饱和室内",
+  "西班牙色彩",
+  "女性视角色",
+  "撞色美学",
+  "装饰艺术"
+ ],
+ "mood": [
+  "女性力量",
+  "家庭秘密",
+  "欲望与爱",
+  "身份认同",
+  "黑色幽默",
+  "生命热情"
+ ],
+ "profile": {
+  "definition": "阿莫多瓦的视觉风格以饱和色光为主，阿莫多瓦红、高饱和室内、西班牙色彩，营造出女性力量的氛围。",
+  "lighting": "饱和色光，高光偏室内暖光，阴影偏色彩分层，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "女性群像、室内空间、色彩构图，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩阿莫多瓦红、高饱和室内、西班牙色彩。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

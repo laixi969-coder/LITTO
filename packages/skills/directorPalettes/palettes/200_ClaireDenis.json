@@ -1,0 +1,75 @@
+{
+ "id": "200",
+ "name": "ClaireDenis 克莱尔·德尼",
+ "nameEn": "",
+ "category": "10_东方美学与留白意境",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF8F00",
+    "name": "20%",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "18%",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#C62828",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "18%",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8F00",
+    "name": "",
+    "emotion": "非洲记忆"
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "",
+    "emotion": "身体感官"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "",
+    "emotion": "自然原欲"
+   },
+   {
+    "hex": "#78909C",
+    "name": "",
+    "emotion": "巴黎疏离"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "非洲金光",
+  "highlight_tint": "皮肤侧光",
+  "shadow_tint": "暗调阴影",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

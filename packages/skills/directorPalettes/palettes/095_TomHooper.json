@@ -1,0 +1,102 @@
+{
+ "id": "095",
+ "name": "汤姆·霍珀",
+ "nameEn": "TomHooper",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "英国",
+ "years": "1972-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B4513",
+    "name": "木棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金菊黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#4682B4",
+    "name": "钢蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#556B2F",
+    "name": "暗橄榄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#CD853F",
+    "name": "秘鲁棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "炭黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#DAA520",
+    "name": null,
+    "emotion": "荣耀辉煌"
+   },
+   {
+    "hex": "#4682B4",
+    "name": null,
+    "emotion": "克制内敛"
+   },
+   {
+    "hex": "#8B4513",
+    "name": null,
+    "emotion": "历史厚重"
+   },
+   {
+    "hex": "#556B2F",
+    "name": null,
+    "emotion": "自然宁静"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "油画柔光",
+  "highlight_bias": "窗光侧照",
+  "shadow_bias": "蜡烛暖光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "广角畸变",
+  "对称构图",
+  "历史场景",
+  "人物特写",
+  "英伦古典",
+  "舞台感"
+ ],
+ "colorKeywords": [
+  "英伦古典色",
+  "油画暖调",
+  "历史质感",
+  "钢蓝与金",
+  "维多利亚色",
+  "宫廷色调"
+ ],
+ "mood": [
+  "历史传记",
+  "人性尊严",
+  "英伦古典",
+  "励志传奇",
+  "身份认同",
+  "时代变迁"
+ ],
+ "profile": {
+  "definition": "汤姆·霍珀的视觉风格以油画柔光为主，英伦古典色、油画暖调，营造出历史传记的氛围。",
+  "lighting": "油画柔光，高光偏窗光侧照，阴影偏蜡烛暖光，整体暖调。",
+  "framing": "广角畸变、对称构图、历史场景。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

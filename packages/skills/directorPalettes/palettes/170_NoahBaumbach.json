@@ -1,0 +1,105 @@
+{
+ "id": "170",
+ "name": "诺亚·鲍姆巴赫",
+ "nameEn": "NoahBaumbach",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "美国",
+ "years": "1969-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#5D4037",
+    "name": "纽约棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#78909C",
+    "name": "布鲁克林灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#000000",
+    "name": "黑白黑",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "白白白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "公寓米",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#78909C",
+    "name": "知识分子忧郁",
+    "emotion": "知识分子忧郁"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "家庭温暖",
+    "emotion": "家庭温暖"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "纽约沧桑",
+    "emotion": "纽约沧桑"
+   },
+   {
+    "hex": "#000000",
+    "name": "关系破裂",
+    "emotion": "关系破裂"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "纽约自然光",
+  "highlight_tint": "室内暖光",
+  "highlight_bias": "室内暖光",
+  "shadow_tint": "黑白高对比",
+  "shadow_bias": "黑白高对比",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "纽约公寓",
+  "家庭对话",
+  "离婚故事",
+  "知识分子",
+  "兄弟情谊",
+  "成长烦恼"
+ ],
+ "colorKeywords": [
+  "鲍姆巴赫暖调",
+  "纽约知识分子色",
+  "家庭对话色",
+  "黑白散文色",
+  "布鲁克林棕灰",
+  "婚姻故事色"
+ ],
+ "mood": [
+  "知识分子",
+  "家庭解体",
+  "纽约故事",
+  "对话电影",
+  "成长烦恼",
+  "黑白散文"
+ ],
+ "profile": {
+  "definition": "诺亚·鲍姆巴赫的视觉风格：纽约自然光，鲍姆巴赫暖调, 纽约知识分子色, 家庭对话色。",
+  "lighting": "纽约自然光，室内暖光，黑白高对比",
+  "framing": "纽约公寓、家庭对话、离婚故事。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

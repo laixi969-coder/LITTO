@@ -1,0 +1,108 @@
+{
+ "id": "023",
+ "name": "加斯帕·诺埃",
+ "nameEn": "Gaspar Noé",
+ "category": "02_霓虹黑色与赛博未来",
+ "nationality": "法国/阿根廷",
+ "years": "1998-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0A000F",
+    "name": "迷幻深黑",
+    "ratio": 0.3
+   },
+   {
+    "hex": "#FF0000",
+    "name": "频闪纯红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#0000FF",
+    "name": "电音深蓝",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#FF00FF",
+    "name": "夜店洋红",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#FFD700",
+    "name": "迷幻金",
+    "ratio": 0.1
+   },
+   {
+    "hex": "#E8BEAC",
+    "name": "裸肤",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF1493",
+    "name": "欲望粉",
+    "emotion": "性欲肉体"
+   },
+   {
+    "hex": "#00FFFF",
+    "name": "毒幻青",
+    "emotion": "毒瘾幻觉"
+   },
+   {
+    "hex": "#FF4500",
+    "name": "暴力橙红",
+    "emotion": "暴力愤怒"
+   },
+   {
+    "hex": "#9400D3",
+    "name": "迷幻紫",
+    "emotion": "超越濒死"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "strobing neon, disorienting colored sources, extreme low-angle",
+  "highlight_tint": "strobing red/blue/magenta club lights",
+  "shadow_tint": "pure black void",
+  "contrast_ratio": "extreme 85-95%",
+  "overall_tone": "psychedelic neon dark 50/50"
+ },
+ "composition": [
+  "360 degree rotating camera",
+  "extreme low angle",
+  "long unbroken takes",
+  "first person POV",
+  "stroboscopic editing",
+  "overhead bird's eye",
+  "extreme close-up body",
+  "inverted camera"
+ ],
+ "colorKeywords": [
+  "strobing red-blue neon",
+  "psychedelic magenta",
+  "nightclub color temperature",
+  "saturated violence red",
+  "drug hallucination colors",
+  "strobe light flicker",
+  "blacklight UV glow",
+  "disorienting color shifts"
+ ],
+ "mood": [
+  "extreme cinema",
+  "sensory overload",
+  "primal desire",
+  "violence and sexuality",
+  "drug experience",
+  "existential void",
+  "death transcendence",
+  "audience confrontation"
+ ],
+ "profile": {
+  "definition": "加斯帕·诺埃的视觉风格以strobing neon, disorienting colored sources, extreme low-angle为主，strobing red-blue neon、psychedelic magenta，营造出extreme cinema的氛围。",
+  "lighting": "strobing neon, disorienting colored sources, extreme low-angle，高光偏strobing red/blue/magenta club lights，阴影偏pure black void，整体psychedelic neon dark 50/50。",
+  "framing": "360 degree rotating camera、extreme low angle、long unbroken takes。",
+  "grading": "对比度extreme 85-95%，色调psychedelic neon dark 50/50。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

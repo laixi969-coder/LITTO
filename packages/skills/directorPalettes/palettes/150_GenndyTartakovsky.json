@@ -1,0 +1,105 @@
+{
+ "id": "150",
+ "name": "塔塔科夫斯基",
+ "nameEn": "GenndyTartakovsky",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "俄罗斯/美国",
+ "years": "1970-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1A237E",
+    "name": "武士蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#BF360C",
+    "name": "武士红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#212121",
+    "name": "剪影黑",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "能量黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "丛林绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "钢铁灰",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#1A237E",
+    "name": "武士道魂",
+    "emotion": "武士道魂"
+   },
+   {
+    "hex": "#BF360C",
+    "name": "战斗激情",
+    "emotion": "战斗激情"
+   },
+   {
+    "hex": "#212121",
+    "name": "孤独剑客",
+    "emotion": "孤独剑客"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "能量爆发",
+    "emotion": "能量爆发"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高对比光",
+  "highlight_tint": "剪影背光",
+  "highlight_bias": "剪影背光",
+  "shadow_tint": "动作补光",
+  "shadow_bias": "动作补光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "极简造型",
+  "动作流畅",
+  "剪影构图",
+  "广角镜头",
+  "时间压缩",
+  "未来科技"
+ ],
+ "colorKeywords": [
+  "武士杰克蓝黑",
+  "极简动画色",
+  "剪影高对比",
+  "动作色彩",
+  "未来科技色",
+  "卡通网络色"
+ ],
+ "mood": [
+  "武士精神",
+  "动作美学",
+  "时间旅行",
+  "极简主义",
+  "孤独英雄",
+  "未来复古"
+ ],
+ "profile": {
+  "definition": "塔塔科夫斯基的视觉风格：高对比光，武士杰克蓝黑, 极简动画色, 剪影高对比。",
+  "lighting": "高对比光，剪影背光，动作补光",
+  "framing": "极简造型、动作流畅、剪影构图。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

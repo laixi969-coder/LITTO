@@ -1,0 +1,105 @@
+{
+ "id": "116",
+ "name": "布兰登·柯南伯格",
+ "nameEn": "BrandonCronenberg",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "加拿大",
+ "years": "1980-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#00BCD4",
+    "name": "临床青",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#E91E63",
+    "name": "肉体粉",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#37474F",
+    "name": "暗青灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血肉红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#ECEFF1",
+    "name": "冷白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#263238",
+    "name": "深蓝灰",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#00BCD4",
+    "name": "临床冷漠",
+    "emotion": "临床冷漠"
+   },
+   {
+    "hex": "#E91E63",
+    "name": "肉体迷恋",
+    "emotion": "肉体迷恋"
+   },
+   {
+    "hex": "#37474F",
+    "name": "科技恐惧",
+    "emotion": "科技恐惧"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "身体恐怖",
+    "emotion": "身体恐怖"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "冷白荧光",
+  "highlight_tint": "肉色暖光",
+  "highlight_bias": "肉色暖光",
+  "shadow_tint": "数码色光",
+  "shadow_bias": "数码色光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "身体变形",
+  "临床空间",
+  "数码界面",
+  "未来冷色",
+  "针管仪器",
+  "阶级对照"
+ ],
+ "colorKeywords": [
+  "临床冷白",
+  "肉体粉红",
+  "科幻恐怖色",
+  "数码蓝绿",
+  "未来冷色",
+  "血肉质感"
+ ],
+ "mood": [
+  "身体恐怖",
+  "科技焦虑",
+  "阶级批判",
+  "数码异化",
+  "遗传风格",
+  "冷感恐怖"
+ ],
+ "profile": {
+  "definition": "布兰登·柯南伯格的视觉风格：冷白荧光，临床冷白, 肉体粉红, 科幻恐怖色。",
+  "lighting": "冷白荧光，肉色暖光，数码色光",
+  "framing": "身体变形、临床空间、数码界面。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "189",
+ "name": "洪常秀",
+ "nameEn": "HongSang-soo",
+ "category": "10_东方美学与留白意境",
+ "nationality": "韩国",
+ "years": "1960-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#000000",
+    "name": "黑白黑",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "白白白",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "酒馆棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "首尔灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "街道米",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8D6E63",
+    "name": "酒后微醺",
+    "emotion": "酒后微醺"
+   },
+   {
+    "hex": "#78909C",
+    "name": "日常疏离",
+    "emotion": "日常疏离"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暧昧温暖",
+    "emotion": "暧昧温暖"
+   },
+   {
+    "hex": "#000000",
+    "name": "存在空虚",
+    "emotion": "存在空虚"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光效",
+  "highlight_tint": "室内暖光",
+  "highlight_bias": "室内暖光",
+  "shadow_tint": "街景柔光",
+  "shadow_bias": "街景柔光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "酒馆场景",
+  "男女对话",
+  "结构游戏",
+  "首尔街景",
+  "导演自我投射",
+  "变焦镜头"
+ ],
+ "colorKeywords": [
+  "洪常秀黑白",
+  "酒馆棕调",
+  "日常对话色",
+  "首尔街景色",
+  "结构游戏色",
+  "淡彩美学"
+ ],
+ "mood": [
+  "日常对话",
+  "男女关系",
+  "结构游戏",
+  "酒桌哲学",
+  "首尔故事",
+  "存在主义"
+ ],
+ "profile": {
+  "definition": "洪常秀的视觉风格：自然光效，洪常秀黑白, 酒馆棕调, 日常对话色。",
+  "lighting": "自然光效，室内暖光，街景柔光",
+  "framing": "酒馆场景、男女对话、结构游戏。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

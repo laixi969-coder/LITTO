@@ -1,0 +1,105 @@
+{
+ "id": "128",
+ "name": "泽米吉斯",
+ "nameEn": "RobertZemeckis",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "美国",
+ "years": "1951-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF8F00",
+    "name": "时光橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#1565C0",
+    "name": "科技蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "怀旧金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#5D4037",
+    "name": "小镇棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#E91E63",
+    "name": "粉红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "森林绿",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8F00",
+    "name": "时光冒险",
+    "emotion": "时光冒险"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "怀旧温情",
+    "emotion": "怀旧温情"
+   },
+   {
+    "hex": "#1565C0",
+    "name": "科技奇迹",
+    "emotion": "科技奇迹"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "小镇情怀",
+    "emotion": "小镇情怀"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "暖金怀旧光",
+  "highlight_tint": "科技蓝光",
+  "highlight_bias": "科技蓝光",
+  "shadow_tint": "自然光",
+  "shadow_bias": "自然光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "时空穿越",
+  "美式小镇",
+  "技术奇观",
+  "奔跑镜头",
+  "历史时刻",
+  "家庭温情"
+ ],
+ "colorKeywords": [
+  "时光橙金",
+  "科技蓝",
+  "美式怀旧色",
+  "80年代色彩",
+  "童话暖调",
+  "小镇温馨色"
+ ],
+ "mood": [
+  "时光旅行",
+  "美国梦",
+  "技术创新",
+  "温情奇幻",
+  "斯皮尔伯格风格",
+  "成长冒险"
+ ],
+ "profile": {
+  "definition": "泽米吉斯的视觉风格：暖金怀旧光，时光橙金, 科技蓝, 美式怀旧色。",
+  "lighting": "暖金怀旧光，科技蓝光，自然光",
+  "framing": "时空穿越、美式小镇、技术奇观。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

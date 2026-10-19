@@ -1,0 +1,105 @@
+{
+ "id": "183",
+ "name": "黑泽清",
+ "nameEn": "KiyoshiKurosawa",
+ "category": "10_东方美学与留白意境",
+ "nationality": "日本",
+ "years": "1955-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#2E7D32",
+    "name": "诡异绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#37474F",
+    "name": "都市灰蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00838F",
+    "name": "冷青",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#5D4037",
+    "name": "暗棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "街灯黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "深黑",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#2E7D32",
+    "name": "诡异不安",
+    "emotion": "诡异不安"
+   },
+   {
+    "hex": "#37474F",
+    "name": "都市异化",
+    "emotion": "都市异化"
+   },
+   {
+    "hex": "#00838F",
+    "name": "冰冷恐惧",
+    "emotion": "冰冷恐惧"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "压抑沉闷",
+    "emotion": "压抑沉闷"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "荧光冷光",
+  "highlight_tint": "绿色色光",
+  "highlight_bias": "绿色色光",
+  "shadow_tint": "暗调阴影",
+  "shadow_bias": "暗调阴影",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "静止长镜",
+  "空间异化",
+  "都市公寓",
+  "幽灵出现",
+  "绿色恐怖",
+  "家庭解体"
+ ],
+ "colorKeywords": [
+  "黑泽清绿",
+  "都市恐怖色",
+  "空间异调色",
+  "冷青暗调",
+  "绿色诡异光",
+  "日本恐怖色"
+ ],
+ "mood": [
+  "都市恐怖",
+  "空间异化",
+  "存在恐惧",
+  "日本J-Horror",
+  "心理惊悚",
+  "绿色诡异"
+ ],
+ "profile": {
+  "definition": "黑泽清的视觉风格：荧光冷光，黑泽清绿, 都市恐怖色, 空间异调色。",
+  "lighting": "荧光冷光，绿色色光，暗调阴影",
+  "framing": "静止长镜、空间异化、都市公寓。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "177",
+ "name": "是枝裕和",
+ "nameEn": "HirokazuKoreeda",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "日本",
+ "years": "1962-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#81C784",
+    "name": "夏日绿",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "榻榻米米",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "夏日蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A1887F",
+    "name": "木质棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "阳光黄",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#81C784",
+    "name": "家庭温暖",
+    "emotion": "家庭温暖"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "记忆微光",
+    "emotion": "记忆微光"
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "日常平静",
+    "emotion": "日常平静"
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "夏日清澈",
+    "emotion": "夏日清澈"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然柔光",
+  "highlight_tint": "夏日绿意",
+  "highlight_bias": "夏日绿意",
+  "shadow_tint": "室内暖光",
+  "shadow_bias": "室内暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "家庭群像",
+  "夏日风景",
+  "静帧长镜",
+  "庶民生活",
+  "父子母女",
+  "餐桌场景"
+ ],
+ "colorKeywords": [
+  "是枝裕和绿",
+  "家庭暖调",
+  "夏日绿蓝",
+  "庶民剧色",
+  "榻榻米米白",
+  "静水流深色"
+ ],
+ "mood": [
+  "家庭温情",
+  "庶民剧",
+  "静水流深",
+  "日本家庭",
+  "夏日记忆",
+  "生死主题"
+ ],
+ "profile": {
+  "definition": "是枝裕和的视觉风格：自然柔光，是枝裕和绿, 家庭暖调, 夏日绿蓝。",
+  "lighting": "自然柔光，夏日绿意，室内暖光",
+  "framing": "家庭群像、夏日风景、静帧长镜。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

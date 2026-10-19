@@ -1,0 +1,102 @@
+{
+ "id": "080",
+ "name": "格斯·范·桑特",
+ "nameEn": "GusVanSant",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "美国",
+ "years": "1952-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7A8A8A",
+    "name": "西北冷灰绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#9A9A8A",
+    "name": "雾灰绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5A6A6A",
+    "name": "深灰青",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B8B0A0",
+    "name": "旧木米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#D4CCBC",
+    "name": "雾灰白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A4A4A",
+    "name": "深青黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#6A7A7A",
+    "name": null,
+    "emotion": "青春迷茫"
+   },
+   {
+    "hex": "#8A8A7A",
+    "name": null,
+    "emotion": "死亡诗意"
+   },
+   {
+    "hex": "#A0A090",
+    "name": null,
+    "emotion": "疏离孤独"
+   },
+   {
+    "hex": "#2A3A3A",
+    "name": null,
+    "emotion": "存在虚无"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光柔和",
+  "highlight_bias": "西北雨雾",
+  "shadow_bias": "室内弱光",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "长镜头静观",
+  "自然风景",
+  "青春身体",
+  "公路旅行",
+  "学校空间",
+  "死亡意象"
+ ],
+ "colorKeywords": [
+  "太平洋西北灰",
+  "自然光",
+  "雨雾质感",
+  "青春冷调",
+  "低饱和",
+  "俄勒冈绿"
+ ],
+ "mood": [
+  "青春疏离",
+  "死亡诗意",
+  "酷儿主题",
+  "极简叙事",
+  "美国独立",
+  "存在迷茫"
+ ],
+ "profile": {
+  "definition": "格斯·范·桑特的视觉风格以自然光柔和为主，太平洋西北灰、自然光，营造出青春疏离的氛围。",
+  "lighting": "自然光柔和，高光偏西北雨雾，阴影偏室内弱光，整体冷调。",
+  "framing": "长镜头静观、自然风景、青春身体。",
+  "grading": "对比度中高对比，色调冷调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

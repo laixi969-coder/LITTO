@@ -1,0 +1,105 @@
+{
+ "id": "103",
+ "name": "让-皮埃尔·热内",
+ "nameEn": "Jean-PierreJeunet",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "法国",
+ "years": "1953-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#33691E",
+    "name": "草绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FF8F00",
+    "name": "金橙黄",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "棕褐",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#F57F17",
+    "name": "深金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "深绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "深棕",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8F00",
+    "name": "温暖童话",
+    "emotion": "温暖童话"
+   },
+   {
+    "hex": "#33691E",
+    "name": "自然生机",
+    "emotion": "自然生机"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "怀旧忧伤",
+    "emotion": "怀旧忧伤"
+   },
+   {
+    "hex": "#F57F17",
+    "name": "幸福微光",
+    "emotion": "幸福微光"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "暖黄侧光",
+  "highlight_tint": "绿色补光",
+  "highlight_bias": "绿色补光",
+  "shadow_tint": "柔光散射",
+  "shadow_bias": "柔光散射",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "广角奇想",
+  "物件特写",
+  "蒙太奇拼贴",
+  "法式街景",
+  "人物怪诞",
+  "色彩分层"
+ ],
+ "colorKeywords": [
+  "绿黄暖调",
+  "法式童话色",
+  "高饱和",
+  "暖金光线",
+  "绿色环境",
+  "橙色点缀"
+ ],
+ "mood": [
+  "温暖奇想",
+  "法式幽默",
+  "孤独与爱",
+  "物件迷恋",
+  "命运巧合",
+  "童真爱丽丝"
+ ],
+ "profile": {
+  "definition": "让-皮埃尔·热内的视觉风格：暖黄侧光，绿黄暖调, 法式童话色, 高饱和。",
+  "lighting": "暖黄侧光，绿色补光，柔光散射",
+  "framing": "广角奇想、物件特写、蒙太奇拼贴。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

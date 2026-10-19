@@ -1,0 +1,114 @@
+{
+ "id": "021",
+ "name": "雷德利·斯科特",
+ "nameEn": "Ridley Scott",
+ "category": "02_霓虹黑色与赛博未来",
+ "nationality": "英国",
+ "years": "1977-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0A0F1A",
+    "name": "深空夜黑",
+    "ratio": 0.35
+   },
+   {
+    "hex": "#1A3A5C",
+    "name": "雨夜钢蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#C9A84C",
+    "name": "霓虹暗金",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#8B0000",
+    "name": "暗红血锈",
+    "ratio": 0.1
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗青绿",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#D4A574",
+    "name": "肤色暖金",
+    "ratio": 0.08
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF6B35",
+    "name": "霓虹橙",
+    "emotion": "未来都市诱惑、危险信号"
+   },
+   {
+    "hex": "#00CED1",
+    "name": "电子青",
+    "emotion": "科技冰冷、人工智能"
+   },
+   {
+    "hex": "#FFD700",
+    "name": "广告金",
+    "emotion": "消费主义幻象、好莱坞浮华"
+   },
+   {
+    "hex": "#4A0E0E",
+    "name": "深渊红",
+    "emotion": "恐惧、外星恐怖、生命的脆弱"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "penetrating light beams through smoke/rain, hard edge rim light",
+  "highlight_tint": "neon gold-orange / electronic cyan (neon, screens, ads)",
+  "shadow_tint": "deep blue-black (night, space, dark alleys)",
+  "contrast_ratio": "high, 75-90%, light beams slicing frame",
+  "overall_tone": "cold dark future, 55% cool blue-cyan + 45% warm gold-red"
+ },
+ "composition": [
+  "giant scale composition",
+  "smoke light beams",
+  "silhouette rim lighting",
+  "low angle architecture",
+  "rain wet reflections",
+  "slow push-in dolly",
+  "neon reflections",
+  "corridor perspective",
+  "mirror reflections",
+  "atmospheric haze"
+ ],
+ "colorKeywords": [
+  "smoke piercing beams",
+  "dark golden future",
+  "rainy night neon",
+  "high contrast chiaroscuro",
+  "electronic cyan blue",
+  "neon orange gold",
+  "rain street reflections",
+  "industrial cold light",
+  "giant ad projections",
+  "atmospheric fog"
+ ],
+ "mood": [
+  "cyberpunk",
+  "existential loneliness",
+  "replicant questioning",
+  "cosmic horror",
+  "corporate monopoly",
+  "future noir",
+  "replicant elegy",
+  "epic gloom",
+  "visual grandeur",
+  "rain sorrow"
+ ],
+ "profile": {
+  "definition": "工业青、烟雾黑与琥珀火光构成可触摸的未来废墟。",
+  "lighting": "逆光、体积烟、实景灯源；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "环境揭示、稳定跟随、规模化大全景；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "冷青暗部对琥珀高光，材质微反差；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "全屏青橙、塑料科幻、无烟无层次、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

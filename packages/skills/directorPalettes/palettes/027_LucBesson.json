@@ -1,0 +1,108 @@
+{
+ "id": "027",
+ "name": "吕克·贝松",
+ "nameEn": "Luc Besson",
+ "category": "02_霓虹黑色与赛博未来",
+ "nationality": "法国",
+ "years": "1983-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0D1B2A",
+    "name": "巴黎深蓝",
+    "ratio": 0.25
+   },
+   {
+    "hex": "#FF8C00",
+    "name": "法式橙",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#00CED1",
+    "name": "未来青",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#FFD700",
+    "name": "黄金光",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#DC143C",
+    "name": "法式红",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#F5DEB3",
+    "name": "少女肤",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF1493",
+    "name": "爱之粉",
+    "emotion": "爱情少女"
+   },
+   {
+    "hex": "#00BFFF",
+    "name": "未来蓝",
+    "emotion": "科幻太空"
+   },
+   {
+    "hex": "#FFD700",
+    "name": "神圣金",
+    "emotion": "神性救赎"
+   },
+   {
+    "hex": "#8B0000",
+    "name": "暗血红",
+    "emotion": "暴力死亡"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "polished commercial lighting, golden hour, futuristic colored sources",
+  "highlight_tint": "orange-gold / future cyan",
+  "shadow_tint": "deep Parisian blue",
+  "contrast_ratio": "medium-high 65-80%",
+  "overall_tone": "polished French commercial 50/50"
+ },
+ "composition": [
+  "smooth dolly crane shots",
+  "wide angle futuristic cityscapes",
+  "slow motion heroic",
+  "symmetrical framing",
+  "color-coded design",
+  "floating camera",
+  "iconic costume",
+  "vertical city compositions"
+ ],
+ "colorKeywords": [
+  "French blue-orange",
+  "pop futurism cyan",
+  "golden divine light",
+  "Leon plant green",
+  "Mathilda red jacket",
+  "fifth element orange hair",
+  "cinema du look",
+  "polished commercial sheen"
+ ],
+ "mood": [
+  "French cinematic cool",
+  "pop sci-fi spectacle",
+  "hitman with heart",
+  "young female protagonist",
+  "operatic violence",
+  "romantic criminal world",
+  "euro-pulp aesthetic",
+  "divine feminine"
+ ],
+ "profile": {
+  "definition": "吕克·贝松的视觉风格以polished commercial lighting, golden hour, futuristic colored sources为主，French blue-orange、pop futurism cyan，营造出French cinematic cool的氛围。",
+  "lighting": "polished commercial lighting, golden hour, futuristic colored sources，高光偏orange-gold / future cyan，阴影偏deep Parisian blue，整体polished French commercial 50/50。",
+  "framing": "smooth dolly crane shots、wide angle futuristic cityscapes、slow motion heroic。",
+  "grading": "对比度medium-high 65-80%，色调polished French commercial 50/50。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

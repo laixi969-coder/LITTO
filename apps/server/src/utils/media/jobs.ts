@@ -7,7 +7,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { generateMediaDirect, listMediaModels, readReference, validateCameraRequest } from "@/utils/media/generation";
+import { compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
@@ -37,6 +37,9 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     const model = (await listMediaModels(true)).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
     if (!model) throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
     request = await applyMediaQuality(directory, kind, request, model);
+    // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
+    const spec = compileShotSpec(request.shotSpec);
+    request = { ...request, prompt: withPhotographicBaseline(spec ? `${spec}\n\n${request.prompt}` : request.prompt) };
   }
   const projectId = workspaceProject(directory)!;
   // 负面词与种子走独立字段，不拼进提示词正文：拼接后模型只会当作要绘制的文字内容。

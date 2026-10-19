@@ -1,0 +1,105 @@
+{
+ "id": "190",
+ "name": "阿彼察邦",
+ "nameEn": "ApichatpongWeerasethakul",
+ "category": "10_东方美学与留白意境",
+ "nationality": "泰国",
+ "years": "1970-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1B5E20",
+    "name": "热带绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "热带金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "木屋棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#006064",
+    "name": "洞穴青",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "晨曦绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "土米",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#1B5E20",
+    "name": "自然神秘",
+    "emotion": "自然神秘"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "记忆温暖",
+    "emotion": "记忆温暖"
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "乡愁厚重",
+    "emotion": "乡愁厚重"
+   },
+   {
+    "hex": "#006064",
+    "name": "超自然深邃",
+    "emotion": "超自然深邃"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "丛林绿光",
+  "highlight_tint": "热带柔光",
+  "highlight_bias": "热带柔光",
+  "shadow_tint": "自然天光",
+  "shadow_bias": "自然天光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "热带丛林",
+  "慢长镜头",
+  "记忆梦境",
+  "超自然",
+  "泰国乡村",
+  "同性恋主题"
+ ],
+ "colorKeywords": [
+  "阿彼察邦绿",
+  "热带丛林色",
+  "记忆暖金色",
+  "超自然青绿",
+  "泰国乡野色",
+  "慢电影色调"
+ ],
+ "mood": [
+  "热带迷梦",
+  "记忆与梦",
+  "慢电影",
+  "超自然",
+  "泰国乡村",
+  "神秘主义"
+ ],
+ "profile": {
+  "definition": "阿彼察邦的视觉风格：丛林绿光，阿彼察邦绿, 热带丛林色, 记忆暖金色。",
+  "lighting": "丛林绿光，热带柔光，自然天光",
+  "framing": "热带丛林、慢长镜头、记忆梦境。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

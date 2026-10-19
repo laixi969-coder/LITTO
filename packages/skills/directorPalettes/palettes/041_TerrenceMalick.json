@@ -1,0 +1,108 @@
+{
+ "id": "041",
+ "name": "泰伦斯·马力克",
+ "nameEn": "Terrence Malick",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "美国",
+ "years": "1973-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#D4A574",
+    "name": "麦田金",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B6F47",
+    "name": "大地褐",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2F4530",
+    "name": "深林绿",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#E8D5B7",
+    "name": "暖沙米",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#C25A2A",
+    "name": "夕阳橙",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#F5E6C8",
+    "name": "圣光金",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFC857",
+    "name": "神圣金",
+    "emotion": "神性启示"
+   },
+   {
+    "hex": "#7BA05B",
+    "name": "草甸绿",
+    "emotion": "自然生命"
+   },
+   {
+    "hex": "#8C3A1F",
+    "name": "铁锈红",
+    "emotion": "战争苦难"
+   },
+   {
+    "hex": "#B8D4E3",
+    "name": "天空蓝",
+    "emotion": "浩瀚宇宙"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "golden hour backlight, natural magic hour, soft ambient bounce",
+  "highlight_tint": "warm gold / honey yellow",
+  "shadow_tint": "warm earth brown / muted green",
+  "contrast_ratio": "low-medium 40-55%, soft and diffused",
+  "overall_tone": "warm natural earth, 70% warm + 30% cool"
+ },
+ "composition": [
+  "magic hour golden light",
+  "wide-angle landscape",
+  "steadicam glide",
+  "low angle sun rays",
+  "silhouettes against sunset",
+  "nature framing",
+  "handheld whisper",
+  "lens flare divine"
+ ],
+ "colorKeywords": [
+  "golden hour wheat",
+  "warm earth tones",
+  "soft natural backlight",
+  "honey highlight",
+  "grass green meadow",
+  "warm skin tones",
+  "dust in sunlight",
+  "cloud shadow drift"
+ ],
+ "mood": [
+  "transcendental nature",
+  "spiritual wonder",
+  "human and cosmos",
+  "memory and time",
+  "quiet melancholy",
+  "pastoral poetry",
+  "divine immanence",
+  "wind and light"
+ ],
+ "profile": {
+  "definition": "金色逆光、草地绿和天空蓝让人物融入流动自然。",
+  "lighting": "黄金时刻逆光、自然散射、镜头耀斑；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "漂浮跟随、低机位自然细节、广角远景；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "高光金暖、阴影青绿、肤色自然；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "HDR天空、棚拍逆光、过饱和绿色、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "167",
+ "name": "大卫·洛韦里",
+ "nameEn": "DavidLowery",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "美国",
+ "years": "1980-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF8F00",
+    "name": "德州金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#5D4037",
+    "name": "大地棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#78909C",
+    "name": "幽灵灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "草原绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "暖金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "深土棕",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8F00",
+    "name": "温暖怀旧",
+    "emotion": "温暖怀旧"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "大地厚重",
+    "emotion": "大地厚重"
+   },
+   {
+    "hex": "#78909C",
+    "name": "幽灵忧郁",
+    "emotion": "幽灵忧郁"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "自然生命",
+    "emotion": "自然生命"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "黄金时刻",
+  "highlight_tint": "暖金柔光",
+  "highlight_bias": "暖金柔光",
+  "shadow_tint": "烛光室内",
+  "shadow_bias": "烛光室内",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "幽灵视角",
+  "德州风光",
+  "慢长镜头",
+  "诗意叙事",
+  "儿童视角",
+  "时间流逝"
+ ],
+ "colorKeywords": [
+  "大卫洛韦里暖金",
+  "德州大地色",
+  "幽灵灰调",
+  "诗意电影色",
+  "复古暖调",
+  "草原绿棕"
+ ],
+ "mood": [
+  "诗意慢电影",
+  "幽灵浪漫",
+  "德州故事",
+  "时间流逝",
+  "儿童视角",
+  "独立美学"
+ ],
+ "profile": {
+  "definition": "大卫·洛韦里的视觉风格：黄金时刻，大卫洛韦里暖金, 德州大地色, 幽灵灰调。",
+  "lighting": "黄金时刻，暖金柔光，烛光室内",
+  "framing": "幽灵视角、德州风光、慢长镜头。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

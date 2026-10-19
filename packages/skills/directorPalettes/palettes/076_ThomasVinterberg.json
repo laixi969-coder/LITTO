@@ -1,0 +1,102 @@
+{
+ "id": "076",
+ "name": "温特伯格",
+ "nameEn": "ThomasVinterberg",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "丹麦",
+ "years": "1969-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7A8A9A",
+    "name": "丹麦冷灰",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#9A8A7A",
+    "name": "木棕灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5A6A7A",
+    "name": "深灰蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B8A898",
+    "name": "旧木米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#D4C8B8",
+    "name": "暖米灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A4A5A",
+    "name": "深夜蓝灰",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#6A7A8A",
+    "name": null,
+    "emotion": "压抑愤怒"
+   },
+   {
+    "hex": "#A89888",
+    "name": null,
+    "emotion": "家庭温暖"
+   },
+   {
+    "hex": "#8A7A6A",
+    "name": null,
+    "emotion": "群体暴力"
+   },
+   {
+    "hex": "#2A3A4A",
+    "name": null,
+    "emotion": "正义孤独"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光为主",
+  "highlight_bias": "室内暖光",
+  "shadow_bias": "手持跟拍",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "手持跟拍",
+  "室内空间",
+  "家庭聚会",
+  "小镇社区",
+  "群像表演",
+  "道德困境"
+ ],
+ "colorKeywords": [
+  "丹麦冷调",
+  "Dogme质感",
+  "自然光",
+  "室内暖光",
+  "真实感",
+  "灰调为主"
+ ],
+ "mood": [
+  "道德困境",
+  "群体压力",
+  "家庭戏剧",
+  "真实感",
+  "丹麦压抑",
+  "正义与谎言"
+ ],
+ "profile": {
+  "definition": "温特伯格的视觉风格以自然光为主为主，丹麦冷调、Dogme质感，营造出道德困境的氛围。",
+  "lighting": "自然光为主，高光偏室内暖光，阴影偏手持跟拍，整体冷调。",
+  "framing": "手持跟拍、室内空间、家庭聚会。",
+  "grading": "对比度中高对比，色调冷调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

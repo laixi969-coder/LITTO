@@ -1,0 +1,105 @@
+{
+ "id": "130",
+ "name": "查德·斯塔赫斯基",
+ "nameEn": "ChadStahelski",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "美国",
+ "years": "1968-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#D500F9",
+    "name": "霓虹紫",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00E5FF",
+    "name": "电青",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FF1744",
+    "name": "血红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD600",
+    "name": "金尊黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A2E",
+    "name": "深夜蓝黑",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#76FF03",
+    "name": "荧光绿",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#D500F9",
+    "name": "杀手美学",
+    "emotion": "杀手美学"
+   },
+   {
+    "hex": "#FF1744",
+    "name": "复仇怒火",
+    "emotion": "复仇怒火"
+   },
+   {
+    "hex": "#00E5FF",
+    "name": "冷酷精准",
+    "emotion": "冷酷精准"
+   },
+   {
+    "hex": "#FFD600",
+    "name": "荣耀规则",
+    "emotion": "荣耀规则"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "霓虹色光",
+  "highlight_tint": "雨夜反光",
+  "highlight_bias": "雨夜反光",
+  "shadow_tint": "俱乐部彩光",
+  "shadow_bias": "俱乐部彩光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "长镜头格斗",
+  "霓虹夜景",
+  "杀手酒店",
+  "西装革履",
+  "雨景动作",
+  "仪式感"
+ ],
+ "colorKeywords": [
+  "疾速追杀霓虹色",
+  "紫青对比",
+  "高饱和动作色",
+  "杀手酒店金色",
+  "雨夜反光",
+  "动作美学色"
+ ],
+ "mood": [
+  "杀手美学",
+  "复仇之路",
+  "动作芭蕾",
+  "地下世界",
+  "荣誉规则",
+  "霓虹夜都市"
+ ],
+ "profile": {
+  "definition": "查德·斯塔赫斯基的视觉风格：霓虹色光，疾速追杀霓虹色, 紫青对比, 高饱和动作色。",
+  "lighting": "霓虹色光，雨夜反光，俱乐部彩光",
+  "framing": "长镜头格斗、霓虹夜景、杀手酒店。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

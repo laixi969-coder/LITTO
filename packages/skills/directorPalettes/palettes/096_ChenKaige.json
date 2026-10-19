@@ -1,0 +1,104 @@
+{
+ "id": "096",
+ "name": "陈凯歌",
+ "nameEn": "ChenKaige",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "中国",
+ "years": "1952-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C41E3A",
+    "name": "中国红",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFD700",
+    "name": "帝王金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#191970",
+    "name": "午夜蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#228B22",
+    "name": "翠绿",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "雪白",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#2F2F2F",
+    "name": "炭黑灰",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#C41E3A",
+    "name": null,
+    "emotion": "激情革命"
+   },
+   {
+    "hex": "#FFD700",
+    "name": null,
+    "emotion": "历史辉煌"
+   },
+   {
+    "hex": "#191970",
+    "name": null,
+    "emotion": "命运忧郁"
+   },
+   {
+    "hex": "#228B22",
+    "name": null,
+    "emotion": "青春理想"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高饱和色光",
+  "highlight_bias": "舞台聚光",
+  "shadow_bias": "宫殿光影",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "东方史诗",
+  "戏曲美学",
+  "历史画卷",
+  "象征意象",
+  "第五代",
+  "文化反思"
+ ],
+ "colorKeywords": [
+  "戏曲浓彩",
+  "历史金红",
+  "东方色韵",
+  "宫殿色调",
+  "革命红",
+  "诗意色彩"
+ ],
+ "mood": [
+  "历史史诗",
+  "文化反思",
+  "艺术人生",
+  "东方美学",
+  "理想与现实",
+  "命运无常"
+ ],
+ "profile": {
+  "definition": "陈凯歌的视觉风格以高饱和色光为主，戏曲浓彩、历史金红、东方色韵，营造出历史史诗的氛围。",
+  "lighting": "高饱和色光，高光偏舞台聚光，阴影偏宫殿光影，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "东方史诗、戏曲美学、历史画卷，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩戏曲浓彩、历史金红、东方色韵。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

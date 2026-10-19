@@ -1,0 +1,105 @@
+{
+ "id": "141",
+ "name": "今敏",
+ "nameEn": "SatoshiKon",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "日本",
+ "years": "1963-2010",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E91E63",
+    "name": "偶像粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00BCD4",
+    "name": "都市青",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFC107",
+    "name": "舞台金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#7B1FA2",
+    "name": "梦幻紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#455A64",
+    "name": "都市灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FCE4EC",
+    "name": "樱花粉",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#E91E63",
+    "name": "欲望痴迷",
+    "emotion": "欲望痴迷"
+   },
+   {
+    "hex": "#00BCD4",
+    "name": "都市疏离",
+    "emotion": "都市疏离"
+   },
+   {
+    "hex": "#7B1FA2",
+    "name": "梦境迷离",
+    "emotion": "梦境迷离"
+   },
+   {
+    "hex": "#FFC107",
+    "name": "舞台光芒",
+    "emotion": "舞台光芒"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光现实",
+  "highlight_tint": "梦境彩光",
+  "highlight_bias": "梦境彩光",
+  "shadow_tint": "城市霓虹",
+  "shadow_bias": "城市霓虹",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "蒙太奇剪辑",
+  "现实梦境交融",
+  "女性心理",
+  "东京都市",
+  "镜中倒影",
+  "身份迷失"
+ ],
+ "colorKeywords": [
+  "今敏粉紫",
+  "梦境色彩",
+  "都市霓虹",
+  "心理色光",
+  "舞台金光",
+  "现实虚幻交错色"
+ ],
+ "mood": [
+  "心理迷宫",
+  "身份迷失",
+  "现实梦境",
+  "都市异化",
+  "女性物语",
+  "剪辑魔法"
+ ],
+ "profile": {
+  "definition": "今敏的视觉风格：柔光现实，今敏粉紫, 梦境色彩, 都市霓虹。",
+  "lighting": "柔光现实，梦境彩光，城市霓虹",
+  "framing": "蒙太奇剪辑、现实梦境交融、女性心理。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

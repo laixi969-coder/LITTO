@@ -1,0 +1,105 @@
+{
+ "id": "105",
+ "name": "佐杜洛夫斯基",
+ "nameEn": "AlejandroJodorowsky",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "智利",
+ "years": "1929-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#D50000",
+    "name": "炼金红",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFD600",
+    "name": "神圣金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "秘法绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#4A148C",
+    "name": "灵性紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#01579B",
+    "name": "深渊蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "暗夜黑",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#D50000",
+    "name": "血与火",
+    "emotion": "血与火"
+   },
+   {
+    "hex": "#FFD600",
+    "name": "神圣启示",
+    "emotion": "神圣启示"
+   },
+   {
+    "hex": "#4A148C",
+    "name": "神秘灵性",
+    "emotion": "神秘灵性"
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "自然再生",
+    "emotion": "自然再生"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "色光照明",
+  "highlight_tint": "神圣光束",
+  "highlight_bias": "神圣光束",
+  "shadow_tint": "高饱和色光",
+  "shadow_bias": "高饱和色光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "宗教仪式",
+  "神秘象征",
+  "塔罗牌构图",
+  "沙漠旷野",
+  "身体变形",
+  "色彩仪式"
+ ],
+ "colorKeywords": [
+  "炼金术士色",
+  "高饱和迷幻",
+  "宗教色光",
+  "塔罗色彩",
+  "红金对比",
+  "原始浓烈"
+ ],
+ "mood": [
+  "神秘主义",
+  "迷幻体验",
+  "宗教亵渎",
+  "精神觉醒",
+  "身体政治",
+  "超验艺术"
+ ],
+ "profile": {
+  "definition": "佐杜洛夫斯基的视觉风格：色光照明，炼金术士色, 高饱和迷幻, 宗教色光。",
+  "lighting": "色光照明，神圣光束，高饱和色光",
+  "framing": "宗教仪式、神秘象征、塔罗牌构图。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

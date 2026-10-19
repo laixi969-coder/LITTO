@@ -1,0 +1,105 @@
+{
+ "id": "144",
+ "name": "新海诚",
+ "nameEn": "MakotoShinkai",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "日本",
+ "years": "1973-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#4FC3F7",
+    "name": "天空蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FF8A65",
+    "name": "夕阳橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#BA68C8",
+    "name": "晚霞紫",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "阳光黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#7986CB",
+    "name": "夜空蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#81C784",
+    "name": "青春绿",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#4FC3F7",
+    "name": "思念远方",
+    "emotion": "思念远方"
+   },
+   {
+    "hex": "#FF8A65",
+    "name": "青春遗憾",
+    "emotion": "青春遗憾"
+   },
+   {
+    "hex": "#BA68C8",
+    "name": "浪漫梦幻",
+    "emotion": "浪漫梦幻"
+   },
+   {
+    "hex": "#7986CB",
+    "name": "星空孤独",
+    "emotion": "星空孤独"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "夕阳背光",
+  "highlight_tint": "云海金光",
+  "highlight_bias": "云海金光",
+  "shadow_tint": "雨夜霓虹",
+  "shadow_bias": "雨夜霓虹",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "天空云境",
+  "城市风景",
+  "光影对比",
+  "远距离恋爱",
+  "电车通勤",
+  "青春校园"
+ ],
+ "colorKeywords": [
+  "新海诚蓝",
+  "天空色彩",
+  "夕阳橙紫",
+  "唯美光影",
+  "都市青春色",
+  "云层光色"
+ ],
+ "mood": [
+  "青春距离",
+  "城市孤独",
+  "命运交错",
+  "唯美光影",
+  "思念之苦",
+  "电车情缘"
+ ],
+ "profile": {
+  "definition": "新海诚的视觉风格：夕阳背光，新海诚蓝, 天空色彩, 夕阳橙紫。",
+  "lighting": "夕阳背光，云海金光，雨夜霓虹",
+  "framing": "天空云境、城市风景、光影对比。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

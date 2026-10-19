@@ -1,0 +1,105 @@
+{
+ "id": "107",
+ "name": "科斯马托斯",
+ "nameEn": "PanosCosmatos",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "希腊",
+ "years": "1974-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7B1FA2",
+    "name": "合成器紫",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#C2185B",
+    "name": "霓虹粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "电蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FF6F00",
+    "name": "烈焰橙",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A2E",
+    "name": "深夜蓝黑",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#880E4F",
+    "name": "深玫红",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#7B1FA2",
+    "name": "迷幻噩梦",
+    "emotion": "迷幻噩梦"
+   },
+   {
+    "hex": "#C2185B",
+    "name": "暴力复仇",
+    "emotion": "暴力复仇"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "冰冷愤怒",
+    "emotion": "冰冷愤怒"
+   },
+   {
+    "hex": "#FF6F00",
+    "name": "烈焰毁灭",
+    "emotion": "烈焰毁灭"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "霓虹色光",
+  "highlight_tint": "合成器光感",
+  "highlight_bias": "合成器光感",
+  "shadow_tint": "红色点缀",
+  "shadow_bias": "红色点缀",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "合成器波美学",
+  "慢镜暴力",
+  "对称构图",
+  "霓虹色光",
+  "80年代复古",
+  "宗教恐怖"
+ ],
+ "colorKeywords": [
+  "合成器紫",
+  "霓虹粉蓝",
+  "迷幻恐怖色",
+  "80年代复古色",
+  "高饱和霓虹",
+  "暗调亮色"
+ ],
+ "mood": [
+  "迷幻恐怖",
+  "复仇怒火",
+  "80年代怀旧",
+  "超现实暴力",
+  "金属摇滚",
+  "恶魔崇拜"
+ ],
+ "profile": {
+  "definition": "科斯马托斯的视觉风格：霓虹色光，合成器紫, 霓虹粉蓝, 迷幻恐怖色。",
+  "lighting": "霓虹色光，合成器光感，红色点缀",
+  "framing": "合成器波美学、慢镜暴力、对称构图。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

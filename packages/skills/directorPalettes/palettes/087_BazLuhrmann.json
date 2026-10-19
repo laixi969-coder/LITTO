@@ -1,0 +1,104 @@
+{
+ "id": "087",
+ "name": "巴兹·鲁赫曼",
+ "nameEn": "BazLuhrmann",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "澳大利亚",
+ "years": "1962-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF1493",
+    "name": "深粉",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD700",
+    "name": "金盏黄",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#DC143C",
+    "name": "猩红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#00CED1",
+    "name": "暗绿松石",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#9400D3",
+    "name": "暗紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "深黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFD700",
+    "name": null,
+    "emotion": "奢华狂欢"
+   },
+   {
+    "hex": "#FF1493",
+    "name": null,
+    "emotion": "浪漫激情"
+   },
+   {
+    "hex": "#DC143C",
+    "name": null,
+    "emotion": "悲剧热烈"
+   },
+   {
+    "hex": "#000080",
+    "name": null,
+    "emotion": "忧郁深沉"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高饱和色光",
+  "highlight_bias": "频闪运动",
+  "shadow_bias": "舞台聚光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "MTV式剪辑",
+  "快速运动镜头",
+  "舞台式场面",
+  "拼贴美学",
+  "狂欢场景",
+  "华丽装饰"
+ ],
+ "colorKeywords": [
+  "极饱和色彩",
+  "金红华丽",
+  "霓虹混色",
+  "装饰艺术",
+  "迪斯科色",
+  "歌剧式色彩"
+ ],
+ "mood": [
+  "狂欢悲剧",
+  "浪漫极致",
+  "华丽忧伤",
+  "流行文化",
+  "感官超载",
+  "青春燃烧"
+ ],
+ "profile": {
+  "definition": "巴兹·鲁赫曼的视觉风格以高饱和色光为主，极饱和色彩、金红华丽、霓虹混色，营造出狂欢悲剧的氛围。",
+  "lighting": "高饱和色光，高光偏频闪运动，阴影偏舞台聚光，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "MTV式剪辑、快速运动镜头、舞台式场面，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩极饱和色彩、金红华丽、霓虹混色。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

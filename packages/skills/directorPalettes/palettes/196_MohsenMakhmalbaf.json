@@ -1,0 +1,75 @@
+{
+ "id": "196",
+ "name": "MohsenMakhmalbaf 莫森·玛克玛尔巴夫",
+ "nameEn": "",
+ "category": "10_东方美学与留白意境",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C62828",
+    "name": "22%",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "20%",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#1565C0",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FF6D00",
+    "name": "14%",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#C62828",
+    "name": "",
+    "emotion": "革命激情"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "",
+    "emotion": "生命坚韧"
+   },
+   {
+    "hex": "#1565C0",
+    "name": "",
+    "emotion": "自由渴望"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "",
+    "emotion": "希望绿意"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "强烈色光",
+  "highlight_tint": "自然天光",
+  "shadow_tint": "高饱和色彩",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

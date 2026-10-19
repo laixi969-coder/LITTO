@@ -1,0 +1,108 @@
+{
+ "id": "026",
+ "name": "迈克尔·曼",
+ "nameEn": "Michael Mann",
+ "category": "02_霓虹黑色与赛博未来",
+ "nationality": "美国",
+ "years": "1981-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0A1628",
+    "name": "数码深蓝",
+    "ratio": 0.35
+   },
+   {
+    "hex": "#2C3E50",
+    "name": "城市钢灰",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#4A90D9",
+    "name": "电子冷蓝",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#C4A35A",
+    "name": "都市暖钨",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#8B4513",
+    "name": "皮革棕",
+    "ratio": 0.11
+   },
+   {
+    "hex": "#B0C4DE",
+    "name": "冷钢肤",
+    "ratio": 0.1
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#1E90FF",
+    "name": "枪口蓝",
+    "emotion": "专业精准"
+   },
+   {
+    "hex": "#FF6B35",
+    "name": "枪火橙",
+    "emotion": "暴力瞬间"
+   },
+   {
+    "hex": "#708090",
+    "name": "钢灰寂",
+    "emotion": "孤独疏离"
+   },
+   {
+    "hex": "#DAA520",
+    "name": "暖钨灯",
+    "emotion": "短暂温暖"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "digital cold blue night, practical sources, tungsten warm accents",
+  "highlight_tint": "electronic cold blue screens neon",
+  "shadow_tint": "deep digital blue-black",
+  "contrast_ratio": "medium-high 65-80%",
+  "overall_tone": "cool steel blue noir 75/25"
+ },
+ "composition": [
+  "digital cinematography",
+  "practical light sources",
+  "city night aerial",
+  "wide anamorphic framing",
+  "gunfight choreography",
+  "reflections glass water",
+  "driving plates",
+  "architectural framing"
+ ],
+ "colorKeywords": [
+  "digital cold blue",
+  "steel grey urban",
+  "tungsten warm accent",
+  "practical neon",
+  "LA night chrome",
+  "anamorphic lens flares",
+  "ocean blue night",
+  "wet street reflections"
+ ],
+ "mood": [
+  "professional criminals",
+  "existential male loneliness",
+  "urban alienation",
+  "precision craft",
+  "fate destiny",
+  "noir fatalism",
+  "cool professionalism",
+  "LA nocturne"
+ ],
+ "profile": {
+  "definition": "钢蓝城市、钠灯金和数字夜色呈现职业者的孤独精度。",
+  "lighting": "实景夜灯、数字低照度、冷暖反射；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "长焦监视、精准跟拍、城市横移；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "冷蓝阴影、暖金高光、保持夜色层次；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "霓虹糖果色、过度降噪、肤色橙、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

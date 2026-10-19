@@ -1,0 +1,108 @@
+{
+ "id": "056",
+ "name": "乔·赖特",
+ "nameEn": "Joe Wright",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "英国",
+ "years": "2000-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#D4A574",
+    "name": "落日暖金",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#6B8E4E",
+    "name": "田园草绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8B4513",
+    "name": "胡桃木棕",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#C9B896",
+    "name": "奶油米色",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#4A6741",
+    "name": "松柏深绿",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#9E7B5E",
+    "name": "陶土砖红",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFD700",
+    "name": "黄金时刻",
+    "emotion": "浪漫狂喜"
+   },
+   {
+    "hex": "#8B0000",
+    "name": "暗红血渍",
+    "emotion": "战争悲剧"
+   },
+   {
+    "hex": "#E6E6FA",
+    "name": "薰衣草紫",
+    "emotion": "初恋心动"
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗松绿",
+    "emotion": "压抑隐忍"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "golden hour long take, soft pastoral diffused light, classical painting chiaroscuro",
+  "highlight_tint": "warm honey gold / butter yellow",
+  "shadow_tint": "deep forest green / umber brown",
+  "contrast_ratio": "medium 55-70%",
+  "overall_tone": "warm golden pastoral, 70% warm + 30% cool"
+ },
+ "composition": [
+  "long tracking take",
+  "fluid camera movement",
+  "symmetrical framing",
+  "painterly composition",
+  "depth through doorways",
+  "low-angle romantic",
+  "dancing camera",
+  "period costume detail"
+ ],
+ "colorKeywords": [
+  "golden hour wheat field",
+  "pastoral green meadow",
+  "walnut wood interior",
+  "cream skin tones",
+  "english country garden",
+  "candlelight amber",
+  "dusty window light",
+  "oil painting palette"
+ ],
+ "mood": [
+  "literary romance",
+  "british period elegance",
+  "melancholic nostalgia",
+  "golden memory",
+  "wartime tragedy",
+  "social constraint",
+  "whispered passion",
+  "classical beauty"
+ ],
+ "profile": {
+  "definition": "金麦、草绿与胡桃棕包围人物，柔光与长镜把文学化为流动的油画。",
+  "lighting": "黄金时刻侧逆光与窗纱漫射；肤色奶油暖调，发丝镶金边，空气微粒可见。",
+  "framing": "长镜头跟拍、对称构图、门框透视；先交代空间氛围，再潜入人物内心。",
+  "grading": "高光暖金，阴影绿棕；回忆片段偏暖饱和，现实片段偏冷压抑，对比推动叙事。",
+  "avoid": "硬直射光、现代冷白调色、快速切镜碎切、手持晃动、用统一滤镜替代光线、场景和表演"
+ }
+}

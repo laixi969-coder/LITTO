@@ -1,0 +1,102 @@
+{
+ "id": "074",
+ "name": "达内兄弟",
+ "nameEn": "DardenneBrothers",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "比利时",
+ "years": "1951-/1954-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#6B7B6B",
+    "name": "比利时灰绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B8378",
+    "name": "工业棕灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5A6A5A",
+    "name": "深绿灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#9DA090",
+    "name": "灰绿石",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B8B0A0",
+    "name": "水泥米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3A4A3A",
+    "name": "暗绿黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#7A8A7A",
+    "name": null,
+    "emotion": "生存坚韧"
+   },
+   {
+    "hex": "#5A6258",
+    "name": null,
+    "emotion": "道德困境"
+   },
+   {
+    "hex": "#908A7A",
+    "name": null,
+    "emotion": "底层尊严"
+   },
+   {
+    "hex": "#2A3A2A",
+    "name": null,
+    "emotion": "绝望边缘"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光写实",
+  "highlight_bias": "室内弱光",
+  "shadow_bias": "工业冷光",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "手持跟拍",
+  "近景特写",
+  "工业区",
+  "社会服务",
+  "自行车",
+  "日常劳作"
+ ],
+ "colorKeywords": [
+  "比利时灰绿",
+  "工业色调",
+  "自然光",
+  "水泥质感",
+  "冷调",
+  "底层色"
+ ],
+ "mood": [
+  "社会现实主义",
+  "道德困境",
+  "底层生存",
+  "人文关怀",
+  "紧迫节奏",
+  "挣扎与希望"
+ ],
+ "profile": {
+  "definition": "达内兄弟的视觉风格以自然光写实为主，比利时灰绿、工业色调，营造出社会现实主义的氛围。",
+  "lighting": "自然光写实，高光偏室内弱光，阴影偏工业冷光，整体冷调。",
+  "framing": "手持跟拍、近景特写、工业区。",
+  "grading": "对比度中高对比，色调冷调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

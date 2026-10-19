@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { storyImpact } from "@toonflow/tool-scene-list/storyProject";
 import { t } from "@/lib/i18n";
 import { listMediaModels, generateMedia, readReference } from "@/utils/media/generation";
+import { composeFilm } from "@/utils/media/compose";
 import { z } from "zod";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -212,6 +213,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         return api.workspaceProduction(api.scoped(tenant.workspaceId), workspaceProject(cwd)!, operation, data, tenant.userId);
       },
       listModels: listMediaModels,
+      compose: (request, signal) => composeFilm(cwd, request, signal),
       generateImage: (request, signal, onProgress) => generateAndPublish("image", request, signal, onProgress),
       generateVideo: (request, signal, onProgress) => generateAndPublish("video", request, signal, onProgress),
       generateAudio: (request, signal, onProgress) => generateAndPublish("audio", request, signal, onProgress),

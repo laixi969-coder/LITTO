@@ -1,0 +1,1451 @@
+{
+ "count": 198,
+ "categories": [
+  {
+   "category": "01_黑色悬疑与冷调惊悚",
+   "count": 20,
+   "directors": [
+    {
+     "id": "001",
+     "name": "阿尔弗雷德·希区柯克",
+     "nameEn": "Alfred Hitchcock",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "001_AlfredHitchcock.json"
+    },
+    {
+     "id": "002",
+     "name": "大卫·芬奇",
+     "nameEn": "David Fincher",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "002_DavidFincher.json"
+    },
+    {
+     "id": "003",
+     "name": "迈克尔·哈内克",
+     "nameEn": "Michael Haneke",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "003_MichaelHaneke.json"
+    },
+    {
+     "id": "004",
+     "name": "布莱恩·德·帕尔玛",
+     "nameEn": "Brian De Palma",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "004_BrianDePalma.json"
+    },
+    {
+     "id": "005",
+     "name": "丹尼斯·维伦纽瓦",
+     "nameEn": "Denis Villeneuve",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "005_DenisVilleneuve.json"
+    },
+    {
+     "id": "006",
+     "name": "尼古拉斯·雷弗恩",
+     "nameEn": "Nicolas Winding Refn",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "006_NicolasWindingRefn.json"
+    },
+    {
+     "id": "007",
+     "name": "约翰·卡朋特",
+     "nameEn": "John Carpenter",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "007_JohnCarpenter.json"
+    },
+    {
+     "id": "008",
+     "name": "大卫·柯南伯格",
+     "nameEn": "David Cronenberg",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "008_DavidCronenberg.json"
+    },
+    {
+     "id": "009",
+     "name": "罗曼·波兰斯基",
+     "nameEn": "Roman Polanski",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "009_RomanPolanski.json"
+    },
+    {
+     "id": "010",
+     "name": "克劳德·夏布洛尔",
+     "nameEn": "Claude Chabrol",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "010_ClaudeChabrol.json"
+    },
+    {
+     "id": "011",
+     "name": "亨利-乔治·克鲁佐",
+     "nameEn": "Henri-Georges Clouzot",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "011_HenriGeorgesClouzot.json"
+    },
+    {
+     "id": "012",
+     "name": "柯蒂斯·汉森",
+     "nameEn": "Curtis Hanson",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "012_CurtisHanson.json"
+    },
+    {
+     "id": "013",
+     "name": "阿贝尔·费拉拉",
+     "nameEn": "Abel Ferrara",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "013_AbelFerrara.json"
+    },
+    {
+     "id": "014",
+     "name": "乔纳森·格雷泽",
+     "nameEn": "Jonathan Glazer",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "014_JonathanGlazer.json"
+    },
+    {
+     "id": "015",
+     "name": "大卫·林奇",
+     "nameEn": "David Lynch",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "015_DavidLynch.json"
+    },
+    {
+     "id": "016",
+     "name": "达伦·阿伦诺夫斯基",
+     "nameEn": "Darren Aronofsky",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "016_DarrenAronofsky.json"
+    },
+    {
+     "id": "017",
+     "name": "朴赞郁",
+     "nameEn": "Park Chan-wook",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "017_ParkChanwook.json"
+    },
+    {
+     "id": "018",
+     "name": "保罗·施拉德",
+     "nameEn": "Paul Schrader",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "018_PaulSchrader.json"
+    },
+    {
+     "id": "019",
+     "name": "斯科特·德瑞克森",
+     "nameEn": "Scott Derrickson",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "019_ScottDerrickson.json"
+    },
+    {
+     "id": "020",
+     "name": "斯特法诺·索利马",
+     "nameEn": "Stefano Sollima",
+     "category": "01_黑色悬疑与冷调惊悚",
+     "file": "020_StefanoSollima.json"
+    }
+   ]
+  },
+  {
+   "category": "02_霓虹黑色与赛博未来",
+   "count": 20,
+   "directors": [
+    {
+     "id": "021",
+     "name": "雷德利·斯科特",
+     "nameEn": "Ridley Scott",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "021_RidleyScott.json"
+    },
+    {
+     "id": "022",
+     "name": "王家卫",
+     "nameEn": "Wong Kar-wai",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "022_WongKarwai.json"
+    },
+    {
+     "id": "023",
+     "name": "加斯帕·诺埃",
+     "nameEn": "Gaspar Noé",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "023_GasparNo.json"
+    },
+    {
+     "id": "024",
+     "name": "凯瑟琳·毕格罗",
+     "nameEn": "Kathryn Bigelow",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "024_KathrynBigelow.json"
+    },
+    {
+     "id": "025",
+     "name": "托尼·斯科特",
+     "nameEn": "Tony Scott",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "025_TonyScott.json"
+    },
+    {
+     "id": "026",
+     "name": "迈克尔·曼",
+     "nameEn": "Michael Mann",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "026_MichaelMann.json"
+    },
+    {
+     "id": "027",
+     "name": "吕克·贝松",
+     "nameEn": "Luc Besson",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "027_LucBesson.json"
+    },
+    {
+     "id": "028",
+     "name": "押井守",
+     "nameEn": "Mamoru Oshii",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "028_MamoruOshii.json"
+    },
+    {
+     "id": "029",
+     "name": "大友克洋",
+     "nameEn": "Katsuhiro Otomo",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "029_KatsuhiroOtomo.json"
+    },
+    {
+     "id": "030",
+     "name": "亚历克斯·加兰",
+     "nameEn": "Alex Garland",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "030_AlexGarland.json"
+    },
+    {
+     "id": "031",
+     "name": "詹姆斯·卡梅隆",
+     "nameEn": "James Cameron",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "031_JamesCameron.json"
+    },
+    {
+     "id": "032",
+     "name": "乔治·米勒",
+     "nameEn": "George Miller",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "032_GeorgeMiller.json"
+    },
+    {
+     "id": "033",
+     "name": "罗伯特·罗德里格兹",
+     "nameEn": "Robert Rodriguez",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "033_RobertRodriguez.json"
+    },
+    {
+     "id": "034",
+     "name": "扎克·施奈德",
+     "nameEn": "Zack Snyder",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "034_ZackSnyder.json"
+    },
+    {
+     "id": "035",
+     "name": "邓肯·琼斯",
+     "nameEn": "Duncan Jones",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "035_DuncanJones.json"
+    },
+    {
+     "id": "036",
+     "name": "亚历克斯·普罗亚斯",
+     "nameEn": "Alex Proyas",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "036_AlexProyas.json"
+    },
+    {
+     "id": "037",
+     "name": "尼尔·布洛姆坎普",
+     "nameEn": "Neill Blomkamp",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "037_NeillBlomkamp.json"
+    },
+    {
+     "id": "038",
+     "name": "克里斯托弗·诺兰",
+     "nameEn": "Christopher Nolan",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "038_ChristopherNolan.json"
+    },
+    {
+     "id": "039",
+     "name": "丹尼·博伊尔",
+     "nameEn": "Danny Boyle",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "039_DannyBoyle.json"
+    },
+    {
+     "id": "040",
+     "name": "约翰·麦克蒂尔南",
+     "nameEn": "John McTiernan",
+     "category": "02_霓虹黑色与赛博未来",
+     "file": "040_JohnMcTiernan.json"
+    }
+   ]
+  },
+  {
+   "category": "03_大地暖调与自然光诗意",
+   "count": 20,
+   "directors": [
+    {
+     "id": "041",
+     "name": "泰伦斯·马力克",
+     "nameEn": "Terrence Malick",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "041_TerrenceMalick.json"
+    },
+    {
+     "id": "042",
+     "name": "伊纳里图",
+     "nameEn": "Alejandro G. Iñárritu",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "042_AlejandroGIrritu.json"
+    },
+    {
+     "id": "043",
+     "name": "阿方索·卡隆",
+     "nameEn": "Alfonso Cuarón",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "043_AlfonsoCuarn.json"
+    },
+    {
+     "id": "044",
+     "name": "吉尔莫·德尔·托罗",
+     "nameEn": "Guillermo del Toro",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "044_GuillermodelToro.json"
+    },
+    {
+     "id": "045",
+     "name": "李安",
+     "nameEn": "Ang Lee",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "045_AngLee.json"
+    },
+    {
+     "id": "046",
+     "name": "巴里·詹金斯",
+     "nameEn": "Barry Jenkins",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "046_BarryJenkins.json"
+    },
+    {
+     "id": "047",
+     "name": "史蒂夫·麦奎因",
+     "nameEn": "Steve McQueen",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "047_SteveMcQueen.json"
+    },
+    {
+     "id": "048",
+     "name": "安德烈·阿诺德",
+     "nameEn": "Andrea Arnold",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "048_AndreaArnold.json"
+    },
+    {
+     "id": "049",
+     "name": "赵婷",
+     "nameEn": "Chloé Zhao",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "049_ChloZhao.json"
+    },
+    {
+     "id": "050",
+     "name": "肖恩·贝克",
+     "nameEn": "Sean Baker",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "050_SeanBaker.json"
+    },
+    {
+     "id": "051",
+     "name": "肯·洛奇",
+     "nameEn": "Ken Loach",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "051_KenLoach.json"
+    },
+    {
+     "id": "052",
+     "name": "沃尔特·塞勒斯",
+     "nameEn": "Walter Salles",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "052_WalterSalles.json"
+    },
+    {
+     "id": "053",
+     "name": "史蒂文·斯皮尔伯格",
+     "nameEn": "Steven Spielberg",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "053_StevenSpielberg.json"
+    },
+    {
+     "id": "054",
+     "name": "乔治·卢卡斯",
+     "nameEn": "George Lucas",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "054_GeorgeLucas.json"
+    },
+    {
+     "id": "055",
+     "name": "徐克",
+     "nameEn": "Tsui Hark",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "055_TsuiHark.json"
+    },
+    {
+     "id": "056",
+     "name": "乔·赖特",
+     "nameEn": "Joe Wright",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "056_JoeWright.json"
+    },
+    {
+     "id": "057",
+     "name": "凯瑞·福永",
+     "nameEn": "Cary Fukunaga",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "057_CaryFukunaga.json"
+    },
+    {
+     "id": "058",
+     "name": "罗杰·迪金斯",
+     "nameEn": "Roger Deakins",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "058_RogerDeakins.json"
+    },
+    {
+     "id": "059",
+     "name": "卢贝兹基",
+     "nameEn": "Emmanuel Lubezki",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "059_EmmanuelLubezki.json"
+    },
+    {
+     "id": "060",
+     "name": "安东尼·明格拉",
+     "nameEn": "Anthony Minghella",
+     "category": "03_大地暖调与自然光诗意",
+     "file": "060_AnthonyMinghella.json"
+    }
+   ]
+  },
+  {
+   "category": "04_极简冷构与静观长镜",
+   "count": 20,
+   "directors": [
+    {
+     "id": "061",
+     "name": "塔可夫斯基",
+     "nameEn": "AndreiTarkovsky",
+     "category": "04_极简冷构与静观长镜",
+     "file": "061_AndreiTarkovsky.json"
+    },
+    {
+     "id": "062",
+     "name": "罗伯特·布列松",
+     "nameEn": "RobertBresson",
+     "category": "04_极简冷构与静观长镜",
+     "file": "062_RobertBresson.json"
+    },
+    {
+     "id": "063",
+     "name": "安哲罗普洛斯",
+     "nameEn": "TheoAngelopoulos",
+     "category": "04_极简冷构与静观长镜",
+     "file": "063_TheoAngelopoulos.json"
+    },
+    {
+     "id": "064",
+     "name": "贝拉·塔尔",
+     "nameEn": "BelaTarr",
+     "category": "04_极简冷构与静观长镜",
+     "file": "064_BelaTarr.json"
+    },
+    {
+     "id": "065",
+     "name": "蔡明亮",
+     "nameEn": "TsaiMing-liang",
+     "category": "04_极简冷构与静观长镜",
+     "file": "065_TsaiMingliang.json"
+    },
+    {
+     "id": "066",
+     "name": "安东尼奥尼",
+     "nameEn": "MichelangeloAntonioni",
+     "category": "04_极简冷构与静观长镜",
+     "file": "066_MichelangeloAntonioni.json"
+    },
+    {
+     "id": "067",
+     "name": "考里斯马基",
+     "nameEn": "AkiKaurismaki",
+     "category": "04_极简冷构与静观长镜",
+     "file": "067_AkiKaurismaki.json"
+    },
+    {
+     "id": "068",
+     "name": "布鲁诺·杜蒙",
+     "nameEn": "BrunoDumont",
+     "category": "04_极简冷构与静观长镜",
+     "file": "068_BrunoDumont.json"
+    },
+    {
+     "id": "069",
+     "name": "菲利普·加瑞尔",
+     "nameEn": "PhilippeGarrel",
+     "category": "04_极简冷构与静观长镜",
+     "file": "069_PhilippeGarrel.json"
+    },
+    {
+     "id": "070",
+     "name": "KellyReichardt 凯莉·雷查德",
+     "nameEn": "",
+     "category": "04_极简冷构与静观长镜",
+     "file": "070_KellyReichardt.json"
+    },
+    {
+     "id": "071",
+     "name": "拉夫·迪亚兹",
+     "nameEn": "LavDiaz",
+     "category": "04_极简冷构与静观长镜",
+     "file": "071_LavDiaz.json"
+    },
+    {
+     "id": "072",
+     "name": "沙鲁纳斯·巴塔斯",
+     "nameEn": "SharunasBartas",
+     "category": "04_极简冷构与静观长镜",
+     "file": "072_SharunasBartas.json"
+    },
+    {
+     "id": "073",
+     "name": "贾樟柯",
+     "nameEn": "JiaZhangke",
+     "category": "04_极简冷构与静观长镜",
+     "file": "073_JiaZhangke.json"
+    },
+    {
+     "id": "074",
+     "name": "达内兄弟",
+     "nameEn": "DardenneBrothers",
+     "category": "04_极简冷构与静观长镜",
+     "file": "074_DardenneBrothers.json"
+    },
+    {
+     "id": "075",
+     "name": "拉斯·冯·提尔",
+     "nameEn": "LarsvonTrier",
+     "category": "04_极简冷构与静观长镜",
+     "file": "075_LarsvonTrier.json"
+    },
+    {
+     "id": "076",
+     "name": "温特伯格",
+     "nameEn": "ThomasVinterberg",
+     "category": "04_极简冷构与静观长镜",
+     "file": "076_ThomasVinterberg.json"
+    },
+    {
+     "id": "077",
+     "name": "罗伊·安德森",
+     "nameEn": "RoyAndersson",
+     "category": "04_极简冷构与静观长镜",
+     "file": "077_RoyAndersson.json"
+    },
+    {
+     "id": "078",
+     "name": "WangBing 王兵",
+     "nameEn": "",
+     "category": "04_极简冷构与静观长镜",
+     "file": "078_WangBing.json"
+    },
+    {
+     "id": "079",
+     "name": "卡洛斯·雷加达斯",
+     "nameEn": "CarlosReygadas",
+     "category": "04_极简冷构与静观长镜",
+     "file": "079_CarlosReygadas.json"
+    },
+    {
+     "id": "080",
+     "name": "格斯·范·桑特",
+     "nameEn": "GusVanSant",
+     "category": "04_极简冷构与静观长镜",
+     "file": "080_GusVanSant.json"
+    }
+   ]
+  },
+  {
+   "category": "05_巴洛克华丽与浓墨重彩",
+   "count": 20,
+   "directors": [
+    {
+     "id": "081",
+     "name": "彼得·格林纳威",
+     "nameEn": "PeterGreenaway",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "081_PeterGreenaway.json"
+    },
+    {
+     "id": "082",
+     "name": "费里尼",
+     "nameEn": "FedericoFellini",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "082_FedericoFellini.json"
+    },
+    {
+     "id": "083",
+     "name": "维斯康蒂",
+     "nameEn": "LuchinoVisconti",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "083_LuchinoVisconti.json"
+    },
+    {
+     "id": "084",
+     "name": "贝托鲁奇",
+     "nameEn": "BernardoBertolucci",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "084_BernardoBertolucci.json"
+    },
+    {
+     "id": "085",
+     "name": "科波拉",
+     "nameEn": "FrancisFordCoppola",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "085_FrancisFordCoppola.json"
+    },
+    {
+     "id": "086",
+     "name": "张艺谋",
+     "nameEn": "ZhangYimou",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "086_ZhangYimou.json"
+    },
+    {
+     "id": "087",
+     "name": "巴兹·鲁赫曼",
+     "nameEn": "BazLuhrmann",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "087_BazLuhrmann.json"
+    },
+    {
+     "id": "088",
+     "name": "阿莫多瓦",
+     "nameEn": "PedroAlmodovar",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "088_PedroAlmodovar.json"
+    },
+    {
+     "id": "089",
+     "name": "兰斯莫斯",
+     "nameEn": "YorgosLanthimos",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "089_YorgosLanthimos.json"
+    },
+    {
+     "id": "090",
+     "name": "P·T·安德森",
+     "nameEn": "PaulThomasAnderson",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "090_PaulThomasAnderson.json"
+    },
+    {
+     "id": "091",
+     "name": "保罗·范霍文",
+     "nameEn": "PaulVerhoeven",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "091_PaulVerhoeven.json"
+    },
+    {
+     "id": "092",
+     "name": "德里克·贾曼",
+     "nameEn": "DerekJarman",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "092_DerekJarman.json"
+    },
+    {
+     "id": "093",
+     "name": "特伦斯·戴维斯",
+     "nameEn": "TerenceDavies",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "093_TerenceDavies.json"
+    },
+    {
+     "id": "094",
+     "name": "卢克雷西亚·马特尔",
+     "nameEn": "LucreciaMartel",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "094_LucreciaMartel.json"
+    },
+    {
+     "id": "095",
+     "name": "汤姆·霍珀",
+     "nameEn": "TomHooper",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "095_TomHooper.json"
+    },
+    {
+     "id": "096",
+     "name": "陈凯歌",
+     "nameEn": "ChenKaige",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "096_ChenKaige.json"
+    },
+    {
+     "id": "097",
+     "name": "张叔平",
+     "nameEn": "ZhangShuping",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "097_ZhangShuping.json"
+    },
+    {
+     "id": "098",
+     "name": "塞尔乔·莱昂内",
+     "nameEn": "SergioLeone",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "098_SergioLeone.json"
+    },
+    {
+     "id": "099",
+     "name": "侯孝贤",
+     "nameEn": "HouHsiao-hsien",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "099_HouHsiaohsien.json"
+    },
+    {
+     "id": "100",
+     "name": "萨姆·门德斯",
+     "nameEn": "SamMendes",
+     "category": "05_巴洛克华丽与浓墨重彩",
+     "file": "100_SamMendes.json"
+    }
+   ]
+  },
+  {
+   "category": "06_超现实梦幻与心理畸变",
+   "count": 20,
+   "directors": [
+    {
+     "id": "101",
+     "name": "库布里克",
+     "nameEn": "StanleyKubrick",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "101_StanleyKubrick.json"
+    },
+    {
+     "id": "102",
+     "name": "特瑞·吉列姆",
+     "nameEn": "TerryGilliam",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "102_TerryGilliam.json"
+    },
+    {
+     "id": "103",
+     "name": "让-皮埃尔·热内",
+     "nameEn": "Jean-PierreJeunet",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "103_JeanPierreJeunet.json"
+    },
+    {
+     "id": "104",
+     "name": "米歇尔·冈瑞",
+     "nameEn": "MichelGondry",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "104_MichelGondry.json"
+    },
+    {
+     "id": "105",
+     "name": "佐杜洛夫斯基",
+     "nameEn": "AlejandroJodorowsky",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "105_AlejandroJodorowsky.json"
+    },
+    {
+     "id": "106",
+     "name": "杨凡",
+     "nameEn": "Yonfan",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "106_Yonfan.json"
+    },
+    {
+     "id": "107",
+     "name": "科斯马托斯",
+     "nameEn": "PanosCosmatos",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "107_PanosCosmatos.json"
+    },
+    {
+     "id": "108",
+     "name": "阿里·艾斯特",
+     "nameEn": "AriAster",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "108_AriAster.json"
+    },
+    {
+     "id": "109",
+     "name": "查理·考夫曼",
+     "nameEn": "CharlieKaufman",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "109_CharlieKaufman.json"
+    },
+    {
+     "id": "110",
+     "name": "杨·史云梅耶",
+     "nameEn": "JanSvankmajer",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "110_JanSvankmajer.json"
+    },
+    {
+     "id": "111",
+     "name": "库斯图里卡",
+     "nameEn": "EmirKusturica",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "111_EmirKusturica.json"
+    },
+    {
+     "id": "112",
+     "name": "肯尼斯·安格",
+     "nameEn": "KennethAnger",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "112_KennethAnger.json"
+    },
+    {
+     "id": "113",
+     "name": "玛雅·德伦",
+     "nameEn": "MayaDeren",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "113_MayaDeren.json"
+    },
+    {
+     "id": "114",
+     "name": "马修·巴尼",
+     "nameEn": "MatthewBarney",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "114_MatthewBarney.json"
+    },
+    {
+     "id": "115",
+     "name": "蒂姆·伯顿",
+     "nameEn": "TimBurton",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "115_TimBurton.json"
+    },
+    {
+     "id": "116",
+     "name": "布兰登·柯南伯格",
+     "nameEn": "BrandonCronenberg",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "116_BrandonCronenberg.json"
+    },
+    {
+     "id": "117",
+     "name": "毕赣",
+     "nameEn": "BiGan",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "117_BiGan.json"
+    },
+    {
+     "id": "118",
+     "name": "NagisaOshima 大岛渚",
+     "nameEn": "",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "118_NagisaOshima.json"
+    },
+    {
+     "id": "119",
+     "name": "哈蒙尼·科林",
+     "nameEn": "HarmonyKorine",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "119_HarmonyKorine.json"
+    },
+    {
+     "id": "120",
+     "name": "里芬施塔尔",
+     "nameEn": "LeniRiefenstahl",
+     "category": "06_超现实梦幻与心理畸变",
+     "file": "120_LeniRiefenstahl.json"
+    }
+   ]
+  },
+  {
+   "category": "07_动作史诗与高饱和色彩",
+   "count": 20,
+   "directors": [
+    {
+     "id": "121",
+     "name": "罗兰·艾默里奇",
+     "nameEn": "RolandEmmerich",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "121_RolandEmmerich.json"
+    },
+    {
+     "id": "122",
+     "name": "吴宇森",
+     "nameEn": "JohnWoo",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "122_JohnWoo.json"
+    },
+    {
+     "id": "123",
+     "name": "姜文",
+     "nameEn": "JiangWen",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "123_JiangWen.json"
+    },
+    {
+     "id": "124",
+     "name": "黑泽明",
+     "nameEn": "AkiraKurosawa",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "124_AkiraKurosawa.json"
+    },
+    {
+     "id": "125",
+     "name": "JohnBoorman 约翰·布尔曼",
+     "nameEn": "",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "125_JohnBoorman.json"
+    },
+    {
+     "id": "126",
+     "name": "宫崎骏",
+     "nameEn": "HayaoMiyazaki",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "126_HayaoMiyazaki.json"
+    },
+    {
+     "id": "127",
+     "name": "彼得·杰克逊",
+     "nameEn": "PeterJackson",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "127_PeterJackson.json"
+    },
+    {
+     "id": "128",
+     "name": "泽米吉斯",
+     "nameEn": "RobertZemeckis",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "128_RobertZemeckis.json"
+    },
+    {
+     "id": "129",
+     "name": "伦·怀斯曼",
+     "nameEn": "LenWiseman",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "129_LenWiseman.json"
+    },
+    {
+     "id": "130",
+     "name": "查德·斯塔赫斯基",
+     "nameEn": "ChadStahelski",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "130_ChadStahelski.json"
+    },
+    {
+     "id": "131",
+     "name": "大卫·雷奇",
+     "nameEn": "DavidLeitch",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "131_DavidLeitch.json"
+    },
+    {
+     "id": "132",
+     "name": "安东尼·福奎阿",
+     "nameEn": "AntoineFuqua",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "132_AntoineFuqua.json"
+    },
+    {
+     "id": "133",
+     "name": "迈克尔·贝",
+     "nameEn": "MichaelBay",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "133_MichaelBay.json"
+    },
+    {
+     "id": "134",
+     "name": "加雷斯·埃文斯",
+     "nameEn": "GarethEvans",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "134_GarethEvans.json"
+    },
+    {
+     "id": "135",
+     "name": "里安·约翰逊",
+     "nameEn": "RianJohnson",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "135_RianJohnson.json"
+    },
+    {
+     "id": "136",
+     "name": "马修·沃恩",
+     "nameEn": "MatthewVaughn",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "136_MatthewVaughn.json"
+    },
+    {
+     "id": "137",
+     "name": "塔森·辛格",
+     "nameEn": "TarsemSingh",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "137_TarsemSingh.json"
+    },
+    {
+     "id": "138",
+     "name": "山姆·雷米",
+     "nameEn": "SamRaimi",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "138_SamRaimi.json"
+    },
+    {
+     "id": "139",
+     "name": "奉俊昊",
+     "nameEn": "BongJoon-ho",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "139_BongJoonho.json"
+    },
+    {
+     "id": "140",
+     "name": "李沧东",
+     "nameEn": "LeeChang-dong",
+     "category": "07_动作史诗与高饱和色彩",
+     "file": "140_LeeChangdong.json"
+    }
+   ]
+  },
+  {
+   "category": "08_动画奇幻与异想视觉",
+   "count": 20,
+   "directors": [
+    {
+     "id": "141",
+     "name": "今敏",
+     "nameEn": "SatoshiKon",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "141_SatoshiKon.json"
+    },
+    {
+     "id": "142",
+     "name": "韦斯·安德森",
+     "nameEn": "WesAnderson",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "142_WesAnderson.json"
+    },
+    {
+     "id": "143",
+     "name": "高畑勋",
+     "nameEn": "IsaoTakahata",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "143_IsaoTakahata.json"
+    },
+    {
+     "id": "144",
+     "name": "新海诚",
+     "nameEn": "MakotoShinkai",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "144_MakotoShinkai.json"
+    },
+    {
+     "id": "145",
+     "name": "汤浅政明",
+     "nameEn": "MasaakiYuasa",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "145_MasaakiYuasa.json"
+    },
+    {
+     "id": "146",
+     "name": "亨利·塞利克",
+     "nameEn": "HenrySelick",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "146_HenrySelick.json"
+    },
+    {
+     "id": "147",
+     "name": "希尔万·肖梅",
+     "nameEn": "SylvainChomet",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "147_SylvainChomet.json"
+    },
+    {
+     "id": "148",
+     "name": "汤姆·摩尔",
+     "nameEn": "TommMoore",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "148_TommMoore.json"
+    },
+    {
+     "id": "149",
+     "name": "米歇尔·欧斯洛",
+     "nameEn": "MichelOcelot",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "149_MichelOcelot.json"
+    },
+    {
+     "id": "150",
+     "name": "塔塔科夫斯基",
+     "nameEn": "GenndyTartakovsky",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "150_GenndyTartakovsky.json"
+    },
+    {
+     "id": "151",
+     "name": "特拉维斯·奈特",
+     "nameEn": "TravisKnight",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "151_TravisKnight.json"
+    },
+    {
+     "id": "152",
+     "name": "彼特·道格特",
+     "nameEn": "PeteDocter",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "152_PeteDocter.json"
+    },
+    {
+     "id": "153",
+     "name": "安德鲁·斯坦顿",
+     "nameEn": "AndrewStanton",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "153_AndrewStanton.json"
+    },
+    {
+     "id": "154",
+     "name": "布拉德·伯德",
+     "nameEn": "BradBird",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "154_BradBird.json"
+    },
+    {
+     "id": "155",
+     "name": "石之予",
+     "nameEn": "DomeeShi",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "155_DomeeShi.json"
+    },
+    {
+     "id": "156",
+     "name": "鲍勃·佩尔西凯蒂 等",
+     "nameEn": "BobPersichetti",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "156_BobPersichetti.json"
+    },
+    {
+     "id": "157",
+     "name": "DonBluth 唐·布鲁斯",
+     "nameEn": "",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "157_DonBluth.json"
+    },
+    {
+     "id": "158",
+     "name": "伊日·特尔恩卡",
+     "nameEn": "JiriTrnka",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "158_JiriTrnka.json"
+    },
+    {
+     "id": "159",
+     "name": "米林宏昌",
+     "nameEn": "HiromasaYonebayashi",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "159_HiromasaYonebayashi.json"
+    },
+    {
+     "id": "160",
+     "name": "细田守",
+     "nameEn": "MamoruHosoda",
+     "category": "08_动画奇幻与异想视觉",
+     "file": "160_MamoruHosoda.json"
+    }
+   ]
+  },
+  {
+   "category": "09_浪漫柔光与复古色调",
+   "count": 20,
+   "directors": [
+    {
+     "id": "161",
+     "name": "埃里克·侯麦",
+     "nameEn": "EricRohmer",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "161_EricRohmer.json"
+    },
+    {
+     "id": "162",
+     "name": "弗朗索瓦·特吕弗",
+     "nameEn": "FrancoisTruffaut",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "162_FrancoisTruffaut.json"
+    },
+    {
+     "id": "163",
+     "name": "让-吕克·戈达尔",
+     "nameEn": "Jean-LucGodard",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "163_JeanLucGodard.json"
+    },
+    {
+     "id": "164",
+     "name": "岩井俊二",
+     "nameEn": "ShunjiIwai",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "164_ShunjiIwai.json"
+    },
+    {
+     "id": "165",
+     "name": "关锦鹏",
+     "nameEn": "StanleyKwan",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "165_StanleyKwan.json"
+    },
+    {
+     "id": "166",
+     "name": "托德·海恩斯",
+     "nameEn": "ToddHaynes",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "166_ToddHaynes.json"
+    },
+    {
+     "id": "167",
+     "name": "大卫·洛韦里",
+     "nameEn": "DavidLowery",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "167_DavidLowery.json"
+    },
+    {
+     "id": "168",
+     "name": "塔伊加·维迪提",
+     "nameEn": "TaikaWaititi",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "168_TaikaWaititi.json"
+    },
+    {
+     "id": "169",
+     "name": "埃德加·赖特",
+     "nameEn": "EdgarWright",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "169_EdgarWright.json"
+    },
+    {
+     "id": "170",
+     "name": "诺亚·鲍姆巴赫",
+     "nameEn": "NoahBaumbach",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "170_NoahBaumbach.json"
+    },
+    {
+     "id": "171",
+     "name": "鲁本·奥斯特伦德",
+     "nameEn": "RubenOstlund",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "171_RubenOstlund.json"
+    },
+    {
+     "id": "172",
+     "name": "乔安娜·霍格",
+     "nameEn": "JoannaHogg",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "172_JoannaHogg.json"
+    },
+    {
+     "id": "173",
+     "name": "米娅·汉森-洛夫",
+     "nameEn": "MiaHansen-Love",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "173_MiaHansenLove.json"
+    },
+    {
+     "id": "174",
+     "name": "索菲亚·科波拉",
+     "nameEn": "SofiaCoppola",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "174_SofiaCoppola.json"
+    },
+    {
+     "id": "175",
+     "name": "瑟琳·席安玛",
+     "nameEn": "CelineSciamma",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "175_CelineSciamma.json"
+    },
+    {
+     "id": "176",
+     "name": "雅克·德米",
+     "nameEn": "JacquesDemy",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "176_JacquesDemy.json"
+    },
+    {
+     "id": "177",
+     "name": "是枝裕和",
+     "nameEn": "HirokazuKoreeda",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "177_HirokazuKoreeda.json"
+    },
+    {
+     "id": "178",
+     "name": "滨口龙介",
+     "nameEn": "RyusukeHamaguchi",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "178_RyusukeHamaguchi.json"
+    },
+    {
+     "id": "179",
+     "name": "约阿希姆·特里尔",
+     "nameEn": "JoachimTrier",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "179_JoachimTrier.json"
+    },
+    {
+     "id": "180",
+     "name": "琳恩·拉姆塞",
+     "nameEn": "LynneRamsay",
+     "category": "09_浪漫柔光与复古色调",
+     "file": "180_LynneRamsay.json"
+    }
+   ]
+  },
+  {
+   "category": "10_东方美学与留白意境",
+   "count": 18,
+   "directors": [
+    {
+     "id": "181",
+     "name": "小津安二郎",
+     "nameEn": "YasujiroOzu",
+     "category": "10_东方美学与留白意境",
+     "file": "181_YasujiroOzu.json"
+    },
+    {
+     "id": "182",
+     "name": "沟口健二",
+     "nameEn": "KenjiMizoguchi",
+     "category": "10_东方美学与留白意境",
+     "file": "182_KenjiMizoguchi.json"
+    },
+    {
+     "id": "183",
+     "name": "黑泽清",
+     "nameEn": "KiyoshiKurosawa",
+     "category": "10_东方美学与留白意境",
+     "file": "183_KiyoshiKurosawa.json"
+    },
+    {
+     "id": "184",
+     "name": "北野武",
+     "nameEn": "TakeshiKitano",
+     "category": "10_东方美学与留白意境",
+     "file": "184_TakeshiKitano.json"
+    },
+    {
+     "id": "185",
+     "name": "河濑直美",
+     "nameEn": "NaomiKawase",
+     "category": "10_东方美学与留白意境",
+     "file": "185_NaomiKawase.json"
+    },
+    {
+     "id": "186",
+     "name": "杨德昌",
+     "nameEn": "EdwardYang",
+     "category": "10_东方美学与留白意境",
+     "file": "186_EdwardYang.json"
+    },
+    {
+     "id": "187",
+     "name": "AnnHui 许鞍华",
+     "nameEn": "",
+     "category": "10_东方美学与留白意境",
+     "file": "187_AnnHui.json"
+    },
+    {
+     "id": "188",
+     "name": "金基德",
+     "nameEn": "KimKi-duk",
+     "category": "10_东方美学与留白意境",
+     "file": "188_KimKiduk.json"
+    },
+    {
+     "id": "189",
+     "name": "洪常秀",
+     "nameEn": "HongSang-soo",
+     "category": "10_东方美学与留白意境",
+     "file": "189_HongSangsoo.json"
+    },
+    {
+     "id": "190",
+     "name": "阿彼察邦",
+     "nameEn": "ApichatpongWeerasethakul",
+     "category": "10_东方美学与留白意境",
+     "file": "190_ApichatpongWeerasethakul.json"
+    },
+    {
+     "id": "191",
+     "name": "陈英雄",
+     "nameEn": "TranAnhHung",
+     "category": "10_东方美学与留白意境",
+     "file": "191_TranAnhHung.json"
+    },
+    {
+     "id": "192",
+     "name": "布里兰特·门多萨",
+     "nameEn": "BrillanteMendoza",
+     "category": "10_东方美学与留白意境",
+     "file": "192_BrillanteMendoza.json"
+    },
+    {
+     "id": "193",
+     "name": "萨蒂亚吉特·雷伊",
+     "nameEn": "SatyajitRay",
+     "category": "10_东方美学与留白意境",
+     "file": "193_SatyajitRay.json"
+    },
+    {
+     "id": "194",
+     "name": "阿巴斯·基亚罗斯塔米",
+     "nameEn": "AbbasKiarostami",
+     "category": "10_东方美学与留白意境",
+     "file": "194_AbbasKiarostami.json"
+    },
+    {
+     "id": "195",
+     "name": "AsgharFarhadi 阿斯哈·法哈蒂",
+     "nameEn": "",
+     "category": "10_东方美学与留白意境",
+     "file": "195_AsgharFarhadi.json"
+    },
+    {
+     "id": "196",
+     "name": "MohsenMakhmalbaf 莫森·玛克玛尔巴夫",
+     "nameEn": "",
+     "category": "10_东方美学与留白意境",
+     "file": "196_MohsenMakhmalbaf.json"
+    },
+    {
+     "id": "197",
+     "name": "BahmanGhobadi 巴赫曼·戈巴迪",
+     "nameEn": "",
+     "category": "10_东方美学与留白意境",
+     "file": "197_BahmanGhobadi.json"
+    },
+    {
+     "id": "200",
+     "name": "ClaireDenis 克莱尔·德尼",
+     "nameEn": "",
+     "category": "10_东方美学与留白意境",
+     "file": "200_ClaireDenis.json"
+    }
+   ]
+  }
+ ]
+}

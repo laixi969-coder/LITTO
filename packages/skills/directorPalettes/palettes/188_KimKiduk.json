@@ -1,0 +1,105 @@
+{
+ "id": "188",
+ "name": "金基德",
+ "nameEn": "KimKi-duk",
+ "category": "10_东方美学与留白意境",
+ "nationality": "韩国",
+ "years": "1960-2020",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#006064",
+    "name": "深水青",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#5D4037",
+    "name": "木头棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "寺庙绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#C62828",
+    "name": "血腥红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "佛灯金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "深黑",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#006064",
+    "name": "沉默压抑",
+    "emotion": "沉默压抑"
+   },
+   {
+    "hex": "#C62828",
+    "name": "暴力欲望",
+    "emotion": "暴力欲望"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "佛教救赎",
+    "emotion": "佛教救赎"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "原始本真",
+    "emotion": "原始本真"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "水光反射",
+  "highlight_tint": "自然天光",
+  "highlight_bias": "自然天光",
+  "shadow_tint": "寺庙暖光",
+  "shadow_bias": "寺庙暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "水与岛",
+  "寺庙漂浮",
+  "沉默对白",
+  "身体暴力",
+  "佛教意象",
+  "四季轮回"
+ ],
+ "colorKeywords": [
+  "金基德水色",
+  "寺庙绿棕",
+  "沉默暴力色",
+  "佛教意象色",
+  "水与岛色调",
+  "极端美学色"
+ ],
+ "mood": [
+  "沉默暴力",
+  "佛教意象",
+  "水与岛",
+  "极端美学",
+  "韩国电影",
+  "人性边缘"
+ ],
+ "profile": {
+  "definition": "金基德的视觉风格：水光反射，金基德水色, 寺庙绿棕, 沉默暴力色。",
+  "lighting": "水光反射，自然天光，寺庙暖光",
+  "framing": "水与岛、寺庙漂浮、沉默对白。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

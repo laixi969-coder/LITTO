@@ -1,0 +1,108 @@
+{
+ "id": "044",
+ "name": "吉尔莫·德尔·托罗",
+ "nameEn": "Guillermo del Toro",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "墨西哥",
+ "years": "1993-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#3B220F",
+    "name": "深棕琥珀",
+    "ratio": 0.25
+   },
+   {
+    "hex": "#B8860B",
+    "name": "暗金神话",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "暖黑哥特",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#D4A574",
+    "name": "大地金棕",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#8B4513",
+    "name": "赭石红木",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#F0E68C",
+    "name": "蜜光黄",
+    "ratio": 0.1
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFD700",
+    "name": "童话金",
+    "emotion": "纯真奇幻"
+   },
+   {
+    "hex": "#4682B4",
+    "name": "深海蓝",
+    "emotion": "孤寂爱意"
+   },
+   {
+    "hex": "#8B0000",
+    "name": "暗红血",
+    "emotion": "战争残酷"
+   },
+   {
+    "hex": "#556B2F",
+    "name": "苔藓绿",
+    "emotion": "神秘自然"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "warm side lighting, amber practicals, soft fairy tale diffusion",
+  "highlight_tint": "honey gold / amber yellow",
+  "shadow_tint": "warm black / deep brown (never pure cool black)",
+  "contrast_ratio": "high 70-85%, amber detail preserved in darkness",
+  "overall_tone": "warm amber gothic, 80% warm + 20% cool"
+ },
+ "composition": [
+  "fairy tale symmetry",
+  "creature feature framing",
+  "gothic architecture",
+  "low angle monster reveal",
+  "warm candlelit interior",
+  "fantasy portal",
+  "symmetrical wide shot",
+  "creature close-up empathy"
+ ],
+ "colorKeywords": [
+  "amber fairy tale palette",
+  "warm black gothic",
+  "dark gold mythic tones",
+  "honey light diffusion",
+  "teal laboratory contrast",
+  "moss green forest magic",
+  "blood red violence",
+  "sepia memory glow"
+ ],
+ "mood": [
+  "dark fairy tale wonder",
+  "sympathetic monsters",
+  "gothic romance",
+  "childhood imagination",
+  "anti-fascist resistance",
+  "love across difference",
+  "magical realism",
+  "melancholic beauty"
+ ],
+ "profile": {
+  "definition": "古金、血红、海洋青绿与潮湿黑让怪物童话既温暖又危险。",
+  "lighting": "烛光、月光、潮湿反射、体积光；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "童话对称、缓慢揭示、怪物细节；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "暖金对冷青绿，材质湿润，红色克制；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "糖果奇幻、干净塑料怪物、蓝光糊脸、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

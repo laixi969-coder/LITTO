@@ -1,0 +1,105 @@
+{
+ "id": "111",
+ "name": "库斯图里卡",
+ "nameEn": "EmirKusturica",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "塞尔维亚",
+ "years": "1954-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E65100",
+    "name": "火焰橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFB300",
+    "name": "金盏黄",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#5D4037",
+    "name": "烟熏棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "草原绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "深棕木",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFB300",
+    "name": "狂欢热烈",
+    "emotion": "狂欢热烈"
+   },
+   {
+    "hex": "#E65100",
+    "name": "生命激情",
+    "emotion": "生命激情"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "忧伤怀旧",
+    "emotion": "忧伤怀旧"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "土地家园",
+    "emotion": "土地家园"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "暖金火光",
+  "highlight_tint": "节日灯彩",
+  "highlight_bias": "节日灯彩",
+  "shadow_tint": "自然阳光",
+  "shadow_bias": "自然阳光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "狂欢场面",
+  "铜管乐队",
+  "动物意象",
+  "漂浮叙事",
+  "巴尔干风景",
+  "家庭史诗"
+ ],
+ "colorKeywords": [
+  "巴尔干暖色",
+  "吉普赛色彩",
+  "火焰橙黄",
+  "泥土棕调",
+  "节日彩灯",
+  "阳光金色"
+ ],
+ "mood": [
+  "狂欢悲剧",
+  "家国情怀",
+  "魔幻现实",
+  "吉普赛魂",
+  "生命热情",
+  "荒诞诗意"
+ ],
+ "profile": {
+  "definition": "库斯图里卡的视觉风格：暖金火光，巴尔干暖色, 吉普赛色彩, 火焰橙黄。",
+  "lighting": "暖金火光，节日灯彩，自然阳光",
+  "framing": "狂欢场面、铜管乐队、动物意象。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

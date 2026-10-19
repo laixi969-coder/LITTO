@@ -1,0 +1,102 @@
+{
+ "id": "097",
+ "name": "张叔平",
+ "nameEn": "ZhangShuping",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "中国香港",
+ "years": "1953-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B0000",
+    "name": "丝绒红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2E4A3E",
+    "name": "墨绿缎",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金菊黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#4A2C5A",
+    "name": "暗紫罗",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#CD853F",
+    "name": "金棕绸",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8B0000",
+    "name": null,
+    "emotion": "欲望压抑"
+   },
+   {
+    "hex": "#2E4A3E",
+    "name": null,
+    "emotion": "秘密与嫉妒"
+   },
+   {
+    "hex": "#DAA520",
+    "name": null,
+    "emotion": "记忆温暖"
+   },
+   {
+    "hex": "#4A2C5A",
+    "name": null,
+    "emotion": "神秘浪漫"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光漫射",
+  "highlight_bias": "色彩分层",
+  "shadow_bias": "织物光泽",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "色彩即叙事",
+  "织物肌理",
+  "旗袍美学",
+  "空间色彩",
+  "香港记忆",
+  "细节美学"
+ ],
+ "colorKeywords": [
+  "丝绒质感色",
+  "旗袍色彩",
+  "织物光泽",
+  "浓饱和情绪",
+  "60年代色",
+  "上海怀旧"
+ ],
+ "mood": [
+  "色彩叙事",
+  "织物美学",
+  "香港记忆",
+  "暧昧情愫",
+  "细节之美",
+  "东方精致"
+ ],
+ "profile": {
+  "definition": "张叔平的视觉风格以柔光漫射为主，丝绒质感色、旗袍色彩，营造出色彩叙事的氛围。",
+  "lighting": "柔光漫射，高光偏色彩分层，阴影偏织物光泽，整体暖调。",
+  "framing": "色彩即叙事、织物肌理、旗袍美学。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

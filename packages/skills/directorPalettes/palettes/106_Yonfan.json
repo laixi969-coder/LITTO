@@ -1,0 +1,105 @@
+{
+ "id": "106",
+ "name": "杨凡",
+ "nameEn": "Yonfan",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "中国香港",
+ "years": "1947-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#880E4F",
+    "name": "胭脂红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCCBC",
+    "name": "肤色粉",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#1A237E",
+    "name": "藏青蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "暖金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#4A148C",
+    "name": "暗紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FCE4EC",
+    "name": "樱花粉",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#880E4F",
+    "name": "欲望沉溺",
+    "emotion": "欲望沉溺"
+   },
+   {
+    "hex": "#FFCCBC",
+    "name": "柔美温情",
+    "emotion": "柔美温情"
+   },
+   {
+    "hex": "#1A237E",
+    "name": "压抑秘密",
+    "emotion": "压抑秘密"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "怀旧金粉",
+    "emotion": "怀旧金粉"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光漫射",
+  "highlight_tint": "丝绸反光",
+  "highlight_bias": "丝绸反光",
+  "shadow_tint": "烛光暖调",
+  "shadow_bias": "烛光暖调",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "丝绸质感",
+  "镜面反射",
+  "园林意境",
+  "耽美身体",
+  "戏曲元素",
+  "色彩分层"
+ ],
+ "colorKeywords": [
+  "东方耽美色",
+  "丝绸柔光",
+  "胭脂水粉",
+  "暖金回忆",
+  "藏青压抑",
+  "精致唯美"
+ ],
+ "mood": [
+  "颓废美学",
+  "东方情欲",
+  "身份认同",
+  "时代记忆",
+  "精致忧伤",
+  "耽美文化"
+ ],
+ "profile": {
+  "definition": "杨凡的视觉风格：柔光漫射，东方耽美色, 丝绸柔光, 胭脂水粉。",
+  "lighting": "柔光漫射，丝绸反光，烛光暖调",
+  "framing": "丝绸质感、镜面反射、园林意境。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "184",
+ "name": "北野武",
+ "nameEn": "TakeshiKitano",
+ "category": "10_东方美学与留白意境",
+ "nationality": "日本",
+ "years": "1947-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0288D1",
+    "name": "北野蓝",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#37474F",
+    "name": "海灰蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#C62828",
+    "name": "鲜血红",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "烟花金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "沙米白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "深黑",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#0288D1",
+    "name": "冷酷暴力",
+    "emotion": "冷酷暴力"
+   },
+   {
+    "hex": "#C62828",
+    "name": "鲜血死亡",
+    "emotion": "鲜血死亡"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "短暂温情",
+    "emotion": "短暂温情"
+   },
+   {
+    "hex": "#37474F",
+    "name": "宿命感",
+    "emotion": "宿命感"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "海边冷光",
+  "highlight_tint": "蓝色色光",
+  "highlight_bias": "蓝色色光",
+  "shadow_tint": "高反差",
+  "shadow_bias": "高反差",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "静止画面",
+  "海边场景",
+  "黑帮暴力",
+  "蓝色基调",
+  "死面表情",
+  "长镜头静帧"
+ ],
+ "colorKeywords": [
+  "北野蓝",
+  "暴力静帧色",
+  "黑帮蓝色调",
+  "鲜血点缀",
+  "海边冷色调",
+  "花火金"
+ ],
+ "mood": [
+  "暴力美学",
+  "蓝色调",
+  "黑帮电影",
+  "日本极道",
+  "冷面笑匠",
+  "宿命感"
+ ],
+ "profile": {
+  "definition": "北野武的视觉风格：海边冷光，北野蓝, 暴力静帧色, 黑帮蓝色调。",
+  "lighting": "海边冷光，蓝色色光，高反差",
+  "framing": "静止画面、海边场景、黑帮暴力。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

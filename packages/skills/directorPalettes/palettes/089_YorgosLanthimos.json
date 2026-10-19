@@ -1,0 +1,104 @@
+{
+ "id": "089",
+ "name": "兰斯莫斯",
+ "nameEn": "YorgosLanthimos",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "希腊",
+ "years": "1973-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B4513",
+    "name": "烛光棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗青灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#DAA520",
+    "name": "金菊黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#556B2F",
+    "name": "暗橄榄绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#8B0000",
+    "name": "深红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "炭黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#DAA520",
+    "name": null,
+    "emotion": "权力荒诞"
+   },
+   {
+    "hex": "#556B2F",
+    "name": null,
+    "emotion": "自然野性"
+   },
+   {
+    "hex": "#8B4513",
+    "name": null,
+    "emotion": "古典压抑"
+   },
+   {
+    "hex": "#0F0F0F",
+    "name": null,
+    "emotion": "存在黑色"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "烛光照明",
+  "highlight_bias": "自然窗光",
+  "shadow_bias": "低照度室内",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "鱼眼广角",
+  "畸变构图",
+  "古典宫廷",
+  "荒诞礼仪",
+  "动物隐喻",
+  "冷调幽默"
+ ],
+ "colorKeywords": [
+  "烛光暖调",
+  "古典油画色",
+  "鱼眼畸变色",
+  "自然绿灰",
+  "宫廷金红",
+  "冷调荒诞"
+ ],
+ "mood": [
+  "荒诞主义",
+  "社会规训",
+  "黑色幽默",
+  "权力游戏",
+  "存在困境",
+  "希腊怪诞"
+ ],
+ "profile": {
+  "definition": "兰斯莫斯的视觉风格以烛光照明为主，烛光暖调、古典油画色、鱼眼畸变色，营造出荒诞主义的氛围。",
+  "lighting": "烛光照明，高光偏自然窗光，阴影偏低照度室内，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "鱼眼广角、畸变构图、古典宫廷，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩烛光暖调、古典油画色、鱼眼畸变色。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

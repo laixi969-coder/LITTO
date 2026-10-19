@@ -1,0 +1,105 @@
+{
+ "id": "160",
+ "name": "细田守",
+ "nameEn": "MamoruHosoda",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "日本",
+ "years": "1967-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#00B0FF",
+    "name": "数码蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFA726",
+    "name": "夏日橙",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#66BB6A",
+    "name": "夏日绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#AB47BC",
+    "name": "奇幻紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#EF5350",
+    "name": "狼女红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "阳光黄",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#00B0FF",
+    "name": "数码世界",
+    "emotion": "数码世界"
+   },
+   {
+    "hex": "#FFA726",
+    "name": "夏日青春",
+    "emotion": "夏日青春"
+   },
+   {
+    "hex": "#66BB6A",
+    "name": "家庭温暖",
+    "emotion": "家庭温暖"
+   },
+   {
+    "hex": "#AB47BC",
+    "name": "奇幻成长",
+    "emotion": "奇幻成长"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "数码蓝光",
+  "highlight_tint": "夏日阳光",
+  "highlight_bias": "夏日阳光",
+  "shadow_tint": "家庭暖光",
+  "shadow_bias": "家庭暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "数码空间",
+  "夏日乡村",
+  "家庭羁绊",
+  "狼孩成长",
+  "龙与少女",
+  "网络世界"
+ ],
+ "colorKeywords": [
+  "细田守蓝",
+  "夏日青春色",
+  "数码世界光",
+  "家庭暖色调",
+  "狼女红绿",
+  "夏日祭色彩"
+ ],
+ "mood": [
+  "家庭温情",
+  "数码时代",
+  "夏日青春",
+  "成长蜕变",
+  "奇幻现实",
+  "日本家庭"
+ ],
+ "profile": {
+  "definition": "细田守的视觉风格：数码蓝光，细田守蓝, 夏日青春色, 数码世界光。",
+  "lighting": "数码蓝光，夏日阳光，家庭暖光",
+  "framing": "数码空间、夏日乡村、家庭羁绊。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

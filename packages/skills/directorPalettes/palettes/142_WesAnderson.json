@@ -1,0 +1,105 @@
+{
+ "id": "142",
+ "name": "韦斯·安德森",
+ "nameEn": "WesAnderson",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "美国",
+ "years": "1969-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#F48FB1",
+    "name": "粉红",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "奶油黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#81C784",
+    "name": "薄荷绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#64B5F6",
+    "name": "天空蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BA68C8",
+    "name": "薰衣草紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "珊瑚橙",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F48FB1",
+    "name": "童真忧伤",
+    "emotion": "童真忧伤"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖怀旧",
+    "emotion": "温暖怀旧"
+   },
+   {
+    "hex": "#81C784",
+    "name": "自然治愈",
+    "emotion": "自然治愈"
+   },
+   {
+    "hex": "#64B5F6",
+    "name": "幻想飞翔",
+    "emotion": "幻想飞翔"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光平光",
+  "highlight_tint": "对称布光",
+  "highlight_bias": "对称布光",
+  "shadow_tint": "粉彩配色",
+  "shadow_bias": "粉彩配色",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "绝对对称",
+  "平面调度",
+  "粉彩配色",
+  "章节叙事",
+  "字体设计",
+  "俯拍镜头"
+ ],
+ "colorKeywords": [
+  "韦斯安德森粉",
+  "对称色彩",
+  "复古粉彩",
+  "童话色调",
+  "低饱和高对比",
+  "马卡龙色"
+ ],
+ "mood": [
+  "童真忧伤",
+  "对称美学",
+  "家庭故事",
+  "复古怀旧",
+  "黑色幽默",
+  "童话成人"
+ ],
+ "profile": {
+  "definition": "韦斯·安德森的视觉风格：柔光平光，韦斯安德森粉, 对称色彩, 复古粉彩。",
+  "lighting": "柔光平光，对称布光，粉彩配色",
+  "framing": "绝对对称、平面调度、粉彩配色。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

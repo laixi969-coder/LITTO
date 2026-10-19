@@ -1,0 +1,108 @@
+{
+ "id": "047",
+ "name": "史蒂夫·麦奎因",
+ "nameEn": "Steve McQueen",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "英国",
+ "years": "2008-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#3D2817",
+    "name": "深棕油画",
+    "ratio": 0.25
+   },
+   {
+    "hex": "#8B6239",
+    "name": "赭石暖肤",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#6B4423",
+    "name": "泥土红棕",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#B8860B",
+    "name": "暗金历史",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#2C2418",
+    "name": "暖棕墨黑",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#D4A574",
+    "name": "暖土金",
+    "ratio": 0.1
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#A0522D",
+    "name": "赭红愤怒",
+    "emotion": "反抗与力量"
+   },
+   {
+    "hex": "#556B2F",
+    "name": "橄榄军绿",
+    "emotion": "压迫秩序"
+   },
+   {
+    "hex": "#DEB887",
+    "name": "暖金温柔",
+    "emotion": "人性微光"
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "冷钢灰",
+    "emotion": "都市疏离"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "painterly side lighting, natural available light, warm window bounce",
+  "highlight_tint": "ochre gold / honey amber",
+  "shadow_tint": "warm brown-black / deep umber (never cool)",
+  "contrast_ratio": "medium-high 65-75%, painterly layers",
+  "overall_tone": "warm earth historical, 85% warm + 15% cool"
+ },
+ "composition": [
+  "painterly composition",
+  "long static take",
+  "close-up endurance",
+  "natural framing",
+  "shallow depth of field isolation",
+  "handheld urgency",
+  "historical tableaux",
+  "intimate suffering"
+ ],
+ "colorKeywords": [
+  "warm brown skin tones",
+  "ochre historical palette",
+  "painterly chiaroscuro",
+  "deep umber shadows",
+  "honey gold highlights",
+  "earth red soil",
+  "muted desaturated color",
+  "natural daylight realism"
+ ],
+ "mood": [
+  "historical weight",
+  "quiet resistance",
+  "human dignity",
+  "intimate trauma",
+  "systemic injustice",
+  "visceral physicality",
+  "restrained passion",
+  "moral urgency"
+ ],
+ "profile": {
+  "definition": "深棕油画与赭石暖肤构筑历史的重量，暖棕墨黑的阴影中藏着尊严与忍耐，克制比爆发更有力量。",
+  "lighting": "侧光为主，油画式明暗对比；自然光优先，阴影偏暖棕而非冷黑；高光偏琥珀金。",
+  "framing": "长镜头静观是签名，让观众与人物共同承受；自然画框暗示囚禁与隔离；群像如历史画卷。",
+  "grading": "整体暖棕赭石调，饱和偏低但厚重；类似古典油画的色彩层次，不追求鲜亮。",
+  "avoid": "高饱和亮色、青橙调色、快速剪辑、煽情配乐与镜头、浪漫化苦难"
+ }
+}

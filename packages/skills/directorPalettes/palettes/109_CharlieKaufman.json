@@ -1,0 +1,105 @@
+{
+ "id": "109",
+ "name": "查理·考夫曼",
+ "nameEn": "CharlieKaufman",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国",
+ "years": "1958-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#546E7A",
+    "name": "灰蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#78909C",
+    "name": "雾蓝灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "咖啡棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B0BEC5",
+    "name": "银蓝灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄记忆",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#37474F",
+    "name": "深青灰",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#546E7A",
+    "name": "存在焦虑",
+    "emotion": "存在焦虑"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "自我怀疑",
+    "emotion": "自我怀疑"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖回忆",
+    "emotion": "温暖回忆"
+   },
+   {
+    "hex": "#37474F",
+    "name": "意识深渊",
+    "emotion": "意识深渊"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "冷调自然光",
+  "highlight_tint": "室内荧光",
+  "highlight_bias": "室内荧光",
+  "shadow_tint": "心理色光",
+  "shadow_bias": "心理色光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "元叙事",
+  "心理空间",
+  "身份解构",
+  "纽约街景",
+  "文字与影像",
+  "重复变奏"
+ ],
+ "colorKeywords": [
+  "心理冷调",
+  "纽约灰蓝",
+  "意识流色彩",
+  "低饱和",
+  "雨雾色调",
+  "室内荧光"
+ ],
+ "mood": [
+  "存在焦虑",
+  "身份迷失",
+  "元小说",
+  "自我解构",
+  "孤独写作",
+  "人类处境"
+ ],
+ "profile": {
+  "definition": "查理·考夫曼的视觉风格：冷调自然光，心理冷调, 纽约灰蓝, 意识流色彩。",
+  "lighting": "冷调自然光，室内荧光，心理色光",
+  "framing": "元叙事、心理空间、身份解构。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

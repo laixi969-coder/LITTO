@@ -1,0 +1,105 @@
+{
+ "id": "176",
+ "name": "雅克·德米",
+ "nameEn": "JacquesDemy",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "法国",
+ "years": "1931-1990",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#F48FB1",
+    "name": "罗什福尔粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#64B5F6",
+    "name": "雨伞蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "港口金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "珊瑚橙",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BA68C8",
+    "name": "梦幻紫",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F48FB1",
+    "name": "浪漫梦幻",
+    "emotion": "浪漫梦幻"
+   },
+   {
+    "hex": "#64B5F6",
+    "name": "雨伞忧伤",
+    "emotion": "雨伞忧伤"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "港口温情",
+    "emotion": "港口温情"
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "初恋甜蜜",
+    "emotion": "初恋甜蜜"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "童话柔光",
+  "highlight_tint": "粉蓝彩色",
+  "highlight_bias": "粉蓝彩色",
+  "shadow_tint": "港口阳光",
+  "shadow_bias": "港口阳光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "歌舞场面",
+  "南特港口",
+  "雨伞店",
+  "童话色彩",
+  "年轻恋人",
+  "命运巧合"
+ ],
+ "colorKeywords": [
+  "雅克德米粉蓝",
+  "雨伞店蓝色",
+  "罗什福尔粉",
+  "法国歌舞片色",
+  "童话色彩",
+  "港口暖光"
+ ],
+ "mood": [
+  "浪漫歌舞",
+  "童话色彩",
+  "南特回忆",
+  "雨伞忧伤",
+  "命运爱情",
+  "法国诗意"
+ ],
+ "profile": {
+  "definition": "雅克·德米的视觉风格：童话柔光，雅克德米粉蓝, 雨伞店蓝色, 罗什福尔粉。",
+  "lighting": "童话柔光，粉蓝彩色，港口阳光",
+  "framing": "歌舞场面、南特港口、雨伞店。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

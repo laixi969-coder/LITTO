@@ -1,0 +1,108 @@
+{
+ "id": "054",
+ "name": "乔治·卢卡斯",
+ "nameEn": "George Lucas",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "美国",
+ "years": "1971-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E8A954",
+    "name": "塔图因砂金",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#C25A2A",
+    "name": "双日落橙",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2A3A4C",
+    "name": "深空蓝灰",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#7A6448",
+    "name": "沙堡褐",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#D4C3A0",
+    "name": "沙粒肤",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#4A4035",
+    "name": "绝地褐",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFE6B3",
+    "name": "双日辉光",
+    "emotion": "冒险希望"
+   },
+   {
+    "hex": "#1A2430",
+    "name": "星夜蓝黑",
+    "emotion": "原力黑暗面"
+   },
+   {
+    "hex": "#E07030",
+    "name": "熔岩橙",
+    "emotion": "愤怒堕落"
+   },
+   {
+    "hex": "#B8A67C",
+    "name": "旧共和国金",
+    "emotion": "古典荣耀"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "warm desert sun, binary sunset rim light, practical source lighting",
+  "highlight_tint": "warm golden orange / sand yellow",
+  "shadow_tint": "deep blue-purple space shadow",
+  "contrast_ratio": "high 70-85%, strong key to fill ratio",
+  "overall_tone": "warm desert space opera, 70% warm + 30% cool"
+ },
+ "composition": [
+  "silent film composition",
+  "wipe transitions",
+  "low angle hero reveal",
+  "epic wide establishing",
+  "binary sunset framing",
+  "lightsaber glow practical",
+  "cockpit point of view",
+  "horizon line composition"
+ ],
+ "colorKeywords": [
+  "tatooine desert gold",
+  "binary sunset orange",
+  "deep space navy blue",
+  "jedi robe brown",
+  "sith lightsaber red",
+  "coruscant city gold",
+  "hoth ice blue",
+  "endor forest green"
+ ],
+ "mood": [
+  "space opera mythology",
+  "hero's journey epic",
+  "archetypal good vs evil",
+  "cosmic family saga",
+  "nostalgic childhood wonder",
+  "samurai western fusion",
+  "used universe grime",
+  "mythic destiny"
+ ],
+ "profile": {
+  "definition": "塔图因砂金和双日落橙点燃沙漠星战，深空蓝黑作底色承载神话级别的英雄旅程。",
+  "lighting": "沙漠暖光、双日落逆光为主，光剑作为实际光源；高光偏金橙，阴影偏蓝紫，对比强烈。",
+  "framing": "默片式对称构图，低角度英雄登场，宽银幕远景建立规模；驾驶舱POV和划像转场为标志。",
+  "grading": "暖调金橙主导，沙漠场景饱和高；太空场景冷调深蓝；前传色彩更亮，正传色彩更沉稳。",
+  "avoid": "现代写实感、低饱和性冷淡风、手持晃动摄影机、没有神话感的平庸构图、用CG质感替代胶片颗粒和实际光源"
+ }
+}

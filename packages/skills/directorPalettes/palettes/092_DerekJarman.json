@@ -1,0 +1,102 @@
+{
+ "id": "092",
+ "name": "德里克·贾曼",
+ "nameEn": "DerekJarman",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "英国",
+ "years": "1942-1994",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0000FF",
+    "name": "贾曼蓝",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FF0000",
+    "name": "血红色",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD700",
+    "name": "金盏黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#228B22",
+    "name": "森林绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#000000",
+    "name": "深黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#0000FF",
+    "name": null,
+    "emotion": "永恒与死亡"
+   },
+   {
+    "hex": "#FF0000",
+    "name": null,
+    "emotion": "欲望与生命"
+   },
+   {
+    "hex": "#FFD700",
+    "name": null,
+    "emotion": "神圣与光芒"
+   },
+   {
+    "hex": "#228B22",
+    "name": null,
+    "emotion": "自然与生长"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "单色滤镜",
+  "highlight_bias": "投影光线",
+  "shadow_bias": "烛光暖调",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "单色实验",
+  "投影拼贴",
+  "绘画质感",
+  "酷儿身体",
+  "花园意象",
+  "文字影像"
+ ],
+ "colorKeywords": [
+  "单色实验",
+  "高饱和滤镜",
+  "绘画光影",
+  "酷儿色彩",
+  "蓝白红",
+  "花园色调"
+ ],
+ "mood": [
+  "酷儿美学",
+  "死亡诗学",
+  "先锋实验",
+  "艾滋年代",
+  "艺术反抗",
+  "自然神性"
+ ],
+ "profile": {
+  "definition": "德里克·贾曼的视觉风格以单色滤镜为主，单色实验、高饱和滤镜，营造出酷儿美学的氛围。",
+  "lighting": "单色滤镜，高光偏投影光线，阴影偏烛光暖调，整体暖调。",
+  "framing": "单色实验、投影拼贴、绘画质感。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "113",
+ "name": "玛雅·德伦",
+ "nameEn": "MayaDeren",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国",
+ "years": "1917-1961",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#000000",
+    "name": "纯黑",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#808080",
+    "name": "中灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#C0C0C0",
+    "name": "银灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#404040",
+    "name": "深灰",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#E0E0E0",
+    "name": "浅灰",
+    "ratio": 0.12
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#808080",
+    "name": "梦境诗意",
+    "emotion": "梦境诗意"
+   },
+   {
+    "hex": "#000000",
+    "name": "神秘深渊",
+    "emotion": "神秘深渊"
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "灵性升华",
+    "emotion": "灵性升华"
+   },
+   {
+    "hex": "#404040",
+    "name": "内在焦虑",
+    "emotion": "内在焦虑"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高反差黑白",
+  "highlight_tint": "侧光雕刻",
+  "highlight_bias": "侧光雕刻",
+  "shadow_tint": "自然光",
+  "shadow_bias": "自然光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "舞蹈身体",
+  "多重曝光",
+  "慢动作",
+  "空间折叠",
+  "仪式动作",
+  "海与树"
+ ],
+ "colorKeywords": [
+  "高反差黑白",
+  "实验电影色",
+  "16mm颗粒",
+  "舞蹈光影",
+  "梦境灰阶",
+  "诗意黑白"
+ ],
+ "mood": [
+  "诗意实验",
+  "女性先锋",
+  "梦的逻辑",
+  "仪式舞蹈",
+  "神秘主义",
+  "身体空间"
+ ],
+ "profile": {
+  "definition": "玛雅·德伦的视觉风格：高反差黑白，高反差黑白, 实验电影色, 16mm颗粒。",
+  "lighting": "高反差黑白，侧光雕刻，自然光",
+  "framing": "舞蹈身体、多重曝光、慢动作。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

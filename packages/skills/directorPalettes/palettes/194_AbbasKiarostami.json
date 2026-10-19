@@ -1,0 +1,105 @@
+{
+ "id": "194",
+ "name": "阿巴斯·基亚罗斯塔米",
+ "nameEn": "AbbasKiarostami",
+ "category": "10_东方美学与留白意境",
+ "nationality": "伊朗",
+ "years": "1940-2016",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FFD54F",
+    "name": "伊朗金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "土棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#78909C",
+    "name": "天空灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "橄榄绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "沙漠米",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "阳光黄",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFD54F",
+    "name": "生命温暖",
+    "emotion": "生命温暖"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "土地厚重",
+    "emotion": "土地厚重"
+   },
+   {
+    "hex": "#78909C",
+    "name": "存在哲思",
+    "emotion": "存在哲思"
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "橄榄诗意",
+    "emotion": "橄榄诗意"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光效",
+  "highlight_tint": "乡村阳光",
+  "highlight_bias": "乡村阳光",
+  "shadow_tint": "车内柔光",
+  "shadow_bias": "车内柔光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "汽车内景",
+  "乡村公路",
+  "儿童视角",
+  "真假模糊",
+  "长镜头",
+  "对话驱动"
+ ],
+ "colorKeywords": [
+  "阿巴斯金棕",
+  "伊朗乡村色",
+  "汽车对话色",
+  "极简诗意思",
+  "橄榄土黄色",
+  "真实电影色"
+ ],
+ "mood": [
+  "极简诗意",
+  "伊朗电影",
+  "乡村公路",
+  "真假难辨",
+  "存在哲思",
+  "儿童视角"
+ ],
+ "profile": {
+  "definition": "阿巴斯·基亚罗斯塔米的视觉风格：自然光效，阿巴斯金棕, 伊朗乡村色, 汽车对话色。",
+  "lighting": "自然光效，乡村阳光，车内柔光",
+  "framing": "汽车内景、乡村公路、儿童视角。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

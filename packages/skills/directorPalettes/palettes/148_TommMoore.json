@@ -1,0 +1,105 @@
+{
+ "id": "148",
+ "name": "汤姆·摩尔",
+ "nameEn": "TommMoore",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "爱尔兰",
+ "years": "1977-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1B5E20",
+    "name": "爱尔兰绿",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "凯尔金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "深海蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#C62828",
+    "name": "圣血红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#6A1B9A",
+    "name": "神秘紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "羊皮纸黄",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#1B5E20",
+    "name": "自然灵性",
+    "emotion": "自然灵性"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "神圣之光",
+    "emotion": "神圣之光"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "海洋神秘",
+    "emotion": "海洋神秘"
+   },
+   {
+    "hex": "#C62828",
+    "name": "牺牲奉献",
+    "emotion": "牺牲奉献"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "教堂彩光",
+  "highlight_tint": "森林柔光",
+  "highlight_bias": "森林柔光",
+  "shadow_tint": "黄金时刻",
+  "shadow_bias": "黄金时刻",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "平面装饰",
+  "凯尔特图案",
+  "对称构图",
+  "神话叙事",
+  "森林海洋",
+  "儿童视角"
+ ],
+ "colorKeywords": [
+  "凯尔经色彩",
+  "爱尔兰绿金",
+  "凯尔特装饰色",
+  "森林神秘色",
+  "海洋深蓝",
+  "神圣金光"
+ ],
+ "mood": [
+  "凯尔特神话",
+  "手绘灵魂",
+  "自然灵性",
+  "爱尔兰文化",
+  "儿童成长",
+  "艺术动画"
+ ],
+ "profile": {
+  "definition": "汤姆·摩尔的视觉风格：教堂彩光，凯尔经色彩, 爱尔兰绿金, 凯尔特装饰色。",
+  "lighting": "教堂彩光，森林柔光，黄金时刻",
+  "framing": "平面装饰、凯尔特图案、对称构图。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

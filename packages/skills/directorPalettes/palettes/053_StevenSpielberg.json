@@ -1,0 +1,108 @@
+{
+ "id": "053",
+ "name": "史蒂文·斯皮尔伯格",
+ "nameEn": "Steven Spielberg",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "美国",
+ "years": "1971-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FFD080",
+    "name": "神圣晨光金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#B85C28",
+    "name": "史诗橙褐",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#2C3E55",
+    "name": "深幽蓝",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#8A7A5C",
+    "name": "战火灰土",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#E8D4A8",
+    "name": "柔焦肤",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#4A443A",
+    "name": "暗影褐",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFF5E0",
+    "name": "圣光白",
+    "emotion": "奇迹敬畏"
+   },
+   {
+    "hex": "#6B6054",
+    "name": "硝烟灰",
+    "emotion": "战争残酷"
+   },
+   {
+    "hex": "#E8915A",
+    "name": "落日橙",
+    "emotion": "童年温情"
+   },
+   {
+    "hex": "#1A1A24",
+    "name": "深夜蓝黑",
+    "emotion": "未知神秘"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "backlight rim light, warm golden hour, diffusion glow",
+  "highlight_tint": "warm golden halo / warm white",
+  "shadow_tint": "cool blue-teal, deep shadow detail",
+  "contrast_ratio": "high 70-85%, anamorphic contrast",
+  "overall_tone": "orange-teal epic, 60% warm + 40% cool"
+ },
+ "composition": [
+  "backlit silhouette",
+  "dolly zoom (vertigo effect)",
+  "oners tracking shot",
+  "warm rim light",
+  "dust motes in light beam",
+  "low angle awe",
+  "anamorphic wide",
+  "fog and haze"
+ ],
+ "colorKeywords": [
+  "golden hour magic light",
+  "teal and orange epic",
+  "silver screen black and white",
+  "warm skin halo",
+  "battlefield desaturated",
+  "suburban childhood warm",
+  "alien glow pale",
+  "historical sepia tone"
+ ],
+ "mood": [
+  "childlike wonder",
+  "hollywood epic grandeur",
+  "moral gravity",
+  "suburban nostalgia",
+  "awe of the unknown",
+  "wartime sacrifice",
+  "divine intervention",
+  "father absence theme"
+ ],
+ "profile": {
+  "definition": "清晰轮廓、暖家庭光与冷危险空间形成可读性极强的视觉叙事。",
+  "lighting": "强逆光、轮廓光、烟雾光束；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "低机位儿童视角、清楚揭示、动机推镜；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "暖家庭对冷冒险，高光有光晕；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "全程金蓝、无轮廓暗场、炫技镜头、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

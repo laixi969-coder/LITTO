@@ -1,0 +1,105 @@
+{
+ "id": "146",
+ "name": "亨利·塞利克",
+ "nameEn": "HenrySelick",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "美国",
+ "years": "1952-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF6D00",
+    "name": "南瓜橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#4A148C",
+    "name": "深紫",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "毒物绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD600",
+    "name": "月光黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "炭黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF6D00",
+    "name": "万圣节庆",
+    "emotion": "万圣节庆"
+   },
+   {
+    "hex": "#4A148C",
+    "name": "黑暗奇幻",
+    "emotion": "黑暗奇幻"
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "诡异魔法",
+    "emotion": "诡异魔法"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "暗黑恐惧",
+    "emotion": "暗黑恐惧"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "月光冷光",
+  "highlight_tint": "南瓜暖光",
+  "highlight_bias": "南瓜暖光",
+  "shadow_tint": "哥特暗影",
+  "shadow_bias": "哥特暗影",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "定格动画",
+  "万圣节镇",
+  "哥特建筑",
+  "黑暗童话",
+  "角色设计",
+  "阴影造型"
+ ],
+ "colorKeywords": [
+  "万圣节橙紫",
+  "定格暗黑色",
+  "哥特童话色",
+  "南瓜灯暖光",
+  "毒物绿",
+  "黑暗奇幻色"
+ ],
+ "mood": [
+  "黑暗童话",
+  "万圣节美学",
+  "定格动画",
+  "哥特奇幻",
+  "怪诞温馨",
+  "伯顿风格"
+ ],
+ "profile": {
+  "definition": "亨利·塞利克的视觉风格：月光冷光，万圣节橙紫, 定格暗黑色, 哥特童话色。",
+  "lighting": "月光冷光，南瓜暖光，哥特暗影",
+  "framing": "定格动画、万圣节镇、哥特建筑。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,104 @@
+{
+ "id": "077",
+ "name": "罗伊·安德森",
+ "nameEn": "RoyAndersson",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "瑞典",
+ "years": "1943-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8AA898",
+    "name": "瑞典灰绿",
+    "ratio": 0.24
+   },
+   {
+    "hex": "#A8B8A8",
+    "name": "浅灰绿",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#6A8878",
+    "name": "深绿灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#C8C0B0",
+    "name": "旧米白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B8A898",
+    "name": "枯木棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#5A7868",
+    "name": "暗苔绿",
+    "ratio": 0.12
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#7A9A8A",
+    "name": null,
+    "emotion": "荒诞存在"
+   },
+   {
+    "hex": "#9AACA2",
+    "name": null,
+    "emotion": "生活平庸"
+   },
+   {
+    "hex": "#B0A898",
+    "name": null,
+    "emotion": "温情默默"
+   },
+   {
+    "hex": "#4A6858",
+    "name": null,
+    "emotion": "死亡阴影"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "平光均匀",
+  "highlight_bias": "影棚式打光",
+  "shadow_bias": "灰绿色调",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "固定机位",
+  "平面构图",
+  "室内空间",
+  "静态画面",
+  "人偶式表演",
+  "章节结构"
+ ],
+ "colorKeywords": [
+  "灰绿色调",
+  "舞台平光",
+  "瑞典式荒诞",
+  "低饱和",
+  "粉彩质感",
+  "室内色"
+ ],
+ "mood": [
+  "存在主义幽默",
+  "荒诞不经",
+  "瑞典式忧郁",
+  "死亡主题",
+  "生活琐碎",
+  "超现实"
+ ],
+ "profile": {
+  "definition": "罗伊·安德森的视觉风格以平光均匀为主，灰绿色调、舞台平光、瑞典式荒诞，营造出存在主义幽默的氛围。",
+  "lighting": "平光均匀，高光偏影棚式打光，阴影偏灰绿色调，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "固定机位、平面构图、室内空间，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩灰绿色调、舞台平光、瑞典式荒诞。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

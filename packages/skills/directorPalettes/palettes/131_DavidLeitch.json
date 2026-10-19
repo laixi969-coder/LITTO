@@ -1,0 +1,105 @@
+{
+ "id": "131",
+ "name": "大卫·雷奇",
+ "nameEn": "DavidLeitch",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "美国",
+ "years": "1975-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF6D00",
+    "name": "烈焰橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00B0FF",
+    "name": "电光蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#00E676",
+    "name": "毒绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#D500F9",
+    "name": "霓虹紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FF1744",
+    "name": "血粉红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF6D00",
+    "name": "爆裂动作",
+    "emotion": "爆裂动作"
+   },
+   {
+    "hex": "#00B0FF",
+    "name": "冷冽精准",
+    "emotion": "冷冽精准"
+   },
+   {
+    "hex": "#00E676",
+    "name": "毒笑幽默",
+    "emotion": "毒笑幽默"
+   },
+   {
+    "hex": "#D500F9",
+    "name": "迷幻快感",
+    "emotion": "迷幻快感"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "霓虹色光",
+  "highlight_tint": "分区色光",
+  "highlight_bias": "分区色光",
+  "shadow_tint": "动作补光",
+  "shadow_bias": "动作补光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "色彩分区",
+  "格斗特写",
+  "冷幽默",
+  "动作喜剧",
+  "间谍世界",
+  "快速剪辑"
+ ],
+ "colorKeywords": [
+  "高饱和动作色",
+  "色彩分区美学",
+  "霓虹色光",
+  "动作喜剧色",
+  "毒绿霓虹",
+  "冷蓝调"
+ ],
+ "mood": [
+  "动作美学",
+  "黑色幽默",
+  "间谍游戏",
+  "高能量",
+  "色彩鲜明",
+  "爽片质感"
+ ],
+ "profile": {
+  "definition": "大卫·雷奇的视觉风格：霓虹色光，高饱和动作色, 色彩分区美学, 霓虹色光。",
+  "lighting": "霓虹色光，分区色光，动作补光",
+  "framing": "色彩分区、格斗特写、冷幽默。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "126",
+ "name": "宫崎骏",
+ "nameEn": "HayaoMiyazaki",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "日本",
+ "years": "1941-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#4FC3F7",
+    "name": "天空蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#66BB6A",
+    "name": "森林绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "奶油黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "夕照橙",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#CE93D8",
+    "name": "梦幻紫",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "阳光黄",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#4FC3F7",
+    "name": "自由飞翔",
+    "emotion": "自由飞翔"
+   },
+   {
+    "hex": "#66BB6A",
+    "name": "自然治愈",
+    "emotion": "自然治愈"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖回忆",
+    "emotion": "温暖回忆"
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "勇气成长",
+    "emotion": "勇气成长"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔和天光",
+  "highlight_tint": "自然漫射",
+  "highlight_bias": "自然漫射",
+  "shadow_tint": "温暖阳光",
+  "shadow_bias": "温暖阳光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "飞行场景",
+  "自然风景",
+  "少女主角",
+  "奇幻生物",
+  "欧洲小镇",
+  "手绘质感"
+ ],
+ "colorKeywords": [
+  "吉卜力蓝",
+  "自然绿",
+  "手绘色彩",
+  "温暖黄调",
+  "天空飞行色",
+  "梦幻粉彩"
+ ],
+ "mood": [
+  "飞行梦想",
+  "自然精灵",
+  "反战和平",
+  "少女成长",
+  "手绘温暖",
+  "奇幻治愈"
+ ],
+ "profile": {
+  "definition": "宫崎骏的视觉风格：柔和天光，吉卜力蓝, 自然绿, 手绘色彩。",
+  "lighting": "柔和天光，自然漫射，温暖阳光",
+  "framing": "飞行场景、自然风景、少女主角。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

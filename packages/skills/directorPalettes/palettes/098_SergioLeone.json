@@ -1,0 +1,102 @@
+{
+ "id": "098",
+ "name": "塞尔乔·莱昂内",
+ "nameEn": "SergioLeone",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "意大利",
+ "years": "1929-1989",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#DAA520",
+    "name": "沙漠金",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B4513",
+    "name": "马鞍棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#CD853F",
+    "name": "秘鲁棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#8B7355",
+    "name": "灰棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#556B2F",
+    "name": "暗橄榄",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "深黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#DAA520",
+    "name": null,
+    "emotion": "西部传奇"
+   },
+   {
+    "hex": "#8B4513",
+    "name": null,
+    "emotion": "沧桑命运"
+   },
+   {
+    "hex": "#CD853F",
+    "name": null,
+    "emotion": "荒野自由"
+   },
+   {
+    "hex": "#0F0F0F",
+    "name": null,
+    "emotion": "死亡阴影"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "烈日硬光",
+  "highlight_bias": "黄昏金光",
+  "shadow_bias": "侧光雕刻",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "宽银幕史诗",
+  "极端特写",
+  "决斗构图",
+  "西部荒原",
+  "时间凝固",
+  "三人对峙"
+ ],
+ "colorKeywords": [
+  "沙漠金黄",
+  "西部棕色",
+  "烈日色调",
+  "宽银幕色",
+  "尘土色",
+  "日落橙红"
+ ],
+ "mood": [
+  "西部史诗",
+  "时间美学",
+  "暴力神话",
+  "美国梦",
+  "命运对决",
+  "英雄迟暮"
+ ],
+ "profile": {
+  "definition": "塞尔乔·莱昂内的视觉风格以烈日硬光为主，沙漠金黄、西部棕色，营造出西部史诗的氛围。",
+  "lighting": "烈日硬光，高光偏黄昏金光，阴影偏侧光雕刻，整体暖调。",
+  "framing": "宽银幕史诗、极端特写、决斗构图。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

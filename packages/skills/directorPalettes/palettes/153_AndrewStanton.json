@@ -1,0 +1,105 @@
+{
+ "id": "153",
+ "name": "安德鲁·斯坦顿",
+ "nameEn": "AndrewStanton",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "美国",
+ "years": "1965-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#006064",
+    "name": "深海青",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FF8F00",
+    "name": "沙漠橙",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "小丑鱼橙金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#78909C",
+    "name": "太空灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "生命绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A237E",
+    "name": "深海蓝",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#006064",
+    "name": "深海冒险",
+    "emotion": "深海冒险"
+   },
+   {
+    "hex": "#FF8F00",
+    "name": "荒原希望",
+    "emotion": "荒原希望"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "父子情深",
+    "emotion": "父子情深"
+   },
+   {
+    "hex": "#78909C",
+    "name": "太空孤独",
+    "emotion": "太空孤独"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "海底柔光",
+  "highlight_tint": "太空冷光",
+  "highlight_bias": "太空冷光",
+  "shadow_tint": "沙漠暖光",
+  "shadow_bias": "沙漠暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "海底世界",
+  "太空史诗",
+  "机器人爱情",
+  "父子寻找",
+  "沙漠废土",
+  "生命奇迹"
+ ],
+ "colorKeywords": [
+  "海底蓝绿",
+  "瓦力橙蓝",
+  "皮克斯史诗色",
+  "沙漠暖调",
+  "太空冷色",
+  "生命绿芽"
+ ],
+ "mood": [
+  "史诗冒险",
+  "父子深情",
+  "环保意识",
+  "机器人爱情",
+  "太空探索",
+  "生命奇迹"
+ ],
+ "profile": {
+  "definition": "安德鲁·斯坦顿的视觉风格：海底柔光，海底蓝绿, 瓦力橙蓝, 皮克斯史诗色。",
+  "lighting": "海底柔光，太空冷光，沙漠暖光",
+  "framing": "海底世界、太空史诗、机器人爱情。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

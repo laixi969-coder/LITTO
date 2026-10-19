@@ -1,0 +1,105 @@
+{
+ "id": "117",
+ "name": "毕赣",
+ "nameEn": "BiGan",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "中国",
+ "years": "1989-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#00BCD4",
+    "name": "霓虹青",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#E91E63",
+    "name": "霓虹粉",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#37474F",
+    "name": "雨雾灰蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "暖金灯",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "深绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#263238",
+    "name": "暗夜蓝灰",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#00BCD4",
+    "name": "时间迷梦",
+    "emotion": "时间迷梦"
+   },
+   {
+    "hex": "#E91E63",
+    "name": "爱情执念",
+    "emotion": "爱情执念"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "温暖回忆",
+    "emotion": "温暖回忆"
+   },
+   {
+    "hex": "#37474F",
+    "name": "乡愁雨雾",
+    "emotion": "乡愁雨雾"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "霓虹色光",
+  "highlight_tint": "雨雾散射",
+  "highlight_bias": "雨雾散射",
+  "shadow_tint": "暗调暖光",
+  "shadow_bias": "暗调暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "梦境长镜头",
+  "贵州小镇",
+  "时间循环",
+  "火车意象",
+  "诗歌旁白",
+  "霓虹雨景"
+ ],
+ "colorKeywords": [
+  "贵州雨雾色",
+  "霓虹粉蓝",
+  "梦境色彩",
+  "暗调暖光",
+  "绿苔色",
+  "时间色"
+ ],
+ "mood": [
+  "时间迷宫",
+  "梦境诗意",
+  "贵州乡愁",
+  "爱情执念",
+  "诗电影",
+  "记忆碎片"
+ ],
+ "profile": {
+  "definition": "毕赣的视觉风格：霓虹色光，贵州雨雾色, 霓虹粉蓝, 梦境色彩。",
+  "lighting": "霓虹色光，雨雾散射，暗调暖光",
+  "framing": "梦境长镜头、贵州小镇、时间循环。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

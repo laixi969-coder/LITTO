@@ -1,0 +1,102 @@
+{
+ "id": "091",
+ "name": "保罗·范霍文",
+ "nameEn": "PaulVerhoeven",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "荷兰",
+ "years": "1938-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8B0000",
+    "name": "血暗红",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#000080",
+    "name": "海军蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD700",
+    "name": "金黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2F4F4F",
+    "name": "暗青灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FF1493",
+    "name": "深粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1C1C1C",
+    "name": "炭黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8B0000",
+    "name": null,
+    "emotion": "暴力欲望"
+   },
+   {
+    "hex": "#FFD700",
+    "name": null,
+    "emotion": "权力诱惑"
+   },
+   {
+    "hex": "#FF1493",
+    "name": null,
+    "emotion": "情色诱惑"
+   },
+   {
+    "hex": "#000080",
+    "name": null,
+    "emotion": "权力冷酷"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高饱和色光",
+  "highlight_bias": "霓虹夜色",
+  "shadow_bias": "夸张戏剧光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "大胆构图",
+  "情色暴力",
+  "讽刺社会",
+  "科幻未来",
+  "女性视角",
+  "荷兰视角"
+ ],
+ "colorKeywords": [
+  "荷兰大胆色",
+  "暗红情色",
+  "科幻冷色",
+  "高饱和对比",
+  "暴力美学",
+  "黑色幽默色"
+ ],
+ "mood": [
+  "社会讽刺",
+  "暴力美学",
+  "情色主题",
+  "科幻批判",
+  "女性力量",
+  "大胆挑战"
+ ],
+ "profile": {
+  "definition": "保罗·范霍文的视觉风格以高饱和色光为主，荷兰大胆色、暗红情色，营造出社会讽刺的氛围。",
+  "lighting": "高饱和色光，高光偏霓虹夜色，阴影偏夸张戏剧光，整体暖调。",
+  "framing": "大胆构图、情色暴力、讽刺社会。",
+  "grading": "对比度高对比，色调暖调。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

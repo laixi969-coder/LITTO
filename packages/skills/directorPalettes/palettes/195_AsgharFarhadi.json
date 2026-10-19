@@ -1,0 +1,75 @@
+{
+ "id": "195",
+ "name": "AsgharFarhadi 阿斯哈·法哈蒂",
+ "nameEn": "",
+ "category": "10_东方美学与留白意境",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8D6E63",
+    "name": "20%",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#78909C",
+    "name": "18%",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#5D4037",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A1887F",
+    "name": "18%",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8D6E63",
+    "name": "",
+    "emotion": "道德困境"
+   },
+   {
+    "hex": "#78909C",
+    "name": "",
+    "emotion": "社会压抑"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "",
+    "emotion": "家庭温暖"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "",
+    "emotion": "秘密沉重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "室内柔光",
+  "highlight_tint": "自然天光",
+  "shadow_tint": "公寓荧光",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

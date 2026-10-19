@@ -1,0 +1,105 @@
+{
+ "id": "108",
+ "name": "阿里·艾斯特",
+ "nameEn": "AriAster",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国",
+ "years": "1986-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FFB300",
+    "name": "仲夏夜金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "木屋棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#33691E",
+    "name": "青草绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血暗红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "日光黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "暗棕黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFB300",
+    "name": "日光恐惧",
+    "emotion": "日光恐惧"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "家庭压抑",
+    "emotion": "家庭压抑"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "血腥暴力",
+    "emotion": "血腥暴力"
+   },
+   {
+    "hex": "#33691E",
+    "name": "自然恐怖",
+    "emotion": "自然恐怖"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然日光",
+  "highlight_tint": "暖色火光",
+  "highlight_bias": "暖色火光",
+  "shadow_tint": "室内柔光",
+  "shadow_bias": "室内柔光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "对称构图",
+  "家庭空间",
+  "微缩模型",
+  "民俗仪式",
+  "缓慢恐怖",
+  "女性心理"
+ ],
+ "colorKeywords": [
+  "日光恐怖色",
+  "民俗暖黄",
+  "木屋棕调",
+  "白昼恐惧",
+  "瑞典夏日色",
+  "家庭暖色"
+ ],
+ "mood": [
+  "日光恐怖",
+  "家庭创伤",
+  "民俗恐怖",
+  "悲伤恐惧",
+  "女性心理",
+  "存在焦虑"
+ ],
+ "profile": {
+  "definition": "阿里·艾斯特的视觉风格：自然日光，日光恐怖色, 民俗暖黄, 木屋棕调。",
+  "lighting": "自然日光，暖色火光，室内柔光",
+  "framing": "对称构图、家庭空间、微缩模型。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

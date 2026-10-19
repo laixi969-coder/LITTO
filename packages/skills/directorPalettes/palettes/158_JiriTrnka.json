@@ -1,0 +1,105 @@
+{
+ "id": "158",
+ "name": "伊日·特尔恩卡",
+ "nameEn": "JiriTrnka",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "捷克",
+ "years": "1912-1969",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#5D4037",
+    "name": "木偶棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#78909C",
+    "name": "布拉格灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "舞台金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "森林绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "暗红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#5D4037",
+    "name": "木偶诗意",
+    "emotion": "木偶诗意"
+   },
+   {
+    "hex": "#78909C",
+    "name": "东欧忧郁",
+    "emotion": "东欧忧郁"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "童话光芒",
+    "emotion": "童话光芒"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "暗黑命运",
+    "emotion": "暗黑命运"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "舞台式布光",
+  "highlight_tint": "木偶侧光",
+  "highlight_bias": "木偶侧光",
+  "shadow_tint": "木质感光",
+  "shadow_bias": "木质感光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "木偶造型",
+  "舞台构图",
+  "捷克民间",
+  "童话暗黑",
+  "宗教题材",
+  "政治隐喻"
+ ],
+ "colorKeywords": [
+  "木偶棕褐色",
+  "捷克灰调",
+  "舞台金光",
+  "暗黑童话色",
+  "东欧诗意色",
+  "木质感色"
+ ],
+ "mood": [
+  "木偶动画",
+  "东欧诗意",
+  "童话暗黑",
+  "艺术动画",
+  "捷克民族",
+  "政治隐喻"
+ ],
+ "profile": {
+  "definition": "伊日·特尔恩卡的视觉风格：舞台式布光，木偶棕褐色, 捷克灰调, 舞台金光。",
+  "lighting": "舞台式布光，木偶侧光，木质感光",
+  "framing": "木偶造型、舞台构图、捷克民间。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,104 @@
+{
+ "id": "086",
+ "name": "张艺谋",
+ "nameEn": "ZhangYimou",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "中国",
+ "years": "1950-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C41E3A",
+    "name": "中国红",
+    "ratio": 0.24
+   },
+   {
+    "hex": "#FFD700",
+    "name": "帝王黄",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#228B22",
+    "name": "翠绿",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#000000",
+    "name": "墨黑",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "雪白",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#8B4513",
+    "name": "土棕",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#DC143C",
+    "name": null,
+    "emotion": "热情革命"
+   },
+   {
+    "hex": "#FFD700",
+    "name": null,
+    "emotion": "权力辉煌"
+   },
+   {
+    "hex": "#228B22",
+    "name": null,
+    "emotion": "自然生命力"
+   },
+   {
+    "hex": "#000000",
+    "name": null,
+    "emotion": "命运沉重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高饱和纯色光",
+  "highlight_bias": "对称照明",
+  "shadow_bias": "灯笼暖光",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "对称构图",
+  "大面积纯色",
+  "民俗仪式",
+  "灯笼意象",
+  "集体场面",
+  "身体色彩"
+ ],
+ "colorKeywords": [
+  "中国红黄",
+  "高饱和纯色",
+  "民俗色彩",
+  "灯笼暖光",
+  "仪式感色彩",
+  "西北黄土地"
+ ],
+ "mood": [
+  "民族史诗",
+  "命运抗争",
+  "色彩即叙事",
+  "东方美学",
+  "集体与个人",
+  "原始生命力"
+ ],
+ "profile": {
+  "definition": "张艺谋的视觉风格以高饱和纯色光为主，中国红黄、高饱和纯色、民俗色彩，营造出民族史诗的氛围。",
+  "lighting": "高饱和纯色光，高光偏对称照明，阴影偏灯笼暖光，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "对称构图、大面积纯色、民俗仪式，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩中国红黄、高饱和纯色、民俗色彩。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

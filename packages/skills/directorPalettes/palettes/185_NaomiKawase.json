@@ -1,0 +1,105 @@
+{
+ "id": "185",
+ "name": "河濑直美",
+ "nameEn": "NaomiKawase",
+ "category": "10_东方美学与留白意境",
+ "nationality": "日本",
+ "years": "1969-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#2E7D32",
+    "name": "奈良绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "晨光金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "土地棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "新芽绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "米白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "暖黄",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#2E7D32",
+    "name": "自然母性",
+    "emotion": "自然母性"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "生命之光",
+    "emotion": "生命之光"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "土地记忆",
+    "emotion": "土地记忆"
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "新生希望",
+    "emotion": "新生希望"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "森林绿光",
+  "highlight_tint": "自然柔光",
+  "highlight_bias": "自然柔光",
+  "shadow_tint": "丁达尔效应",
+  "shadow_bias": "丁达尔效应",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "自然森林",
+  "母性主题",
+  "奈良风景",
+  "手持摄影",
+  "私小说式",
+  "生死轮回"
+ ],
+ "colorKeywords": [
+  "河濑直美绿",
+  "奈良森林色",
+  "自然母性色",
+  "晨光辉映绿",
+  "土地棕调",
+  "生命诗意色"
+ ],
+ "mood": [
+  "自然母性",
+  "奈良绿光",
+  "私小说电影",
+  "生命轮回",
+  "女性导演",
+  "诗意手持"
+ ],
+ "profile": {
+  "definition": "河濑直美的视觉风格：森林绿光，河濑直美绿, 奈良森林色, 自然母性色。",
+  "lighting": "森林绿光，自然柔光，丁达尔效应",
+  "framing": "自然森林、母性主题、奈良风景。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -35,3 +35,6 @@ Thumbs.db
 package-lock.json
 cloud/data/
 cloud/node_modules/
+
+# 本地环境模板不入库
+.workbuddy/deploy/litto.env

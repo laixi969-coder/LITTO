@@ -1,0 +1,108 @@
+{
+ "id": "024",
+ "name": "凯瑟琳·毕格罗",
+ "nameEn": "Kathryn Bigelow",
+ "category": "02_霓虹黑色与赛博未来",
+ "nationality": "美国",
+ "years": "1981-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#0F1B0F",
+    "name": "夜视深绿",
+    "ratio": 0.3
+   },
+   {
+    "hex": "#4A5D23",
+    "name": "军绿橄榄",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#C4A35A",
+    "name": "沙漠土黄",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#1E3A5F",
+    "name": "战术冷蓝",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#8B0000",
+    "name": "暗红血锈",
+    "ratio": 0.1
+   },
+   {
+    "hex": "#B8A88A",
+    "name": "沙尘肤",
+    "ratio": 0.13
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#00FF00",
+    "name": "夜视绿",
+    "emotion": "战术军事"
+   },
+   {
+    "hex": "#FF4500",
+    "name": "爆炸橙",
+    "emotion": "战争暴力"
+   },
+   {
+    "hex": "#708090",
+    "name": "战术灰",
+    "emotion": "纪律压力"
+   },
+   {
+    "hex": "#DAA520",
+    "name": "沙漠金",
+    "emotion": "酷热生存"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "handheld documentary natural light, harsh desert sun, night vision green",
+  "highlight_tint": "desert gold/orange explosion",
+  "shadow_tint": "deep olive green-black",
+  "contrast_ratio": "high 70-85%",
+  "overall_tone": "cool military desaturated 60/40"
+ },
+ "composition": [
+  "handheld documentary camera",
+  "shaky cam immediacy",
+  "night vision POV",
+  "wide desert vistas",
+  "tactical POV",
+  "slow motion tension",
+  "explosion aftermath",
+  "close-up on faces"
+ ],
+ "colorKeywords": [
+  "military night vision green",
+  "desert sand ochre",
+  "olive drab military",
+  "tactical cold blue",
+  "explosion orange fire",
+  "dust and haze",
+  "desaturated war tone",
+  "documentary grain"
+ ],
+ "mood": [
+  "war realism",
+  "documentary intensity",
+  "masculine violence",
+  "tactical tension",
+  "moral ambiguity",
+  "desert isolation",
+  "combat stress",
+  "anti-war"
+ ],
+ "profile": {
+  "definition": "凯瑟琳·毕格罗的视觉风格以handheld documentary natural light, harsh desert sun, night vision green为主，military night vision green、desert sand ochre，营造出war realism的氛围。",
+  "lighting": "handheld documentary natural light, harsh desert sun, night vision green，高光偏desert gold/orange explosion，阴影偏deep olive green-black，整体cool military desaturated 60/40。",
+  "framing": "handheld documentary camera、shaky cam immediacy、night vision POV。",
+  "grading": "对比度high 70-85%，色调cool military desaturated 60/40。",
+  "avoid": "避免平光照明、避免色彩杂乱、避免构图失衡。"
+ }
+}

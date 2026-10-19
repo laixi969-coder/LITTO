@@ -1,0 +1,105 @@
+{
+ "id": "145",
+ "name": "汤浅政明",
+ "nameEn": "MasaakiYuasa",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "日本",
+ "years": "1965-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF1744",
+    "name": "狂想红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00E5FF",
+    "name": "流动青",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFEA00",
+    "name": "能量黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#D500F9",
+    "name": "迷幻紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#76FF03",
+    "name": "爆发绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A1A1A",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF1744",
+    "name": "狂想激情",
+    "emotion": "狂想激情"
+   },
+   {
+    "hex": "#00E5FF",
+    "name": "流动自由",
+    "emotion": "流动自由"
+   },
+   {
+    "hex": "#FFEA00",
+    "name": "青春能量",
+    "emotion": "青春能量"
+   },
+   {
+    "hex": "#D500F9",
+    "name": "迷幻梦境",
+    "emotion": "迷幻梦境"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "流动色光",
+  "highlight_tint": "变形光影",
+  "highlight_bias": "变形光影",
+  "shadow_tint": "高饱和色",
+  "shadow_bias": "高饱和色",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "变形动画",
+  "手绘线条",
+  "色彩爆炸",
+  "心理流动",
+  "运动轨迹",
+  "空间扭曲"
+ ],
+ "colorKeywords": [
+  "汤浅政明高饱和",
+  "流动色彩",
+  "手绘能量色",
+  "变形狂想色",
+  "心理流动彩",
+  "青春爆炸色"
+ ],
+ "mood": [
+  "狂想自由",
+  "青春能量",
+  "心理流动",
+  "手绘质感",
+  "迷幻体验",
+  "打破常规"
+ ],
+ "profile": {
+  "definition": "汤浅政明的视觉风格：流动色光，汤浅政明高饱和, 流动色彩, 手绘能量色。",
+  "lighting": "流动色光，变形光影，高饱和色",
+  "framing": "变形动画、手绘线条、色彩爆炸。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

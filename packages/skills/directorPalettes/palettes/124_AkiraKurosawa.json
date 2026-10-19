@@ -1,0 +1,105 @@
+{
+ "id": "124",
+ "name": "黑泽明",
+ "nameEn": "AkiraKurosawa",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "日本",
+ "years": "1910-1998",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#000000",
+    "name": "墨黑",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#808080",
+    "name": "中灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#C0C0C0",
+    "name": "银灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#404040",
+    "name": "深灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#E0E0E0",
+    "name": "浅灰",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#000000",
+    "name": "命运沉重",
+    "emotion": "命运沉重"
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "正义希望",
+    "emotion": "正义希望"
+   },
+   {
+    "hex": "#808080",
+    "name": "人性灰色",
+    "emotion": "人性灰色"
+   },
+   {
+    "hex": "#C0C0C0",
+    "name": "武士荣耀",
+    "emotion": "武士荣耀"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高反差黑白",
+  "highlight_tint": "侧光雕刻",
+  "highlight_bias": "侧光雕刻",
+  "shadow_tint": "雨幕光线",
+  "shadow_bias": "雨幕光线",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "雨幕构图",
+  "运动长镜",
+  "武士群像",
+  "自然元素",
+  "低角度仰拍",
+  "画面纵深"
+ ],
+ "colorKeywords": [
+  "高反差黑白",
+  "雨幕质感",
+  "武士道黑白",
+  "运动光影",
+  "自然灰阶",
+  "史诗黑白"
+ ],
+ "mood": [
+  "武士道精神",
+  "人性探讨",
+  "史诗格局",
+  "命运无常",
+  "人道主义",
+  "东方哲学"
+ ],
+ "profile": {
+  "definition": "黑泽明的视觉风格：高反差黑白，高反差黑白, 雨幕质感, 武士道黑白。",
+  "lighting": "高反差黑白，侧光雕刻，雨幕光线",
+  "framing": "雨幕构图、运动长镜、武士群像。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,108 @@
+{
+ "id": "022",
+ "name": "王家卫",
+ "nameEn": "Wong Kar-wai",
+ "category": "02_霓虹黑色与赛博未来",
+ "nationality": "中国香港",
+ "years": "1988-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1A0A1F",
+    "name": "午夜深紫",
+    "ratio": 0.3
+   },
+   {
+    "hex": "#C41E3A",
+    "name": "霓虹正红",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#006B54",
+    "name": "墨绿翡翠",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#F4A460",
+    "name": "暖沙黄",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#4169E1",
+    "name": "霓虹蓝",
+    "ratio": 0.13
+   },
+   {
+    "hex": "#FFDAB9",
+    "name": "蜜桃肤",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF1493",
+    "name": "霓虹粉",
+    "emotion": "暧昧欲望"
+   },
+   {
+    "hex": "#00FFFF",
+    "name": "电子青",
+    "emotion": "疏离时间"
+   },
+   {
+    "hex": "#FFD700",
+    "name": "回忆金",
+    "emotion": "怀旧记忆"
+   },
+   {
+    "hex": "#8B0000",
+    "name": "暗血红",
+    "emotion": "心碎遗憾"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "step-printed slow shutter, neon color bleeding, soft colored fill",
+  "highlight_tint": "neon pink/red/green",
+  "shadow_tint": "deep purple-black",
+  "contrast_ratio": "medium-high 65-80%",
+  "overall_tone": "warm saturated neon, 55% warm + 45% cool"
+ },
+ "composition": [
+  "step printing slow shutter",
+  "neon color framing",
+  "wide-angle distortion",
+  "through glass/window",
+  "mirror reflection",
+  "slow motion",
+  "smoke and haze",
+  "close-up intimacy"
+ ],
+ "colorKeywords": [
+  "neon saturated red-green",
+  "step-printed color bleed",
+  "1960s hong kong neon",
+  "warm tungsten gold",
+  "neon blue night",
+  "cheongsam red patterns",
+  "cigarette smoke haze",
+  "rain-streaked neon"
+ ],
+ "mood": [
+  "urban loneliness",
+  "romantic melancholy",
+  "missed connections",
+  "hong kong nocturne",
+  "time and memory",
+  "unrequited love",
+  "neon poetry",
+  "emotional saturation"
+ ],
+ "profile": {
+  "definition": "酒红、墨绿和钨丝金包围人物，偏色与拖影把城市变成记忆。",
+  "lighting": "低照度钨丝与绿色荧光混合；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "门框遮挡、缓慢横移、短暂拖影；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "轻欠曝，高光晕染，阴影蓝绿；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "洁白棚光、全局青橙、赛博霓虹堆叠、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

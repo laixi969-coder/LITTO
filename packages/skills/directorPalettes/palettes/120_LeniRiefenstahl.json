@@ -1,0 +1,105 @@
+{
+ "id": "120",
+ "name": "里芬施塔尔",
+ "nameEn": "LeniRiefenstahl",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "德国",
+ "years": "1902-2003",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#D4AF37",
+    "name": "金铂色",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "山岳蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "雪白",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#5D4037",
+    "name": "古铜棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A237E",
+    "name": "深渊蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "深褐",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#D4AF37",
+    "name": "壮美崇拜",
+    "emotion": "壮美崇拜"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "山岳崇高",
+    "emotion": "山岳崇高"
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯净理想",
+    "emotion": "纯净理想"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "身体雕塑",
+    "emotion": "身体雕塑"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "侧光雕刻",
+  "highlight_tint": "阳光塑形",
+  "highlight_bias": "阳光塑形",
+  "shadow_tint": "云雾光束",
+  "shadow_bias": "云雾光束",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "对称壮美",
+  "人体雕塑",
+  "山岳仰拍",
+  "群众场面",
+  "动态剪辑",
+  "光与影"
+ ],
+ "colorKeywords": [
+  "壮美金色",
+  "山岳蓝白",
+  "雕塑光感",
+  "史诗色调",
+  "人体古铜色",
+  "云隙光束"
+ ],
+ "mood": [
+  "壮美美学",
+  "身体崇拜",
+  "山岳精神",
+  "史诗感",
+  "争议美学",
+  "意志胜利"
+ ],
+ "profile": {
+  "definition": "里芬施塔尔的视觉风格：侧光雕刻，壮美金色, 山岳蓝白, 雕塑光感。",
+  "lighting": "侧光雕刻，阳光塑形，云雾光束",
+  "framing": "对称壮美、人体雕塑、山岳仰拍。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "133",
+ "name": "迈克尔·贝",
+ "nameEn": "MichaelBay",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "美国",
+ "years": "1965-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF6D00",
+    "name": "爆炸橙",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#1565C0",
+    "name": "天空蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "火球金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "火焰红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "钢铁灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "高光白",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF6D00",
+    "name": "爆炸快感",
+    "emotion": "爆炸快感"
+   },
+   {
+    "hex": "#1565C0",
+    "name": "英雄主义",
+    "emotion": "英雄主义"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "黄金时刻",
+    "emotion": "黄金时刻"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "肾上腺素",
+    "emotion": "肾上腺素"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "爆炸逆光",
+  "highlight_tint": "黄金时刻",
+  "highlight_bias": "黄金时刻",
+  "shadow_tint": "高对比暖光",
+  "shadow_bias": "高对比暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "360°环绕",
+  "慢动作爆炸",
+  "低角度仰拍",
+  "汽车追逐",
+  "军事装备",
+  "美旗飘扬"
+ ],
+ "colorKeywords": [
+  "贝式橙蓝",
+  "爆炸高饱和",
+  "黄金时刻光",
+  "高对比色调",
+  "美军金属色",
+  "火球金"
+ ],
+ "mood": [
+  "爆炸美学",
+  "美国英雄",
+  "肾上腺素",
+  "大场面爽片",
+  "军事动作",
+  "爱国主义"
+ ],
+ "profile": {
+  "definition": "迈克尔·贝的视觉风格：爆炸逆光，贝式橙蓝, 爆炸高饱和, 黄金时刻光。",
+  "lighting": "爆炸逆光，黄金时刻，高对比暖光",
+  "framing": "360°环绕、慢动作爆炸、低角度仰拍。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

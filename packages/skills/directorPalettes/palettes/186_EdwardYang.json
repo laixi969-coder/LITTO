@@ -1,0 +1,105 @@
+{
+ "id": "186",
+ "name": "杨德昌",
+ "nameEn": "EdwardYang",
+ "category": "10_东方美学与留白意境",
+ "nationality": "中国台湾",
+ "years": "1947-2007",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#546E7A",
+    "name": "台北灰蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#455A64",
+    "name": "都市冷灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "中产棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "暖灯黄",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#0288D1",
+    "name": "玻璃蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "公寓米",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#546E7A",
+    "name": "都市疏离",
+    "emotion": "都市疏离"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "中产阶级压抑",
+    "emotion": "中产阶级压抑"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "家庭微温",
+    "emotion": "家庭微温"
+   },
+   {
+    "hex": "#0288D1",
+    "name": "玻璃般透明",
+    "emotion": "玻璃般透明"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "冷白荧光",
+  "highlight_tint": "玻璃窗光",
+  "highlight_bias": "玻璃窗光",
+  "shadow_tint": "都市霓虹",
+  "shadow_bias": "都市霓虹",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "都市空间",
+  "中产阶级",
+  "长镜头观察",
+  "台北街景",
+  "家庭关系",
+  "多线叙事"
+ ],
+ "colorKeywords": [
+  "杨德昌冷灰",
+  "台北都巿色",
+  "中产棕调",
+  "玻璃窗蓝色",
+  "疏离冷色调",
+  "长镜头观察色"
+ ],
+ "mood": [
+  "都市疏离",
+  "中产阶级",
+  "台北故事",
+  "理性观察",
+  "台湾新电影",
+  "存在焦虑"
+ ],
+ "profile": {
+  "definition": "杨德昌的视觉风格：冷白荧光，杨德昌冷灰, 台北都巿色, 中产棕调。",
+  "lighting": "冷白荧光，玻璃窗光，都市霓虹",
+  "framing": "都市空间、中产阶级、长镜头观察。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "159",
+ "name": "米林宏昌",
+ "nameEn": "HiromasaYonebayashi",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "日本",
+ "years": "1973-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#66BB6A",
+    "name": "森林绿",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#81D4FA",
+    "name": "天空蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#A1887F",
+    "name": "木纹棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#CE93D8",
+    "name": "魔法紫",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#FFF9C4",
+    "name": "米白",
+    "ratio": 0.2
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#66BB6A",
+    "name": "自然治愈",
+    "emotion": "自然治愈"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "家庭温暖",
+    "emotion": "家庭温暖"
+   },
+   {
+    "hex": "#81D4FA",
+    "name": "天空自由",
+    "emotion": "天空自由"
+   },
+   {
+    "hex": "#A1887F",
+    "name": "怀旧温情",
+    "emotion": "怀旧温情"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "森林柔光",
+  "highlight_tint": "室内暖光",
+  "highlight_bias": "室内暖光",
+  "shadow_tint": "自然天光",
+  "shadow_bias": "自然天光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "小人视角",
+  "微观世界",
+  "家庭温情",
+  "森林花园",
+  "吉卜力传承",
+  "成长冒险"
+ ],
+ "colorKeywords": [
+  "吉卜力绿",
+  "小人视角色彩",
+  "森林暖调",
+  "家庭温情色",
+  "手绘细腻色",
+  "天空蓝绿"
+ ],
+ "mood": [
+  "吉卜力传承",
+  "微观世界",
+  "家庭温情",
+  "成长冒险",
+  "自然治愈",
+  "手绘细腻"
+ ],
+ "profile": {
+  "definition": "米林宏昌的视觉风格：森林柔光，吉卜力绿, 小人视角色彩, 森林暖调。",
+  "lighting": "森林柔光，室内暖光，自然天光",
+  "framing": "小人视角、微观世界、家庭温情。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

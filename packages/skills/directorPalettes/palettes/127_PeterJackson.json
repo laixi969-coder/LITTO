@@ -1,0 +1,105 @@
+{
+ "id": "127",
+ "name": "彼得·杰克逊",
+ "nameEn": "PeterJackson",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "新西兰",
+ "years": "1961-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FFD54F",
+    "name": "魔戒金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "精灵绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#5D4037",
+    "name": "中土棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "魔多红",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "刚铎蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#3E2723",
+    "name": "深土棕",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFD54F",
+    "name": "魔幻荣耀",
+    "emotion": "魔幻荣耀"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "自然希望",
+    "emotion": "自然希望"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "黑暗威胁",
+    "emotion": "黑暗威胁"
+   },
+   {
+    "hex": "#5D4037",
+    "name": "史诗厚重",
+    "emotion": "史诗厚重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "魔幻金光",
+  "highlight_tint": "战场火光",
+  "highlight_bias": "战场火光",
+  "shadow_tint": "洞穴暗影",
+  "shadow_bias": "洞穴暗影",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "新西兰地貌",
+  "大场面战争",
+  "霍比特人",
+  "魔幻生物",
+  "指环王",
+  "航拍大全景"
+ ],
+ "colorKeywords": [
+  "魔戒金色",
+  "中土大地色",
+  "精灵绿色",
+  "魔幻色调",
+  "新西兰风光",
+  "战争火光"
+ ],
+ "mood": [
+  "史诗魔幻",
+  "中土世界",
+  "友情与勇气",
+  "正邪大战",
+  "新西兰风景",
+  "奇幻冒险"
+ ],
+ "profile": {
+  "definition": "彼得·杰克逊的视觉风格：魔幻金光，魔戒金色, 中土大地色, 精灵绿色。",
+  "lighting": "魔幻金光，战场火光，洞穴暗影",
+  "framing": "新西兰地貌、大场面战争、霍比特人。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

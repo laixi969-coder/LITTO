@@ -1,0 +1,108 @@
+{
+ "id": "051",
+ "name": "肯·洛奇",
+ "nameEn": "Ken Loach",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "英国",
+ "years": "1967-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7A848C",
+    "name": "工人灰蓝",
+    "ratio": 0.25
+   },
+   {
+    "hex": "#B5A893",
+    "name": "朴素暖灰",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#556B2F",
+    "name": "爱尔兰苔绿",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#C9B896",
+    "name": "旧木黄",
+    "ratio": 0.13
+   },
+   {
+    "hex": "#8C7A6B",
+    "name": "石墙棕",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#D4C5A9",
+    "name": "阴天肤",
+    "ratio": 0.15
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#A9B2B8",
+    "name": "雾霭蓝",
+    "emotion": "压抑无力"
+   },
+   {
+    "hex": "#E5D8BE",
+    "name": "麦浪金",
+    "emotion": "尊严暖意"
+   },
+   {
+    "hex": "#6B5344",
+    "name": "焦土褐",
+    "emotion": "愤怒抗争"
+   },
+   {
+    "hex": "#9DB0A0",
+    "name": "苔原青",
+    "emotion": "隐忍希望"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "overcast natural light, soft window light, flat documentary style",
+  "highlight_tint": "cool grey-blue / neutral white",
+  "shadow_tint": "warm brown-grey, lifted shadows",
+  "contrast_ratio": "low 35-50%, natural flat lighting",
+  "overall_tone": "muted earthy neutral, 50% warm + 50% cool"
+ },
+ "composition": [
+  "documentary realism",
+  "natural window light",
+  "static medium shot",
+  "shallow depth of field",
+  "working class interiors",
+  "location shooting",
+  "non-professional actors",
+  "social realist composition"
+ ],
+ "colorKeywords": [
+  "british council grey",
+  "irish countryside green",
+  "overcast soft light",
+  "weathered wood brown",
+  "stone wall beige",
+  "NHS blue grey",
+  "faded union jack red",
+  "kitchen sink palette"
+ ],
+ "mood": [
+  "working class dignity",
+  "bureaucratic cruelty",
+  "quiet solidarity",
+  "irish tragedy",
+  "socialist humanism",
+  "everyday struggle",
+  "community warmth",
+  "systemic injustice"
+ ],
+ "profile": {
+  "definition": "工人灰蓝和朴素暖灰构成冷静的日常底色，平视固定镜头让普通人的尊严自然显现。",
+  "lighting": "阴天柔光、窗户散射光为主，不用戏剧化打光；阴影偏暖褐，高光偏冷灰，整体扁平自然。",
+  "framing": "中景平视，固定机位长镜；人物放在画面中心，尊重被摄者；背景适度虚化突出人物。",
+  "grading": "低饱和中性调，冷暖各半；肤色保持真实，不美化也不丑化；整体偏灰增加纪实感。",
+  "avoid": "三点布光、高饱和调色、仰拍英雄化或俯拍怜悯化、快速剪辑和花哨运镜、用审美消解社会议题的严肃性"
+ }
+}

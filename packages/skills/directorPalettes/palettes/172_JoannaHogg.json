@@ -1,0 +1,105 @@
+{
+ "id": "172",
+ "name": "乔安娜·霍格",
+ "nameEn": "JoannaHogg",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "英国",
+ "years": "1960-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#8D6E63",
+    "name": "英伦棕",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#90A4AE",
+    "name": "伦敦灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "台灯黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "家具棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#78909C",
+    "name": "雨雾蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "英伦米",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8D6E63",
+    "name": "中产阶级压抑",
+    "emotion": "中产阶级压抑"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "家庭温情",
+    "emotion": "家庭温情"
+   },
+   {
+    "hex": "#90A4AE",
+    "name": "英伦忧郁",
+    "emotion": "英伦忧郁"
+   },
+   {
+    "hex": "#6D4C41",
+    "name": "记忆厚重",
+    "emotion": "记忆厚重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "室内柔光",
+  "highlight_tint": "英国阴天",
+  "highlight_bias": "英国阴天",
+  "shadow_tint": "自然窗光",
+  "shadow_bias": "自然窗光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "静态构图",
+  "英伦公寓",
+  "中产阶级",
+  "自传色彩",
+  "家庭聚会",
+  "家具空间"
+ ],
+ "colorKeywords": [
+  "乔安娜霍格暖棕",
+  "英伦敦灰调",
+  "中产阶级色",
+  "家具电影色",
+  "自传体色彩",
+  "台灯暖光"
+ ],
+ "mood": [
+  "英国中产",
+  "自传体电影",
+  "静态美学",
+  "家庭关系",
+  "记忆碎片",
+  "克制情感"
+ ],
+ "profile": {
+  "definition": "乔安娜·霍格的视觉风格：室内柔光，乔安娜霍格暖棕, 英伦敦灰调, 中产阶级色。",
+  "lighting": "室内柔光，英国阴天，自然窗光",
+  "framing": "静态构图、英伦公寓、中产阶级。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,110 @@
+{
+ "id": "001",
+ "name": "阿尔弗雷德·希区柯克",
+ "nameEn": "Alfred Hitchcock",
+ "category": "01_黑色悬疑与冷调惊悚",
+ "nationality": "British / American",
+ "years": "1925-1976",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#1A2332",
+    "name": "深夜暗蓝",
+    "ratio": 0.4
+   },
+   {
+    "hex": "#3D5A6C",
+    "name": "雾霭钢蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8B6914",
+    "name": "暗金琥珀",
+    "ratio": 0.15
+   },
+   {
+    "hex": "#C41E3A",
+    "name": "恐惧猩红",
+    "ratio": 0.08
+   },
+   {
+    "hex": "#2E4A38",
+    "name": "深墨绿",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#D4C5A9",
+    "name": "暖米肤",
+    "ratio": 0.05
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#7B241C",
+    "name": "血暗红",
+    "emotion": "谋杀、死亡、危险信号"
+   },
+   {
+    "hex": "#F7DC6F",
+    "name": "眩晕金",
+    "emotion": "晕眩、梦境、精神不稳定"
+   },
+   {
+    "hex": "#283747",
+    "name": "冷灰蓝",
+    "emotion": "监视、窥视、未知威胁"
+   },
+   {
+    "hex": "#F8B195",
+    "name": "唇粉橘",
+    "emotion": "金发女郎、诱惑、危机前的美"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "3/4 side light, hard shadow edge",
+  "highlight_tint": "warm golden yellow (candlelight / tungsten)",
+  "shadow_tint": "cold blue-cyan (night / psychological fear)",
+  "contrast_ratio": "high, 75-85%",
+  "overall_tone": "cold dark, 65% cool + 35% warm accent"
+ },
+ "composition": [
+  "symmetrical composition",
+  "low angle shot",
+  "high angle shot",
+  "dolly zoom / vertigo shot",
+  "voyeuristic POV",
+  "staircase composition",
+  "silhouette lighting",
+  "window framing",
+  "mirror reflection",
+  "long tracking shot"
+ ],
+ "colorKeywords": [
+  "complementary red-green-blue contrast",
+  "chiaroscuro lighting",
+  "dark low-key lighting",
+  "golden candlelight warmth",
+  "cold blue night",
+  "red warning point light",
+  "blonde backlight",
+  "figure hidden in shadow"
+ ],
+ "mood": [
+  "suspense tension",
+  "psychological fear",
+  "elegant danger",
+  "film noir",
+  "middle class anxiety",
+  "voyeurism",
+  "misperception",
+  "suspended time"
+ ],
+ "profile": {
+  "definition": "优雅中性色被翠绿和警示红刺破，颜色成为欲望与危险的开关。",
+  "lighting": "古典布光加入动机明确的色光；肤色保持可读，不让环境偏色吞没面部层次。",
+  "framing": "空间—视线—目标—反应，精准推近；先交代颜色承载的空间，再进入人物与关键物件。",
+  "grading": "中间调中性偏冷，红绿分场出现；高光、中间调和阴影分别处理，局部强调色不污染全画面。",
+  "avoid": "红绿全程铺满、廉价黑场、随机手持、无动机环绕和随机变焦、用统一滤镜替代色彩比例、光源和材质。"
+ }
+}

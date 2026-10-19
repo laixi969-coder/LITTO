@@ -1,0 +1,105 @@
+{
+ "id": "191",
+ "name": "陈英雄",
+ "nameEn": "TranAnhHung",
+ "category": "10_东方美学与留白意境",
+ "nationality": "越南/法国",
+ "years": "1962-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#2E7D32",
+    "name": "越南绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "暖金",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "木棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "青木瓜绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "米白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFAB91",
+    "name": "朝阳橙",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#2E7D32",
+    "name": "越南绿意",
+    "emotion": "越南绿意"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "温暖美食",
+    "emotion": "温暖美食"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "乡愁记忆",
+    "emotion": "乡愁记忆"
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "少女青涩",
+    "emotion": "少女青涩"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光漫射",
+  "highlight_tint": "窗格光影",
+  "highlight_bias": "窗格光影",
+  "shadow_tint": "自然天光",
+  "shadow_bias": "自然天光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "越南风景",
+  "美食光影",
+  "女性视角",
+  "法式诗意",
+  "战争背景",
+  "日常诗意"
+ ],
+ "colorKeywords": [
+  "陈英雄绿金",
+  "青木瓜色",
+  "越南美食色",
+  "法式东方色",
+  "温暖绿意",
+  "诗意日常色"
+ ],
+ "mood": [
+  "越南诗意",
+  "美食电影",
+  "法式东方",
+  "女性成长",
+  "战争记忆",
+  "日常美学"
+ ],
+ "profile": {
+  "definition": "陈英雄的视觉风格：柔光漫射，陈英雄绿金, 青木瓜色, 越南美食色。",
+  "lighting": "柔光漫射，窗格光影，自然天光",
+  "framing": "越南风景、美食光影、女性视角。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

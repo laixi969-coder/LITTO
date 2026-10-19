@@ -1,0 +1,105 @@
+{
+ "id": "156",
+ "name": "鲍勃·佩尔西凯蒂 等",
+ "nameEn": "BobPersichetti",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "美国",
+ "years": "1970-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E91E63",
+    "name": "蜘蛛粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00BCD4",
+    "name": "赛博青",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD600",
+    "name": "漫画黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#7C4DFF",
+    "name": "多元紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#00E676",
+    "name": "霓虹绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "墨黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#E91E63",
+    "name": "少年英雄",
+    "emotion": "少年英雄"
+   },
+   {
+    "hex": "#00BCD4",
+    "name": "未来都市",
+    "emotion": "未来都市"
+   },
+   {
+    "hex": "#FFD600",
+    "name": "漫画活力",
+    "emotion": "漫画活力"
+   },
+   {
+    "hex": "#7C4DFF",
+    "name": "无限可能",
+    "emotion": "无限可能"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "霓虹色光",
+  "highlight_tint": "漫画网点",
+  "highlight_bias": "漫画网点",
+  "shadow_tint": "赛博朋克光",
+  "shadow_bias": "赛博朋克光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "漫画分镜",
+  "多元宇宙",
+  "纽约布鲁克林",
+  "少年成长",
+  "蛛网图案",
+  "涂鸦风格"
+ ],
+ "colorKeywords": [
+  "平行宇宙色彩",
+  "漫画美学色",
+  "赛博霓虹色",
+  "蜘蛛红蓝",
+  "涂鸦撞色",
+  "多元宇宙彩"
+ ],
+ "mood": [
+  "少年英雄",
+  "多元宇宙",
+  "漫画革命",
+  "黑人主角",
+  "成长旅程",
+  "无限可能"
+ ],
+ "profile": {
+  "definition": "鲍勃·佩尔西凯蒂 等的视觉风格：霓虹色光，平行宇宙色彩, 漫画美学色, 赛博霓虹色。",
+  "lighting": "霓虹色光，漫画网点，赛博朋克光",
+  "framing": "漫画分镜、多元宇宙、纽约布鲁克林。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

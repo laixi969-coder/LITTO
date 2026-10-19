@@ -1,0 +1,105 @@
+{
+ "id": "174",
+ "name": "索菲亚·科波拉",
+ "nameEn": "SofiaCoppola",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "美国",
+ "years": "1971-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#F48FB1",
+    "name": "少女粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#78909C",
+    "name": "迷失灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "东京蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BA68C8",
+    "name": "玛丽紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F48FB1",
+    "name": "少女忧伤",
+    "emotion": "少女忧伤"
+   },
+   {
+    "hex": "#78909C",
+    "name": "迷失孤独",
+    "emotion": "迷失孤独"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温柔回忆",
+    "emotion": "温柔回忆"
+   },
+   {
+    "hex": "#BA68C8",
+    "name": "奢华空虚",
+    "emotion": "奢华空虚"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光漫射",
+  "highlight_tint": "霓虹夜色",
+  "highlight_bias": "霓虹夜色",
+  "shadow_tint": "自然晨光",
+  "shadow_bias": "自然晨光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "少女视角",
+  "柔光镜头",
+  "东京夜色",
+  "玛丽皇后",
+  "孤独女性",
+  "时尚美学"
+ ],
+ "colorKeywords": [
+  "索菲亚粉调",
+  "迷失东京蓝",
+  "少女柔粉色",
+  "玛丽皇后金粉",
+  "孤独女性色",
+  "时尚电影色"
+ ],
+ "mood": [
+  "少女忧伤",
+  "迷失孤独",
+  "女性视角",
+  "时尚美学",
+  "家庭背景",
+  "独立女性"
+ ],
+ "profile": {
+  "definition": "索菲亚·科波拉的视觉风格：柔光漫射，索菲亚粉调, 迷失东京蓝, 少女柔粉色。",
+  "lighting": "柔光漫射，霓虹夜色，自然晨光",
+  "framing": "少女视角、柔光镜头、东京夜色。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

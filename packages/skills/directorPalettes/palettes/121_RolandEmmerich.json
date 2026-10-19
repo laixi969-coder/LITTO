@@ -1,0 +1,105 @@
+{
+ "id": "121",
+ "name": "罗兰·艾默里奇",
+ "nameEn": "RolandEmmerich",
+ "category": "07_动作史诗与高饱和色彩",
+ "nationality": "德国/美国",
+ "years": "1955-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF6D00",
+    "name": "爆炸橙",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "末日蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "火焰红",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#37474F",
+    "name": "废墟灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "火球金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "暗黑",
+    "ratio": 0.14
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF6D00",
+    "name": "毁灭冲击",
+    "emotion": "毁灭冲击"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "末日恐惧",
+    "emotion": "末日恐惧"
+   },
+   {
+    "hex": "#B71C1C",
+    "name": "生存战斗",
+    "emotion": "生存战斗"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "希望曙光",
+    "emotion": "希望曙光"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "爆炸火光",
+  "highlight_tint": "末日天光",
+  "highlight_bias": "末日天光",
+  "shadow_tint": "高对比冷暖",
+  "shadow_bias": "高对比冷暖",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "大破坏场面",
+  "全球地标",
+  "群众逃亡",
+  "爆炸慢镜",
+  "总统白宫",
+  "外星入侵"
+ ],
+ "colorKeywords": [
+  "爆炸橙蓝",
+  "末日色调",
+  "高饱和灾难色",
+  "火光冲天",
+  "冷蓝暖橙对比",
+  "废墟灰调"
+ ],
+ "mood": [
+  "末日灾难",
+  "生存希望",
+  "全球危机",
+  "英雄主义",
+  "大场面震撼",
+  "美国精神"
+ ],
+ "profile": {
+  "definition": "罗兰·艾默里奇的视觉风格：爆炸火光，爆炸橙蓝, 末日色调, 高饱和灾难色。",
+  "lighting": "爆炸火光，末日天光，高对比冷暖",
+  "framing": "大破坏场面、全球地标、群众逃亡。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

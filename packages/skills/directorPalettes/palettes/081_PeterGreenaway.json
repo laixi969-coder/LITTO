@@ -1,0 +1,104 @@
+{
+ "id": "081",
+ "name": "彼得·格林纳威",
+ "nameEn": "PeterGreenaway",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "英国",
+ "years": "1942-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C41E3A",
+    "name": "血红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "深翠绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD700",
+    "name": "黄金色",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#1A237E",
+    "name": "午夜蓝",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#4A0E1A",
+    "name": "深酒红",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#DC143C",
+    "name": null,
+    "emotion": "欲望与死亡"
+   },
+   {
+    "hex": "#228B22",
+    "name": null,
+    "emotion": "自然与生机"
+   },
+   {
+    "hex": "#FFD700",
+    "name": null,
+    "emotion": "奢华与神圣"
+   },
+   {
+    "hex": "#000000",
+    "name": null,
+    "emotion": "黑暗与深渊"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "舞台式布光",
+  "highlight_bias": "高饱和色光",
+  "shadow_bias": "对称照明",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "对称构图",
+  "数字分章",
+  "画框嵌套",
+  "正面平视",
+  "静物陈列",
+  "文字叠加"
+ ],
+ "colorKeywords": [
+  "高饱和三原色",
+  "油画质感",
+  "红绿对比",
+  "金色装饰",
+  "黑白穿插",
+  "建筑色彩"
+ ],
+ "mood": [
+  "智性游戏",
+  "巴洛克华丽",
+  "黑色幽默",
+  "死亡美学",
+  "数字命理学",
+  "艺术史引用"
+ ],
+ "profile": {
+  "definition": "彼得·格林纳威的视觉风格以舞台式布光为主，高饱和三原色、油画质感、红绿对比，营造出智性游戏的氛围。",
+  "lighting": "舞台式布光，高光偏高饱和色光，阴影偏对称照明，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "对称构图、数字分章、画框嵌套，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩高饱和三原色、油画质感、红绿对比。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

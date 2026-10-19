@@ -1,0 +1,105 @@
+{
+ "id": "152",
+ "name": "彼特·道格特",
+ "nameEn": "PeteDocter",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "美国",
+ "years": "1968-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#4FC3F7",
+    "name": "天空蓝",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#CE93D8",
+    "name": "梦幻紫",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#81C784",
+    "name": "新生绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#F48FB1",
+    "name": "情感粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "灵魂蓝",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#4FC3F7",
+    "name": "飞翔自由",
+    "emotion": "飞翔自由"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖亲情",
+    "emotion": "温暖亲情"
+   },
+   {
+    "hex": "#CE93D8",
+    "name": "灵魂梦幻",
+    "emotion": "灵魂梦幻"
+   },
+   {
+    "hex": "#81C784",
+    "name": "新生希望",
+    "emotion": "新生希望"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光暖光",
+  "highlight_tint": "灵魂彩光",
+  "highlight_bias": "灵魂彩光",
+  "shadow_tint": "梦幻光感",
+  "shadow_bias": "梦幻光感",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "抽象概念",
+  "情感拟人",
+  "灵魂世界",
+  "成长旅程",
+  "家庭温情",
+  "皮克斯质感"
+ ],
+ "colorKeywords": [
+  "皮克斯暖调",
+  "灵魂色彩",
+  "情感粉彩",
+  "梦幻蓝紫",
+  "治愈色彩",
+  "成长绿黄"
+ ],
+ "mood": [
+  "情感探索",
+  "温暖治愈",
+  "成长旅程",
+  "皮克斯灵魂",
+  "家庭温情",
+  "人生意义"
+ ],
+ "profile": {
+  "definition": "彼特·道格特的视觉风格：柔光暖光，皮克斯暖调, 灵魂色彩, 情感粉彩。",
+  "lighting": "柔光暖光，灵魂彩光，梦幻光感",
+  "framing": "抽象概念、情感拟人、灵魂世界。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

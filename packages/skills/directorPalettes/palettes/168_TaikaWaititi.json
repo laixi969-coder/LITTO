@@ -1,0 +1,105 @@
+{
+ "id": "168",
+ "name": "塔伊加·维迪提",
+ "nameEn": "TaikaWaititi",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "新西兰",
+ "years": "1975-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF8F00",
+    "name": "新西兰橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "毛利绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "阳光金",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#E91E63",
+    "name": "幽默粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#00BCD4",
+    "name": "海洋青",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#6A1B9A",
+    "name": "雷神紫",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF8F00",
+    "name": "温暖幽默",
+    "emotion": "温暖幽默"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "自然温情",
+    "emotion": "自然温情"
+   },
+   {
+    "hex": "#E91E63",
+    "name": "怪诞可爱",
+    "emotion": "怪诞可爱"
+   },
+   {
+    "hex": "#6A1B9A",
+    "name": "奇幻冒险",
+    "emotion": "奇幻冒险"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然暖光",
+  "highlight_tint": "新西兰阳光",
+  "highlight_bias": "新西兰阳光",
+  "shadow_tint": "高饱和色光",
+  "shadow_bias": "高饱和色光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "新西兰风光",
+  "怪诞人物",
+  "幽默温情",
+  "色彩饱和",
+  "毛利文化",
+  "儿童视角"
+ ],
+ "colorKeywords": [
+  "塔伊加温调",
+  "新西兰风光色",
+  "怪诞饱和色",
+  "雷神色彩",
+  "幽默暖光",
+  "毛利绿金"
+ ],
+ "mood": [
+  "怪诞幽默",
+  "温暖治愈",
+  "新西兰风光",
+  "独立喜剧",
+  "雷神导演",
+  "毛利文化"
+ ],
+ "profile": {
+  "definition": "塔伊加·维迪提的视觉风格：自然暖光，塔伊加温调, 新西兰风光色, 怪诞饱和色。",
+  "lighting": "自然暖光，新西兰阳光，高饱和色光",
+  "framing": "新西兰风光、怪诞人物、幽默温情。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

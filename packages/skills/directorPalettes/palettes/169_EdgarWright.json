@@ -1,0 +1,105 @@
+{
+ "id": "169",
+ "name": "埃德加·赖特",
+ "nameEn": "EdgarWright",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "英国",
+ "years": "1974-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E53935",
+    "name": "血与冰淇淋红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "警探蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD600",
+    "name": "喜剧黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "僵尸绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#6A1B9A",
+    "name": "科幻紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FF6D00",
+    "name": "动作橙",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#E53935",
+    "name": "热血喜剧",
+    "emotion": "热血喜剧"
+   },
+   {
+    "hex": "#0D47A1",
+    "name": "悬疑推理",
+    "emotion": "悬疑推理"
+   },
+   {
+    "hex": "#FFD600",
+    "name": "英式幽默",
+    "emotion": "英式幽默"
+   },
+   {
+    "hex": "#6A1B9A",
+    "name": "科幻迷幻",
+    "emotion": "科幻迷幻"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "高饱和色光",
+  "highlight_tint": "类型片布光",
+  "highlight_bias": "类型片布光",
+  "shadow_tint": "快速切换光",
+  "shadow_bias": "快速切换光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "快速剪辑",
+  "类型解构",
+  "英式幽默",
+  "血与冰淇淋三部曲",
+  "转场神技",
+  "同步剪辑"
+ ],
+ "colorKeywords": [
+  "埃德加赖特高饱和",
+  "类型片色彩",
+  "英式喜剧色",
+  "血与冰淇淋三色",
+  "快速转场色",
+  "漫画撞色"
+ ],
+ "mood": [
+  "英式幽默",
+  "类型解构",
+  "快速剪辑",
+  "极客文化",
+  "音乐电影",
+  "热血喜剧"
+ ],
+ "profile": {
+  "definition": "埃德加·赖特的视觉风格：高饱和色光，埃德加赖特高饱和, 类型片色彩, 英式喜剧色。",
+  "lighting": "高饱和色光，类型片布光，快速切换光",
+  "framing": "快速剪辑、类型解构、英式幽默。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

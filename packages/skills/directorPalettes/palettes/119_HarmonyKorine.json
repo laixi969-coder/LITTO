@@ -1,0 +1,105 @@
+{
+ "id": "119",
+ "name": "哈蒙尼·科林",
+ "nameEn": "HarmonyKorine",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国",
+ "years": "1973-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF1744",
+    "name": "霓虹红",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00E5FF",
+    "name": "电青",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FF9100",
+    "name": "橙粉",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#EA80FC",
+    "name": "紫粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#76FF03",
+    "name": "毒绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#121212",
+    "name": "深黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF1744",
+    "name": "青春毁灭",
+    "emotion": "青春毁灭"
+   },
+   {
+    "hex": "#00E5FF",
+    "name": "迷幻狂欢",
+    "emotion": "迷幻狂欢"
+   },
+   {
+    "hex": "#FF9100",
+    "name": "危险活力",
+    "emotion": "危险活力"
+   },
+   {
+    "hex": "#EA80FC",
+    "name": "梦幻堕落",
+    "emotion": "梦幻堕落"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "霓虹色光",
+  "highlight_tint": "VHS噪点",
+  "highlight_bias": "VHS噪点",
+  "shadow_tint": "日光直射",
+  "shadow_bias": "日光直射",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "VHS质感",
+  "手持混乱",
+  "青少年群像",
+  "霓虹夜景",
+  "垃圾美学",
+  "南方小镇"
+ ],
+ "colorKeywords": [
+  "VHS迷幻色",
+  "霓虹粉青",
+  "青春堕落色",
+  "日光毒绿",
+  "垃圾美学色",
+  "派对彩光"
+ ],
+ "mood": [
+  "迷幻青春",
+  "边缘文化",
+  "美国南方",
+  "毁灭美学",
+  "儿童视角",
+  "无政府主义"
+ ],
+ "profile": {
+  "definition": "哈蒙尼·科林的视觉风格：霓虹色光，VHS迷幻色, 霓虹粉青, 青春堕落色。",
+  "lighting": "霓虹色光，VHS噪点，日光直射",
+  "framing": "VHS质感、手持混乱、青少年群像。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

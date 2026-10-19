@@ -1,0 +1,75 @@
+{
+ "id": "157",
+ "name": "DonBluth 唐·布鲁斯",
+ "nameEn": "",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "",
+ "years": "",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#7B1FA2",
+    "name": "20%",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "18%",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFA000",
+    "name": "16%",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#00695C",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#E57373",
+    "name": "14%",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "18%",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#7B1FA2",
+    "name": "",
+    "emotion": "魔法奇幻"
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "",
+    "emotion": "自然冒险"
+   },
+   {
+    "hex": "#FFA000",
+    "name": "",
+    "emotion": "80年代怀旧"
+   },
+   {
+    "hex": "#00695C",
+    "name": "",
+    "emotion": "深海神秘"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "童话柔光",
+  "highlight_tint": "森林色光",
+  "shadow_tint": "80年代粉彩",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [],
+ "colorKeywords": [],
+ "mood": [],
+ "profile": {}
+}

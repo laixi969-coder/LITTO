@@ -4,7 +4,7 @@ import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider, type ProviderTools } from "@toonflow/providers";
-import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
+import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
@@ -161,6 +161,76 @@ async function assetBytes(asset: MediaAsset, mediaType: "image" | "video" | "aud
   return { bytes, mimeType };
 }
 
+/**
+ * 写实基底：用可执行的成像行为替代「8K／超写实／电影感」这类空形容词。
+ * 只约束成像与材质，不改创作内容；用户明确要求动画或插画时整段跳过。
+ */
+const PHOTOGRAPHIC_BASELINE = [
+  "PHOTOGRAPHICBASELINE 实拍成像基底：35mm 电影镜头，真实光学景深与自然高光滚降，高光不糊成纯白。",
+  "皮肤保留毛孔、绒毛、肤色不均与真实皮脂反光，T 区与鼻头有自然油光；妆感可辨——粉底边界、唇部纹理、眉毛根根分明，不做无瑕哑光的塑料皮肤。",
+  "布料可见纤维与自然褶皱，金属与玻璃有各自的光泽与反射，不共用同一种塑料光泽。",
+  "光源来自画面内可见或可推断的实际光源，方向明确，墙面与地面留有投影，人物与环境受同一光源支配；不用多点均匀柔光把脸拍平。",
+  "头发有碎发飞出与不均匀的发丝反光，发根保留蓬松与分缝。",
+  "曝光正常，画面明亮通透，中间调不压暗，暗部保留细节但不到死黑。",
+  "色彩自然准确，不刻意降低饱和度，不加青橙滤镜，不让人脸与墙面发灰。",
+  "画面干净：无明显噪点、无胶片颗粒、无脏污、无划痕、无霉斑、无做旧痕迹。",
+  "服装、道具与场景保持干净完整、维护良好；只有剧情明确要求的状态改变才例外，且只影响指定对象。",
+  "禁止 3D 渲染感、CG 塑料质感、无瑕均匀皮肤与全画面同焦。",
+].join("");
+
+/**
+ * 判断提示词是否在写人：编译层会追加 REFERENCEUSE 等模板段落，只取 REQUEST: 到下一个大写标记之间的作者原文，
+ * 否则模板里的 "face" 会把空镜误判成人物镜头。
+ */
+export function looksLikePersonShot(prompt: string) {
+  const authored = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(prompt)?.[1] ?? prompt;
+  // 明确声明空镜的请求直接放行：场景与道具的描述里常会提到人物，按关键词一刀切会把空镜全部误拦。
+  if (/无人|空镜|不出现人物|不要人物|无人物|\bno people\b|\bempty scene\b/i.test(authored)) return false;
+  return /人脸|面容|面部|正脸|肖像|长相|五官|表情|眼神|口型|对白|台词|人物|角色|男主|女主|演员|男人|女人|男子|女子|男性|女性|男孩|女孩|\bface\b|\bportrait\b|\beyes\b|\bdialogue\b|\bman\b|\bwoman\b/i.test(authored);
+}
+
+/**
+ * 幂等地补上写实基底。入队与执行两处都会调用，靠标记避免重复叠加；
+ * 明确要求动画、插画、漫画、3D 渲染等风格时整段跳过，保持「真人要超逼真、漫画照常出漫画」的分流。
+ */
+/**
+ * 把镜头规格编译成结构化指令：景别、运镜、调度、表演、光线逐项写清，
+ * 模型不必再从一句散文里猜；空字段直接省略，不补默认值。
+ */
+export function compileShotSpec(spec: MediaShotSpec | undefined) {
+  if (!spec) return "";
+  const parts = [
+    spec.shotSize ? `景别 ${spec.shotSize}` : "",
+    spec.lens ? `焦段 ${spec.lens}` : "",
+    spec.cameraMove ? `运镜 ${spec.cameraMove}` : "",
+    spec.blocking ? `调度 ${spec.blocking}` : "",
+    spec.action ? `动作 ${spec.action}` : "",
+    spec.performance ? `表演 ${spec.performance}` : "",
+    spec.lighting ? `光线 ${spec.lighting}` : "",
+    spec.startState ? `起始 ${spec.startState}` : "",
+    spec.endState ? `结束 ${spec.endState}` : "",
+  ].filter(Boolean);
+  return parts.length ? `SHOTSPEC: ${parts.join("；")}` : "";
+}
+
+export function withPhotographicBaseline(prompt: string) {
+  if (prompt.includes("PHOTOGRAPHICBASELINE")) return prompt;
+  const authored = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(prompt)?.[1] ?? prompt;
+  if (/动画|插画|漫画|卡通|二次元|像素|3D\s*渲染|CG\s*渲染|anime|cartoon|illustration|\brender\b|\bstylized\b/i.test(authored)) return prompt;
+  return `${PHOTOGRAPHIC_BASELINE}\n\n${prompt}`;
+}
+
+/** 视频未指定时长时的推荐值：取模型可用区间的上限三分之二，避免每次都落在最短档。 */
+function recommendedDuration(map: unknown, requested: number | undefined) {
+  if (typeof requested === "number" && requested > 0) return requested;
+  const ranges = Array.isArray(map) ? map : [];
+  const supported = ranges
+    .flatMap(entry => Array.isArray((entry as { duration?: unknown })?.duration) ? (entry as { duration: number[] }).duration : [])
+    .filter(value => Number.isFinite(value) && value > 0);
+  if (!supported.length) return requested;
+  return Math.round(Math.max(...supported) * 2 / 3);
+}
+
 async function generateMediaUnrecorded(
   cwd: string,
   mediaType: "image" | "video" | "audio",
@@ -183,12 +253,41 @@ async function generateMediaUnrecorded(
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
   validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
+  // 视频未明确指定时长时按模型能力取推荐值：调用方漏传时不再落到供应商默认的最短档，也不强制每镜等长。
+  const duration = mediaType === "video" ? recommendedDuration(model.durationResolutionMap, request.duration) : request.duration;
+  // 禁止主动做旧：默认干净完整是产品底线，只有明确标注设计意图的破败场景才放行。
+  const DISTRESSED = /脏|污渍|油污|污垢|破烂|腐烂|发霉|霉斑|生锈|锈蚀|破洞|破损|陈旧|做旧|衰败|荒废|废墟|残破|\bdirty\b|\brusted\b|\bdecayed\b|\bderelict\b|\bgrimy\b/i;
+  // 只检查作者自己写的部分：系统注入的基底与锚点段落本身含有「污渍/破损」这类词，
+  // 不排除就会自己触发自己的规则（实际发生过）。
+  const stripped = request.prompt
+    .replace(/PHOTOGRAPHICBASELINE[\s\S]*?\n\n/g, "")
+    .replace(/^LOOK: [\s\S]*?\n\n/m, "")
+    .replace(/^ERA [\s\S]*?\n\n/m, "")
+    .replace(/^CAST: [\s\S]*?\n\n/m, "")
+    .replace(/^SHOTSPEC: .*\n\n/m, "");
+  const authoredPrompt = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(stripped)?.[1] ?? stripped;
+  // 再剥掉否定句：「没有污渍、破损」是在要求干净，不是在要求做旧。
+  const positiveDemand = authoredPrompt
+    .replace(/(没有|无|不带|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得)[^，。；,;.\n]*/g, "")
+    .replace(/\b(no|without|avoid|remove|clean of)\b[^,.;\n]*/gi, "");
+  if (mediaType !== "audio" && DISTRESSED.test(positiveDemand) && !/DISTRESSED\s*[:：]/i.test(request.prompt)) {
+    invalid("默认不生成脏旧破损的人物、服装与场景。若确属设计需要（如废墟、贫民窟、战后场景），在提示词里写明「DISTRESSED: 具体理由」，只影响该对象与当前时段");
+  }
+
+  // 纯文本生成没有身份锚点，等于每镜重新选角。人物镜头必须带参考图，只放行无人空镜与建资产用途。
+  if (mediaType === "video" && request.purpose !== "asset" && !request.images?.length && !request.firstFrame && !request.lastFrame) {
+    if (looksLikePersonShot(request.prompt)) {
+      invalid("人物镜头必须提供角色参考图：用 images 传已采用的定妆图，或用 firstFrame 接上一镜末帧。纯文本生成会每镜重新选角，跨镜必然换脸；仅空镜、环境、流体、光效可用纯文本");
+    }
+  }
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory, reportTask);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;
   if (typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
+  const spec = request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
+  const prompt = withPhotographicBaseline(spec ? `${spec}\n\n${request.prompt}` : request.prompt);
   // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
   const referenceReads = new Map<string, ReturnType<typeof readReference>>();
   const reference = (item: MediaReference, type: string) => {
@@ -213,12 +312,12 @@ async function generateMediaUnrecorded(
       voice: request.voice, instructions: request.instructions, speed: request.speed, volume: request.volume, format: request.format, sampleRate: request.sampleRate,
     })
     : mediaType === "image"
-    ? await provider.generateImage!({ model: request.modelId, prompt: request.prompt, negativePrompt: request.negativePrompt, seed: request.seed, images, ratio: request.ratio, size: request.size })
+    ? await provider.generateImage!({ model: request.modelId, prompt, negativePrompt: request.negativePrompt, seed: request.seed, images, ratio: request.ratio, size: request.size })
     : await runCameraSession(provider, () => provider.generateVideo!({
-      model: request.modelId, prompt: request.prompt, negativePrompt: request.negativePrompt, seed: request.seed,
+      model: request.modelId, prompt, negativePrompt: request.negativePrompt, seed: request.seed,
       images,
       videos, audios, firstFrame, lastFrame,
-      ratio: request.ratio, resolution: request.resolution, duration: request.duration,
+      ratio: request.ratio, resolution: request.resolution, duration,
       generateAudio: request.generateAudio, mode: request.mode,
       cameraTrajectory: request.cameraTrajectory, imageAndCameraOnly: request.imageAndCameraOnly,
     })))().catch(error => {

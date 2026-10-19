@@ -1,0 +1,105 @@
+{
+ "id": "193",
+ "name": "萨蒂亚吉特·雷伊",
+ "nameEn": "SatyajitRay",
+ "category": "10_东方美学与留白意境",
+ "nationality": "印度",
+ "years": "1921-1992",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#000000",
+    "name": "墨黑",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "恒河白",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "泥土棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#808080",
+    "name": "中灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "金辉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "土米",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#8D6E63",
+    "name": "大地厚重",
+    "emotion": "大地厚重"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "人性光辉",
+    "emotion": "人性光辉"
+   },
+   {
+    "hex": "#808080",
+    "name": "命运沉思",
+    "emotion": "命运沉思"
+   },
+   {
+    "hex": "#000000",
+    "name": "贫困沉重",
+    "emotion": "贫困沉重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光效",
+  "highlight_tint": "侧光塑形",
+  "highlight_bias": "侧光塑形",
+  "shadow_tint": "窗格光影",
+  "shadow_bias": "窗格光影",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "孟加拉乡村",
+  "阿普成长",
+  "自然风景",
+  "家庭故事",
+  "长镜头",
+  "人文主义"
+ ],
+ "colorKeywords": [
+  "雷伊黑白棕",
+  "孟加拉诗意色",
+  "印度人文色",
+  "阿普三部曲色",
+  "泥土棕调",
+  "恒河金色"
+ ],
+ "mood": [
+  "人文主义",
+  "印度诗意",
+  "黑白经典",
+  "阿普三部曲",
+  "孟加拉电影",
+  "现实主义"
+ ],
+ "profile": {
+  "definition": "萨蒂亚吉特·雷伊的视觉风格：自然光效，雷伊黑白棕, 孟加拉诗意色, 印度人文色。",
+  "lighting": "自然光效，侧光塑形，窗格光影",
+  "framing": "孟加拉乡村、阿普成长、自然风景。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

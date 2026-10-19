@@ -1,0 +1,105 @@
+{
+ "id": "179",
+ "name": "约阿希姆·特里尔",
+ "nameEn": "JoachimTrier",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "挪威",
+ "years": "1974-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#607D8B",
+    "name": "奥斯陆灰",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#0288D1",
+    "name": "峡湾蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "暖黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "复古棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "雪国白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2E7D32",
+    "name": "森林绿",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#607D8B",
+    "name": "北欧忧郁",
+    "emotion": "北欧忧郁"
+   },
+   {
+    "hex": "#0288D1",
+    "name": "内心清澈",
+    "emotion": "内心清澈"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "青春温暖",
+    "emotion": "青春温暖"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "回忆厚重",
+    "emotion": "回忆厚重"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "北欧冷光",
+  "highlight_tint": "奥斯陆冬光",
+  "highlight_bias": "奥斯陆冬光",
+  "shadow_tint": "室内暖光",
+  "shadow_bias": "室内暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "奥斯陆风景",
+  "内心独白",
+  "青春回忆",
+  "北欧都市",
+  "存在焦虑",
+  "文学气质"
+ ],
+ "colorKeywords": [
+  "奥斯陆灰蓝",
+  "北欧冷调",
+  "青春暖黄",
+  "奥斯陆三部曲色",
+  "存在主义色",
+  "森林绿色"
+ ],
+ "mood": [
+  "奥斯陆三部曲",
+  "北欧忧郁",
+  "青春回忆",
+  "存在焦虑",
+  "文学电影",
+  "内心独白"
+ ],
+ "profile": {
+  "definition": "约阿希姆·特里尔的视觉风格：北欧冷光，奥斯陆灰蓝, 北欧冷调, 青春暖黄。",
+  "lighting": "北欧冷光，奥斯陆冬光，室内暖光",
+  "framing": "奥斯陆风景、内心独白、青春回忆。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

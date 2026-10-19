@@ -1,0 +1,105 @@
+{
+ "id": "147",
+ "name": "希尔万·肖梅",
+ "nameEn": "SylvainChomet",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "法国",
+ "years": "1963-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FFCC80",
+    "name": "怀旧黄",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "老城棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "雨空蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#EF9A9A",
+    "name": "玫瑰粉",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "乡村绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#BCAAA4",
+    "name": "米色",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FFCC80",
+    "name": "怀旧温情",
+    "emotion": "怀旧温情"
+   },
+   {
+    "hex": "#8D6E63",
+    "name": "老城记忆",
+    "emotion": "老城记忆"
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "雨中忧伤",
+    "emotion": "雨中忧伤"
+   },
+   {
+    "hex": "#EF9A9A",
+    "name": "温柔爱情",
+    "emotion": "温柔爱情"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "暖黄街灯",
+  "highlight_tint": "雨天柔光",
+  "highlight_bias": "雨天柔光",
+  "shadow_tint": "室内暖光",
+  "shadow_bias": "室内暖光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "法式街景",
+  "水彩插画",
+  "音乐叙事",
+  "默片风格",
+  "夸张造型",
+  "温情人物"
+ ],
+ "colorKeywords": [
+  "法式怀旧色",
+  "水彩插画色",
+  "暖黄街灯色",
+  "雨空蓝调",
+  "老城棕调",
+  "温情粉彩"
+ ],
+ "mood": [
+  "法式温情",
+  "音乐叙事",
+  "怀旧记忆",
+  "默片美学",
+  "雅克塔蒂致敬",
+  "手绘优雅"
+ ],
+ "profile": {
+  "definition": "希尔万·肖梅的视觉风格：暖黄街灯，法式怀旧色, 水彩插画色, 暖黄街灯色。",
+  "lighting": "暖黄街灯，雨天柔光，室内暖光",
+  "framing": "法式街景、水彩插画、音乐叙事。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

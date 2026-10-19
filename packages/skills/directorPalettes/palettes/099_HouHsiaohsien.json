@@ -1,0 +1,104 @@
+{
+ "id": "099",
+ "name": "侯孝贤",
+ "nameEn": "HouHsiao-hsien",
+ "category": "05_巴洛克华丽与浓墨重彩",
+ "nationality": "中国台湾",
+ "years": "1947-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#5F7D6B",
+    "name": "青绿山水",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#8B7355",
+    "name": "旧木棕",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#A89F8A",
+    "name": "灰米白",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#4A5D52",
+    "name": "深青绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#CD853F",
+    "name": "琥珀棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2C3A32",
+    "name": "暗松绿",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#5F7D6B",
+    "name": null,
+    "emotion": "诗意宁静"
+   },
+   {
+    "hex": "#8B7355",
+    "name": null,
+    "emotion": "历史记忆"
+   },
+   {
+    "hex": "#A89F8A",
+    "name": null,
+    "emotion": "留白含蓄"
+   },
+   {
+    "hex": "#2C3A32",
+    "name": null,
+    "emotion": "深沉内敛"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光为主",
+  "highlight_bias": "柔光散射",
+  "shadow_bias": "窗棂光影",
+  "contrast": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "长镜头静观",
+  "东方留白",
+  "框景构图",
+  "自然风景",
+  "历史记忆",
+  "家庭日常"
+ ],
+ "colorKeywords": [
+  "唐代青绿",
+  "东方素雅",
+  "自然光色",
+  "历史灰调",
+  "台湾乡土",
+  "留白意境"
+ ],
+ "mood": [
+  "东方诗意",
+  "历史记忆",
+  "台湾乡土",
+  "家庭变迁",
+  "静默力量",
+  "时间之河"
+ ],
+ "profile": {
+  "definition": "侯孝贤的视觉风格以自然光为主为主，唐代青绿、东方素雅、自然光色，营造出东方诗意的氛围。",
+  "lighting": "自然光为主，高光偏柔光散射，阴影偏窗棂光影，整体暖调。",
+  "composition": [],
+  "mood": [],
+  "framing": "长镜头静观、东方留白、框景构图，强调视觉层次感。",
+  "grading": "对比度高对比，色调暖调，色彩唐代青绿、东方素雅、自然光色。",
+  "avoid": "避免平淡无奇、避免低饱和度、避免构图简单"
+ }
+}

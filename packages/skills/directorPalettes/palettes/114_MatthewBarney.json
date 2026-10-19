@@ -1,0 +1,105 @@
+{
+ "id": "114",
+ "name": "马修·巴尼",
+ "nameEn": "MatthewBarney",
+ "category": "06_超现实梦幻与心理畸变",
+ "nationality": "美国",
+ "years": "1967-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#E91E63",
+    "name": "肉体粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#00BCD4",
+    "name": "医学蓝",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#FFD600",
+    "name": "金铂黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#795548",
+    "name": "皮肤棕",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#9C27B0",
+    "name": "深紫",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#212121",
+    "name": "炭黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#E91E63",
+    "name": "身体越界",
+    "emotion": "身体越界"
+   },
+   {
+    "hex": "#00BCD4",
+    "name": "临床冷漠",
+    "emotion": "临床冷漠"
+   },
+   {
+    "hex": "#FFD600",
+    "name": "神话仪式",
+    "emotion": "神话仪式"
+   },
+   {
+    "hex": "#795548",
+    "name": "肉体凡胎",
+    "emotion": "肉体凡胎"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "工作室布光",
+  "highlight_tint": "雕塑式照明",
+  "highlight_bias": "雕塑式照明",
+  "shadow_tint": "冷色工业光",
+  "shadow_bias": "冷色工业光",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "身体雕塑",
+  "装置影像",
+  "行为艺术",
+  "神话叙事",
+  "工业空间",
+  "生物形态"
+ ],
+ "colorKeywords": [
+  "肉体粉色",
+  "医学蓝白",
+  "生物形态色",
+  "雕塑式光影",
+  "金铂点缀",
+  "工业冷色"
+ ],
+ "mood": [
+  "身体政治",
+  "神话当代",
+  "极端美学",
+  "艺术跨界",
+  "性别流动",
+  "仪式感"
+ ],
+ "profile": {
+  "definition": "马修·巴尼的视觉风格：工作室布光，肉体粉色, 医学蓝白, 生物形态色。",
+  "lighting": "工作室布光，雕塑式照明，冷色工业光",
+  "framing": "身体雕塑、装置影像、行为艺术。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

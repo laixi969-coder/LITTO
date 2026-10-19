@@ -1,0 +1,104 @@
+{
+ "id": "075",
+ "name": "拉斯·冯·提尔",
+ "nameEn": "LarsvonTrier",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "丹麦",
+ "years": "1956-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#5A7A6A",
+    "name": "北欧冷绿",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#7A8A7A",
+    "name": "苔绿灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#8B7B6B",
+    "name": "旧木棕",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#3A5A4A",
+    "name": "深冷绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#A09A8A",
+    "name": "枯米灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2A4A3A",
+    "name": "暗绿黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#6A8A7A",
+    "name": null,
+    "emotion": "苦难圣洁"
+   },
+   {
+    "hex": "#4A6A5A",
+    "name": null,
+    "emotion": "心理折磨"
+   },
+   {
+    "hex": "#8A7A6A",
+    "name": null,
+    "emotion": "人性复杂"
+   },
+   {
+    "hex": "#1A3A2A",
+    "name": null,
+    "emotion": "存在深渊"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "自然光为主",
+  "highlight_bias": "手持跟拍",
+  "shadow_bias": "室内弱光",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "手持摄影",
+  "Dogme美学",
+  "女性主角",
+  "心理空间",
+  "舞台感",
+  "章节结构"
+ ],
+ "colorKeywords": [
+  "北欧冷绿",
+  "Dogme95色",
+  "去装饰",
+  "手持颗粒",
+  "高饱和段落",
+  "黑白交替"
+ ],
+ "mood": [
+  "女性苦难",
+  "心理惊悚",
+  "存在主义",
+  "挑衅观众",
+  "宗教主题",
+  "实验精神"
+ ],
+ "profile": {
+  "definition": "拉斯·冯·提尔的视觉风格以自然光为主为主，北欧冷绿、Dogme95色、去装饰，营造出女性苦难的氛围。",
+  "lighting": "自然光为主，高光偏手持跟拍，阴影偏室内弱光，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "手持摄影、Dogme美学、女性主角，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩北欧冷绿、Dogme95色、去装饰。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

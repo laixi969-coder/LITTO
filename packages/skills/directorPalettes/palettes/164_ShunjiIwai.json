@@ -1,0 +1,105 @@
+{
+ "id": "164",
+ "name": "岩井俊二",
+ "nameEn": "ShunjiIwai",
+ "category": "09_浪漫柔光与复古色调",
+ "nationality": "日本",
+ "years": "1963-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#F8BBD0",
+    "name": "樱花粉",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "柔光黄",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "天空蓝",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#A5D6A7",
+    "name": "青春绿",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#FFFFFF",
+    "name": "纯白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#D7CCC8",
+    "name": "回忆米",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F8BBD0",
+    "name": "青春悸动",
+    "emotion": "青春悸动"
+   },
+   {
+    "hex": "#FFCC80",
+    "name": "温暖回忆",
+    "emotion": "温暖回忆"
+   },
+   {
+    "hex": "#90CAF9",
+    "name": "青春忧伤",
+    "emotion": "青春忧伤"
+   },
+   {
+    "hex": "#D7CCC8",
+    "name": "岁月温柔",
+    "emotion": "岁月温柔"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "柔光漫射",
+  "highlight_tint": "窗光逆光",
+  "highlight_bias": "窗光逆光",
+  "shadow_tint": "樱花粉色",
+  "shadow_bias": "樱花粉色",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "书信影像",
+  "樱花飘落",
+  "青春校园",
+  "朦胧柔光",
+  "女性成长",
+  "音乐叙事"
+ ],
+ "colorKeywords": [
+  "岩井俊二粉",
+  "樱花色调",
+  "青春柔光色",
+  "情书白色",
+  "莉莉周青",
+  "残酷青春色"
+ ],
+ "mood": [
+  "青春残酷",
+  "书信浪漫",
+  "樱花意象",
+  "成长疼痛",
+  "音乐电影",
+  "日本青春"
+ ],
+ "profile": {
+  "definition": "岩井俊二的视觉风格：柔光漫射，岩井俊二粉, 樱花色调, 青春柔光色。",
+  "lighting": "柔光漫射，窗光逆光，樱花粉色",
+  "framing": "书信影像、樱花飘落、青春校园。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "id": "149",
+ "name": "米歇尔·欧斯洛",
+ "nameEn": "MichelOcelot",
+ "category": "08_动画奇幻与异想视觉",
+ "nationality": "法国",
+ "years": "1943-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#FF6D00",
+    "name": "非洲橙",
+    "ratio": 0.2
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "森林绿",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#7B1FA2",
+    "name": "东方紫",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "沙漠金",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#00695C",
+    "name": "海洋青",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#000000",
+    "name": "剪影黑",
+    "ratio": 0.18
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#FF6D00",
+    "name": "非洲阳光",
+    "emotion": "非洲阳光"
+   },
+   {
+    "hex": "#7B1FA2",
+    "name": "东方神秘",
+    "emotion": "东方神秘"
+   },
+   {
+    "hex": "#1B5E20",
+    "name": "自然生机",
+    "emotion": "自然生机"
+   },
+   {
+    "hex": "#FFD54F",
+    "name": "童话温暖",
+    "emotion": "童话温暖"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "剪影背光",
+  "highlight_tint": "民族色光",
+  "highlight_bias": "民族色光",
+  "shadow_tint": "装饰光影",
+  "shadow_bias": "装饰光影",
+  "contrast": "高对比",
+  "contrast_ratio": "高对比",
+  "overall_tone": "暖调"
+ },
+ "composition": [
+  "剪影造型",
+  "平面装饰",
+  "全球童话",
+  "民族图案",
+  "对称构图",
+  "寓言叙事"
+ ],
+ "colorKeywords": [
+  "剪影对比色",
+  "全球民族色",
+  "非洲橙绿",
+  "东方紫韵",
+  "装饰艺术色",
+  "童话色彩"
+ ],
+ "mood": [
+  "全球童话",
+  "剪影美学",
+  "民族文化",
+  "寓言故事",
+  "装饰艺术",
+  "儿童友好"
+ ],
+ "profile": {
+  "definition": "米歇尔·欧斯洛的视觉风格：剪影背光，剪影对比色, 全球民族色, 非洲橙绿。",
+  "lighting": "剪影背光，民族色光，装饰光影",
+  "framing": "剪影造型、平面装饰、全球童话。",
+  "grading": "整体色调暖调，对比度高对比。",
+  "avoid": "避免平光、避免色彩混乱、避免构图松散。"
+ }
+}

@@ -1,0 +1,104 @@
+{
+ "id": "065",
+ "name": "蔡明亮",
+ "nameEn": "TsaiMing-liang",
+ "category": "04_极简冷构与静观长镜",
+ "nationality": "马来西亚/中国台湾",
+ "years": "1957-",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#5B6770",
+    "name": "都市冷灰蓝",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8A959E",
+    "name": "水泥灰",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#3D474E",
+    "name": "深夜蓝灰",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#7A8985",
+    "name": "霉绿灰",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#B8C0C5",
+    "name": "日光灯白",
+    "ratio": 0.14
+   },
+   {
+    "hex": "#2A3238",
+    "name": "暗室青黑",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#6B7A85",
+    "name": null,
+    "emotion": "都市孤独"
+   },
+   {
+    "hex": "#9DA7AD",
+    "name": null,
+    "emotion": "疏离漠然"
+   },
+   {
+    "hex": "#4A5860",
+    "name": null,
+    "emotion": "欲望压抑"
+   },
+   {
+    "hex": "#1F282D",
+    "name": null,
+    "emotion": "存在虚无"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "日光灯冷白",
+  "highlight_bias": "霓虹冷光",
+  "shadow_bias": "室内暗光",
+  "contrast": "中高对比",
+  "overall_tone": "冷调"
+ },
+ "composition": [
+  "极慢长镜",
+  "固定机位",
+  "门框构图",
+  "楼梯空间",
+  "水意象",
+  "身体独处"
+ ],
+ "colorKeywords": [
+  "冷灰调",
+  "日光灯色",
+  "水泥质感",
+  "雨天灰蒙",
+  "霓虹冷光",
+  "漏水水渍"
+ ],
+ "mood": [
+  "孤独",
+  "疏离",
+  "欲望",
+  "都市异化",
+  "时间停滞",
+  "静默无言"
+ ],
+ "profile": {
+  "definition": "蔡明亮的视觉风格以日光灯冷白为主，冷灰调、日光灯色、水泥质感，营造出孤独的氛围。",
+  "lighting": "日光灯冷白，高光偏霓虹冷光，阴影偏室内暗光，整体冷调。",
+  "composition": [],
+  "mood": [],
+  "framing": "极慢长镜、固定机位、门框构图，强调视觉层次感。",
+  "grading": "对比度中高对比，色调冷调，色彩冷灰调、日光灯色、水泥质感。",
+  "avoid": "避免快速剪辑、避免强烈明暗对比、避免色彩杂乱"
+ }
+}

@@ -1,0 +1,108 @@
+{
+ "id": "052",
+ "name": "沃尔特·塞勒斯",
+ "nameEn": "Walter Salles",
+ "category": "03_大地暖调与自然光诗意",
+ "nationality": "巴西",
+ "years": "1998-至今",
+ "palette": {
+  "primary": [
+   {
+    "hex": "#C48A3A",
+    "name": "南美赭黄",
+    "ratio": 0.22
+   },
+   {
+    "hex": "#8B5A2B",
+    "name": "红土褐",
+    "ratio": 0.18
+   },
+   {
+    "hex": "#D4A855",
+    "name": "公路金黄",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#5A6B3A",
+    "name": "塞拉多绿",
+    "ratio": 0.12
+   },
+   {
+    "hex": "#E8C68A",
+    "name": "焦糖肤",
+    "ratio": 0.16
+   },
+   {
+    "hex": "#6B4A3A",
+    "name": "旧皮褐",
+    "ratio": 0.16
+   }
+  ],
+  "emotional": [
+   {
+    "hex": "#F2D299",
+    "name": "金穗黄",
+    "emotion": "希望启程"
+   },
+   {
+    "hex": "#4A3728",
+    "name": "深棕褐",
+    "emotion": "乡愁沉淀"
+   },
+   {
+    "hex": "#D97B3A",
+    "name": "落日橙",
+    "emotion": "旅途炽热"
+   },
+   {
+    "hex": "#7A8C6B",
+    "name": "草原青",
+    "emotion": "自由宽广"
+   }
+  ]
+ },
+ "lighting": {
+  "key_light": "warm tropical sunlight, golden hour side light, dust motes in sun",
+  "highlight_tint": "golden amber / warm yellow",
+  "shadow_tint": "deep umber / red-brown earth",
+  "contrast_ratio": "medium-high 60-75%, warm sun contrast",
+  "overall_tone": "warm earthy golden, 80% warm + 20% cool"
+ },
+ "composition": [
+  "road movie traveling shots",
+  "south american landscape",
+  "golden hour natural light",
+  "moving vehicle perspective",
+  "handheld intimacy",
+  "wide horizon lines",
+  "dust and heat haze",
+  "historical road trip"
+ ],
+ "colorKeywords": [
+  "brazilian savanna ochre",
+  "andean mountain brown",
+  "highway golden dust",
+  "tropical sunset orange",
+  "caramel skin tone",
+  "cerrado green foliage",
+  "vintage leather brown",
+  "dusty bus window"
+ ],
+ "mood": [
+  "latin american journey",
+  "coming of age on road",
+  "discovery of self and continent",
+  "paternal-mentor bond",
+  "working class warmth",
+  "political awakening",
+  "nostalgia for home",
+  "expansive freedom"
+ ],
+ "profile": {
+  "definition": "公路、家庭与拉丁美洲地景以人文写实连接私人历史",
+  "lighting": "自然日光、车窗光与黄金时刻，避免过分唯美",
+  "framing": "流动跟拍、车内关系和宽阔地景，运动有旅程方向",
+  "grading": "尘土黄、植物绿、天蓝与暖肤色，胶片式柔和对比",
+  "avoid": "避免人工光感、避免冷色调主导、避免过度饱和"
+ }
+}

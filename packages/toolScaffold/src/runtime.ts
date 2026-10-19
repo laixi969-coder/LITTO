@@ -108,8 +108,22 @@ export interface MediaReference {
   mimeType: string;
 }
 
+/** 镜头规格：把散文描述落成可执行字段，避免模型每次自己猜景别、运镜与光位。 */
+export interface MediaShotSpec {
+  shotSize?: string;
+  lens?: string;
+  cameraMove?: string;
+  blocking?: string;
+  action?: string;
+  performance?: string;
+  lighting?: string;
+  startState?: string;
+  endState?: string;
+}
+
 export interface MediaGenerationRequest {
   purpose?: "asset" | "standalone" | "storyboard";
+  shotSpec?: MediaShotSpec;
   cameraTrajectory?: CameraTrajectory;
   imageAndCameraOnly?: boolean;
   shotId?: string;
@@ -160,6 +174,8 @@ export interface MediaContext {
   generateImage(request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]>;
   generateVideo(request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]>;
   generateAudio(request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]>;
+  /** 把已生成的镜头合成为一支片子：拼轨后统一调色与响度归一，供成片输出使用。 */
+  compose?(request: { clips: string[]; output: string; grade?: { contrast?: number; saturation?: number; brightness?: number; grain?: number }; targetLufs?: number }, signal?: AbortSignal): Promise<{ path: string; duration: number; clips: number }>;
 }
 
 export interface QuestionField {

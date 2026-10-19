@@ -28,7 +28,20 @@ const relativePath = z.string().min(1).max(2048).refine(
 const imageReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^image\/[a-z0-9.+-]+$/i) });
 const videoReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^video\/[a-z0-9.+-]+$/i) });
 const audioReference = z.strictObject({ path: relativePath, mimeType: z.string().regex(/^audio\/[a-z0-9.+-]+$/i) });
+const shotSpecSchema = z.strictObject({
+  shotSize: z.string().trim().max(40).optional().describe("景别，如 大远景/中景/近景/特写"),
+  lens: z.string().trim().max(40).optional().describe("焦段与成像，如 35mm 浅景深"),
+  cameraMove: z.string().trim().max(120).optional().describe("运镜及动机，如 缓慢横移跟随；无动机不动"),
+  blocking: z.string().trim().max(200).optional().describe("人物调度：位置、朝向、视线、前后景关系"),
+  action: z.string().trim().max(200).optional().describe("本镜可执行的动作与起止"),
+  performance: z.string().trim().max(200).optional().describe("表演：目标、触发、反应，不写情绪标签"),
+  lighting: z.string().trim().max(200).optional().describe("光源、方向、光比与暗部处理"),
+  startState: z.string().trim().max(200).optional().describe("首帧已发生的状态"),
+  endState: z.string().trim().max(200).optional().describe("本镜结束时的可见状态"),
+}).optional();
+
 const sharedFields = {
+  shotSpec: shotSpecSchema.describe("镜头规格。填了就不再靠散文猜景别与运镜；留空则只用 prompt"),
   purpose: z.enum(["asset", "standalone"]).optional().describe("仅无 shotId 时使用：asset 为基础资产，standalone 为用户明确要求的独立画面。已有镜头项目的正式分镜必须使用 shotId，不能标为独立图绕过规格。"),
   shotId: z.string().min(1).max(128).optional(),
   productionFingerprint: z.string().length(64).optional(),
