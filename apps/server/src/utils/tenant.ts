@@ -6,8 +6,8 @@ export type Tenant = { userId: string; email: string; isAdmin: boolean; workspac
 export const tenantStore = new AsyncLocalStorage<Tenant>();
 export const currentTenant = () => tenantStore.getStore();
 
-/** LITTO_AUTH=off keeps the original single-user behaviour (local desktop / quick trials). Default: on. */
-export const authEnabled = () => process.env.LITTO_AUTH !== "off";
+/** MILIMILI_AUTH=off keeps the original single-user behaviour (local desktop / quick trials). Default: on. */
+export const authEnabled = () => process.env.MILIMILI_AUTH !== "off";
 
 export const dataDir = () => process.env.TOONFLOW_DATA_DIR as string;
 /** Per-workspace private area: settings.json (provider keys), workspaces/<project dirs>. */

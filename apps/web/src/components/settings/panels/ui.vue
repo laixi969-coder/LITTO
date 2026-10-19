@@ -101,7 +101,7 @@
     <el-card class="appearancePreview" shadow="never">
       <div class="previewIcon"><icon-sparkles :size="20" /></div>
       <div class="previewText">
-        <strong>LITTO 每一个灵感，都值得被看见</strong>
+        <strong>MILIMILI 每一个灵感，都值得被看见</strong>
         <p>这是当前颜色、字体与圆角的实际效果。</p>
       </div>
       <el-tag type="primary" effect="light">预览</el-tag>

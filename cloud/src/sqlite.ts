@@ -1,4 +1,4 @@
-/** SQLite driver shim: node:sqlite under Node (tests, standalone), bun:sqlite under Bun (inside the LITTO server). Same tiny surface either way. */
+/** SQLite driver shim: node:sqlite under Node (tests, standalone), bun:sqlite under Bun (inside the MILIMILI server). Same tiny surface either way. */
 export type Stmt = { all(...p: any[]): any[]; get(...p: any[]): any; run(...p: any[]): { changes: number | bigint } };
 export type SqliteDb = { exec(sql: string): void; prepare(sql: string): Stmt };
 

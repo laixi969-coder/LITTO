@@ -1,15 +1,15 @@
 {
-  "name": "litto",
-  "description": "LITTO（里头）—— 好戏，都在里头。面向影视与短剧创作的 AI 工作台。",
-  "author": "LITTO contributors",
+  "name": "milimili",
+  "description": "MILIMILI（里头）—— 好戏，都在里头。面向影视与短剧创作的 AI 工作台。",
+  "author": "MILIMILI contributors",
   "license": "MIT",
-  "homepage": "https://github.com/laixi969-coder/LITTO#readme",
+  "homepage": "https://github.com/laixi969-coder/MILIMILI#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/laixi969-coder/LITTO.git"
+    "url": "git+https://github.com/laixi969-coder/MILIMILI.git"
   },
   "bugs": {
-    "url": "https://github.com/laixi969-coder/LITTO/issues"
+    "url": "https://github.com/laixi969-coder/MILIMILI/issues"
   },
   "type": "module",
   "packageManager": "bun@1.3.14",

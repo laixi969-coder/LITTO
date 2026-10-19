@@ -28,7 +28,7 @@ app.use("*", async (c, next) => {
     if (origin && !config.production && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         c.header("Access-Control-Allow-Origin", origin);
         c.header("Access-Control-Allow-Credentials", "true");
-        c.header("Access-Control-Allow-Headers", "content-type, authorization, x-workspace-id, x-litto-csrf, idempotency-key");
+        c.header("Access-Control-Allow-Headers", "content-type, authorization, x-workspace-id, x-milimili-csrf, idempotency-key");
         c.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
         c.header("Vary", "Origin");
     }
@@ -37,11 +37,11 @@ app.use("*", async (c, next) => {
 });
 
 // Metrics + simple per-IP rate limit (fixed one-minute window).
-// x-forwarded-for 由客户端任意填写，只有部署在可信反向代理后（LITTO_TRUST_PROXY=1）才采用，否则每次换个假 IP 就能绕过限流。
+// x-forwarded-for 由客户端任意填写，只有部署在可信反向代理后（MILIMILI_TRUST_PROXY=1）才采用，否则每次换个假 IP 就能绕过限流。
 const buckets = new Map<string, { t: number; n: number }>();
 setInterval(() => { const cutoff = Date.now() - 60_000; for (const [key, b] of buckets) if (b.t < cutoff) buckets.delete(key); }, 60_000).unref();
 function clientIp(c: Context) {
-    if (process.env.LITTO_TRUST_PROXY === "1") {
+    if (process.env.MILIMILI_TRUST_PROXY === "1") {
         const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
         if (forwarded) return forwarded;
     }
@@ -54,7 +54,7 @@ app.use("*", async (c, next) => {
     if (Date.now() - b.t > 60_000) (b.t = Date.now()), (b.n = 0);
     b.n++;
     buckets.set(key, b);
-    if (b.n > (auth ? 30 : 600) && !process.env.LITTO_NO_RATELIMIT) {
+    if (b.n > (auth ? 30 : 600) && !process.env.MILIMILI_NO_RATELIMIT) {
         c.header("Retry-After", String(Math.ceil((b.t + 60_000 - Date.now()) / 1000)));
         return c.json({ error: "操作太频繁，请稍后再试", code: "rate_limited" }, 429);
     }

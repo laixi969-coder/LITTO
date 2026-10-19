@@ -4,7 +4,7 @@ description: 把已确认的剧本或场次表拆解成可确认的资产清单�
 metadata:
   version: "1.2.0"
   displayName: 剧本拆解
-  author: LITTO
+  author: MILIMILI
 ---
 
 # 剧本拆解

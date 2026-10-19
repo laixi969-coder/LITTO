@@ -209,7 +209,7 @@ export function useNodeAi() {
     const signal = AbortSignal.timeout(60000);
     const current = await readMediaJob(jobId, signal);
     if (["QUEUED", "RUNNING"].includes(current.status)) {
-      const response = await fetch(`/cloud/generations/${encodeURIComponent(jobId)}/cancel`, { method: "POST", headers: { "x-litto-csrf": "1" }, signal });
+      const response = await fetch(`/cloud/generations/${encodeURIComponent(jobId)}/cancel`, { method: "POST", headers: { "x-milimili-csrf": "1" }, signal });
       if (!response.ok && response.status !== 409) throw new Error("停止生成失败");
     }
     while (!(await readMediaJob(jobId, signal)).settled) await delayMediaPoll(signal);

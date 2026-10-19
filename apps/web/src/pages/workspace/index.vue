@@ -1,7 +1,7 @@
 <template>
   <main class="workspacePage" :style="{ '--agentWidth': `${agentVisible ? agentWidth : 0}px` }">
     <aside class="workspaceRail" aria-label="项目任务">
-      <router-link class="railBrand" to="/home">LITTO <small>里头</small></router-link>
+      <router-link class="railBrand" to="/home">MILIMILI <small>里头</small></router-link>
       <span class="projectTitle" :title="workspaceStore.project?.name">{{ workspaceStore.project?.name }}</span>
       <div ref="historyTarget" class="historyTarget" />
       <div class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起助手' : '打开助手' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
@@ -32,12 +32,12 @@
         </span>
       </template>
     </el-segmented>
-    <el-tooltip v-if="!agentVisible" content="LITTO Agent" placement="bottom" :showArrow="false" :hideAfter="0">
+    <el-tooltip v-if="!agentVisible" content="MILIMILI Agent" placement="bottom" :showArrow="false" :hideAfter="0">
       <el-button
         class="agentButton"
         :class="{ active: agentVisible }"
         :aria-expanded="agentVisible"
-        aria-label="LITTO Agent"
+        aria-label="MILIMILI Agent"
         aria-controls="agentPanel"
         @click="agentVisible = !agentVisible"></el-button>
     </el-tooltip>

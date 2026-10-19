@@ -32,7 +32,7 @@ export async function sampleAdMedia(s: Scope, mediaId: string, cuts: number[] = 
   const hash = sha256(bytes);
   if (/^image\/(png|jpeg|webp)$/.test(media.mime)) return { frames: [{ data: bytes, mime: media.mime }], timestamps: [0], hash, duration: 0, hasAudio: false, omittedCuts: 0 };
   if (!media.mime.startsWith("video/")) throw bad("视觉分析仅支持图片或视频");
-  const directory = await mkdtemp(join(tmpdir(), "littoAdReview"));
+  const directory = await mkdtemp(join(tmpdir(), "milimiliAdReview"));
   try {
     const source = join(directory, "source");
     await writeFile(source, bytes);

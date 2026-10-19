@@ -34,7 +34,7 @@ async function sourceFile(s: Scope, clip: EClip, directory: string) {
 export async function suggestCuts(s: Scope, sequenceId: string, leftId: string, rightId: string, version: number) {
   const { edit, left, right, sourceIds } = currentPair(s, sequenceId, leftId, rightId, version);
   if (right.transition.type !== "cut" || Math.abs(end(left) - right.start) > 0.001) throw bad("剪点候选需要相邻连续硬切");
-  const directory = await mkdtemp(join(tmpdir(), "littoCuts"));
+  const directory = await mkdtemp(join(tmpdir(), "milimiliCuts"));
   try {
     const samples = async (clip: EClip, outgoing: boolean) => {
       const { file, probe } = await sourceFile(s, clip, directory);
@@ -71,7 +71,7 @@ export async function soundBridge(s: Scope, sequenceId: string, input: z.infer<t
   if ((input.mode === "jCut" || input.mode === "crossfade") && (right.in < input.duration * right.speed || right.start < input.duration)) {
     throw bad("后镜素材头部没有足够声音余量，请先调整画面入点或使用独立声音素材");
   }
-  const directory = await mkdtemp(join(tmpdir(), "littoSound"));
+  const directory = await mkdtemp(join(tmpdir(), "milimiliSound"));
   try {
     for (const clip of [left, right]) {
       const { probe } = await sourceFile(s, clip, directory);
@@ -91,7 +91,7 @@ export async function previewCut(s: Scope, sequenceId: string, leftId: string, r
   const source = `seamPreview:${sha256(JSON.stringify([sequenceId, version, leftId, rightId, edit.clips.map(c => resolveClip(s, c).mediaId)]))}`;
   const existing = s.list("media", { projectId: sequence.projectId, source })[0];
   if (existing) return { media: mediaView(existing), version };
-  const directory = await mkdtemp(join(tmpdir(), "littoSeam"));
+  const directory = await mkdtemp(join(tmpdir(), "milimiliSeam"));
   try {
     const window = { start: Math.max(left.start, right.start - 1.5), end: Math.min(end(right), Math.max(end(left), right.start) + 1.5) };
     const resolved = resolveClip(s, left), media = resolved.mediaId && s.get("media", resolved.mediaId);

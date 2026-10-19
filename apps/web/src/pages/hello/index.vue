@@ -5,7 +5,7 @@
       <h1><brandLogo class="logo" /></h1>
       <p class="slogan">好戏，都在里头</p>
       <p class="description">把剧本、角色、场景、分镜和生成，放进同一个画布。</p>
-      <el-button type="primary" size="large" round :loading="saving" @click="enter">进入 LITTO</el-button>
+      <el-button type="primary" size="large" round :loading="saving" @click="enter">进入 MILIMILI</el-button>
     </div>
     <footer class="footer">
       <languageSelect />

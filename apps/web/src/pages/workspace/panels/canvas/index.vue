@@ -313,9 +313,9 @@ function documentHandles(node: Node<DocumentNodeData>) {
 async function readDocumentCanvas(directory: string, canvasPath: string, nodeId: string) {
   checkDocumentDirectory(directory);
   const files = useWorkspaceFiles(directory);
-  const canvas = await files.readJson<{ toonflowCanvas?: boolean; nodes?: Node<DocumentNodeData>[] }>(canvasPath);
+  const canvas = await files.readJson<{ milimiliCanvas?: boolean; littoCanvas?: boolean; toonflowCanvas?: boolean; nodes?: Node<DocumentNodeData>[] }>(canvasPath);
   checkDocumentDirectory(directory);
-  if (canvas?.toonflowCanvas !== true || !Array.isArray(canvas.nodes)) throw new Error("文件不是有效画布");
+  if (canvas?.milimiliCanvas !== true && canvas?.littoCanvas !== true && canvas?.toonflowCanvas !== true || !Array.isArray(canvas?.nodes)) throw new Error("文件不是有效画布");
   const node = canvas.nodes.find((item) => item && item.id === nodeId);
   if (!node) throw new Error("节点已删除，请刷新文件树");
   if (node.data !== undefined && (!node.data || typeof node.data !== "object" || Array.isArray(node.data))) throw new Error("节点数据无效");
@@ -465,7 +465,7 @@ const saveCanvas = debounce((directory: string, fileName: string) => {
   // ACT: 同页保存按顺序完成，防止慢请求覆盖后续修改；不处理多个客户端的并发编辑。
   saving = saving.then(async () => {
     try {
-      await useWorkspaceFiles(directory).writeJson(fileName, { toonflowCanvas: true, nodes: flow.nodes, edges: flow.edges, viewport: flow.viewport });
+      await useWorkspaceFiles(directory).writeJson(fileName, { milimiliCanvas: true, nodes: flow.nodes, edges: flow.edges, viewport: flow.viewport });
       saveError = undefined;
     } catch (err) {
       saveError = err;

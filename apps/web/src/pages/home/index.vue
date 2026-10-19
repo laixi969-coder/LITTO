@@ -322,7 +322,7 @@ const hasMediaModel = computed(() => {
   );
 });
 const needsModels = computed(() => !hasTextModel.value || !hasMediaModel.value);
-const bannerKey = "litto:connect-banner-dismissed";
+const bannerKey = "milimili:connect-banner-dismissed";
 const bannerDismissed = ref(
   (() => {
     try {
@@ -346,7 +346,7 @@ const opening = ref(false);
 const promptWorkspacePicker = ref<InstanceType<typeof workspacePicker>>();
 const relocationPicker = ref<InstanceType<typeof workspacePicker>>();
 // 首页想法按账号存在本机浏览器：刷新、返回或进项目后回来都不丢，开始创作成功后清除。
-const draftKey = `littoHomeDraft:${me?.user.id ?? "local"}`;
+const draftKey = `milimiliHomeDraft:${me?.user.id ?? "local"}`;
 const prompt = ref(
   (() => {
     try {
@@ -502,7 +502,7 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
     if (!empty) return ElMessage.warning("该文件夹不为空，请重新选择空文件夹；已有项目请使用“导入项目”或点击项目列表打开。");
     await useWorkspaceFiles(directory).writeJson(
       "画布1.json",
-      { toonflowCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+      { milimiliCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
       true,
     );
     if (storyBrief) await updateStory(directory, 0, { type: "brief", value: storyBrief });
@@ -664,7 +664,7 @@ watch(
           if (entry.type !== "file" || !entry.name.endsWith(".json")) continue;
           if (!(await isCanvasFile(files, entry.path))) continue;
           const canvas = await files.readJson<unknown>(entry.path);
-          if (canvas && typeof canvas === "object" && "toonflowCanvas" in canvas && canvas.toonflowCanvas === true && "nodes" in canvas)
+          if (canvas && typeof canvas === "object" && ((canvas as { milimiliCanvas?: boolean }).milimiliCanvas === true || (canvas as { littoCanvas?: boolean }).littoCanvas === true || (canvas as { toonflowCanvas?: boolean }).toonflowCanvas === true) && "nodes" in canvas)
             shots.push(...getCanvasShots(canvas.nodes));
           if (!active) return;
         }

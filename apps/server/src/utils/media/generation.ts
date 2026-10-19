@@ -2,6 +2,7 @@ import { recordUsage } from "@/utils/usage";
 import { guardedFetch } from "@/utils/ssrf";
 import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider, type ProviderTools } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
@@ -22,7 +23,7 @@ async function runCameraSession<T>(provider: Provider & { config: Record<string,
   // ACT: 官方服务只有一个可变 3D 缓存。单进程按源站排他；异常时保留占用，
   // 防止取消 HTTP 后仍在运行的 GPU 任务被下一次 seed 清空。恢复须重启两端。
   const endpoint = new URL(String(provider.config.baseUrl)).origin;
-  if (cameraSessions.has(endpoint)) throw new Error("GEN3C 服务正在使用或上次结果不确定；不要重试 seed，异常恢复须重启 GEN3C 与 LITTO");
+  if (cameraSessions.has(endpoint)) throw new Error("GEN3C 服务正在使用或上次结果不确定；不要重试 seed，异常恢复须重启 GEN3C 与 MILIMILI");
   cameraSessions.add(endpoint);
   const result = await action();
   cameraSessions.delete(endpoint);
@@ -375,6 +376,50 @@ async function generateMediaUnrecorded(
   }
 }
 
+const canvasWriteQueue = new Map<string, Promise<unknown>>();
+
+/**
+ * 生成结果必须落到画布：outputName 本来就是「画布显示名称」，但此前只用于任务记录，
+ * 磁盘上有文件、UI 里没有节点，用户会认为没生成。同一画布串行写入，避免并发任务互相覆盖。
+ */
+async function registerOnCanvas(cwd: string, file: GeneratedMedia, request: MediaGenerationRequest) {
+  if (file.mediaType === "audio") return;
+  const canvasPath = join(cwd, "画布1.json");
+  const dataType = file.mediaType === "video" ? "VIDEO" : "IMAGE";
+  const handle = file.mediaType === "video" ? "video" : "image";
+  const label = request.outputName?.trim() || file.path.split("/").pop()?.replace(/\.[^.]+$/, "") || "未命名";
+  const previous = canvasWriteQueue.get(canvasPath) ?? Promise.resolve();
+  const task = previous.then(async () => {
+    let canvas: Record<string, unknown> = { milimiliCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 0.5 } };
+    try {
+      if (existsSync(canvasPath)) {
+        const parsed: unknown = JSON.parse(readFileSync(canvasPath, "utf8"));
+        if (parsed && typeof parsed === "object" && ((parsed as { milimiliCanvas?: unknown }).milimiliCanvas === true || (parsed as { littoCanvas?: unknown }).littoCanvas === true || (parsed as { toonflowCanvas?: unknown }).toonflowCanvas === true)) canvas = parsed as Record<string, unknown>;
+      }
+    } catch { /* 画布损坏：按默认结构重建，避免一个坏文件卡死后续登记 */ }
+    const nodes = Array.isArray(canvas.nodes) ? (canvas.nodes as Record<string, unknown>[]) : [];
+    if (nodes.some(node => (node?.data as { sourcePath?: string } | undefined)?.sourcePath === file.path)) return;
+    const index = nodes.length;
+    nodes.push({
+      id: `shot-${crypto.randomUUID()}`,
+      type: file.mediaType === "video" ? "remote-videoNode" : "remote-imageNode",
+      initialized: true,
+      position: { x: (index % 4) * 420, y: Math.floor(index / 4) * 340 },
+      data: {
+        label,
+        sourcePath: file.path,
+        outputs: { [handle]: { dataType, value: { url: file.path, mimeType: file.mimeType } } },
+        handles: [{ id: handle, type: "source", dataType, label: file.mediaType === "video" ? "视频输出" : "图像输出" }],
+        lineageLabel: label,
+      },
+    });
+    canvas.nodes = nodes;
+    writeFileSync(canvasPath, JSON.stringify(canvas, null, 1), "utf8");
+  }).catch(() => { /* 画布登记失败不影响已生成的素材本身 */ });
+  canvasWriteQueue.set(canvasPath, task);
+  return task;
+}
+
 /** Every media generation (from the canvas nodes, the agent tools, or the HTTP route) is recorded for the user's usage receipts. */
 export async function generateMediaDirect(
   cwd: string,
@@ -387,6 +432,8 @@ export async function generateMediaDirect(
   const base = { kind: mediaType, providerId: request.providerId, modelId: request.modelId, durationMs: 0 };
   try {
     const files = await generateMediaUnrecorded(cwd, mediaType, request, signal, reportTask);
+    // 先登记画布再计费返回：用户在 UI 里看到的节点与磁盘文件必须同时存在。
+    for (const file of files) await registerOnCanvas(cwd, file, request);
     const seconds = (request as { duration?: number }).duration;
     recordUsage(mediaType === "video" && seconds ? { ...base, units: seconds, unit: "second", durationMs: Date.now() - started }
       : { ...base, units: Math.max(1, files.length), unit: mediaType === "image" ? "image" : "call", durationMs: Date.now() - started });

@@ -86,13 +86,13 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     const data = await storage.get(media.storageKey);
     frames.push({ data, mime: media.mime });
     if (region) {
-      const directory = await mkdtemp(join(tmpdir(), "littoRegion"));
+      const directory = await mkdtemp(join(tmpdir(), "milimiliRegion"));
       try { const source = join(directory, "source"); await writeFile(source, data); await addRegion(source, directory, await probeFile(source), [], null); }
       finally { await rm(directory, { recursive: true, force: true }); }
     }
   }
   else if (/^video\/(mp4|webm)$/.test(media.mime)) {
-    const directory = await mkdtemp(join(tmpdir(), "littoQc"));
+    const directory = await mkdtemp(join(tmpdir(), "milimiliQc"));
     try {
       const source = join(directory, "source");
       await writeFile(source, await storage.get(media.storageKey));

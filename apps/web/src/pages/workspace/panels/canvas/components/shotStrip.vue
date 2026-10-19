@@ -70,8 +70,8 @@ async function refresh() {
   } catch { if (!controller.signal.aborted) loadError.value = "镜头状态暂时不可用"; }
 }
 watch(() => props.projectId, refresh, { immediate: true });
-window.addEventListener("littoProductionUpdated", refresh);
-onScopeDispose(() => { controller.abort(); window.removeEventListener("littoProductionUpdated", refresh); });
+window.addEventListener("milimiliProductionUpdated", refresh);
+onScopeDispose(() => { controller.abort(); window.removeEventListener("milimiliProductionUpdated", refresh); });
 const emit = defineEmits<{ select: [id: string]; finalize: [id: string, finalized: boolean] }>();
 </script>
 

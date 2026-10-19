@@ -12,10 +12,10 @@ const domain = `gui/${process.getuid!()}`;
 const agentDirectory = join(homedir(), "Library/LaunchAgents");
 const logDirectory = join(root, "data/logs");
 const services = [
-  { name: "littoServer", port: 3000, cwd: join(root, "apps/server"), health: "/cloud/health" },
-  { name: "littoWeb", port: 5188, cwd: join(root, "apps/web"), health: "/@vite/client" },
+  { name: "milimiliServer", port: 3000, cwd: join(root, "apps/server"), health: "/cloud/health" },
+  { name: "milimiliWeb", port: 5188, cwd: join(root, "apps/web"), health: "/@vite/client" },
 ];
-const labelOf = (name: string) => `com.litto.${name}`;
+const labelOf = (name: string) => `com.milimili.${name}`;
 const xml = (value: string) => value.replace(/[<>&"']/g, char => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char]!);
 
 function launchctl(...args: string[]) {
@@ -51,7 +51,7 @@ if (action === "start") {
   for (const service of services) {
     const label = labelOf(service.name);
     if (launchctl("print", `${domain}/${label}`).exitCode === 0) continue;
-    const args = service.name === "littoServer"
+    const args = service.name === "milimiliServer"
       ? [bunPath, "--watch", "src/index.ts"]
       : [nodePath, join(root, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(service.port), "--strictPort"];
     const environment = { NODE_ENV: "dev", TOONFLOW_DATA_DIR: join(root, "data"), PATH: [...new Set([dirname(bunPath), dirname(nodePath), ...mediaPaths, "/usr/bin", "/bin", "/usr/sbin", "/sbin"])].join(":") };

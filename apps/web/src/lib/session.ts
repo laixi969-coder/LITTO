@@ -1,4 +1,4 @@
-/** LITTO account session (cloud API under /cloud, HttpOnly cookie). `authDisabled` = server runs with LITTO_AUTH=off (single-user mode). */
+/** MILIMILI account session (cloud API under /cloud, HttpOnly cookie). `authDisabled` = server runs with MILIMILI_AUTH=off (single-user mode). */
 export type Me = { user: { id: string; email: string; isAdmin: boolean }; workspaceId: string; role: string; workspaces: { id: string; name: string; kind: string; role: string }[] };
 
 let me: Me | null = null;
@@ -19,7 +19,7 @@ export const getMe = () => me;
 export const isAuthDisabled = () => authDisabled;
 
 export async function cloudRequest<T = unknown>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const response = await fetch(`/cloud${path}`, { method, credentials: "same-origin", headers: { "Content-Type": "application/json", "x-litto-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(`/cloud${path}`, { method, credentials: "same-origin", headers: { "Content-Type": "application/json", "x-milimili-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const details = Array.isArray(data.details) ? data.details.map((item: { path: string; message: string }) => `${item.path}：${item.message}`).join("；") : "";

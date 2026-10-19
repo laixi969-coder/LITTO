@@ -19,8 +19,8 @@ function parseUrl(value: string, base?: URL) {
 }
 
 // Multi-tenant servers (accounts on) must not let an agent reach internal services: refuse loopback / private / link-local / metadata
-// addresses before every request and redirect hop. Single-user mode (LITTO_AUTH=off) or LITTO_ALLOW_PRIVATE_UPSTREAMS=1 keeps the old open behaviour.
-const privateAllowed = () => process.env.LITTO_AUTH === "off" || process.env.LITTO_ALLOW_PRIVATE_UPSTREAMS === "1";
+// addresses before every request and redirect hop. Single-user mode (MILIMILI_AUTH=off) or MILIMILI_ALLOW_PRIVATE_UPSTREAMS=1 keeps the old open behaviour.
+const privateAllowed = () => process.env.MILIMILI_AUTH === "off" || process.env.MILIMILI_ALLOW_PRIVATE_UPSTREAMS === "1";
 function blockedIp(ip: string): boolean {
   if (isIP(ip) === 4) {
     const [a, b] = ip.split(".").map(Number);
@@ -50,7 +50,7 @@ async function fetchText(value: string, signal: AbortSignal) {
     const response = await fetch(url, {
       redirect: "manual",
       signal,
-      headers: { "user-agent": "LITTO/2.0", accept: "text/html, text/plain, application/json, application/xml;q=0.9, */*;q=0.5" },
+      headers: { "user-agent": "MILIMILI/2.0", accept: "text/html, text/plain, application/json, application/xml;q=0.9, */*;q=0.5" },
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();

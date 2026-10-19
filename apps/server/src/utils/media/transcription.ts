@@ -20,15 +20,15 @@ const serverSpeechSchema = z.object({
 let activeTranscriptions = 0;
 
 function serverSpeechConfig() {
-  if (!process.env.LITTO_SPEECH_URL?.trim()) return undefined;
+  if (!process.env.MILIMILI_SPEECH_URL?.trim()) return undefined;
   const parsed = serverSpeechSchema.safeParse({
-    url: process.env.LITTO_SPEECH_URL.trim(),
-    model: process.env.LITTO_SPEECH_MODEL?.trim() || "Systran/faster-whisper-small",
-    apiKey: process.env.LITTO_SPEECH_API_KEY?.trim() || "",
-    timeoutMs: process.env.LITTO_SPEECH_TIMEOUT_MS || "900000",
-    concurrency: process.env.LITTO_SPEECH_CONCURRENCY || "1",
+    url: process.env.MILIMILI_SPEECH_URL.trim(),
+    model: process.env.MILIMILI_SPEECH_MODEL?.trim() || "Systran/faster-whisper-small",
+    apiKey: process.env.MILIMILI_SPEECH_API_KEY?.trim() || "",
+    timeoutMs: process.env.MILIMILI_SPEECH_TIMEOUT_MS || "900000",
+    concurrency: process.env.MILIMILI_SPEECH_CONCURRENCY || "1",
   });
-  if (!parsed.success) throw Object.assign(new Error("服务器转写配置无效，请管理员检查 LITTO_SPEECH 环境变量"), { status: 503 });
+  if (!parsed.success) throw Object.assign(new Error("服务器转写配置无效，请管理员检查 MILIMILI_SPEECH 环境变量"), { status: 503 });
   return parsed.data;
 }
 
@@ -54,7 +54,7 @@ export async function transcribeMusic(audio: Buffer, providerId: string, model: 
   if (managed) {
     if (!server) throw Object.assign(new Error("服务器尚未配置听歌识词服务"), { status: 503 });
     if (activeTranscriptions >= server.concurrency) throw Object.assign(new Error("听歌识词服务繁忙，请稍后重试"), { status: 429 });
-    apiUrl = server.url; apiKey = server.apiKey; model = server.model; providerId = "littoSpeech";
+    apiUrl = server.url; apiKey = server.apiKey; model = server.model; providerId = "milimiliSpeech";
   } else {
     const providers = conf.get("settings", {}).customProviders;
     const parsed = providerSchema.safeParse(Array.isArray(providers) ? providers.find(item => item?.id === providerId) : undefined);

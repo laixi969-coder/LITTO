@@ -30,7 +30,7 @@ function requireAccountAccess(email: string) {
 // ACT: 进程内计数，单实例部署足够；多实例需改为数据库或共享缓存。
 const codeRequests = new Map<string, number[]>();
 function throttleCodeRequest(email: string) {
-    if (process.env.LITTO_NO_RATELIMIT) return;
+    if (process.env.MILIMILI_NO_RATELIMIT) return;
     const at = Date.now();
     if (codeRequests.size > 10_000) for (const [key, times] of codeRequests) if (at - times[times.length - 1] > 3600_000) codeRequests.delete(key);
     const recent = (codeRequests.get(email) ?? []).filter((t) => at - t < 3600_000);
@@ -169,23 +169,23 @@ export function loginUser(email: string, identity?: { provider: string; subject:
 }
 
 export function setSessionCookie(c: Context, token: string) {
-    setCookie(c, "litto_session", token, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: SESSION_TTL_MS / 1000 });
+    setCookie(c, "milimili_session", token, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: SESSION_TTL_MS / 1000 });
 }
 
 export function logout(c: Context) {
     const t = tokenOf(c);
     if (t) run("DELETE FROM sessions WHERE token_hash=?", sha256(t));
-    deleteCookie(c, "litto_session", { path: "/" });
+    deleteCookie(c, "milimili_session", { path: "/" });
 }
 
 function tokenOf(c: Context): string | null {
     const h = c.req.header("authorization");
     if (h?.startsWith("Bearer ")) return h.slice(7);
-    return getCookie(c, "litto_session") ?? null;
+    return getCookie(c, "milimili_session") ?? null;
 }
 
 /**
- * Pure session resolution (no Hono): used by the HTTP middleware below and by the LITTO server's Express layer.
+ * Pure session resolution (no Hono): used by the HTTP middleware below and by the MILIMILI server's Express layer.
  * Returns null when the token is missing/invalid; throws HttpError(403) when the requested workspace is not the caller's.
  */
 export function resolveSession(token: string | null | undefined, wantedWorkspace?: string | null): Auth | null {
@@ -206,7 +206,7 @@ export async function authenticate(c: Context, next: Next) {
     const token = tokenOf(c);
     if (!token) throw new HttpError(401, "not authenticated", "unauthenticated");
     // Cookie sessions require a custom header on mutations (CSRF defence; cross-site forms cannot set it).
-    if (!bearer && !["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("x-litto-csrf") !== "1") throw forbidden("csrf check failed");
+    if (!bearer && !["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("x-milimili-csrf") !== "1") throw forbidden("csrf check failed");
     const auth = resolveSession(token, c.req.header("x-workspace-id"));
     if (!auth) throw new HttpError(401, "session invalid", "unauthenticated");
     c.set("auth", auth);

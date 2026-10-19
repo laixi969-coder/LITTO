@@ -47,7 +47,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   return { project, projectList, pendingAgentMessage, openProject, renameProject, removeProject };
 }, {
   persist: {
-    key: "toonflow.projectList",
+    key: "milimili.projectList",
     pick: ["project", "projectList"],
   },
 });

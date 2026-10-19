@@ -310,10 +310,10 @@ watch([cameraTrajectory, imageAndCameraOnly], () => { preview.value = null; pend
 watch([shotId, modelKey], () => { cameraTrajectory.value = undefined; imageAndCameraOnly.value = false; });
 watch(durations, values => { if (!values.includes(duration.value)) duration.value = values[0] ?? 4; });
 async function request(path: string, method = "GET", body?: unknown) {
-  const response = await fetch(`/cloud${path}`, { method, signal: controller.signal, headers: { "Content-Type": "application/json", "x-litto-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(`/cloud${path}`, { method, signal: controller.signal, headers: { "Content-Type": "application/json", "x-milimili-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const result = await response.json();
   if (!response.ok) throw new Error([typeof result.error === "string" ? result.error : result.error?.message || result.message || `请求失败 ${response.status}`, ...(Array.isArray(result.details) ? result.details.map((item: any) => `${item.path}: ${item.message}`) : [])].join("；"));
-  if (method !== "GET") window.dispatchEvent(new Event("littoProductionUpdated"));
+  if (method !== "GET") window.dispatchEvent(new Event("milimiliProductionUpdated"));
   return result;
 }
 async function run(action: () => Promise<unknown>) {
@@ -479,7 +479,7 @@ async function createShot() {
 async function uploadReference(event: Event, forAsset = false) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0]; if (!file) return;
-  const response = await fetch(`/cloud/media?projectId=${encodeURIComponent(projectId!)}`, { method: "POST", headers: { "x-litto-csrf": "1", "Content-Type": file.type }, body: file, signal: controller.signal });
+  const response = await fetch(`/cloud/media?projectId=${encodeURIComponent(projectId!)}`, { method: "POST", headers: { "x-milimili-csrf": "1", "Content-Type": file.type }, body: file, signal: controller.signal });
   const media = await response.json();
   if (!response.ok) throw new Error(media.error?.message || "上传失败");
   const reference = await request(`/projects/${projectId}/references`, "POST", { kind: media.mime.split("/")[0], name: file.name, mediaId: media.id });
@@ -549,7 +549,7 @@ async function refreshResults() {
     if (!targetId.value) selectPendingVersion();
     await refreshCandidatePool();
   }
-  window.dispatchEvent(new Event("littoProductionUpdated"));
+  window.dispatchEvent(new Event("milimiliProductionUpdated"));
 }
 // 直接选中待处理的版本：没有主关键帧选最新关键帧，有了选最新未批准的 Take；当前选中的仍待处理就保留。
 function selectPendingVersion() {

@@ -38,3 +38,6 @@ cloud/node_modules/
 
 # 本地环境模板不入库
 .workbuddy/deploy/litto.env
+
+# 本地运行时数据：含主密钥与租户库，禁止入库
+apps/server/data/

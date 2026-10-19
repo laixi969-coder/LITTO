@@ -22,7 +22,7 @@ async function login(email: string): Promise<Who> {
 
 const stamp = Date.now().toString(36);
 check("no session → 401 on /api", (await api(null, "GET", "/api/workspaces/list")).status === 401);
-check("forged cookie → 401", (await api({ email: "x", cookie: "litto_session=forged" }, "GET", "/api/workspaces/list")).status === 401);
+check("forged cookie → 401", (await api({ email: "x", cookie: "milimili_session=forged" }, "GET", "/api/workspaces/list")).status === 401);
 check("MCP/A2A not mounted in multi-tenant mode", [(await fetch(`${BASE}/mcp`)).status, (await fetch(`${BASE}/a2a`)).status].every((s) => s === 404 || s === 401));
 
 const alice = await login(`alice-${stamp}@example.com`), bob = await login(`bob-${stamp}@example.com`);
@@ -71,7 +71,7 @@ await api(alice, "PUT", "/api/settings/save", { settings: JSON.parse(aliceView).
 
 // plugin install is code execution: admin only
 for (const p of ["/api/tools/install", "/api/nodes/install", "/api/providers/media/save", "/api/skills/install"]) check(`non-admin blocked: POST ${p}`, (await api(alice, "POST", p, {})).status === 403);
-const admin = await login("admin@litto.local");
+const admin = await login("admin@milimili.local");
 check("admin passes the gate (gets validation error, not 403)", (await api(admin, "POST", "/api/tools/install", {})).status !== 403);
 
 console.log(failed ? `\n${failed} FAILED` : "\nall tenancy checks passed");

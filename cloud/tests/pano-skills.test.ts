@@ -5,9 +5,9 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "litto-test3-"));
+const dir = mkdtempSync(join(tmpdir(), "milimili-test3-"));
 const hasFfmpeg = (() => { try { execSync("ffmpeg -version", { stdio: "ignore" }); return true; } catch { return false; } })();
-Object.assign(process.env, { LITTO_DATA_DIR: dir, LITTO_QUIET: "1", LITTO_MOCK_LATENCY_MS: "20", LITTO_WORKER_POLL_MS: "30", LITTO_NO_RATELIMIT: "1", NODE_ENV: "test", LITTO_NO_DERIVATIVES: "1" });
+Object.assign(process.env, { MILIMILI_DATA_DIR: dir, MILIMILI_QUIET: "1", MILIMILI_MOCK_LATENCY_MS: "20", MILIMILI_WORKER_POLL_MS: "30", MILIMILI_NO_RATELIMIT: "1", NODE_ENV: "test", MILIMILI_NO_DERIVATIVES: "1" });
 
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");
@@ -188,7 +188,7 @@ test("built-in skills run deterministically", async () => {
 });
 
 test("publishing: strict manifests, admin only, draft/unpublish, injection safety, invalid LLM output", async () => {
-    const admin = await login("admin@litto.local");
+    const admin = await login("admin@milimili.local");
     const { u, shot } = await fixture("skills3@example.com");
     // only admins publish
     assert.equal((await call(u, "POST", "/admin/skills", { manifest: manifest() })).status, 403);

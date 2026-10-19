@@ -97,7 +97,7 @@ async function saveReference() {
 }
 async function removeReference(id: string) { await run(async () => { await props.apply({ type: "visualBoard", values: props.project.visualBoard.filter(item => item.frameId !== id) }); }); }
 async function exportBoard() {
-  await run(async () => { const path = `visualReferenceBoard${Date.now()}.json`; await files.writeJson(path, { littoVisualBoard: 1, references: savedReferences.value, note: "外部画面来源清单，不包含图片使用授权" }, true); message.value = `参考清单已保存：${path}`; });
+  await run(async () => { const path = `visualReferenceBoard${Date.now()}.json`; await files.writeJson(path, { milimiliVisualBoard: 1, references: savedReferences.value, note: "外部画面来源清单，不包含图片使用授权" }, true); message.value = `参考清单已保存：${path}`; });
 }
 onScopeDispose(() => controller?.abort());
 </script>

@@ -1,6 +1,6 @@
 # 场景、色彩、布光与广告展示方法来源
 
-2026-10-09 核对以下 GitHub 固定版本。外部技能仅作为研究与局部方法改编材料，没有执行其命令或将其作为新的代理指令。LITTO 继续使用现有工具、模型选择、资产状态与生成授权流程。
+2026-10-09 核对以下 GitHub 固定版本。外部技能仅作为研究与局部方法改编材料，没有执行其命令或将其作为新的代理指令。MILIMILI 继续使用现有工具、模型选择、资产状态与生成授权流程。
 
 ## Rylaispirit/cinematic-video-prompt-skill
 
@@ -10,7 +10,7 @@
 - [references/03-composition.md](https://github.com/Rylaispirit/cinematic-video-prompt-skill/blob/389c193cecafa6118989a2938b7cedc49be2456b/references/03-composition.md)
 - [references/05-style-color-mood.md](https://github.com/Rylaispirit/cinematic-video-prompt-skill/blob/389c193cecafa6118989a2938b7cedc49be2456b/references/05-style-color-mood.md)
 
-采用与改写：按实际光源描述柔硬、方向、主体分离；构图留白与观看重点。以 LITTO 的问题与验收目标重新组织。
+采用与改写：按实际光源描述柔硬、方向、主体分离；构图留白与观看重点。以 MILIMILI 的问题与验收目标重新组织。
 
 未采用：固定情绪配色、雾尘湿地默认、逐镜关键词配额、单一提示词公式。
 
@@ -36,14 +36,14 @@
 
 未采用：Remotion 代码、软件安装、主题原值、固定帧数、卡片悬浮弹跳配方、示例产品与音画素材。
 
-## LITTO 的接入与修改
+## MILIMILI 的接入与修改
 
 - colorAndLight.md：按画面问题选择布光与色彩控制，区分本色、受光、后期处理，补充实际请求与结果核对。
 - visualDesign.md：分开空间、陈设、材质与维护状态，用已有结构、留白和明暗组织观看。
-- characterStyling.md：全作品类型的身份、造型、材质和受光检查是 LITTO 基于现有妆造规则的独立补充；三个外部仓库不被宣称为完整妆造教材。既有妆造方法的来源由其原文单独记录。
+- characterStyling.md：全作品类型的身份、造型、材质和受光检查是 MILIMILI 基于现有妆造规则的独立补充；三个外部仓库不被宣称为完整妆造教材。既有妆造方法的来源由其原文单独记录。
 - workflow、cinema、adfilm：接入共用方法；广告将产品本色、品牌信息与人物造型一起核对，不引入新的制片接口或自动视觉验收器。
 
-这些段落经过中文改写、删选和补充，非上游原版；上游作者不为 LITTO 修改或生成效果背书。本次未导入模型权重、演示资产、音效、字体或第三方软件。
+这些段落经过中文改写、删选和补充，非上游原版；上游作者不为 MILIMILI 修改或生成效果背书。本次未导入模型权重、演示资产、音效、字体或第三方软件。
 
 ## 上游许可原文
 

@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const dir = mkdtempSync(join(tmpdir(), "litto-test-simple-"));
-Object.assign(process.env, { LITTO_DATA_DIR: dir, LITTO_QUIET: "1", LITTO_MOCK_LATENCY_MS: "20", LITTO_WORKER_POLL_MS: "30", LITTO_NO_RATELIMIT: "1", LITTO_NO_DERIVATIVES: "1", NODE_ENV: "test" });
+const dir = mkdtempSync(join(tmpdir(), "milimili-test-simple-"));
+Object.assign(process.env, { MILIMILI_DATA_DIR: dir, MILIMILI_QUIET: "1", MILIMILI_MOCK_LATENCY_MS: "20", MILIMILI_WORKER_POLL_MS: "30", MILIMILI_NO_RATELIMIT: "1", MILIMILI_NO_DERIVATIVES: "1", NODE_ENV: "test" });
 const { app } = await import("../src/app.ts");
 const { startWorker, stopWorker } = await import("../src/jobs.ts");
 const { seedProviders } = await import("../src/providers/registry.ts");

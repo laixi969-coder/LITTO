@@ -70,7 +70,7 @@ if (!config.has("settings.customProviders")) {
 // ── Multi-tenant settings ─────────────────────────────────────────────────
 // Every call site does `conf.get/set(...)`. The default export is a proxy that routes each call to the *current workspace's*
 // settings file (data/tenants/<workspaceId>/settings.json, mode 0600) so provider keys and preferences are never shared across tenants.
-// Outside an authenticated request (startup, background work) or with LITTO_AUTH=off it falls back to the global data/settings.json.
+// Outside an authenticated request (startup, background work) or with MILIMILI_AUTH=off it falls back to the global data/settings.json.
 
 type Settings = typeof config;
 const tenantConfigs = new Map<string, Settings>();

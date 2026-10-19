@@ -169,9 +169,9 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
   await props.flushSave();
   checkCanvasDirectory(directory, signal);
   {
-    const data = await useWorkspaceFiles(directory).readJson<Partial<NonNullable<Canvas["flow"]>> & { toonflowCanvas?: boolean } | null>(nextCanvas.id);
+    const data = await useWorkspaceFiles(directory).readJson<Partial<NonNullable<Canvas["flow"]>> & { milimiliCanvas?: boolean; littoCanvas?: boolean; toonflowCanvas?: boolean } | null>(nextCanvas.id);
     checkCanvasDirectory(directory, signal);
-    if (data?.toonflowCanvas !== true || !Array.isArray(data.nodes) || !Array.isArray(data.edges) || !data.viewport
+    if (data?.milimiliCanvas !== true && data?.littoCanvas !== true && data?.toonflowCanvas !== true || !Array.isArray(data?.nodes) || !Array.isArray(data.edges) || !data.viewport
       || ![data.viewport.x, data.viewport.y, data.viewport.zoom].every(Number.isFinite) || data.viewport.zoom <= 0) throw new Error("画布文件格式无效");
     // 旧画布可能保存了临时导出进度，重新打开时任务已不存在。
     for (const node of data.nodes) if (node.type === "remote-videoNode" && node.data) delete node.data.exportProgress;
@@ -235,8 +235,8 @@ async function removeCanvas(canvas: Canvas) {
       if (canvases.value.length <= 1) throw new Error("至少保留一个画布");
       const files = useWorkspaceFiles(directory);
       const storedCanvases = await Promise.all((await listCanvases(directory)).map(async canvas => {
-        const data = await files.readJson<{ toonflowCanvas?: boolean; nodes?: { id: string; data?: unknown }[] }>(canvas.id);
-        if (data?.toonflowCanvas !== true || !Array.isArray(data.nodes) || data.nodes.some(node => !node || typeof node.id !== "string")) {
+        const data = await files.readJson<{ milimiliCanvas?: boolean; littoCanvas?: boolean; toonflowCanvas?: boolean; nodes?: { id: string; data?: unknown }[] }>(canvas.id);
+        if (data?.milimiliCanvas !== true && data?.littoCanvas !== true && data?.toonflowCanvas !== true || !Array.isArray(data?.nodes) || data.nodes.some(node => !node || typeof node.id !== "string")) {
           throw new Error(`无法确认 ${canvas.id} 的素材引用，已停止删除`);
         }
         return { id: canvas.id, nodes: [...data.nodes, ...getRetainedNodes(canvas.id)] };
@@ -274,7 +274,7 @@ async function createCanvasFile(directory: string, name?: string, signal?: Abort
     const canvasName = name ?? `画布${number}`;
     const id = `${canvasName}.json`;
     try {
-      await files.writeJson(id, { toonflowCanvas: true, ...flow }, true);
+      await files.writeJson(id, { milimiliCanvas: true, ...flow }, true);
       return { id, name: canvasName, flow };
     } catch (err) {
       if (name !== undefined || !axios.isAxiosError<{ data?: { code?: string } }>(err) || err.response?.status !== 409 || err.response.data.data?.code !== "EEXIST") throw err;

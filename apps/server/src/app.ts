@@ -57,15 +57,15 @@ export async function createApp({
   const app = express();
   app.disable("x-powered-by");
   // 只有部署在可信反向代理之后才采用 x-forwarded-for，否则客户端可伪造来源绕过限流。
-  if (process.env.LITTO_TRUST_PROXY === "1") app.set("trust proxy", 1);
+  if (process.env.MILIMILI_TRUST_PROXY === "1") app.set("trust proxy", 1);
   app.use(securityHeaders);
 
   if (process.env.NODE_ENV === "dev") {
     await buildRoute();
     app.use(logger("dev"));
   }
-  // Same-origin by default; set LITTO_CORS_ORIGINS=a,b for split deployments.
-  app.use(process.env.LITTO_CORS_ORIGINS ? cors({ origin: process.env.LITTO_CORS_ORIGINS.split(","), credentials: true }) : authEnabled() ? (_req, _res, next) => next() : cors());
+  // Same-origin by default; set MILIMILI_CORS_ORIGINS=a,b for split deployments.
+  app.use(process.env.MILIMILI_CORS_ORIGINS ? cors({ origin: process.env.MILIMILI_CORS_ORIGINS.split(","), credentials: true }) : authEnabled() ? (_req, _res, next) => next() : cors());
   app.use(languageRequest);
   await mountCloud(app);
   app.use("/a2a", express.json({ limit: "2mb" }));

@@ -18,7 +18,7 @@ export function ensureReferenceCrop(s: Scope, projectId: string, referenceId: st
   if (cached) return cached.id as string;
   if (!storage.getSync || !storage.putSync || !ffmpegSync()) throw bad("当前存储或 FFmpeg 不支持参考裁切");
   // ACT: 沿用同步编译器，裁图缓存复用；单次处理限 30 秒，异步编译后可迁移至媒体队列。
-  const directory = mkdtempSync(join(tmpdir(), "littoCrop"));
+  const directory = mkdtempSync(join(tmpdir(), "milimiliCrop"));
   try {
     const path = join(directory, "source");
     writeFileSync(path, storage.getSync(media.storageKey));

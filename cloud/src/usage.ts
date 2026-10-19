@@ -2,7 +2,7 @@ import { all, get, run, setting } from "./db.ts";
 import { now, ulid } from "./util.ts";
 
 /**
- * Usage & spend receipts (BYOK model: the user pays their own provider, so LITTO records WHAT was used, not credits).
+ * Usage & spend receipts (BYOK model: the user pays their own provider, so MILIMILI records WHAT was used, not credits).
  * Costs are only shown when a price is known: either reported by the provider/model (text tokens) or configured by the admin
  * in the `pricing` system setting ({"providerId/modelId": {perImage?, perSecond?, perCall?}}). Nothing is guessed.
  */

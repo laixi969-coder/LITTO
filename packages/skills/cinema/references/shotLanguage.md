@@ -77,7 +77,7 @@
 
 为剪辑保留必要的动作前后余量；反打保留视线关系和动作阶段。动作模糊应随运动出现，稳定段保持关键面部与道具可辨。帧率、快门、慢动作和音画同步若无原生控制，只能作为意图或后期计划，不能靠写入提示词保证。
 
-### 6. 应用到 LITTO，而不只写在分析里
+### 6. 应用到 MILIMILI，而不只写在分析里
 
 1. 读当前 World/Look、资产和已锁定镜头；选择本场摄影方向。只对本次需要的镜头设计，不重写整片。
 2. 用当前工具 schema 落位：camera 的 shotSize、position、height、angle、lensMm、focus、depth、motion、motivation、side、screenDirection；lighting 的 motivatedLight、key、fill、negativeFill、practicals、exposure、keyDirection、timeOfDay、colorTemp。字段不存在时不得伪造，额外意图写入已有可用文本字段。
@@ -96,7 +96,7 @@
 
 ## 资料依据与使用边界
 
-以下为摄影基础的一手资料；上面的风格路由、字段映射与生成模型取舍是 LITTO 的应用规则，不是厂商保证的生成效果。设备手册不能证明某生成模型支持真实相机参数。
+以下为摄影基础的一手资料；上面的风格路由、字段映射与生成模型取舍是 MILIMILI 的应用规则，不是厂商保证的生成效果。设备手册不能证明某生成模型支持真实相机参数。
 
 - [Panavision：焦段、画幅、距离与画面关系](https://www.panavision.com/highlights/highlights-detail/5-ways-focal-length-affects-your-subject)
 - [Panavision：摄影机运动及其叙事用途](https://www.panavision.com/highlights/highlights-detail/5-camera-moves-and-their-effect-on-your-audience)

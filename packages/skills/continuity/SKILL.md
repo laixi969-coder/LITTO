@@ -4,7 +4,7 @@ description: 让一个项目里的几十个镜头像同一部片子：开拍前�
 metadata:
   version: "1.2.0"
   displayName: 连续性守则
-  author: LITTO
+  author: MILIMILI
 ---
 
 # 连续性守则

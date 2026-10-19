@@ -9,7 +9,7 @@ export const useHelloStore = defineStore("hello", () => {
     if (typeof settings.value.helloCompleted === "boolean") return completed.value;
     let previouslyCompleted = false;
     try {
-      previouslyCompleted = JSON.parse(localStorage.getItem("toonflow.hello") ?? "null")?.completed === true;
+      previouslyCompleted = JSON.parse(localStorage.getItem("milimili.hello") ?? localStorage.getItem("toonflow.hello") ?? "null")?.completed === true;
     } catch {
       // ACT: 旧缓存不可读时仍可从已配置的模型恢复；桌面随机端口之间无法迁移 localStorage。
     }

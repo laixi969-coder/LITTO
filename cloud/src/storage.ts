@@ -87,7 +87,7 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     if (usage(workspaceId).bytes + data.length > ws.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
     // Real video/audio: record true duration and size (needed for trim limits in the editor). Best effort, needs ffprobe.
     let probed: { duration: number | null; width: number | null; height: number | null } | null = null;
-    if (/^(video|audio)\//.test(mime) && !process.env.LITTO_NO_PROBE) probed = await probeBuffer(data);
+    if (/^(video|audio)\//.test(mime) && !process.env.MILIMILI_NO_PROBE) probed = await probeBuffer(data);
     const id = ulid();
     const key = `${workspaceId}/${projectId ?? "_"}/${id}`;
     await storage.put(key, data);
@@ -101,7 +101,7 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
         await storage.delete(key);
         throw error;
     }
-    if (!process.env.LITTO_NO_DERIVATIVES) void makeDerivatives(row as any);
+    if (!process.env.MILIMILI_NO_DERIVATIVES) void makeDerivatives(row as any);
     return row;
 }
 

@@ -4,13 +4,13 @@ import { isIP } from "node:net";
 /**
  * SSRF guard for every URL a tenant can influence (provider API addresses, fetched pages, generated-media URLs).
  * Blocks loopback, private, link-local, CGNAT, cloud-metadata and equivalent IPv6 ranges — after DNS resolution and on every redirect hop.
- * Single-user mode (LITTO_AUTH=off, e.g. a local Ollama) or LITTO_ALLOW_PRIVATE_UPSTREAMS=1 turns the guard off.
+ * Single-user mode (MILIMILI_AUTH=off, e.g. a local Ollama) or MILIMILI_ALLOW_PRIVATE_UPSTREAMS=1 turns the guard off.
  *
  * Known gap: resolution and connection are separate lookups, so a hostile DNS server could answer differently the second time
  * (rebinding). Closing it fully needs connecting to the pinned IP (not possible with Bun's fetch); run the server in a network
  * segment without access to internal services as defence in depth.
  */
-export const privateUpstreamsAllowed = () => process.env.LITTO_AUTH === "off" || process.env.LITTO_ALLOW_PRIVATE_UPSTREAMS === "1";
+export const privateUpstreamsAllowed = () => process.env.MILIMILI_AUTH === "off" || process.env.MILIMILI_ALLOW_PRIVATE_UPSTREAMS === "1";
 
 // 198.18.0.0/15 (benchmarking) is deliberately NOT blocked: Fake-IP proxies (Clash etc., common on dev machines) answer every DNS lookup with it.
 const v4Blocked: [number, number][] = [ // [network, prefix length]

@@ -2,7 +2,7 @@
   <div class="privacy">
     <section class="settingSection" aria-labelledby="collectionTitle">
       <h3 id="collectionTitle">数据与隐私</h3>
-      <p class="description">LITTO 不收集匿名使用统计，也不会向第三方上报你的提示词、对话、文件内容、项目名称、路径、账号或密钥。</p>
+      <p class="description">MILIMILI 不收集匿名使用统计，也不会向第三方上报你的提示词、对话、文件内容、项目名称、路径、账号或密钥。</p>
       <p class="description">生成内容时，素材与提示词只会发送到你自己配置的模型服务。</p>
     </section>
   </div>

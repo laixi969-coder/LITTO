@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="packages/assets/logo-wordmark.svg" width="260" alt="LITTO 里头" />
+  <img src="packages/assets/logo-wordmark.svg" width="260" alt="MILIMILI 里头" />
 </p>
 
 <h3 align="center">好戏，都在里头。</h3>
 
-LITTO（里头）是面向影视与短剧创作的 AI 工作台：把剧本、角色、场景、分镜和生成放进同一个无限画布，由 Agent 协助你从一句灵感走到一部成片。
+MILIMILI（里头）是面向影视与短剧创作的 AI 工作台：把剧本、角色、场景、分镜和生成放进同一个无限画布，由 Agent 协助你从一句灵感走到一部成片。
 
-产品要求以 [LITTO PRD V3.0](docs/prd.md) 为准，包含一级 Music Film／音乐影像模块。当前实现与目标之间的差距见 [V3 核查表](docs/prdAudit.md)；已有后端代码不等于当前工作台已接通全部制片能力，MV 核心链路尚未实现。
+产品要求以 [MILIMILI PRD V3.0](docs/prd.md) 为准，包含一级 Music Film／音乐影像模块。当前实现与目标之间的差距见 [V3 核查表](docs/prdAudit.md)；已有后端代码不等于当前工作台已接通全部制片能力，MV 核心链路尚未实现。
 
 ## 核心能力
 
 - **无限画布**：文本、图片、视频、音频、3D 导演台等节点自由连线，所见即所得。
-- **AI Agent**：内置创作搭档，能读写项目文件、操作画布、调用图像/视频/音频生成；支持 MCP，外部 Coding 工具也能驱动 LITTO。
+- **AI Agent**：内置创作搭档，能读写项目文件、操作画布、调用图像/视频/音频生成；支持 MCP，外部 Coding 工具也能驱动 MILIMILI。
 - **剧本到分镜**：技能与团队（导演 / 编剧 / 审校）把小说或灵感拆成剧本、资产和分镜。
 - **自带模型**：自由接入文本与媒体模型供应商（含自定义供应商与 ComfyUI 工作流），密钥由你自己保管。
 - **本地优先**：项目与素材保存在你指定的工作目录。
@@ -42,11 +42,11 @@ cd apps/web && npx vite
 
 macOS 上长期使用本地工作台时，可先停止终端或 Coding 工具里运行的前后端，再在仓库根目录执行 `bun run local:start`。此命令用系统 launchd 托管前后端，固定访问 `http://localhost:5188/#/workspace`，后端使用 3000；关闭终端或聊天工具后继续运行，进程退出后自动拉起，登录 macOS 后自动启动。沿用仓库 `data/` 和默认账号模式，不自动安装依赖或构建。端口被占用时会报错，不会换端口或结束其他进程。
 
-用 `bun run local:status` 查看进程和退出状态，日志位于 `data/logs/littoServer.log`、`data/logs/littoWeb.log`。`bun run local:stop` 停止本次登录的服务；若要永久取消自动启动，停止后移除 `~/Library/LaunchAgents/littoServer.plist` 和 `~/Library/LaunchAgents/littoWeb.plist`。切换仓库路径前应先在原仓库停止服务，再从新路径启动。
+用 `bun run local:status` 查看进程和退出状态，日志位于 `data/logs/milimiliServer.log`、`data/logs/milimiliWeb.log`。`bun run local:stop` 停止本次登录的服务；若要永久取消自动启动，停止后移除 `~/Library/LaunchAgents/milimiliServer.plist` 和 `~/Library/LaunchAgents/milimiliWeb.plist`。切换仓库路径前应先在原仓库停止服务，再从新路径启动。
 
 MV 听歌识词可使用自托管 Speaches，无需用户提供商业 API Key。CPU/GPU 容器配置、环境变量与部署验收见 [MV 开源转写部署](docs/musicDeployment.md)。
 
-默认启用邮箱验证码、Session 与租户隔离；`LITTO_AUTH=off` 为本地单用户模式。当前工作台的 BYOK 设置尚未接入云端加密凭据系统，部署状态与其他未满足项见 V3 核查表。
+默认启用邮箱验证码、Session 与租户隔离；`MILIMILI_AUTH=off` 为本地单用户模式。当前工作台的 BYOK 设置尚未接入云端加密凭据系统，部署状态与其他未满足项见 V3 核查表。
 
 ## 目录
 
@@ -55,9 +55,9 @@ MV 听歌识词可使用自托管 Speaches，无需用户提供商业 API Key。
 | `apps/server` | 服务端（Bun + Express）：Agent、生成、工作区、MCP |
 | `apps/web` | 前端（Vue 3 + Vite） |
 | `packages/*` | 节点、工具、供应商适配、技能、国际化等 |
-| `cloud/` | LITTO 云端能力原型（账号、积分账本、管理后台、连续性检查），迁移中 |
+| `cloud/` | MILIMILI 云端能力原型（账号、积分账本、管理后台、连续性检查），迁移中 |
 | `legacy/` | 早期基于 infinite-canvas 的 React 版本，仅供参考 |
 
 ## 致谢与许可（Attribution）
 
-LITTO 基于开源项目 [Toonflow](https://github.com/HBAI-Ltd/Toonflow-app)（MIT 许可，Copyright (c) 2026 HBAI-Ltd）构建。本仓库的 [LICENSE](./LICENSE) 保留了 Toonflow 的版权与许可声明，并追加 LITTO 贡献者的版权行。依赖项各自遵循其许可证。
+MILIMILI 基于开源项目 [Toonflow](https://github.com/HBAI-Ltd/Toonflow-app)（MIT 许可，Copyright (c) 2026 HBAI-Ltd）构建。本仓库的 [LICENSE](./LICENSE) 保留了 Toonflow 的版权与许可声明，并追加 MILIMILI 贡献者的版权行。依赖项各自遵循其许可证。

@@ -16,7 +16,10 @@ import { loadSettings, settingsStorage } from "@/stores/settings";
 import { isAuthDisabled, loadMe, registerSessionGuard } from "@/lib/session";
 import { checkDesktopUpdate } from "@/stores/desktopUpdate";
 import { registerLanguage } from "@/lib/i18n";
+import { migrateBrandKeys } from "@/lib/migrateBrandKeys";
 import { locale, translate } from "@toonflow/i18n/vue";
+
+migrateBrandKeys();
 
 const app = createApp(App);
 app.onUnmount(registerLanguage());
@@ -37,7 +40,7 @@ async function notifyDesktopReady(failed = false) {
 
 // ACT: 已安装客户端的自动更新不经过 NSIS；启动时阻止缺少所需 API 的旧 WebView2 进入业务页面。
 (requiresWebView2Update
-  ? Promise.reject(new Error("当前 Microsoft Edge WebView2 Runtime 版本过旧。请以管理员身份运行微软最新版安装器；若仍提示已安装，请修复 WebView2 或联系管理员检查更新服务。更新完成后，请完全退出 LITTO 再重新打开。"))
+  ? Promise.reject(new Error("当前 Microsoft Edge WebView2 Runtime 版本过旧。请以管理员身份运行微软最新版安装器；若仍提示已安装，请修复 WebView2 或联系管理员检查更新服务。更新完成后，请完全退出 MILIMILI 再重新打开。"))
   : (registerSessionGuard(), loadMe().then(me => me || isAuthDisabled() ? loadSettings() : undefined))).then(async () => {
   app.use(createPinia().use(createPersistedState({ storage: settingsStorage })));
   app.use(router);

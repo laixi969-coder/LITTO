@@ -90,7 +90,7 @@ export async function inspectFinalQuality(s: Scope, id: string) {
 async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
   const { render, media } = renderMedia(s, id);
   const inspectionFingerprint = createHash("sha256").update(JSON.stringify([fingerprint, render.manifest?.duration, render.manifest?.clips])).digest("hex");
-  const directory = await mkdtemp(join(tmpdir(), "littoFinalQuality"));
+  const directory = await mkdtemp(join(tmpdir(), "milimiliFinalQuality"));
   try {
     const file = join(directory, "output.mp4");
     const data = await storage.get(media.storageKey);

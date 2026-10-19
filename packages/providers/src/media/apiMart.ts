@@ -298,6 +298,8 @@ export default {
         body.image_with_roles = imageUrls.map((url) => ({ role: "reference_image", url }));
       }
     } else if (lowerName.includes("minimax")) {
+      // H3 的对白与环境音是可选能力：不显式开启时供应商只返回静音画面。
+      if (typeof request.generateAudio === "boolean") body.generate_audio = request.generateAudio;
       if (Array.isArray(mode)) {
         if (imageUrls.length) body.image_with_roles = imageUrls.map((url) => ({ role: "reference_image", url }));
         if (videoUrls.length) body.video_urls = videoUrls;

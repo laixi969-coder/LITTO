@@ -1,6 +1,6 @@
 # 武打导演专项：节拍、空间、兵器与法术
 
-LITTO 于 2026-10-10 基于漫剧老李 Short-Drama Director Suite 改写。固定提交、采用文件与 MIT 许可见[来源与许可](actionChoreographyLicense.md)。先遵循[动作编排](actionChoreography.md)；本资料用于影视分镜和生成提示词，不把创作词库当作武术史料、真人动作教学或模型效果证明。
+MILIMILI 于 2026-10-10 基于漫剧老李 Short-Drama Director Suite 改写。固定提交、采用文件与 MIT 许可见[来源与许可](actionChoreographyLicense.md)。先遵循[动作编排](actionChoreography.md)；本资料用于影视分镜和生成提示词，不把创作词库当作武术史料、真人动作教学或模型效果证明。
 
 ## 1. 先选表现尺度
 
@@ -68,7 +68,7 @@ LITTO 于 2026-10-10 基于漫剧老李 Short-Drama Director Suite 改写。固�
 
 关键动作期间保留轮廓和空间参照，减少遮盖面部、持物手和接触位置的特效。同一镜头不同时塞入多种无关法术。屏幕大规模群体只交代必要层次，不承诺模型精确控制每个个体。
 
-## 6. 落实到 LITTO
+## 6. 落实到 MILIMILI
 
 ### 原版流程与 Vidu Q4 的边界
 

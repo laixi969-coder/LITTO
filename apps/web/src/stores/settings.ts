@@ -79,7 +79,7 @@ export const privacySettings = computed(() => {
   const raw = settings.value.privacy;
   const privacy = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
   return {
-    dataCollectionEnabled: false, // LITTO never collects usage data
+    dataCollectionEnabled: false, // MILIMILI never collects usage data
     anonymousId: typeof privacy.anonymousId === "string" ? privacy.anonymousId : "",
   };
 });

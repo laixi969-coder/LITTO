@@ -4,7 +4,7 @@ description: 创作开场吸引人、有人物行动与剧情推进的 MV：从�
 metadata:
   version: "1.6.0"
   displayName: 音乐影像
-  author: LITTO
+  author: MILIMILI
 ---
 
 # 音乐影像

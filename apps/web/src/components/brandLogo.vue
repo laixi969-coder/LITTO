@@ -1,5 +1,5 @@
 <template>
-  <span class="brandLogo" :class="{ fixedDark: theme === 'dark', fixedLight: theme === 'light' }" role="img" aria-label="LITTO 里头">
+  <span class="brandLogo" :class="{ fixedDark: theme === 'dark', fixedLight: theme === 'light' }" role="img" aria-label="MILIMILI 里头">
     <svg class="lightLogo" viewBox="290 102 959 797" aria-hidden="true" focusable="false">
       <image :href="logoLight" width="1536" height="1024" />
     </svg>

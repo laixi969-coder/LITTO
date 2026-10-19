@@ -25,7 +25,7 @@ export function inspectProductionQuality(s: Scope, projectId: string, type: "key
   if (pending.has(pendingKey)) return pending.get(pendingKey)!;
   const slot = nextSlot++ % slots.length;
   const task = slots[slot]!.then(async () => {
-    const directory = await mkdtemp(join(tmpdir(), "littoQuality"));
+    const directory = await mkdtemp(join(tmpdir(), "milimiliQuality"));
     let result: Record<string, any>;
     try {
       const bytes = await storage.get(media.storageKey);

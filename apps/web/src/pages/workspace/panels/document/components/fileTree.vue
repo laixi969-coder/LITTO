@@ -144,7 +144,7 @@ const loadChildren: LoadFunction = async (node, resolve, reject) => {
     const files = useWorkspaceFiles(directory);
     if (node.level > 0 && node.data.type === "canvas") {
       const canvas = await files.readJson(path);
-      if (!isRecord(canvas) || canvas.toonflowCanvas !== true || !Array.isArray(canvas.nodes)) throw new Error("不是有效的画布文件");
+      if (!isRecord(canvas) || (canvas.milimiliCanvas !== true && canvas.littoCanvas !== true && canvas.toonflowCanvas !== true) || !Array.isArray(canvas.nodes)) throw new Error("不是有效的画布文件");
       if (version !== treeVersion.value || directory !== props.directory) return reject();
       return resolve(canvasItems(canvas, path));
     }

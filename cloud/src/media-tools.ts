@@ -14,7 +14,7 @@ const exec = (args: string[]) => new Promise<void>((res, rej) => { const p = spa
  */
 export async function makeDerivatives(media: { id: string; workspaceId: string; projectId: string | null; mime: string; storageKey: string }) {
     if (!/^(video\/(mp4|webm)|image\/(png|jpeg|webp|gif))$/.test(media.mime)) return;
-    const dir = mkdtempSync(join(tmpdir(), "litto-media-"));
+    const dir = mkdtempSync(join(tmpdir(), "milimili-media-"));
     try {
         const src = join(dir, "src");
         writeFileSync(src, await storage.get(media.storageKey));
@@ -58,7 +58,7 @@ export async function probeFile(path: string): Promise<Probe | null> {
     } catch { return null; }
 }
 export async function probeBuffer(data: Buffer): Promise<Probe | null> {
-    const dir = mkdtempSync(join(tmpdir(), "litto-probe-"));
+    const dir = mkdtempSync(join(tmpdir(), "milimili-probe-"));
     try { writeFileSync(join(dir, "m"), data); return await probeFile(join(dir, "m")); } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 export { run2 as runCmd };
