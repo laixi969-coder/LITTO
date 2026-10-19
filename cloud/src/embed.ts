@@ -1,5 +1,5 @@
 /**
- * Embedding surface for the MILIMILI server (Toonflow's Express app).
+ * Embedding surface for the MILI MILI server (Toonflow's Express app).
  *   initCloud()           – migrate DB, seed providers/skills, start the job worker
  *   cloudRequestListener  – (req,res) handler for Express: app.use("/cloud", cloudRequestListener)
  *   resolveSession()      – cookie/bearer → { user, workspaceId, role } | null

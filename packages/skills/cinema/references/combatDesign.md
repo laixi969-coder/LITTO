@@ -1,6 +1,6 @@
 # 写实与玄幻动作：从可见事件到镜头执行
 
-这是 MILIMILI 自行编写的动作设计资料。结合对 real-combat-director 与 xuanhuan-combat-director 的能力评估，补充发力、多人压力、能量尺度与终局空间的设计入口；两仓库未提供明确 LICENSE，未移植其正文、招式表、参数库或脚本。来源版本记录见[来源与许可](actionChoreographyLicense.md)。先遵循[动作编排](actionChoreography.md)和[武打专项](manjuActionDirection.md)，不将素材词库当武术史料或生成效果保证。
+这是 MILI MILI 自行编写的动作设计资料。结合对 real-combat-director 与 xuanhuan-combat-director 的能力评估，补充发力、多人压力、能量尺度与终局空间的设计入口；两仓库未提供明确 LICENSE，未移植其正文、招式表、参数库或脚本。来源版本记录见[来源与许可](actionChoreographyLicense.md)。先遵循[动作编排](actionChoreography.md)和[武打专项](manjuActionDirection.md)，不将素材词库当武术史料或生成效果保证。
 
 ## 发力和承接
 

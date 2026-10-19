@@ -4,7 +4,7 @@ import type { Request } from "express";
 import conf from "@/utils/conf";
 import type { DesktopRuntime, desktopUpdateAttempt, updateSnapshot } from "@/types/desktop";
 
-// MILIMILI has no update service: the update check below never touches the network, so these are intentionally empty.
+// MILI MILI has no update service: the update check below never touches the network, so these are intentionally empty.
 const updateBaseUrls = { official: "", github: "" };
 const updateRuntimeId = crypto.randomUUID();
 let cancelledUpdateAttempt: string | undefined;
@@ -163,7 +163,7 @@ export async function checkDesktopUpdate(req: Request): Promise<void> {
   const state = getDesktopState(req);
   if (state.checkingUpdate || state.downloadingUpdate || state.applyingUpdate)
     throw Object.assign(new Error("更新操作正在执行，请稍后再试。"), { status: 409 });
-  // MILIMILI: update checking is disabled (no update server). Report "no update" without any network call.
+  // MILI MILI: update checking is disabled (no update server). Report "no update" without any network call.
   state.updateError = "";
   state.checkedBaseUrl = undefined;
 }

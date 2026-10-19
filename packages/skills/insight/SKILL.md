@@ -4,13 +4,13 @@ description: 从访谈、评论、消费行为、品牌 brief 或案例中提炼
 metadata:
   version: "1.0.0"
   displayName: 消费者洞察
-  author: MILIMILI
+  author: MILI MILI
   basedOn: hiccai-insight
 ---
 
 # 消费者洞察
 
-在 MILIMILI 中是广告通道的上游：[adfilm](../adfilm/SKILL.md) 的简报缺少消费者依据、卖点不清或用户要求洞察时调用；产出的洞察（含证据状态）再交回 adfilm 写策略与脚本。不用于剧情故事与 MV。
+在 MILI MILI 中是广告通道的上游：[adfilm](../adfilm/SKILL.md) 的简报缺少消费者依据、卖点不清或用户要求洞察时调用；产出的洞察（含证据状态）再交回 adfilm 写策略与脚本。不用于剧情故事与 MV。
 
 帮助使用者理解：**什么人在什么情境下，为了实现什么进展，受到什么阻力或取舍影响，因此怎样选择；这让业务应该改变什么。**
 

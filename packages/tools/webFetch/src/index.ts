@@ -50,7 +50,7 @@ async function fetchText(value: string, signal: AbortSignal) {
     const response = await fetch(url, {
       redirect: "manual",
       signal,
-      headers: { "user-agent": "MILIMILI/2.0", accept: "text/html, text/plain, application/json, application/xml;q=0.9, */*;q=0.5" },
+      headers: { "user-agent": "MILI MILI/2.0", accept: "text/html, text/plain, application/json, application/xml;q=0.9, */*;q=0.5" },
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();

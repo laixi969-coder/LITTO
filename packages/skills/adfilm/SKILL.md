@@ -1,10 +1,10 @@
 ---
 name: adfilm
-description: 创作广告、品牌片与原生短视频。TikTok、Reels、Shorts、带货、UGC、软件/App 推广、纯内容涨粉、Hook 与 hiccai-pop 使用已集成的 v3.5.2 原生短视频方法；电影式广告与品牌片使用广告导演流程。按用户要求交付完整创意、可拍分镜或衔接 MILIMILI 制作；纯叙事影片使用 cinema。
+description: 创作广告、品牌片与原生短视频。TikTok、Reels、Shorts、带货、UGC、软件/App 推广、纯内容涨粉、Hook 与 hiccai-pop 使用已集成的 v3.5.2 原生短视频方法；电影式广告与品牌片使用广告导演流程。按用户要求交付完整创意、可拍分镜或衔接 MILI MILI 制作；纯叙事影片使用 cinema。
 metadata:
   version: "1.4.0"
   displayName: 广告与原生短视频
-  author: MILIMILI
+  author: MILI MILI
 ---
 
 # 广告与原生短视频

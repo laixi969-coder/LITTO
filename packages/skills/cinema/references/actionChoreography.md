@@ -1,8 +1,8 @@
 # 武打与动作电影编排
 
-MILIMILI 适配版，2026-10-06 更新：在 fight-prompt-director 的动作因果方法上，结合 martial-arts-director-cy 的体系与节奏设计、NolanX 的动作摄影方法。已改写为本项目的 ShotSpec、资产和连续性流程；固定版本、改动说明及完整许可见 [许可与来源](actionChoreographyLicense.md)。这些是影视表演设计参考，不是动作捕捉数据或模型效果保证。
+MILI MILI 适配版，2026-10-06 更新：在 fight-prompt-director 的动作因果方法上，结合 martial-arts-director-cy 的体系与节奏设计、NolanX 的动作摄影方法。已改写为本项目的 ShotSpec、资产和连续性流程；固定版本、改动说明及完整许可见 [许可与来源](actionChoreographyLicense.md)。这些是影视表演设计参考，不是动作捕捉数据或模型效果保证。
 
-2026-10-10 增补：[武打导演专项](manjuActionDirection.md)吸收漫剧老李的表现强度分档、防守状态过渡、动作与视线接剪、长镜头判型及法术媒介方法。涉及这些需求时按需读取；上游固定模型、秒数、招式配额和效果宣称不作为 MILIMILI 约束。
+2026-10-10 增补：[武打导演专项](manjuActionDirection.md)吸收漫剧老李的表现强度分档、防守状态过渡、动作与视线接剪、长镜头判型及法术媒介方法。涉及这些需求时按需读取；上游固定模型、秒数、招式配额和效果宣称不作为 MILI MILI 约束。
 
 2026-10-11 增补：发力衔接、多人围攻、玄幻能量体量或终局接续任务读取[写实与玄幻动作设计](combatDesign.md)。沿用同一份执行节拍、既定胜负与世界规则。
 

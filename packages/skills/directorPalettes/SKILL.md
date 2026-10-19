@@ -4,7 +4,7 @@ description: 198 位世界导演的实测色卡库，含主色板（6 色，带 
 metadata:
   version: "1.0.0"
   displayName: 导演色卡库
-  author: 知卡星球（数据）／MILIMILI（结构）
+  author: 知卡星球（数据）／MILI MILI（结构）
 ---
 
 # 导演色卡库

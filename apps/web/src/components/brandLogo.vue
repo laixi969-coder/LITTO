@@ -1,11 +1,7 @@
 <template>
-  <span class="brandLogo" :class="{ fixedDark: theme === 'dark', fixedLight: theme === 'light' }" role="img" aria-label="MILIMILI 里头">
-    <svg class="lightLogo" viewBox="290 102 959 797" aria-hidden="true" focusable="false">
-      <image :href="logoLight" width="1536" height="1024" />
-    </svg>
-    <svg class="darkLogo" viewBox="303 124 940 735" aria-hidden="true" focusable="false">
-      <image :href="logoDark" width="1536" height="1024" />
-    </svg>
+  <span class="brandLogo" :class="{ fixedDark: theme === 'dark', fixedLight: theme === 'light' }" role="img" aria-label="MILI MILI 米粒米粒">
+    <img class="lightLogo" :src="logoLight" alt="" />
+    <img class="darkLogo" :src="logoDark" alt="" />
   </span>
 </template>
 
@@ -21,15 +17,13 @@ withDefaults(defineProps<{ theme?: "auto" | "light" | "dark" }>(), { theme: "aut
   display: inline-block;
   flex-shrink: 0;
   width: 144px;
-  height: 120px;
   max-width: 100%;
   vertical-align: middle;
 
-
-  svg {
+  img {
     display: block;
     width: 100%;
-    height: 100%;
+    height: auto;
   }
 
   .darkLogo { display: none; }

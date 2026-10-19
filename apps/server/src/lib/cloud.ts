@@ -4,7 +4,7 @@ import { error } from "@/lib/responseFormat";
 import { authEnabled, tenantStore, type Tenant } from "@/utils/tenant";
 
 /**
- * MILIMILI cloud layer (accounts, workspaces, credit ledger, admin, domain APIs) lives in /cloud and is mounted into this Express app:
+ * MILI MILI cloud layer (accounts, workspaces, credit ledger, admin, domain APIs) lives in /cloud and is mounted into this Express app:
  *   /cloud/*  → the cloud HTTP API (its own auth: OTP login, sessions, workspaces)
  *   /api/*    → Toonflow's engine, now behind the cloud session (tenant = the caller's workspace)
  */

@@ -8,7 +8,7 @@
 | [CY-CHENYUE/martial-arts-director-cy](https://github.com/CY-CHENYUE/martial-arts-director-cy) | `65c7c1dd35fcf4a01bfc1372ab506b60e2d0d26d` | 91 | SKILL.md、references/martial-arts-systems.md、references/choreography-beats.md、references/style-references.md 的体系选型、节奏与动作/摄影联合规划方法 |
 | [nolanx-ai/nolanx.ai](https://github.com/nolanx-ai/nolanx.ai) | `595d86364377f654e24ddf2c9e875496d85e8246` | 1986 | skills/action-choreography-camera-logic/SKILL.md 的空间锚点、摄影动机、反应与恢复节拍；星标属于整个项目 |
 
-修改声明：MILIMILI 于 2026-10-06 对上述方法做了中文归纳、删减和重新组织，形成 actionChoreography.md；没有原样安装上游工作流。适配本项目的 ShotSpec、资产先行和真实输出核验；删除固定模型、固定 15 秒/16 格、姿态配额、风格自动绑定服装场景、默认破坏以及分镜图保证逐格成片等假设。补充自然人体比例、模型能力边界、真实节拍证据与局部修复要求。上游作者不为这些修改背书。
+修改声明：MILI MILI 于 2026-10-06 对上述方法做了中文归纳、删减和重新组织，形成 actionChoreography.md；没有原样安装上游工作流。适配本项目的 ShotSpec、资产先行和真实输出核验；删除固定模型、固定 15 秒/16 格、姿态配额、风格自动绑定服装场景、默认破坏以及分镜图保证逐格成片等假设。补充自然人体比例、模型能力边界、真实节拍证据与局部修复要求。上游作者不为这些修改背书。
 
 另核验 [qualsenWeb/fight-video-create-skill](https://github.com/qualsenWeb/fight-video-create-skill)，83 星，提交 `8a5afd27822ebef540f2669c877cabeffa62256b`。其源代码与文档为 Apache-2.0，但 data/、reference/ 为 CC BY-NC-ND 4.0；未将其资料、样本、脚本或文档纳入本项目。未引入未经核验的模型效果承诺或外部安装命令。
 
@@ -18,9 +18,9 @@
 
 采用范围：short-drama-director/references 下的 action-previs-15grid.md、combat-direction-engine.md、combat-rhythm-defense3state.md、action-cinematography-breakdown.md、xuanhuan-magic-combat.md 的表现分档、状态过渡、多人路径、接剪、长镜头与法术媒介方法。另查阅 martial-arts-arsenal.md、martial-arts-combat-library.md、authentic-martial-taxonomy.md，未移植其完整招式名录或将其中武术分类当作史实。
 
-修改声明：MILIMILI 将上述方法归纳、删减并重新组织为 manjuActionDirection.md，接入 cinema 与 workflow 的按需读取流程。删除固定模型、强制 15 秒/宫格数量、招式配额、强制破坏/血腥、禁用静止与慢镜等绝对规则；不沿用完播率预测或未经本项目验证的模型效果结论。改用现有 ShotSpec 字段、用户已选媒体规格、模型能力查询和实际结果验收。没有执行或移植上游脚本，也没有安装其全套工作流。上游作者不为本项目修改背书。
+修改声明：MILI MILI 将上述方法归纳、删减并重新组织为 manjuActionDirection.md，接入 cinema 与 workflow 的按需读取流程。删除固定模型、强制 15 秒/宫格数量、招式配额、强制破坏/血腥、禁用静止与慢镜等绝对规则；不沿用完播率预测或未经本项目验证的模型效果结论。改用现有 ShotSpec 字段、用户已选媒体规格、模型能力查询和实际结果验收。没有执行或移植上游脚本，也没有安装其全套工作流。上游作者不为本项目修改背书。
 
-2026-10-11 再核验主分支仍为上述提交。增补查阅 SKILL.md、asset-first-pipeline.md、segment-splicing.md、model-adapters.md、dialogue-speed-check.md、★ prompt-feeding-checklist.md、quality-gate-review.md，将资产实际投喂、具体接续状态、投喂精简和未验证示范标记补入本地专项。Q4 自然语言编译适配为 MILIMILI 自有实现，上游没有 Q4 专用分支；未移植其脚本、效果保证、确认门禁或模型专用语法。
+2026-10-11 再核验主分支仍为上述提交。增补查阅 SKILL.md、asset-first-pipeline.md、segment-splicing.md、model-adapters.md、dialogue-speed-check.md、★ prompt-feeding-checklist.md、quality-gate-review.md，将资产实际投喂、具体接续状态、投喂精简和未验证示范标记补入本地专项。Q4 自然语言编译适配为 MILI MILI 自有实现，上游没有 Q4 专用分支；未移植其脚本、效果保证、确认门禁或模型专用语法。
 
 MIT License
 
@@ -303,4 +303,4 @@ Apache License
 - real-combat-director：https://github.com/lixiaoxiao9888-create/real-combat-director，提交 ed3e262e092b6bf13f8a733c7757325c4db84f1d。
 - xuanhuan-combat-director：https://github.com/lixiaoxiao9888-create/xuanhuan-combat-director，提交 7a0567886d1137f2f54b6431793e3e36ccbbe948。
 
-上述快照未提供明确 LICENSE。MILIMILI 仅评估其能力范围，自行编写 combatDesign.md，以通用动作、摄影和空间设计原则补充现有流程；未复制两仓库正文、具体招式/角色/场景库、数值参数或脚本，也不将同源仓库的 MIT 许可推定适用于它们。
+上述快照未提供明确 LICENSE。MILI MILI 仅评估其能力范围，自行编写 combatDesign.md，以通用动作、摄影和空间设计原则补充现有流程；未复制两仓库正文、具体招式/角色/场景库、数值参数或脚本，也不将同源仓库的 MIT 许可推定适用于它们。

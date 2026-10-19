@@ -45,7 +45,7 @@ async function readJson(response: Response, limit: number): Promise<any> {
 
 export default {
   id: "gen3c", label: "GEN3C · 数值相机轨迹", version: "1.0.0",
-  readme: "连接官方 GEN3C JSON API（db2ffe12ced12ddafcec5e0422ee46ce8520746b）。专用单客户端 GPU 服务，PNG 1280×704 首帧，24fps、121帧单镜头；只接收图像与相机轨迹，不执行逐请求文本或音频指导。必须显式设置 imageAndCameraOnly。取消或异常后服务可能仍在运行，须同时重启 GEN3C 与 MILIMILI 才可重新使用此端点。部署、尺度校准和限制见 docs/masterShotsIntegration.md。",
+  readme: "连接官方 GEN3C JSON API（db2ffe12ced12ddafcec5e0422ee46ce8520746b）。专用单客户端 GPU 服务，PNG 1280×704 首帧，24fps、121帧单镜头；只接收图像与相机轨迹，不执行逐请求文本或音频指导。必须显式设置 imageAndCameraOnly。取消或异常后服务可能仍在运行，须同时重启 GEN3C 与 MILI MILI 才可重新使用此端点。部署、尺度校准和限制见 docs/masterShotsIntegration.md。",
   rules,
   models: [{ id: "gen3c", label: "GEN3C · 121帧轨迹生成", type: "video", mode: ["singleImage"], audio: false, durationResolutionMap: [{ duration: [5.041666666666667], resolution: ["1280x704"] }], cameraTrajectory: true, promptControl: "imageAndCameraOnly" }] satisfies ProviderModel[],
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {

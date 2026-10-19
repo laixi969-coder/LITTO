@@ -23,7 +23,7 @@ async function runCameraSession<T>(provider: Provider & { config: Record<string,
   // ACT: 官方服务只有一个可变 3D 缓存。单进程按源站排他；异常时保留占用，
   // 防止取消 HTTP 后仍在运行的 GPU 任务被下一次 seed 清空。恢复须重启两端。
   const endpoint = new URL(String(provider.config.baseUrl)).origin;
-  if (cameraSessions.has(endpoint)) throw new Error("GEN3C 服务正在使用或上次结果不确定；不要重试 seed，异常恢复须重启 GEN3C 与 MILIMILI");
+  if (cameraSessions.has(endpoint)) throw new Error("GEN3C 服务正在使用或上次结果不确定；不要重试 seed，异常恢复须重启 GEN3C 与 MILI MILI");
   cameraSessions.add(endpoint);
   const result = await action();
   cameraSessions.delete(endpoint);

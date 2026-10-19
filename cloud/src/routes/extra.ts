@@ -138,7 +138,7 @@ extra.post("/webhooks/stripe", async (c) => {
 // ---------------- provider callbacks (PRD §16: Callback/Webhook) ----------------
 /**
  * Providers that finish asynchronously POST here. Body: {taskId, status:'done'|'failed', outputs?:[{b64,mime,duration?}|{url,mime?}], costUsd?, error?}.
- * Header X-MILIMILI-Signature = hex HMAC-SHA256(provider webhook secret, raw body).
+ * Header X-MILI MILI-Signature = hex HMAC-SHA256(provider webhook secret, raw body).
  */
 extra.post("/webhooks/providers/:providerId", async (c) => {
     const p = get("SELECT * FROM providers WHERE id=?", c.req.param("providerId"));
@@ -164,7 +164,7 @@ adminExtra.post("/providers/:id/webhook-secret", (c) => {
     run("UPDATE providers SET webhook_secret=? WHERE id=?", JSON.stringify(encrypt(secret)), c.req.param("id"));
     audit(authOf(c).user.id, "provider.webhook_secret", c.req.param("id"));
     // Shown once; only the encrypted form is stored.
-    return c.json({ secret, url: `${config.publicUrl}/webhooks/providers/${c.req.param("id")}`, header: "X-MILIMILI-Signature: hex(HMAC-SHA256(secret, rawBody))" });
+    return c.json({ secret, url: `${config.publicUrl}/webhooks/providers/${c.req.param("id")}`, header: "X-MILI MILI-Signature: hex(HMAC-SHA256(secret, rawBody))" });
 });
 adminExtra.get("/usage", (c) => c.json(summary(null, Math.min(365, Number(c.req.query("days") ?? 30) || 30))));
 adminExtra.get("/plans", (c) => c.json({ plans: plans(), packs: packs() }));

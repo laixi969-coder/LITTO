@@ -53,7 +53,7 @@ async function load() {
   } catch (cause) {
     // 读取失败不能证明模型失效，保留上次列表与已保存的选择。
     error.value = axios.isAxiosError(cause) && (!cause.response || [502, 503, 504].includes(cause.response.status))
-      ? "无法连接 MILIMILI 服务或请求超时，模型状态暂时无法确认。已保留原设置，请在服务恢复后刷新可用模型。"
+      ? "无法连接 MILI MILI 服务或请求超时，模型状态暂时无法确认。已保留原设置，请在服务恢复后刷新可用模型。"
       : axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : "读取可用模型失败";
   }
   finally { loading.value = false; }

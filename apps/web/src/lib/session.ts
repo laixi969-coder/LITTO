@@ -1,4 +1,4 @@
-/** MILIMILI account session (cloud API under /cloud, HttpOnly cookie). `authDisabled` = server runs with MILIMILI_AUTH=off (single-user mode). */
+/** MILI MILI account session (cloud API under /cloud, HttpOnly cookie). `authDisabled` = server runs with MILIMILI_AUTH=off (single-user mode). */
 export type Me = { user: { id: string; email: string; isAdmin: boolean }; workspaceId: string; role: string; workspaces: { id: string; name: string; kind: string; role: string }[] };
 
 let me: Me | null = null;

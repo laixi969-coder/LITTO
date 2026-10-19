@@ -1,6 +1,6 @@
 # 表演指导与人物调度
 
-MILIMILI 适配版，2026-10-13。在原有 O-Side、NolanX、H3 方法上，对照 act-skill、ai-film-skills 与 director-craft-framework 补充适用范围、当场行为和摄影时机。固定版本、实际采用边界与许可见[来源与许可](performanceDirectionLicense.md)。这些是社区创作方法；本项目没有据此保证任何模型的表演或口型效果。
+MILI MILI 适配版，2026-10-13。在原有 O-Side、NolanX、H3 方法上，对照 act-skill、ai-film-skills 与 director-craft-framework 补充适用范围、当场行为和摄影时机。固定版本、实际采用边界与许可见[来源与许可](performanceDirectionLicense.md)。这些是社区创作方法；本项目没有据此保证任何模型的表演或口型效果。
 
 用于有角色表演、对白、无声反应或群像的镜头。无人环境、静物产品镜头不套人物表演模板；动画、动物、面具或机械角色按已确认的表现方式设计，不强加真人面部肌肉。
 

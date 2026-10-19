@@ -1,7 +1,7 @@
 <template>
   <main class="workspacePage" :style="{ '--agentWidth': `${agentVisible ? agentWidth : 0}px` }">
     <aside class="workspaceRail" aria-label="项目任务">
-      <router-link class="railBrand" to="/home">MILIMILI <small>里头</small></router-link>
+      <router-link class="railBrand" to="/home">MILI MILI <small>里头</small></router-link>
       <span class="projectTitle" :title="workspaceStore.project?.name">{{ workspaceStore.project?.name }}</span>
       <div ref="historyTarget" class="historyTarget" />
       <div class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起助手' : '打开助手' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
@@ -32,12 +32,12 @@
         </span>
       </template>
     </el-segmented>
-    <el-tooltip v-if="!agentVisible" content="MILIMILI Agent" placement="bottom" :showArrow="false" :hideAfter="0">
+    <el-tooltip v-if="!agentVisible" content="MILI MILI Agent" placement="bottom" :showArrow="false" :hideAfter="0">
       <el-button
         class="agentButton"
         :class="{ active: agentVisible }"
         :aria-expanded="agentVisible"
-        aria-label="MILIMILI Agent"
+        aria-label="MILI MILI Agent"
         aria-controls="agentPanel"
         @click="agentVisible = !agentVisible"></el-button>
     </el-tooltip>
@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, nextTick, onMounted, onScopeDispose, provide, ref } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave, useRoute } from "vue-router";
 import axios from "axios";
 import { IconLayoutDashboard, IconFileText, IconLayoutSidebarRight, IconSettings } from "@tabler/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -89,7 +89,16 @@ provide("openProductionShot", (id: string) => productionPanelRef.value?.openShot
 const documentPanel = defineAsyncComponent(() => import("./panels/document/index.vue"));
 
 const activePanel = ref<"canvas" | "document">("canvas");
-onMounted(() => anonymousData.track("workspace.canvas"));
+const route = useRoute();
+onMounted(async () => {
+  anonymousData.track("workspace.canvas");
+  // 项目列表存在浏览器本地，换设备或直接调接口建出来的目录不会出现在首页。
+  // 支持 /#/workspace?directory=<绝对路径> 直达，链接可收藏、可分享。
+  const target = typeof route.query.directory === "string" ? route.query.directory.trim() : "";
+  if (target && workspaceStore.project?.directory !== target) {
+    await workspaceStore.openProject(target).catch(() => { /* 目录无效时保留当前项目，不打断打开流程 */ });
+  }
+});
 const workspaceStore = useWorkspaceStore();
 const panelOptions = [
   { label: "画布", value: "canvas", icon: IconLayoutDashboard },

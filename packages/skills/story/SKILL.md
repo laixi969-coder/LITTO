@@ -4,7 +4,7 @@ description: 从想法或已有素材发展故事与剧本，比较少量创意�
 metadata:
   version: "1.4.0"
   displayName: 故事与剧本
-  author: MILIMILI
+  author: MILI MILI
   basedOn: hiccai-story 2.3.0
 ---
 

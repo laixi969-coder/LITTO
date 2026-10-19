@@ -4,7 +4,7 @@ description: 制作叙事影片、电影短片、电影式动画及武打动作�
 metadata:
   version: "2.5.0"
   displayName: 电影创作
-  author: MILIMILI
+  author: MILI MILI
 ---
 
 # 电影创作

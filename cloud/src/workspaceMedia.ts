@@ -25,7 +25,7 @@ export function configureWorkspaceMedia(execute: (request: GenRequest) => Promis
     },
   };
   upsertProvider("workspaceMedia", {
-    name: "MILIMILI 工作区模型",
+    name: "MILI MILI 工作区模型",
     adapter: "workspaceMedia",
     priority: 1000,
     timeoutMs: 3600000,

@@ -4,7 +4,7 @@
 
 采用范围：SKILL.md 的全剧到分集流程，以及 references 中 hook-design.md、opening-rules.md、rhythm-curve.md、villain-design.md、paywall-design.md 的节奏、角色对抗、悬念与兑现思路。
 
-MILIMILI 将其归纳改编为 shortDramaWriting.md，衔接现有 story 工作台、版本、事实与线索管理。取消固定集数、字数、场数、反派层级、节奏比例、付费卡点和逐命令确认要求；加入与电影、剧集、广告及 MV 的方法优先级、工具容量边界和真实效果核验。未引入上游脚本、独立状态文件、样例剧情或合规结论。上游作者不为本改编背书。
+MILI MILI 将其归纳改编为 shortDramaWriting.md，衔接现有 story 工作台、版本、事实与线索管理。取消固定集数、字数、场数、反派层级、节奏比例、付费卡点和逐命令确认要求；加入与电影、剧集、广告及 MV 的方法优先级、工具容量边界和真实效果核验。未引入上游脚本、独立状态文件、样例剧情或合规结论。上游作者不为本改编背书。
 
 ## 上游 MIT 许可原文
 

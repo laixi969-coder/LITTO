@@ -185,7 +185,7 @@ function tokenOf(c: Context): string | null {
 }
 
 /**
- * Pure session resolution (no Hono): used by the HTTP middleware below and by the MILIMILI server's Express layer.
+ * Pure session resolution (no Hono): used by the HTTP middleware below and by the MILI MILI server's Express layer.
  * Returns null when the token is missing/invalid; throws HttpError(403) when the requested workspace is not the caller's.
  */
 export function resolveSession(token: string | null | undefined, wantedWorkspace?: string | null): Auth | null {

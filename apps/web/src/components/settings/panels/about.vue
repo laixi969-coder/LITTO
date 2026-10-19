@@ -11,7 +11,7 @@
 
     <el-card class="infoCard" shadow="never">
       <p class="slogan">好戏，都在里头。</p>
-      <p class="note">MILIMILI 是面向影视与短剧创作的 AI 工作台：把剧本、角色、场景、分镜和生成放在同一个画布里。</p>
+      <p class="note">MILI MILI 是面向影视与短剧创作的 AI 工作台：把剧本、角色、场景、分镜和生成放在同一个画布里。</p>
     </el-card>
   </div>
 </template>
