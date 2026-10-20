@@ -18,7 +18,8 @@ metadata:
 - [workflow](../workflow/SKILL.md)：剧本改编、资产制作、画布制作阶段和模型执行；先读现场模型能力；只有明确选用 Seedance 后，其专用规则才约束分段上限和提示词格式，不覆盖电影创作意图。
 - [canvas](../canvas/SKILL.md)：查询实际节点、配置、参考顺序并操作画布，不猜节点能力。
 - [continuity](../continuity/SKILL.md)：身份、服装、道具、空间、动作、光线与情绪的跨镜状态；锁定资产与版本修复。
-- 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)。
+- 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)，**对白怎么切镜见 [对白覆盖与正反打](references/coverage.md)**。
+- **有对白的段落先出 coverage 表再拆镜**：说话人、是否在画、景别、前景、台词字数、时长六列。出现「说话人不在画且没有独立镜头」的行，就是成片会翻车的行。单镜一轮以上的说话人交替必须拆成 A 镜 / B 镜，不要把换人交给模型在镜内完成。
 - MV 镜头另外读取 [MV 导演编排](../musicfilm/references/musicVideoDirection.md)：沿用 musicfilm 的开场悬念与故事选择，音乐和表演共同占用时间；完整内容保存到 `musicVideo` 后编译，不只写自由提示词。
 - MV 拆镜先 `readSceneList`，使用有效采用版的 `storyContext` 和逐场 `story` 正文、目标、阻碍、变化、知情及因果，再对应音乐段落。`needsUpdate` 时先更新；没有关联正文时回读 `readStoryProject`。把触发、行动、反应和结果落实到 `action/performance/musicVideo.timeline`，核对编译预览；不以情绪摘要代替剧情，也不在每个新镜头重演整场。
 

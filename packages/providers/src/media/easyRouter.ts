@@ -60,7 +60,16 @@ async function readBytes(response: Response, maxBytes: number) {
 }
 
 function videoModel(id: string): ProviderModel | undefined {
-  if (["dreamina-seedance-2-0", "dreamina-seedance-2-0-fast"].includes(id)) return { id, label: id, type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: ["480P", "720P", "1080P"] }] };
+  // Seedance 的时长能力按版本给：2.0 单条 15 秒，2.5 单条 30 秒。此前写死 5/10 秒是适配没跟上，不是模型上限。
+  const seedanceVersion = /^dreamina-seedance-(\d+)-(\d+)(-fast)?$/.exec(id);
+  if (seedanceVersion) {
+    const major = Number(seedanceVersion[1]);
+    const minor = Number(seedanceVersion[2]);
+    const max = major >= 3 || (major === 2 && minor >= 5) ? 30 : major === 2 ? 15 : 10;
+    const duration = [5, 10, 15, 20, 25, 30].filter(value => value <= max);
+    return { id, label: id, type: "video", mode: ["text", "singleImage"], audio: "optional",
+      durationResolutionMap: [{ duration, resolution: ["480P", "720P", "1080P"] }] };
+  }
   if (!/^PixVerse\/(c1|v6|v5\.6|v5\.5|v5|v4\.5|v4|v3\.5)$/.test(id)) return;
   const continuous = ["PixVerse/c1", "PixVerse/v6"].includes(id);
   const audio = continuous || ["PixVerse/v5.6", "PixVerse/v5.5"].includes(id);
@@ -76,8 +85,8 @@ export default {
   models: [
     { id: "gpt-image-2", label: "GPT Image 2", type: "image", mode: ["text", "singleImage"], imageSizes: ["1K"], imageRatios: ["1:1", "3:2", "2:3"] },
     { id: "PixVerse/v6", label: "PixVerse V6", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["720P", "1080P"] }] },
-    { id: "dreamina-seedance-2-0", label: "Seedance 2.0", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: ["480P", "720P", "1080P"] }] },
-    { id: "dreamina-seedance-2-0-fast", label: "Seedance 2.0 Fast", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "dreamina-seedance-2-0", label: "Seedance 2.0", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "dreamina-seedance-2-0-fast", label: "Seedance 2.0 Fast", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["480P", "720P", "1080P"] }] },
   ] satisfies ProviderModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const result = await fetchJson(this, "/models", this.signal ?? AbortSignal.timeout(30000));
@@ -128,7 +137,7 @@ export default {
     });
   },
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
-    const seedance = ["dreamina-seedance-2-0", "dreamina-seedance-2-0-fast"].includes(request.model);
+    const seedance = /^dreamina-seedance-\d+-\d+(-fast)?$/.test(request.model);
     const model = videoModel(request.model);
     if (!model) throw new Error("此 EasyRouter 视频模型尚未适配");
     if (!request.prompt.trim()) throw new Error("请填写提示词");

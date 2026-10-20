@@ -4,6 +4,8 @@ import { mkdir, readdir, stat } from "@toonflow/file";
 import conf from "@/utils/conf";
 import { getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
+import { coverageCheck, readCoverage } from "@/utils/media/coverage";
+import { dailySpend } from "@/utils/media/spend";
 
 export type CheckLevel = "block" | "warn" | "info";
 
@@ -99,6 +101,21 @@ export async function preflight(cwd: string, options: { shotSpec?: Record<string
       passed: false,
       detail: `清单里 ${plannedCharacters} 个角色，只有 ${castFiles.length} 份档案，缺的会在分镜阶段每镜漂移`,
       rule: "角色卡先于分镜",
+    });
+  }
+
+  // 3.5 对白覆盖：说话人不在画、自己又没有独立镜头，成片里必然出现「听见 B 的声音却一直看着 A 的脸」。
+  items.push(coverageCheck((await readCoverage(cwd))?.shots));
+
+  // 3.6 消耗：项目今天烧了多少，和「这一批要多少」是两个数，混在一起就会以为没花多少。
+  const spend = await dailySpend(cwd).catch(() => null);
+  if (spend) {
+    items.push({
+      key: "spend",
+      level: spend.seconds > 600 ? "warn" : "info",
+      passed: true,
+      detail: `最近 24 小时：${spend.calls} 次视频请求（失败 ${spend.failed}），成功 ${spend.seconds} 秒，约 ${spend.credits} 积分。批量前先用 /api/ai/media/estimate 报价`,
+      rule: "生成前报价，避免无声消耗",
     });
   }
 

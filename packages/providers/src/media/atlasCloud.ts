@@ -97,7 +97,9 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
     const imageField = fields.images ?? fields.image;
     if (images.length && !imageField) throw new Error("文生图模型不能附带参考图");
     if (images.length > (imageField?.maxItems ?? (fields.images ? 10 : 1))) throw new Error("参考图数量超过所选模型上限");
-    if (schema.required?.some(field => ["image", "images"].includes(field)) && images.length < (imageField?.minItems ?? 1)) throw new Error("此模型需要参考图");
+    if (schema.required?.some(field => ["image", "images"].includes(field)) && images.length < (imageField?.minItems ?? 1)) {
+      throw new Error(`「${request.model}」是编辑模型，必须带参考图：在请求里用 images 传 1–${imageField?.maxItems ?? 10} 张图；只想凭文字出图请切回文生图模型（如 openai/gpt-image-2/text-to-image）`);
+    }
     const urls: string[] = [];
     for (const image of images) urls.push(await uploadImage(context, image, signal));
     if (urls.length) body[fields.images ? "images" : "image"] = fields.images ? urls : urls[0];

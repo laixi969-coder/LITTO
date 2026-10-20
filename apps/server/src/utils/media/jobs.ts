@@ -7,10 +7,12 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline } from "@/utils/media/generation";
+import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
+import { coverageGate } from "@/utils/media/coverage";
+import { modelAccess } from "@/utils/modelAvailability";
 
 export function workspaceProject(directory: string) {
   const tenant = currentTenant();
@@ -29,13 +31,23 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
+  // 覆盖表判 block 的项目不放行视频生成：一镜塞三轮以上对白，成片里必然是「听见他的声音却一直看着另一个人」。
+  if (kind === "video") {
+    const blocked = await coverageGate(directory);
+    if (blocked) throw Object.assign(new Error(`对白覆盖未通过：${blocked}`), { status: 400, retryable: false });
+  }
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
   if (production && request.productionFingerprint !== production.fingerprint) throw Object.assign(new Error("提交参数或镜头规格与已预览版本不一致；请重新 compile 并完整复用返回的 request，保留画幅、精度和 productionFingerprint"), { status: 409 });
   // ACT: 正式镜头以当前规格和指纹为准，提示词由服务端编译，避免模型逐字复制长文本。
   if (production) request = production.request;
   else {
     const model = (await listMediaModels(true)).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
-    if (!model) throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
+    if (!model) {
+      // 余额不足会把整个供应商停用，模型随之从列表消失；这时报「类型不匹配」会让人去翻配置。
+      const blocked = modelAccess("media", request.providerId, request.modelId).reason();
+      if (blocked) throw Object.assign(new Error(`所选模型当前不可用：${blocked}。充值或修好后调 POST /api/providers/reenable 重新启用`), { status: 400, retryable: false });
+      throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
+    }
     request = await applyMediaQuality(directory, kind, request, model);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
     const spec = compileShotSpec(request.shotSpec);
@@ -63,6 +75,8 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     }
     if (count) assetReferenceFingerprint = hash.digest("hex");
   }
+  // 提示词红线放在入队前：否则任务先排进队列、执行时才失败，用户只看到「提交成功」然后一片红。
+  assertPromptPolicy(merged as Parameters<typeof assertPromptPolicy>[0], kind);
   return api.enqueueWorkspaceMedia({
     workspaceId: tenant.workspaceId,
     userId: tenant.userId,

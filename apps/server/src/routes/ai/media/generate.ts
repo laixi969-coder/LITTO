@@ -96,7 +96,8 @@ interface LookEntry {
  * 不用逐镜重复选风格。已经带 LOOK 标记的请求不重复叠加。
  */
 async function projectLook(cwd: string): Promise<string> {
-  const file = await resolveWorkspacePath(cwd, "assets/look.json");
+  // 新建项目还没有 assets 目录，缺省允许上级缺失，否则整个生成接口会被 ENOENT 打成 404。
+  const file = await resolveWorkspacePath(cwd, "assets/look.json", true);
   let entry: LookEntry;
   try {
     entry = JSON.parse(await readFile(file.path, "utf8")) as LookEntry;

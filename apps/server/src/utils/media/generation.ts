@@ -232,6 +232,40 @@ function recommendedDuration(map: unknown, requested: number | undefined) {
   return Math.round(Math.max(...supported) * 2 / 3);
 }
 
+/**
+ * 提示词红线：主动做旧、以及纯文本生成人物镜。
+ * 入队前也调用一次——排在队列里执行时才失败，用户看到的是「提交成功然后红了一片」，说不清哪一步错了。
+ */
+export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "image" | "video" | "audio") {
+  // 禁止主动做旧：默认干净完整是产品底线，只有明确标注设计意图的破败场景才放行。
+  const DISTRESSED = /脏|污渍|油污|污垢|破烂|腐烂|发霉|霉斑|生锈|锈蚀|破洞|破损|陈旧|做旧|衰败|荒废|废墟|残破|\bdirty\b|\brusted\b|\bdecayed\b|\bderelict\b|\bgrimy\b/i;
+  // 只检查作者自己写的部分：系统注入的基底与锚点段落本身含有「污渍/破损」这类词，
+  // 不排除就会自己触发自己的规则（实际发生过）。
+  const stripped = request.prompt
+    .replace(/PHOTOGRAPHICBASELINE[\s\S]*?\n\n/g, "")
+    .replace(/^LOOK: [\s\S]*?\n\n/m, "")
+    .replace(/^ERA [\s\S]*?\n\n/m, "")
+    .replace(/^CAST: [\s\S]*?\n\n/m, "")
+    .replace(/^SHOTSPEC: .*\n\n/m, "");
+  const authoredPrompt = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(stripped)?.[1] ?? stripped;
+  // 再剥掉否定句：「没有污渍、破损」是在要求干净，不是在要求做旧。
+  const positiveDemand = authoredPrompt
+    .replace(/(没有|无|不带|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得)[^，。；,;.\n]*/g, "")
+    .replace(/\b(no|without|avoid|remove|clean of)\b[^,.;\n]*/gi, "");
+  if (mediaType !== "audio" && DISTRESSED.test(positiveDemand) && !/DISTRESSED\s*[:：]/i.test(request.prompt)) {
+    // 把命中的词直接回给作者：只报「不许做旧」等于让人去猜是哪几个字踩了线。
+    const hits = [...new Set(positiveDemand.match(new RegExp(DISTRESSED.source, "gi")) ?? [])].slice(0, 6);
+    invalid(`提示词里出现会被生成成脏旧破损的词：${hits.map(word => `「${word}」`).join("、")}。默认不生成脏旧破损的人物、服装与场景。若不是设计需要，换成具体面料、剪裁与颜色；确属设计需要（废墟、贫民窟、战后场景），在提示词里写明「DISTRESSED: 具体理由」，只影响该对象与当前时段`);
+  }
+
+  // 纯文本生成没有身份锚点，等于每镜重新选角。人物镜头必须带参考图，只放行无人空镜与建资产用途。
+  if (mediaType === "video" && request.purpose !== "asset" && !request.images?.length && !request.firstFrame && !request.lastFrame) {
+    if (looksLikePersonShot(request.prompt)) {
+      invalid("人物镜头必须提供角色参考图：用 images 传已采用的定妆图，或用 firstFrame 接上一镜末帧。纯文本生成会每镜重新选角，跨镜必然换脸；仅空镜、环境、流体、光效可用纯文本");
+    }
+  }
+}
+
 async function generateMediaUnrecorded(
   cwd: string,
   mediaType: "image" | "video" | "audio",
@@ -256,31 +290,7 @@ async function generateMediaUnrecorded(
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
   // 视频未明确指定时长时按模型能力取推荐值：调用方漏传时不再落到供应商默认的最短档，也不强制每镜等长。
   const duration = mediaType === "video" ? recommendedDuration(model.durationResolutionMap, request.duration) : request.duration;
-  // 禁止主动做旧：默认干净完整是产品底线，只有明确标注设计意图的破败场景才放行。
-  const DISTRESSED = /脏|污渍|油污|污垢|破烂|腐烂|发霉|霉斑|生锈|锈蚀|破洞|破损|陈旧|做旧|衰败|荒废|废墟|残破|\bdirty\b|\brusted\b|\bdecayed\b|\bderelict\b|\bgrimy\b/i;
-  // 只检查作者自己写的部分：系统注入的基底与锚点段落本身含有「污渍/破损」这类词，
-  // 不排除就会自己触发自己的规则（实际发生过）。
-  const stripped = request.prompt
-    .replace(/PHOTOGRAPHICBASELINE[\s\S]*?\n\n/g, "")
-    .replace(/^LOOK: [\s\S]*?\n\n/m, "")
-    .replace(/^ERA [\s\S]*?\n\n/m, "")
-    .replace(/^CAST: [\s\S]*?\n\n/m, "")
-    .replace(/^SHOTSPEC: .*\n\n/m, "");
-  const authoredPrompt = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(stripped)?.[1] ?? stripped;
-  // 再剥掉否定句：「没有污渍、破损」是在要求干净，不是在要求做旧。
-  const positiveDemand = authoredPrompt
-    .replace(/(没有|无|不带|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得)[^，。；,;.\n]*/g, "")
-    .replace(/\b(no|without|avoid|remove|clean of)\b[^,.;\n]*/gi, "");
-  if (mediaType !== "audio" && DISTRESSED.test(positiveDemand) && !/DISTRESSED\s*[:：]/i.test(request.prompt)) {
-    invalid("默认不生成脏旧破损的人物、服装与场景。若确属设计需要（如废墟、贫民窟、战后场景），在提示词里写明「DISTRESSED: 具体理由」，只影响该对象与当前时段");
-  }
-
-  // 纯文本生成没有身份锚点，等于每镜重新选角。人物镜头必须带参考图，只放行无人空镜与建资产用途。
-  if (mediaType === "video" && request.purpose !== "asset" && !request.images?.length && !request.firstFrame && !request.lastFrame) {
-    if (looksLikePersonShot(request.prompt)) {
-      invalid("人物镜头必须提供角色参考图：用 images 传已采用的定妆图，或用 firstFrame 接上一镜末帧。纯文本生成会每镜重新选角，跨镜必然换脸；仅空镜、环境、流体、光效可用纯文本");
-    }
-  }
+  assertPromptPolicy(request, mediaType);
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory, reportTask);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;

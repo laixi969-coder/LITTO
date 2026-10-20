@@ -4,6 +4,8 @@ import * as providerDebug from "@/utils/media/debug";
 import * as mediaJobs from "@/utils/media/jobs";
 import * as mediaLipSync from "@/utils/media/lipSync";
 import * as mediaGeneration from "@/utils/media/generation";
+import * as mediaCoverage from "@/utils/media/coverage";
+import * as mediaSpend from "@/utils/media/spend";
 import * as mediaProvider from "@/utils/media/provider";
 import * as transcription from "@/utils/media/transcription";
 import * as ffmpeg from "@/utils/ffmpeg";
@@ -32,6 +34,8 @@ export default {
   desktop,
   providerDebug,
   mediaGeneration,
+  mediaCoverage,
+  mediaSpend,
   mediaJobs,
   mediaLipSync,
   mediaProvider,
