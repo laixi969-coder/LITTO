@@ -12,6 +12,7 @@ import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { modelAccess } from "@/utils/modelAvailability";
 import { assertMediaModelSelection, isSelectedModel } from "@/utils/modelSelection";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
+import { blockingLine } from "@/utils/media/blocking";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { applyMediaQuality } from "@/utils/media/quality";
 

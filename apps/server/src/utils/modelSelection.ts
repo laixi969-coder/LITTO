@@ -21,7 +21,10 @@ export function assertModelSelection(kind: ModelKind, providerId: string, modelI
   const selected = selectedModel(kind);
   const action = kind === "text" ? "请在对话的模型选择器中选择并保存" : "请通过 requestProductionDecision(selectModel) 在聊天中选择并保存，无需跳转设置页";
   if (!selected) throw Object.assign(new Error(`尚未设置${label}模型。${action}，系统不会自动选择或切换。`), { status: 400, retryable: false });
-  if (!isSelectedModel(kind, providerId, modelId)) throw Object.assign(new Error(`用户选定的${label}模型为 ${selected.providerId} / ${selected.modelId}，禁止改用 ${providerId} / ${modelId}。如需更换，${action}。`), { status: 400, retryable: false });
+  if (!isSelectedModel(kind, providerId, modelId)) {
+    // 两边必须一致才能生成：这个镜头记着自己的模型，用户选定的是另一个。说清楚是哪两处不一致，比一句「禁止改用」有用。
+    throw Object.assign(new Error(`这个${label}任务用的是 ${providerId} / ${modelId}，你当前选定的是 ${selected.providerId} / ${selected.modelId}，两者不一致。二选一：把这个镜头/节点的模型改回已选定的那个，或者${action}换成前者。系统不会自己替你选。`), { status: 400, retryable: false });
+  }
 }
 
 export async function assertMediaModelSelection(kind: "image" | "video" | "audio", request: MediaGenerationRequest, directory: string) {
