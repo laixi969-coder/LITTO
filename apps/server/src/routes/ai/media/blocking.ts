@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import { validateFields } from "@/lib/middleware";
-import { success } from "@/lib/responseFormat";
+import { error, success } from "@/lib/responseFormat";
 import u from "@/utils";
+import { currentTenant } from "@/utils/tenant";
 import { buildBlocking } from "@/utils/media/blocking";
 
 const personSchema = z.strictObject({
@@ -34,7 +35,7 @@ export default Router().post("/", validateFields({
     name: z.string().trim().min(1).max(60),
     width: z.number().positive().max(200),
     depth: z.number().positive().max(200),
-    people: z.array(personSchema).min(1).max(40),
+    people: z.array(personSchema).min(2).max(40),
     cameras: z.array(cameraSchema).min(1).max(40),
     axis: z.tuple([z.string().trim().min(1).max(40), z.string().trim().min(1).max(40)]).optional(),
     props: z.array(z.strictObject({
@@ -47,6 +48,7 @@ export default Router().post("/", validateFields({
   outputDirectory: z.string().trim().max(200).optional(),
   save: z.boolean().optional(),
 }), async (req, res) => {
+  if (currentTenant()?.role === "VIEWER" && req.body.save !== false) return res.status(403).json(error("只读成员不能写入工作区", null, 403));
   const cwd = await u.workspace.resolveWorkspace(req, req.body.directory);
   const result = await buildBlocking(cwd, req.body);
   res.json(success(result));

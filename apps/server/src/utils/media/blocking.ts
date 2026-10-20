@@ -45,8 +45,8 @@ export interface AxisCheck {
   crossing: boolean;
 }
 
-const SCALE = 56;
-const PAD = 40;
+const scale = 56;
+const pad = 40;
 
 function pointOf(scene: BlockingScene, target: string | [number, number]): [number, number] {
   if (Array.isArray(target)) return target;
@@ -66,7 +66,7 @@ export function checkAxis(scene: BlockingScene): AxisCheck {
   const pair = scene.axis ?? ([scene.people[0]?.name, scene.people[1]?.name] as [string, string]);
   const a = scene.people.find(item => item.name === pair[0]);
   const b = scene.people.find(item => item.name === pair[1]);
-  if (!a || !b) throw new Error(`轴线要求 ${pair.join(" 与 ")} 都在人物列表里`);
+  if (!a || !b || (a.x === b.x && a.y === b.y)) throw Object.assign(new Error("轴线需要两个位置不同的人物"), { status: 400 });
   const axis: [[number, number], [number, number]] = [[a.x, a.y], [b.x, b.y]];
   const sides = scene.cameras.map(camera => ({ id: camera.id, side: sideOf(axis, [camera.x, camera.y]) }));
   const distinct = [...new Set(sides.map(item => item.side).filter(side => side !== 0))];
@@ -104,25 +104,29 @@ export function blockingText(scene: BlockingScene, camera: BlockingCamera) {
   return parts.join("；") + "。";
 }
 
+function escapeXml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
 function svgOf(scene: BlockingScene, axis: AxisCheck) {
-  const width = scene.width * SCALE;
-  const depth = scene.depth * SCALE;
-  const totalW = width + PAD * 2;
-  const totalH = depth + PAD * 2;
-  const px = (x: number) => PAD + x * SCALE;
-  const py = (y: number) => PAD + y * SCALE;
+  const width = scene.width * scale;
+  const depth = scene.depth * scale;
+  const totalW = width + pad * 2;
+  const totalH = depth + pad * 2;
+  const px = (x: number) => pad + x * scale;
+  const py = (y: number) => pad + y * scale;
   const out: string[] = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}" font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">`);
   out.push(`<rect width="100%" height="100%" fill="#12141a"/>`);
-  out.push(`<rect x="${PAD}" y="${PAD}" width="${width}" height="${depth}" fill="#1b1e26" stroke="#3a4050" stroke-width="1.5"/>`);
+  out.push(`<rect x="${pad}" y="${pad}" width="${width}" height="${depth}" fill="#1b1e26" stroke="#3a4050" stroke-width="1.5"/>`);
   // 一米一格，方便读距离
-  for (let x = 1; x < scene.width; x += 1) out.push(`<line x1="${px(x)}" y1="${PAD}" x2="${px(x)}" y2="${PAD + depth}" stroke="#262b36" stroke-width="1"/>`);
-  for (let y = 1; y < scene.depth; y += 1) out.push(`<line x1="${PAD}" y1="${py(y)}" x2="${PAD + width}" y2="${py(y)}" stroke="#262b36" stroke-width="1"/>`);
+  for (let x = 1; x < scene.width; x += 1) out.push(`<line x1="${px(x)}" y1="${pad}" x2="${px(x)}" y2="${pad + depth}" stroke="#262b36" stroke-width="1"/>`);
+  for (let y = 1; y < scene.depth; y += 1) out.push(`<line x1="${pad}" y1="${py(y)}" x2="${pad + width}" y2="${py(y)}" stroke="#262b36" stroke-width="1"/>`);
   for (const prop of scene.props ?? []) {
     const rect = prop.round
-      ? `<ellipse cx="${px(prop.x)}" cy="${py(prop.y)}" rx="${prop.w * SCALE / 2}" ry="${prop.h * SCALE / 2}" fill="#232833" stroke="#4a5266"/>`
-      : `<rect x="${px(prop.x - prop.w / 2)}" y="${py(prop.y - prop.h / 2)}" width="${prop.w * SCALE}" height="${prop.h * SCALE}" rx="3" fill="#232833" stroke="#4a5266"/>`;
-    out.push(rect + `<text x="${px(prop.x)}" y="${py(prop.y) + 4}" fill="#8b93a7" font-size="11" text-anchor="middle">${prop.label}</text>`);
+      ? `<ellipse cx="${px(prop.x)}" cy="${py(prop.y)}" rx="${prop.w * scale / 2}" ry="${prop.h * scale / 2}" fill="#232833" stroke="#4a5266"/>`
+      : `<rect x="${px(prop.x - prop.w / 2)}" y="${py(prop.y - prop.h / 2)}" width="${prop.w * scale}" height="${prop.h * scale}" rx="3" fill="#232833" stroke="#4a5266"/>`;
+    out.push(rect + `<text x="${px(prop.x)}" y="${py(prop.y) + 4}" fill="#8b93a7" font-size="11" text-anchor="middle">${escapeXml(prop.label)}</text>`);
   }
   const a = scene.people.find(item => item.name === axis.pair[0]);
   const b = scene.people.find(item => item.name === axis.pair[1]);
@@ -141,7 +145,7 @@ function svgOf(scene: BlockingScene, axis: AxisCheck) {
     const p2 = [cx + Math.cos(angle + spread) * reach, cy + Math.sin(angle + spread) * reach];
     out.push(`<line x1="${cx}" y1="${cy}" x2="${px(tx)}" y2="${py(ty)}" stroke="#ffb454" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>`);
     out.push(`<polygon points="${cx},${cy} ${p1[0].toFixed(1)},${p1[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}" fill="#ffb454" opacity="0.9"/>`);
-    out.push(`<text x="${cx}" y="${cy - 10}" fill="#ffb454" font-size="11" text-anchor="middle">${camera.id}</text>`);
+    out.push(`<text x="${cx}" y="${cy - 10}" fill="#ffb454" font-size="11" text-anchor="middle">${escapeXml(camera.id)}</text>`);
   }
   for (const person of scene.people) {
     const cx = px(person.x);
@@ -154,10 +158,10 @@ function svgOf(scene: BlockingScene, axis: AxisCheck) {
     const rad = facing * Math.PI / 180;
     out.push(`<circle cx="${cx}" cy="${cy}" r="15" fill="#2d3444" stroke="#8fa4ff" stroke-width="1.5"/>`);
     out.push(`<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(rad) * 22}" y2="${cy + Math.sin(rad) * 22}" stroke="#8fa4ff" stroke-width="2"/>`);
-    out.push(`<text x="${cx}" y="${cy + 34}" fill="#e6eaf5" font-size="12" text-anchor="middle">${person.name}</text>`);
+    out.push(`<text x="${cx}" y="${cy + 34}" fill="#e6eaf5" font-size="12" text-anchor="middle">${escapeXml(person.name)}</text>`);
   }
-  out.push(`<text x="${PAD}" y="${PAD - 14}" fill="#e6eaf5" font-size="14">${scene.name}　俯视走位（一格一米）</text>`);
-  if (axis.crossing) out.push(`<text x="${PAD}" y="${totalH - 12}" fill="#ff6b6b" font-size="12">机位跨在轴线两侧：跳轴</text>`);
+  out.push(`<text x="${pad}" y="${pad - 14}" fill="#e6eaf5" font-size="14">${escapeXml(scene.name)}　俯视走位（一格一米）</text>`);
+  if (axis.crossing) out.push(`<text x="${pad}" y="${totalH - 12}" fill="#ff6b6b" font-size="12">机位跨在轴线两侧：跳轴</text>`);
   out.push(`</svg>`);
   return out.join("\n");
 }
@@ -167,7 +171,21 @@ function svgOf(scene: BlockingScene, axis: AxisCheck) {
  * 生成前先把人和机位摆定，关键帧才有依据；只靠提示词写「过肩」，模型每次给的左右都可能反。
  */
 export async function buildBlocking(cwd: string, request: { scene: BlockingScene; outputDirectory?: string; save?: boolean }) {
-  const axis = checkAxis(request.scene);
+  const scene = request.scene;
+  const invalid = (message: string) => { throw Object.assign(new Error(message), { status: 400 }); };
+  if (new Set(scene.people.map(person => person.name)).size !== scene.people.length) invalid("人物名称不能重复");
+  if (new Set(scene.cameras.map(camera => camera.id)).size !== scene.cameras.length) invalid("机位编号不能重复");
+  if (/[\\/]/.test(scene.name) || scene.name === "." || scene.name === "..") invalid("场次名称不能包含路径");
+  for (const person of scene.people) {
+    if (person.faceTo && !scene.people.some(other => other.name === person.faceTo)) invalid("人物朝向引用了不存在的人物");
+  }
+  for (const camera of scene.cameras) {
+    if (typeof camera.target === "string" && !scene.people.some(person => person.name === camera.target)) invalid("机位目标不存在");
+    if (camera.foreground && !scene.people.some(person => person.name === camera.foreground)) invalid("前景人物不存在");
+    const target = pointOf(scene, camera.target);
+    if (target[0] === camera.x && target[1] === camera.y) invalid("机位与目标重合，无法确定朝向");
+  }
+  const axis = checkAxis(scene);
   const cameras = request.scene.cameras.map(camera => ({
     id: camera.id,
     blocking: blockingText(request.scene, camera),
@@ -183,6 +201,7 @@ export async function buildBlocking(cwd: string, request: { scene: BlockingScene
     svg = join(outputDirectory, `${request.scene.name}.svg`);
     // 同时存一份结构化结果：后续生成可以直接取 blocking 文本，不必重新算一遍。
     const record = await resolveWorkspacePath(cwd, "assets/blocking.json", true);
+    await mkdir(dirname(record.path), { recursive: true });
     await writeAtomic(record.path, JSON.stringify({
       scene: request.scene, axis, cameras, generated: new Date().toISOString(),
     }, null, 1));
@@ -231,7 +250,10 @@ export async function readBlocking(cwd: string): Promise<BlockingRecord | null> 
 export async function blockingLine(cwd: string, shotId?: string): Promise<string> {
   if (!shotId) return "";
   const record = await readBlocking(cwd);
-  const camera = record?.cameras?.find(item => item.id === shotId || shotId.startsWith(item.id));
+  const cameras = Array.isArray(record?.cameras) ? record.cameras.filter(item => item && typeof item.id === "string" && item.id && typeof item.blocking === "string") : [];
+  const camera = cameras.find(item => item.id === shotId)
+    ?? cameras.filter(item => shotId.startsWith(item.id) && /^[_.-]/.test(shotId.slice(item.id.length)))
+      .sort((left, right) => right.id.length - left.id.length)[0];
   if (!camera?.blocking) return "";
   return `BLOCKING: ${camera.blocking}`;
 }

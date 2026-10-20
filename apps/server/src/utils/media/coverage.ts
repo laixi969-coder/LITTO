@@ -1,4 +1,5 @@
-import { readFile, writeAtomic } from "@toonflow/file";
+import { mkdir, readFile, writeAtomic } from "@toonflow/file";
+import { dirname } from "node:path";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 
 /** 一句台词：谁说、说什么。speaker 用角色档案里的名字，画外音也照写，靠 ownShot 区分。 */
@@ -113,9 +114,10 @@ export function evaluateCoverage(shots: CoverageShot[]) {
     const duration = typeof shot.duration === "number" && shot.duration > 0 ? shot.duration : undefined;
     let problem: CoverageRow["problem"] = "";
     let detail = "";
-    if (speaker && !visible.includes(speaker) && !ownShot && lines.length) {
+    const orphan = !ownShot && lines.find(item => !visible.includes(item.speaker));
+    if (orphan) {
       problem = "orphan";
-      detail = `${shot.id}：${speaker} 说话但不在画，也没有他的独立镜头`;
+      detail = `${shot.id}：${orphan.speaker} 说话但不在画，也没有他的独立镜头`;
     } else if (turns >= 3) {
       problem = "overloaded";
       detail = `${shot.id}：一镜里换了 ${turns} 轮说话人（${lines.map(item => item.speaker).filter((name, index, list) => list.indexOf(name) === index).join("、")}），必须拆成正反打`;
@@ -124,12 +126,12 @@ export function evaluateCoverage(shots: CoverageShot[]) {
       // 「对方在别处有镜头」只能让观众知道是谁在说，不解决这一句该给谁镜头。
       problem = "offscreen";
       detail = `${shot.id}：画面里只有 ${visible[0]}，却有 ${turns} 轮画外对答，观众会听见对方说话却看不见他`;
-    } else if (turns === 2) {
-      problem = "multi";
-      detail = `${shot.id}：一镜里换了一轮说话人，同框长镜可以保留，但要给听者可见反应`;
     } else if (duration && chars && chars / SPEECH_RATE > duration) {
       problem = "crowded";
       detail = `${shot.id}：${chars} 字台词按 ${SPEECH_RATE} 字/秒需要 ${(chars / SPEECH_RATE).toFixed(1)} 秒，计划只有 ${duration} 秒`;
+    } else if (turns === 2) {
+      problem = "multi";
+      detail = `${shot.id}：一镜里换了一轮说话人，同框长镜可以保留，但要给听者可见反应`;
     }
     rows.push({ id: shot.id, speaker, visible, ownShot, turns, chars, duration, problem, detail });
   }
@@ -222,6 +224,7 @@ export async function readCoverage(directory: string): Promise<CoverageFile | nu
 
 export async function writeCoverage(directory: string, file: CoverageFile) {
   const resolved = await resolveWorkspacePath(directory, "assets/coverage.json", true);
+  await mkdir(dirname(resolved.path), { recursive: true });
   await writeAtomic(resolved.path, JSON.stringify(file, null, 1));
   return resolved.path;
 }

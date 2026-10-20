@@ -106,7 +106,10 @@ export async function dailySpend(directory?: string) {
   let failed = 0;
   for (const row of rows as { status: string; parameters?: string }[]) {
     calls += 1;
-    if (row.status !== "SUCCEEDED") { failed += 1; continue; }
+    if (row.status !== "SUCCEEDED") {
+      if (["FAILED", "TIMEOUT"].includes(row.status)) failed += 1;
+      continue;
+    }
     let request: { duration?: number; resolution?: string; providerId?: string; modelId?: string } = {};
     try {
       request = (JSON.parse(row.parameters ?? "{}").request ?? {}) as typeof request;

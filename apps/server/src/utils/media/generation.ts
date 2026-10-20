@@ -299,9 +299,7 @@ async function generateMediaUnrecorded(
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
   const spec = request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
-  // 走位板补位：作者没写空间关系时，用 assets/blocking.json 里对应机位的描述，避免左右靠猜。
-  const blocking = request.prompt.includes("BLOCKING:") ? "" : await blockingLine(directory, request.outputName);
-  const prompt = withPhotographicBaseline([spec, blocking, request.prompt].filter(Boolean).join("\n\n"));
+  const prompt = withPhotographicBaseline([spec, request.prompt].filter(Boolean).join("\n\n"));
   // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
   const referenceReads = new Map<string, ReturnType<typeof readReference>>();
   const reference = (item: MediaReference, type: string) => {
@@ -469,6 +467,8 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
       const model = (await listMediaModels()).find(model => model.type === mediaType && model.providerId === request.providerId && model.modelId === request.modelId);
       if (!model) invalid("所选媒体模型不存在或类型不匹配");
       request = await applyMediaQuality(cwd, mediaType, request, model);
+      const blocking = request.prompt.includes("BLOCKING:") ? "" : await blockingLine(cwd, request.outputName);
+      if (blocking) request = { ...request, prompt: `${blocking}\n\n${request.prompt}` };
     }
     return generateMediaDirect(cwd, mediaType, request, signal);
   }

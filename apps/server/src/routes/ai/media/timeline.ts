@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import { validateFields } from "@/lib/middleware";
-import { success } from "@/lib/responseFormat";
+import { error, success } from "@/lib/responseFormat";
 import u from "@/utils";
+import { currentTenant } from "@/utils/tenant";
 import { exportTimeline } from "@/utils/media/timeline";
 
 const clipSchema = z.strictObject({
@@ -20,9 +21,10 @@ export default Router().post("/", validateFields({
   directory: z.string().min(1).max(4096),
   clips: z.array(clipSchema).min(1).max(2000),
   name: z.string().trim().max(60).optional(),
-  fps: z.number().min(1).max(120).optional(),
+  fps: z.number().int().min(1).max(120).optional(),
   outputDirectory: z.string().trim().max(200).optional(),
 }), async (req, res) => {
+  if (currentTenant()?.role === "VIEWER") return res.status(403).json(error("只读成员不能写入工作区", null, 403));
   const cwd = await u.workspace.resolveWorkspace(req, req.body.directory);
   const result = await exportTimeline(cwd, req.body);
   res.json(success({

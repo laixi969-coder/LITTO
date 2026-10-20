@@ -76,14 +76,13 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     }
     if (count) assetReferenceFingerprint = hash.digest("hex");
   }
-  // 提示词红线放在入队前：否则任务先排进队列、执行时才失败，用户只看到「提交成功」然后一片红。
-  assertPromptPolicy(merged as Parameters<typeof assertPromptPolicy>[0], kind);
   // 走位补位也放在入队前：作者没写空间关系时按镜头号取走位板，这样 compiled_prompt 与实发一致。
-  // 只对视频注入：图片没有机位与景别，塞进去是噪音。
-  if (kind === "video" && !merged.prompt.includes("BLOCKING:")) {
+  // 正式镜头已在 compile 时冻结；独立素材在入队时冻结，执行时不再读取走位板。
+  if (!production && !merged.prompt.includes("BLOCKING:")) {
     const blocking = await blockingLine(directory, merged.outputName);
     if (blocking) merged.prompt = `${blocking}\n\n${merged.prompt}`;
   }
+  assertPromptPolicy(merged as Parameters<typeof assertPromptPolicy>[0], kind);
   return api.enqueueWorkspaceMedia({
     workspaceId: tenant.workspaceId,
     userId: tenant.userId,
@@ -207,6 +206,10 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
-  result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
+  if (!result.compiled.prompt.includes("BLOCKING:")) {
+    const blocking = await blockingLine(directory, request.outputName);
+    if (blocking) result.compiled.prompt = `${blocking}\n\n${result.compiled.prompt}`;
+  }
+  result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, result.compiled.prompt, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
   return { ...result, request: { ...request, shotId, productionFingerprint: result.fingerprint, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
 }

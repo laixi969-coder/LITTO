@@ -1,4 +1,5 @@
 import { mkdir, writeAtomic } from "@toonflow/file";
+import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
@@ -17,6 +18,7 @@ export interface TimelineEntry {
   index: number;
   name: string;
   path: string;
+  sourceDuration: number;
   sourceIn: number;
   sourceOut: number;
   recordIn: number;
@@ -54,8 +56,8 @@ function rational(value: number, fps: number) {
  * OpenTimelineIO：filmcraft / 达芬奇 / Premiere 都能读的时间线互换格式。
  * 手写 JSON 而不是引 SDK —— 结构稳定，少一个依赖。
  */
-function buildOtio(name: string, fps: number, entries: TimelineEntry[], absolute: string[]) {
-  const children = entries.map((entry, index) => ({
+function buildOtio(name: string, fps: number, entries: TimelineEntry[]) {
+  const children = entries.map(entry => ({
     OTIO_SCHEMA: "Clip.2",
     name: entry.name,
     metadata: { milimili: { sourceIn: entry.sourceIn, sourceOut: entry.sourceOut, recordIn: entry.recordIn } },
@@ -70,11 +72,11 @@ function buildOtio(name: string, fps: number, entries: TimelineEntry[], absolute
         OTIO_SCHEMA: "ExternalReference.1",
         name: entry.name,
         // URL 里带中文或空格时不编码，部分剪辑器会当成不存在的路径。
-        target_url: `file://${encodeURI(absolute[index])}`,
+        target_url: pathToFileURL(entry.absolute).href,
         available_range: {
           OTIO_SCHEMA: "TimeRange.1",
           start_time: rational(0, fps),
-          duration: rational(entry.sourceOut - entry.sourceIn, fps),
+          duration: rational(entry.sourceDuration, fps),
         },
         metadata: {},
       },
@@ -125,7 +127,7 @@ async function probeDuration(cwd: string, path: string) {
   const data = await new Promise<{ format?: { duration?: string | number } }>((resolve, reject) =>
     ffmpeg.ffprobe(path, (error, result) => error ? reject(error) : resolve(result)));
   const duration = Number(data.format?.duration ?? 0);
-  if (!duration) throw new Error(`读不到时长：${path}`);
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error(`读不到时长：${path}`);
   return duration;
 }
 
@@ -140,41 +142,44 @@ export async function exportTimeline(cwd: string, request: {
   outputDirectory?: string;
   verifyDuration?: boolean;
 }): Promise<TimelineResult> {
-  const fps = request.fps && request.fps >= 1 && request.fps <= 120 ? Math.round(request.fps) : 24;
+  const fps = request.fps ?? 24;
+  if (!Number.isInteger(fps) || fps < 1 || fps > 120) throw Object.assign(new Error("时间线帧率必须是 1 到 120 的整数"), { status: 400 });
   const name = (request.name ?? "milimili-timeline").replace(/[\\/:*?"<>|\n\r]/g, "").slice(0, 60) || "milimili-timeline";
   const entries: TimelineEntry[] = [];
-  const absolute: string[] = [];
   let cursor = 0;
   for (const [index, clip] of request.clips.entries()) {
     const resolved = await resolveWorkspacePath(cwd, clip.path);
     const available = await probeDuration(cwd, resolved.path);
-    const sourceIn = Math.max(0, Number(clip.in ?? 0));
-    const sourceOut = clip.out === undefined ? available : Math.min(available, Number(clip.out));
-    if (sourceOut <= sourceIn + 0.04) throw new Error(`第 ${index + 1} 条的入出点不成立：in=${sourceIn} out=${sourceOut}（素材长 ${available.toFixed(2)} 秒）`);
-    const duration = sourceOut - sourceIn;
+    const availableFrames = Math.floor(available * fps + 1e-6);
+    const inFrame = Math.max(0, Math.round(Number(clip.in ?? 0) * fps));
+    const outFrame = clip.out === undefined ? availableFrames : Math.min(availableFrames, Math.round(Number(clip.out) * fps));
+    const sourceIn = inFrame / fps;
+    const sourceOut = outFrame / fps;
+    if (!Number.isFinite(inFrame) || !Number.isFinite(outFrame) || outFrame <= inFrame) throw new Error(`第 ${index + 1} 条的入出点不成立：in=${sourceIn} out=${sourceOut}（素材长 ${available.toFixed(2)} 秒）`);
+    const frames = outFrame - inFrame;
     entries.push({
       index: index + 1,
-      name: clip.name?.trim() || `S${pad(index + 1, 2)}`,
+      name: clip.name?.replace(/[\r\n]/g, " ").trim() || `S${pad(index + 1, 2)}`,
       path: clip.path,
+      sourceDuration: availableFrames / fps,
       sourceIn,
       sourceOut,
-      recordIn: cursor,
-      recordOut: cursor + duration,
-      frames: Math.round(duration * fps),
+      recordIn: cursor / fps,
+      recordOut: (cursor + frames) / fps,
+      frames,
       absolute: resolved.path,
     });
-    absolute.push(resolved.path);
-    cursor += duration;
+    cursor += frames;
   }
   const outputDirectory = request.outputDirectory ?? "assets/timeline";
   const otioResolved = await resolveWorkspacePath(cwd, join(outputDirectory, `${name}.otio`), true);
   const edlResolved = await resolveWorkspacePath(cwd, join(outputDirectory, `${name}.edl`), true);
   await mkdir(dirname(otioResolved.path), { recursive: true });
-  await writeAtomic(otioResolved.path, JSON.stringify(buildOtio(name, fps, entries, absolute), null, 2));
+  await writeAtomic(otioResolved.path, JSON.stringify(buildOtio(name, fps, entries), null, 2));
   await writeAtomic(edlResolved.path, buildEdl(name, fps, entries));
   return {
     fps,
-    duration: Number(cursor.toFixed(3)),
+    duration: Number((cursor / fps).toFixed(3)),
     entries,
     otio: { path: join(outputDirectory, `${name}.otio`), clips: entries.length },
     edl: { path: join(outputDirectory, `${name}.edl`), clips: entries.length },
