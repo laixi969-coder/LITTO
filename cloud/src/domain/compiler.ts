@@ -11,7 +11,7 @@ import type { ShotInput } from "./schema.ts";
 import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
-import { physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
+import { physicalInteractionPlan, videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
@@ -303,7 +303,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         sections.motionTiming = J([
             musicVideo && "The execution timeline defines the action order, timing and explicitly timed camera changes. Apply untimed path and camera descriptions only where compatible; never introduce an extra action, cut or pause from background context.",
             !musicVideo && cam.design?.timing && `Action timing: ${cam.design.timing}`,
-            "Real-time unless specified. Continue ongoing action; camera movement does not replace performance. Cut only where the execution beats explicitly direct it.",
+            videoMotionTiming,
         ]);
         sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
         sections.renderingStandard = photographicRendering;

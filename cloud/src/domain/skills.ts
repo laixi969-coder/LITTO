@@ -1,5 +1,6 @@
 import { NARRATIVE_FUNCTIONS } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
+import { videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
 
 /**
  * Skills output STRUCTURED specs (never just a long prompt). They are deterministic, rule-based experts;
@@ -168,7 +169,7 @@ export function motionDirector(action: string, duration: number) {
         inertia: "Accelerate and decelerate; objects keep momentum after the hand releases them.",
         secondaryMotion: "Only visible flexible materials respond to actual forces; no automatic wind or hair motion.",
         cameraInertia: "Choose locked, smooth or handheld movement from narrative intent; a tripod may remain completely still.",
-        timing: `${duration}s available: budget actual action, dialogue and pause lengths; no fixed percentage split.`,
+        timing: `${duration}s available, not a target to fill: budget actual action and dialogue lengths, justify each pause. ${videoMotionTiming}`,
         action,
     };
 }

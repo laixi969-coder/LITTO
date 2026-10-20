@@ -1,4 +1,5 @@
 import { type Scope } from "../db.ts";
+import { videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
 import { bad, notFound, sha256 } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
 import { createShotsFromDrafts, validateVisibleAssets } from "./shots.ts";
@@ -34,6 +35,7 @@ const refined = z.object({ shots: z.array(z.object({
  */
 async function refineWithLlm(s: Scope, projectId: string, actor: string, script: string, drafts: ShotDraft[], world: any, goal?: string) {
   const system = [
+    videoMotionTiming,
     "You are a film director. Return ONLY JSON {\"shots\":[...]}. Each shot needs sourceIndexes (zero-based draft indexes), visibleAssetIds, title, narrativeFunction, action, performance{emotion,intensity,eyeline,lookTarget,gesture,timing}, blocking{foreground,midground,background}, camera, lighting, duration, intendedStateDelta and creativeBrief. Merge adjacent beats within a scene or split one beat into consecutive shots when motivated. Cover all beats in order without repeating events; repeated sourceIndexes are only for a split beat. Preserve real asset IDs; visibleAssetIds is the subset appearing at some point, excluding voice-only characters.",
     "Preserve SCRIPT facts and GOAL. Design unspecified staging and responses to established intentions without inventing events, props, backstory or dialogue. A shot earns its duration through action, information, relationship change or purposeful stillness. Use the shortest readable duration preserving speech, action and reaction; estimate edit handles separately. Do not fill a draft duration with breathing, blinking, slow pushes or explanatory narration. Select useful behavior from CHARACTERS for the current goal; do not paste biographies, relationships or full habit/knowledge lists into execution fields.",
     "Stage before photography. Anchor each visible performer to existing landmarks; separate body facing, gaze and camera direction, with contact/held props when relevant. camera.design needs technique,purpose,start,end,subjectPath,cameraPath,timing,cut,invariants[],acceptance[],fallback. start describes ONE initial instant, excluding later entrances; end is the visible result. Subject and camera paths are separate. Camera distance, framing, background, depth and focus describe visible results, not just lens numbers. A move needs trigger, path and stopping point; static is valid. Preserve world light source and geography across reverse angles. Acceptance, fallback and neighbouring-shot edit notes are production records, not extra actions.",

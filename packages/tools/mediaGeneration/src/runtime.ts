@@ -3,6 +3,8 @@ import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 
 export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia, MediaContext } from "@toonflow/tools-scaffold/runtime";
 
+export const videoMotionTiming = "Motion defaults to real time. Combat and rescue use compact, continuous causal action: contact triggers response and the next movement; approach, support, transfer and withdrawal connect without idle resets. Let compatible actions overlap naturally while preserving readable contact, force, weight and consequences. Do not divide duration into equal action slots or stretch brief actions to fill the clip. Camera follows the action at its actual speed or stays locked; never default to slow pushes, slow pans or waiting for the camera before acting. Slow motion is allowed only for an explicitly designated beat with a clear narrative purpose or user request; resume real time afterwards, never spread it across the whole scene. Preserve explicit dialogue/music sync, planned cuts and purposeful stillness; do not add cuts, events or pauses to fill time.";
+
 /** 项目总览不重复回传每个产物的整段编译提示词；原生成记录与其余参数仍保留。 */
 export function compactProductionRead<T>(value: T): T {
   if (!value || typeof value !== "object") return value;

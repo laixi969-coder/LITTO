@@ -15,6 +15,7 @@ import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@
 import { blockingLine } from "@/utils/media/blocking";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { applyMediaQuality } from "@/utils/media/quality";
+import { videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
 
 const maxMediaSize = 100 * 1024 * 1024;
 const cameraSessions = new Set<string>();
@@ -299,7 +300,8 @@ async function generateMediaUnrecorded(
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
   const spec = request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
-  const prompt = withPhotographicBaseline([spec, request.prompt].filter(Boolean).join("\n\n"));
+  const motionTiming = mediaType === "video" && !request.prompt.includes(videoMotionTiming) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
+  const prompt = withPhotographicBaseline([spec, request.prompt, motionTiming].filter(Boolean).join("\n\n"));
   // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
   const referenceReads = new Map<string, ReturnType<typeof readReference>>();
   const reference = (item: MediaReference, type: string) => {
