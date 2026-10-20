@@ -10,6 +10,7 @@ export type MediaProvider = {
   id: string;
   label: string;
   version?: string;
+  builtinVersion?: string;
   readme?: string;
   modelsUrl?: string;
   canSyncModels?: boolean;

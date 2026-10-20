@@ -20,6 +20,7 @@
           <el-space class="itemActions" wrap>
             <el-button text @click="reenableProvider('media', item.id).catch(() => ElMessage.error('重新启用失败'))">修复后重新启用</el-button>
             <el-button v-if="item.canSyncModels || item.modelsUrl" text :icon="IconDownload" :disabled="!!deletingFile || !!item.loadError || !item.revision" @click="editProvider(item, true)">同步并选择模型</el-button>
+            <el-button v-if="item.builtinVersion && item.builtinVersion !== item.version" text :loading="updatingFile === item.fileName" :disabled="!!deletingFile || !!updatingFile || !!item.loadError" @click="updateBuiltin(item)">更新内置适配器</el-button>
             <el-button text :icon="IconEdit" :disabled="!!deletingFile || !!item.loadError" @click="editProvider(item)">编辑模型</el-button>
             <el-popconfirm title="确定删除此供应商及其模型？" confirmButtonText="删除" cancelButtonText="取消" @confirm="deleteProvider(item)">
               <template #reference><el-button text type="danger" :icon="IconTrash" :loading="deletingFile === item.fileName" :disabled="!!deletingFile || !item.revision">删除</el-button></template>
@@ -58,6 +59,7 @@ const editorVisible = ref(false);
 const addMode = ref<"connection" | "builtin" | "custom">("connection");
 const editingProvider = ref<MediaProvider>();
 const deletingFile = ref("");
+const updatingFile = ref("");
 const syncOnOpen = ref(false);
 let loadRequest = 0;
 
@@ -89,6 +91,19 @@ function openAdd(mode: "connection" | "builtin" | "custom") {
   mediaProviderDialog.value ??= defineAsyncComponent(() => import("./addCustomProviderDialog.vue"));
   addMode.value = mode;
   providerDialogVisible.value = true;
+}
+
+async function updateBuiltin(provider: MediaProvider) {
+  if (updatingFile.value) return;
+  updatingFile.value = provider.fileName;
+  try {
+    const { data } = await axios.put("/api/providers/media/update", { fileName: provider.fileName, revision: provider.revision });
+    if (data.code !== 200) throw new Error(data.message || "更新失败");
+    await loadProviders();
+    invalidateNodeModels("media");
+    ElMessage.success("适配器已更新，原文件已备份；可同步并选择模型");
+  } catch (cause) { ElMessage.error(axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : cause instanceof Error ? cause.message : "更新失败"); }
+  finally { updatingFile.value = ""; }
 }
 
 function editProvider(provider: MediaProvider, sync = false) {

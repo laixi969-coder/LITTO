@@ -167,6 +167,7 @@ export const videoGenerationSchema = z.strictObject({
   ]).optional().describe("单图等模式传枚举字符串；多参考模式优先传真实数组，如 [\"imageReference:15\",\"audioReference:3\"]，也兼容该数组的 JSON 字符串。具体值须与 listMediaModels 一致。"),
 });
 export const audioGenerationSchema = z.strictObject({
+  audioParameters: z.record(z.string().min(1).max(100), z.union([z.string().max(20000), z.number().finite(), z.boolean()])).refine(value => Object.keys(value).length <= 40, "音频参数最多 40 项").optional().describe("仅使用供应商已同步参数定义中的额外音频参数，例如音乐的 lyrics、instrumental、duration。不能覆盖 model、text、prompt、音色或格式等已有字段。"),
   providerId: sharedFields.providerId,
   modelId: sharedFields.modelId,
   prompt: z.string().trim().min(1).max(100000),

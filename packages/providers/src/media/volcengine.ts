@@ -36,12 +36,26 @@ function wait(signal: AbortSignal) {
 }
 
 export default {
-  id: "volcengine", label: "火山方舟", version: "1.0.0", rules,
+  id: "volcengine", label: "火山方舟", version: "1.1.0", rules,
   readme: "使用火山方舟 API Key。内置 Seedream 4.5 与 Seedance 1.5 Pro，支持本地图片参考、首帧和首尾帧。API 地址可改为兼容方舟协议的中转；模型 ID 可在模型配置中替换为控制台接入点 ID。\n\n[官方文档](https://docs.volcengine.com/docs/ark/seedream-4-0-5-0?lang=zh)",
   models: [
     { id: "doubao-seedream-4-5-251128", label: "Seedream 4.5", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "doubao-seedance-1-5-pro-251215", label: "Seedance 1.5 Pro", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: "optional", durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12], resolution: ["480P", "720P", "1080P"] }] },
   ] satisfies ProviderModel[],
+  async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
+    const result = await fetchJson(this, "/models", this.signal ?? AbortSignal.timeout(30000));
+    if (!Array.isArray(result.data)) throw new Error("方舟模型目录格式错误");
+    const models = new Map<string, ProviderModel>();
+    for (const item of result.data) {
+      const id = item.id ?? item.model_id;
+      if (typeof id !== "string" || modelIds && !modelIds.includes(id)) continue;
+      const known = this.models?.find(model => model.id === id);
+      // ACT: 只开放当前生成入口已执行的文字、图片参考与首尾帧模式；不把新模型的全部能力猜成已接入。
+      const template = known ?? this.models?.find(model => /^doubao-seedream-/.test(id) ? model.type === "image" : /^doubao-seedance-/.test(id) && model.type === "video");
+      if (template) models.set(id, { ...template, id, label: item.name || item.display_name || id });
+    }
+    return [...models.values()];
+  },
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
     if (!request.model.trim() || !request.prompt.trim()) throw new Error("请填写模型 ID 和提示词");
     if (request.mask) throw new Error("方舟当前未接入蒙版编辑");

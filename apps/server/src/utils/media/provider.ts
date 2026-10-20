@@ -1,6 +1,6 @@
 import { t, translateMessage, validationOptions } from "@/lib/i18n";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, unlink } from "@toonflow/file";
+import { lstat, mkdir, readFile, readdir, unlink, writeAtomic } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
 import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/providers";
@@ -18,6 +18,8 @@ type Expression = Extract<ReturnType<typeof parseExpression>, { type: "Parenthes
 type ObjectExpression = Extract<Expression, { type: "ObjectExpression" }>;
 
 const providerTranspiler = new Bun.Transpiler({ loader: "ts", target: "bun", define: { require: "undefined" } });
+let builtinDirectory: string | undefined;
+export function setBuiltinDirectory(path: string | undefined) { builtinDirectory = path; }
 
 const providerIdSchema = z.string().max(96).regex(/^[a-z][a-zA-Z0-9]*$/)
   .refine(value => value.toLowerCase() !== "tfrouter", "此供应商已移除")
@@ -183,7 +185,7 @@ function metadata(fileName: string, source: string) {
   const { id, label, version, readme, modelsUrl, models, canSyncModels } = parseProvider(source);
   if (fileName !== `${id}.ts`) invalid("供应商 ID 与文件名不一致");
   return { fileName, id, label, version, readme, canSyncModels: canSyncModels || !!modelsUrl, modelsUrl, models,
-    revision: createHash("sha256").update(source).digest("hex"), loadError: "" };
+    revision: createHash("sha256").update(source).digest("hex"), loadError: "", builtinVersion: builtinDirectory ? mediaProviders.find(provider => provider.id === id)?.version : undefined };
 }
 
 async function directory(create = false) {
@@ -279,7 +281,7 @@ export async function saveMediaProvider(fileName: string, models: z.infer<typeof
   if (!checked.success) invalid(checked.error.issues.map(issue => translateMessage(issue.message)).join("; "));
   const path = await directory();
   if (!path) invalid("供应商文件不存在", 404);
-  const release = lockWorkspaceFiles([join(path, fileName)]);
+  const release = lockWorkspaceFiles([path]);
   try {
     const current = await readProvider(path, fileName);
     if (current.revision !== revision) invalid("供应商文件已被修改，请刷新页面后再编辑", 409);
@@ -293,6 +295,33 @@ export async function saveMediaProvider(fileName: string, models: z.infer<typeof
     const source = current.source.slice(0, start) + replacement + current.source.slice(end);
     const result = metadata(fileName, source);
     if (expectedApiKey !== undefined && getMediaProviderApiKey(result.id) !== expectedApiKey) invalid("供应商配置已变更，请重试", 409);
+    await writeWorkspaceFile(join(path, fileName), source);
+    return result;
+  } finally { release(); }
+}
+
+export async function updateBuiltinMediaProvider(fileName: string, revision: string) {
+  if (!mediaProviderFileSchema.safeParse(fileName).success || !builtinDirectory) invalid("内置供应商更新不可用");
+  const id = fileName.slice(0, -3);
+  if (!mediaProviders.some(provider => provider.id === id)) invalid("此供应商不是内置适配器");
+  const path = await directory();
+  if (!path) invalid("请先安装此供应商");
+  const release = lockWorkspaceFiles([join(path, fileName)]);
+  try {
+    const current = await getMediaProvider(id);
+    if (current.revision !== revision) invalid("供应商已被修改，请刷新后更新", 409);
+    const builtin = await readProvider(builtinDirectory, fileName);
+    const parsed = parseProvider(builtin.source);
+    // ACT: 显式更新实现，保留已有模型的用户配置，并补新内置模型；不触碰密钥、默认选择和旧生成记录。
+    const models = new Map(parsed.models.map(model => [model.id, model]));
+    for (const model of current.models) models.set(model.id, { ...models.get(model.id), ...model });
+    const property = parsed.modelProperty;
+    if (property?.type !== "ObjectProperty") invalid("内置适配器缺少模型列表");
+    const source = builtin.source.slice(0, property.value.start!) + JSON.stringify([...models.values()], null, 2) + builtin.source.slice(property.value.end!);
+    const result = metadata(fileName, source);
+    const backupDirectory = join(dirname(conf.path), "providerBackups");
+    await mkdir(backupDirectory, { recursive: true });
+    await writeAtomic(join(backupDirectory, `providerBackup${crypto.randomUUID().replaceAll("-", "")}.json`), JSON.stringify({ fileName, source: current.source, revision: current.revision }, null, 2), { mode: 0o600 });
     await writeWorkspaceFile(join(path, fileName), source);
     return result;
   } finally { release(); }

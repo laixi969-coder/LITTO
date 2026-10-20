@@ -48,7 +48,7 @@ const busy = ref(false), status = ref(""), error = ref("");
 const models = ref<NodeMediaModel[]>([]), speechKey = ref(""), voice = ref("");
 const imageKey = ref("");
 const key = (model: NodeMediaModel) => JSON.stringify([model.providerId, model.modelId]);
-const speechModels = computed(() => models.value.filter(item => item.type === "audio"));
+const speechModels = computed(() => models.value.filter(item => item.type === "audio" && (!item.audioTask || item.audioTask === "speech")));
 const speechModel = computed(() => speechModels.value.find(item => key(item) === speechKey.value));
 const imageModels = computed(() => models.value.filter(item => item.type === "image"));
 const imageModel = computed(() => imageModels.value.find(item => key(item) === imageKey.value));

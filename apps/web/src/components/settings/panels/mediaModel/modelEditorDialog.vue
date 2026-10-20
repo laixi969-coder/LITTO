@@ -75,6 +75,14 @@
             </div>
           </el-form-item>
         </template>
+        <template v-if="draft.type === 'audio'">
+          <el-form-item label="表演语气指令">
+            <el-switch v-model="draft.speechInstructions" aria-label="音频模型支持表演语气指令" />
+          </el-form-item>
+          <el-form-item label="音色 ID">
+            <el-input-tag v-model="draft.voices" placeholder="输入平台音色 ID 后按回车" aria-label="音色 ID 列表" />
+          </el-form-item>
+        </template>
         <details class="modelOptions">
           <summary>更多配置（JSON）</summary>
           <el-input v-model="options" type="textarea" dir="ltr" :rows="6" resize="vertical" aria-label="模型的更多配置" />
@@ -133,6 +141,8 @@ function createDraft() {
     imageMode: [] as string[], videoMode: [] as string[], mixedMode: [] as string[],
     mixedModeCount: { videoReference: 1, imageReference: 1, audioReference: 1 } as Record<string, number | undefined>,
     audio: "optional" as "optional" | boolean,
+    speechInstructions: false,
+    voices: [] as string[],
     durationResolutionMap: [{ duration: [] as string[], resolution: [] as string[] }],
   };
 }
@@ -177,6 +187,12 @@ watch(visible, (isVisible) => {
     delete extra.audio;
     delete extra.durationResolutionMap;
   }
+  if (draft.value.type === "audio") {
+    draft.value.speechInstructions = extra.speechInstructions === true;
+    draft.value.voices = Array.isArray(extra.voices) ? extra.voices.map(item => item.voice).filter((voice): voice is string => typeof voice === "string") : [];
+    delete extra.speechInstructions;
+    delete extra.voices;
+  }
   options.value = JSON.stringify(extra, null, 2);
   initialDraft = JSON.parse(JSON.stringify(draft.value));
   initialExtraMode = extra.mode;
@@ -193,12 +209,12 @@ function confirmModel() {
     try { extra = JSON.parse(options.value); }
     catch { throw new Error("更多配置不是有效的 JSON"); }
     if (!extra || typeof extra !== "object" || Array.isArray(extra)) throw new Error("更多配置必须是 JSON 对象");
-    const fields = ["id", "label", "type", ...(draft.value.type === "video" ? ["audio", "durationResolutionMap"] : [])];
+    const fields = ["id", "label", "type", ...(draft.value.type === "video" ? ["audio", "durationResolutionMap"] : []), ...(draft.value.type === "audio" ? ["voices", "speechInstructions"] : [])];
     if (fields.some(field => field in extra)) throw new Error("已有表单项请直接在上方编辑");
     const value: MediaProviderModel = { ...extra, id, label, type: draft.value.type };
     const typeChanged = !model || value.type !== model.type;
     const changed = (...fields: (keyof typeof initialDraft)[]) => typeChanged || fields.some(field => JSON.stringify(draft.value[field]) !== JSON.stringify(initialDraft[field]));
-    const modelFields = value.type === "image" ? ["mode"] : value.type === "video" ? ["mode", "audio", "durationResolutionMap"] : [];
+    const modelFields = value.type === "image" ? ["mode"] : value.type === "video" ? ["mode", "audio", "durationResolutionMap"] : value.type === "audio" ? ["voices", "speechInstructions"] : [];
     if (!typeChanged) for (const field of modelFields) if (field in original) value[field] = original[field];
     const modeChanged = changed(value.type === "image" ? "imageMode" : "videoMode", "mixedMode", "mixedModeCount") || JSON.stringify(extra.mode) !== JSON.stringify(initialExtraMode);
     if ((value.type === "image" || value.type === "video") && modeChanged) {
@@ -215,6 +231,11 @@ function confirmModel() {
       modes.push(...(extra.mode as unknown[] ?? []));
       if (!modes.length) throw new Error("请至少选择一种生成模式");
       value.mode = modes;
+    }
+    if (value.type === "audio" && changed("speechInstructions")) value.speechInstructions = draft.value.speechInstructions;
+    if (value.type === "audio" && changed("voices")) {
+      if (draft.value.voices.some(voice => !voice.trim()) || new Set(draft.value.voices).size !== draft.value.voices.length) throw new Error("音色 ID 不能为空或重复");
+      value.voices = draft.value.voices.map(voice => ({ title: voice, voice }));
     }
     if (value.type === "video" && changed("audio")) value.audio = draft.value.audio;
     if (value.type === "video" && changed("durationResolutionMap")) {

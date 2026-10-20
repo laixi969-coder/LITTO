@@ -26,6 +26,7 @@ interface ProviderModel {
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   voices?: { title: string; voice: string }[];
   speechInstructions?: boolean;
+  audioTask?: "speech" | "music" | "soundEffect";
   lipSync?: boolean;
 }
 
@@ -163,6 +164,8 @@ interface CameraTrajectorySpec {
 
 interface AudioRequest extends MediaRequest {
   text: string;
+  /** 供应商音频参数；只允许传入已同步参数定义中的标量字段。 */
+  audioParameters?: Record<string, string | number | boolean>;
   /** 表演语气说明，不作为台词朗读。 */
   instructions?: string;
   audios?: MediaInput[];

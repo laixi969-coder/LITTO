@@ -72,7 +72,7 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
       cameraTrajectory: model.cameraTrajectory === true, promptControl: model.promptControl === "imageAndCameraOnly" ? "imageAndCameraOnly" : undefined,
       mode: model.mode, durationResolutionMap: model.durationResolutionMap, audio: model.audio, lipSync: model.lipSync === true, speechInstructions: model.speechInstructions === true,
-      ...(model.type === "audio" ? { voices: model.voices } : {}),
+      ...(model.type === "audio" ? { voices: model.voices, audioTask: model.audioTask, audioParameterSchema: record(model.inputSchema).properties } : {}),
       ...(model.type === "image" ? {
         imageSizes: imageOptions(Array.isArray(model.imageSizes) ? model.imageSizes : builtIn?.imageSizes, /^[^\u0000-\u001f\u007f]+$/),
         imageRatios: imageOptions(Array.isArray(model.imageRatios) ? model.imageRatios : builtIn?.imageRatios, /^[1-9]\d{0,3}:[1-9]\d{0,3}$/),
@@ -290,6 +290,7 @@ async function generateMediaUnrecorded(
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
   validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
+  if (mediaType === "audio" && Object.keys(request.audioParameters ?? {}).length && !model.inputSchema) invalid("此模型未提供额外音频参数定义，请清空额外参数");
   // 视频未明确指定时长时按模型能力取推荐值：调用方漏传时不再落到供应商默认的最短档，也不强制每镜等长。
   const duration = mediaType === "video" ? recommendedDuration(model.durationResolutionMap, request.duration) : request.duration;
   assertPromptPolicy(request, mediaType);
@@ -322,7 +323,7 @@ async function generateMediaUnrecorded(
   await reportTask?.({ status: "submitting" });
   const assets = await (async () => mediaType === "audio"
     ? await provider.generateAudio!({
-      model: request.modelId, text: request.prompt, audios,
+      model: request.modelId, text: request.prompt, audios, audioParameters: request.audioParameters,
       voice: request.voice, instructions: request.instructions, speed: request.speed, volume: request.volume, format: request.format, sampleRate: request.sampleRate,
     })
     : mediaType === "image"

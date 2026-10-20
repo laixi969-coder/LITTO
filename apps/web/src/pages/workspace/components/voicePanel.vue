@@ -142,7 +142,7 @@ let savedContent: string | null = null;
 const savedSnapshot = ref(JSON.stringify(project.value));
 const emotions = ["开心", "悲伤", "愤怒", "紧张", "惊讶", "克制", "低声耳语", "激动喊叫"];
 const dirty = computed(() => JSON.stringify(project.value) !== savedSnapshot.value);
-const speechModels = computed(() => models.value.filter(model => model.type === "audio"));
+const speechModels = computed(() => models.value.filter(model => model.type === "audio" && (!model.audioTask || model.audioTask === "speech")));
 function syncMode(model: NodeMediaModel) {
   return model.mode?.find(mode => Array.isArray(mode) && mode.some(item => /^videoReference:[1-9]\d*$/.test(item)) && mode.some(item => /^audioReference:[1-9]\d*$/.test(item))) as NodeVideoRequest["mode"] | undefined;
 }

@@ -17,6 +17,7 @@
     "./media/meta": "./src/media/meta.ts",
     "./media/agnes": "./src/media/agnes.ts",
     "./media/volcengine": "./src/media/volcengine.ts",
+    "./media/volcSpeech": "./src/media/volcSpeech.ts",
     "./media/bailian": "./src/media/bailian.ts",
     "./media/kling": "./src/media/kling.ts",
     "./media/vidu": "./src/media/vidu.ts",

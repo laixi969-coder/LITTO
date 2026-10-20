@@ -99,7 +99,9 @@ export interface MediaModel {
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   audio?: boolean | "optional";
   voices?: { title: string; voice: string }[];
+  audioParameterSchema?: Record<string, unknown>;
   speechInstructions?: boolean;
+  audioTask?: "speech" | "music" | "soundEffect";
   lipSync?: boolean;
 }
 
@@ -122,6 +124,7 @@ export interface MediaShotSpec {
 }
 
 export interface MediaGenerationRequest {
+  audioParameters?: Record<string, string | number | boolean>;
   purpose?: "asset" | "standalone" | "storyboard";
   shotSpec?: MediaShotSpec;
   cameraTrajectory?: CameraTrajectory;

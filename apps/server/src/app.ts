@@ -16,7 +16,7 @@ import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 
-const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts"];
+const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts"];
 
 export async function createApp({
   webRoot,
@@ -40,6 +40,8 @@ export async function createApp({
   // conf 由下方的路由动态加载，必须先确定整个进程共用的数据目录。
   if (dataDirectory) process.env.TOONFLOW_DATA_DIR = resolve(dataDirectory);
   const { default: conf } = await import("@/utils/conf");
+  const { setBuiltinDirectory } = await import("@/utils/media/provider");
+  setBuiltinDirectory(providersRoot ? resolve(providersRoot, "media") : undefined);
   // 移除旧安装遗留的供应商脚本，不会随新版再次安装。
   await unlink(resolve(dirname(conf.path), "providers/tfRouter.ts")).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw error;

@@ -16,6 +16,7 @@ const mediaProviders: Record<string, { label: string; customUrl?: boolean; verif
   meta: { label: "秘塔 MiniMax" },
   agnes: { label: "Agnes AI", verifyUrl: () => "https://apihub.agnes-ai.com/v1/models" },
   volcengine: { label: "火山方舟" },
+  volcSpeech: { label: "火山引擎 · 豆包语音" },
   bailian: { label: "阿里百炼" },
   kling: { label: "可灵" },
   vidu: { label: "Vidu", customUrl: true },

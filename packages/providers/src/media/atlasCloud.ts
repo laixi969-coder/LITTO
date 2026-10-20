@@ -47,11 +47,11 @@ function wait(signal: AbortSignal, milliseconds: number) {
   });
 }
 
-async function generate(context: ProviderContext, mediaType: "image" | "video", body: Record<string, unknown>, signal: AbortSignal): Promise<MediaAsset[]> {
+async function generate(context: ProviderContext, mediaType: "image" | "video" | "audio", body: Record<string, unknown>, signal: AbortSignal): Promise<MediaAsset[]> {
   await context.tool.reportTask?.({ status: "submitting" });
   let task;
   try {
-    task = await fetchJson(context, `/api/v1/model/${mediaType === "image" ? "generateImage" : "generateVideo"}`, signal, JSON.stringify(body));
+    task = await fetchJson(context, `/api/v1/model/${mediaType === "image" ? "generateImage" : mediaType === "audio" ? "generateAudio" : "generateVideo"}`, signal, JSON.stringify(body));
   } catch (error) {
     const rejected = [400, 401, 402, 403, 404, 413, 415, 422, 429].includes(Number((error as { status?: number }).status));
     await context.tool.reportTask?.({ status: rejected ? "rejected" : "unknown" });
@@ -76,8 +76,8 @@ async function generate(context: ProviderContext, mediaType: "image" | "video", 
   }
 }
 
-type InputField = { type?: string; enum?: (string | number)[]; default?: unknown; minItems?: number; maxItems?: number };
-type AtlasModel = ProviderModel & { schemaUrl?: string; inputSchema?: { properties: Record<string, InputField>; required?: string[] } };
+type InputField = { type?: string; enum?: (string | number | boolean)[]; default?: unknown; minimum?: number; maximum?: number; maxLength?: number; minItems?: number; maxItems?: number };
+type AtlasModel = ProviderModel & Record<string, unknown> & { schemaUrl?: string; inputSchema?: { properties: Record<string, InputField>; required?: string[] } };
 
 async function generateSynced(context: ProviderContext, request: ImageRequest | VideoRequest, mediaType: "image" | "video", model: AtlasModel) {
   const schema = model.inputSchema!;
@@ -126,15 +126,17 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 }
 
 export default {
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.2.1", rules,
-  readme: "支持同步 Atlas Cloud 实时目录并选取已适配的 Seedream、GPT Image 2 图片和可灵视频。所选模型的尺寸、时长、分辨率从官方参数定义更新；复杂参考、分层和多镜头模型需单独适配，不加入可用目录。本地参考图自动上传。\n\n[官方文档](https://www.atlascloud.ai/docs/zh)",
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.1", rules,
+  readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
+    { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
+    { id: "suno/chirp-v6", label: "Suno Chirp v6 · 音乐", type: "audio", audioTask: "music", inputSchema: { properties: { prompt: { type: "string" } }, required: ["prompt"] } },
     { id: "sync/lipsync-v3", label: "Sync Lipsync v3 · 已有视频对口型", type: "video", lipSync: true, audio: true, mode: [["videoReference:1", "audioReference:1"]] },
     { id: "bytedance/seedream-v4.5", label: "Seedream 4.5 文生图", type: "image", mode: ["text"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "bytedance/seedream-v4.5/edit", label: "Seedream 4.5 参考图编辑", type: "image", mode: ["singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "kwaivgi/kling-v2.6-pro/text-to-video", label: "Kling 2.6 Pro 文生视频", type: "video", mode: ["text"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
     { id: "kwaivgi/kling-v2.6-pro/image-to-video", label: "Kling 2.6 Pro 首帧视频", type: "video", mode: ["singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
-  ] satisfies ProviderModel[],
+  ] as AtlasModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const baseUrl = String(this.config.baseUrl || "https://api.atlascloud.ai").trim().replace(/\/+$/, "");
     const signal = this.signal ?? AbortSignal.timeout(60000);
@@ -146,6 +148,7 @@ export default {
     const catalogue: AtlasModel[] = result.data.filter(item => item.display_console === true && typeof item.model === "string" && (
       item.type === "Image" && (/^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2\/(text-to-image|edit|image-to-image)$/.test(item.model))
       || item.type === "Video" && (/^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || item.model === "sync/lipsync-v3")
+      || item.type === "Audio" && !/asr|stt|transcri|lyrics-generation|voice-clon|voice-design/i.test(item.model)
     )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(), schemaUrl: item.schema }));
     if (!modelIds) return catalogue;
     const models: AtlasModel[] = [];
@@ -161,13 +164,19 @@ export default {
       const result = await response.json() as Record<string, any>;
       const input = result?.components?.schemas?.Input;
       if (!input?.properties || !Array.isArray(input.required)) throw new Error(`模型 ${model.id} 参数格式错误`);
-      const allowed = ["model", "prompt", "size", "quality", "output_format", "images", "image", "end_image", "duration", "resolution", "aspect_ratio", "sound", "multi_shot"];
+      const allowed = model.type === "audio" ? Object.entries(input.properties as Record<string, InputField>).filter(([, field]) => ["string", "number", "integer", "boolean"].includes(field.type ?? "")).map(([name]) => name) : ["model", "prompt", "size", "quality", "output_format", "images", "image", "end_image", "duration", "resolution", "aspect_ratio", "sound", "multi_shot"];
       if (input.required.some((field: string) => !allowed.includes(field))) throw new Error(`模型 ${model.id} 包含未适配的必填参数`);
       const properties = Object.fromEntries(Object.entries(input.properties as Record<string, InputField>).filter(([field]) => allowed.includes(field)).map(([field, value]) => [field,
-        Object.fromEntries(Object.entries(value).filter(([key]) => ["type", "enum", "default", "minItems", "maxItems"].includes(key))),
+        Object.fromEntries(Object.entries(value).filter(([key]) => ["type", "enum", "default", "minimum", "maximum", "maxLength", "minItems", "maxItems"].includes(key))),
       ])) as Record<string, InputField>;
       model.inputSchema = { properties, required: input.required };
-      if (model.type === "image") {
+      if (model.type === "audio") {
+        if (!properties.text && !properties.prompt) throw new Error(`模型 ${model.id} 不是已适配的文字生成音频模型`);
+        model.audioTask = properties.text ? "speech" : /sound|effect|sfx/i.test(model.id) ? "soundEffect" : "music";
+        model.speechInstructions = !!properties.instructions;
+        const voices = (properties.voice ?? properties.voice_id)?.enum?.filter((voice): voice is string => typeof voice === "string").map(voice => ({ title: voice, voice }));
+        if (voices?.length) model.voices = voices;
+      } else if (model.type === "image") {
         const editing = !!(properties.images || properties.image);
         model.mode = editing ? ["singleImage", ...(properties.images ? ["multiReference" as const] : [])] : ["text"];
         model.imageSizes = properties.size?.enum?.filter((size): size is string => typeof size === "string" && /^\d+[x*]\d+$/.test(size));
@@ -182,6 +191,37 @@ export default {
       models.push(model);
     }
     return models;
+  },
+  async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {
+    const model = this.models?.find(item => item.id === request.model && item.type === "audio") as AtlasModel | undefined;
+    if (!model?.inputSchema) throw new Error("请先同步并选择此音频模型以读取参数定义");
+    if (!request.text.trim()) throw new Error("请填写配音文本或音乐、音效描述");
+    if (request.audios?.length || (request.volume !== undefined && request.volume !== 0)) throw new Error("当前音频适配不支持参考音频或音量增益");
+    const fields = model.inputSchema.properties;
+    const body: Record<string, unknown> = { model: request.model, [fields.text ? "text" : "prompt"]: request.text };
+    const set = (field: string, value: unknown) => {
+      if (value === undefined) return;
+      const rule = fields[field];
+      if (!rule) throw new Error(`此音频模型不支持参数 ${field}`);
+      if (rule.type === "string" && typeof value !== "string" || rule.type === "boolean" && typeof value !== "boolean" || ["number", "integer"].includes(rule.type ?? "") && typeof value !== "number" || rule.type === "integer" && !Number.isInteger(value) || typeof value === "string" && rule.maxLength !== undefined && value.length > rule.maxLength) throw new Error(`音频参数 ${field} 类型或长度错误`);
+      if (rule.enum && !rule.enum.includes(value as string | number) || typeof value === "number" && (!Number.isFinite(value) || rule.minimum !== undefined && value < rule.minimum || rule.maximum !== undefined && value > rule.maximum)) throw new Error(`音频参数 ${field} 超出模型支持范围`);
+      body[field] = value;
+    };
+    set(fields.voice ? "voice" : "voice_id", request.voice || undefined);
+    set(fields.format ? "format" : fields.codec ? "codec" : "output_format", request.format);
+    set("sample_rate", request.sampleRate);
+    set("instructions", request.instructions || undefined);
+    if (request.speed !== undefined) set(fields.speed ? "speed" : "speech_rate", fields.speed ? request.speed : Math.round((request.speed - 1) * 100));
+    for (const [field, value] of Object.entries(request.audioParameters ?? {})) {
+      if (["model", "text", "prompt", "voice", "voice_id", "speed", "speech_rate", "format", "output_format", "codec", "sample_rate", "instructions"].includes(field)) throw new Error(`请通过专用字段填写 ${field}，不能从额外参数覆盖`);
+      set(field, value);
+    }
+    for (const field of model.inputSchema.required ?? []) {
+      if (body[field] === undefined && fields[field]?.default !== undefined) body[field] = fields[field].default;
+      if (body[field] === undefined) throw new Error(`音频模型缺少必填参数 ${field}，请设置音色或更新适配`);
+    }
+    const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+    return generate(this, "audio", body, signal);
   },
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
     const synced = this.models?.find(item => item.id === request.model) as AtlasModel | undefined;

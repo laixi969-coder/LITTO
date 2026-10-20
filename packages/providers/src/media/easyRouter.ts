@@ -3,6 +3,11 @@ const rules = [
   { type: "input", field: "baseUrl" as const, title: "API 地址", value: "https://easyrouter.io/v1" },
 ] as const;
 
+function speechModel(id: string): ProviderModel | undefined {
+  if (!/^(?:gpt-4o-mini-tts(?:-\d{4}-\d{2}-\d{2})?|tts-1(?:-hd)?|gemini-[\w.-]+-tts(?:-preview)?)$/.test(id)) return;
+  return { id, label: id, type: "audio", voices: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"].map(voice => ({ title: voice, voice })) };
+}
+
 function mediaUrl(input: MediaInput) {
   if (input.type === "url") {
     if (!/^https?:\/\//i.test(input.url)) throw new Error("参考图须使用 HTTP 地址");
@@ -80,9 +85,10 @@ function videoModel(id: string): ProviderModel | undefined {
 }
 
 export default {
-  id: "easyRouter", label: "EasyRouter", version: "1.1.0", rules,
-  readme: "EasyRouter 图片与视频共用 API Key。内置 GPT Image 2 文生图/单图编辑、PixVerse V6 和 Seedance 2.0 视频，支持本地视频首帧。视频自动轮询并通过带认证的内容接口下载。\n\n[官方文档](https://docs.easyrouter.io/zh/docs/api)",
+  id: "easyRouter", label: "EasyRouter", version: "1.2.0", rules,
+  readme: "图片、视频和独立配音共用 API Key，可同步目录并选择已适配模型。配音支持 GPT TTS 与 Gemini TTS，使用 /audio/speech 返回音频流；Gemini 保留原生 WAV 和默认语速。支持平台音色 ID，不支持此接口未定义的克隆参考和表演指令。视频自动轮询并通过带认证的内容接口下载。\n\n[配音文档](https://docs.easyrouter.io/en/docs/api/ai-model/audio/speech)",
   models: [
+    { id: "gpt-4o-mini-tts", label: "GPT-4o Mini TTS · 配音", type: "audio", voices: [{ title: "Alloy", voice: "alloy" }, { title: "Nova", voice: "nova" }] },
     { id: "gpt-image-2", label: "GPT Image 2", type: "image", mode: ["text", "singleImage"], imageSizes: ["1K"], imageRatios: ["1:1", "3:2", "2:3"] },
     { id: "PixVerse/v6", label: "PixVerse V6", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["720P", "1080P"] }] },
     { id: "dreamina-seedance-2-0", label: "Seedance 2.0", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["480P", "720P", "1080P"] }] },
@@ -94,10 +100,29 @@ export default {
     const models = new Map<string, ProviderModel>();
     for (const item of result.data) {
       if (typeof item?.id !== "string" || (modelIds && !modelIds.includes(item.id))) continue;
-      const model: ProviderModel | undefined = item.id === "gpt-image-2" ? { id: item.id, label: "GPT Image 2", type: "image", mode: ["text", "singleImage"], imageSizes: ["1K"], imageRatios: ["1:1", "3:2", "2:3"] } : videoModel(item.id);
+      const model: ProviderModel | undefined = item.id === "gpt-image-2" ? { id: item.id, label: "GPT Image 2", type: "image", mode: ["text", "singleImage"], imageSizes: ["1K"], imageRatios: ["1:1", "3:2", "2:3"] } : speechModel(item.id) ?? videoModel(item.id);
       if (model) models.set(item.id, { ...model, label: item.display_name || item.displayName || model.label });
     }
     return [...models.values()];
+  },
+  async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {
+    if (Object.keys(request.audioParameters ?? {}).length) throw new Error("EasyRouter 语音不支持额外音频参数");
+    if (!speechModel(request.model)) throw new Error("此模型尚未适配 EasyRouter 语音协议");
+    if (!request.text.trim()) throw new Error("请填写配音文本");
+    if (request.audios?.length || request.instructions || request.sampleRate !== undefined || (request.volume !== undefined && request.volume !== 0)) throw new Error("此语音接口不支持参考音频、表演指令、指定采样率或音量增益");
+    if (request.speed !== undefined && (!Number.isFinite(request.speed) || request.speed < 0.25 || request.speed > 4)) throw new Error("语速须为 0.25–4");
+    const gemini = request.model.startsWith("gemini-");
+    if (gemini && (request.speed !== undefined && request.speed !== 1 || request.format !== undefined && request.format !== "wav")) throw new Error("Gemini TTS 使用原生 WAV 与默认语速，不支持在此接口调整格式或语速");
+    const formats: Record<string, string> = { mp3: "audio/mpeg", opus: "audio/ogg", aac: "audio/aac", flac: "audio/flac", wav: "audio/wav", pcm: "audio/pcm" };
+    const format = request.format ?? (gemini ? "wav" : "mp3");
+    if (!formats[format]) throw new Error("不支持此音频格式");
+    const signal = AbortSignal.any([AbortSignal.timeout(180000), ...(this.signal ? [this.signal] : [])]);
+    const response = await fetchResponse(this, "/audio/speech", signal, JSON.stringify({ model: request.model, input: request.text, voice: request.voice || "alloy", ...(!gemini ? { response_format: format, speed: request.speed ?? 1 } : {}) }));
+    const mimeType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+    if (!mimeType?.startsWith("audio/")) throw new Error("EasyRouter 未返回音频流");
+    const data = await readBytes(response, 100 * 1024 * 1024);
+    if (!data.length) throw new Error("EasyRouter 返回空音频");
+    return [{ mediaType: "audio", type: "binary", data, mimeType }];
   },
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
     if (request.model !== "gpt-image-2") throw new Error("当前 EasyRouter 图片适配支持 GPT Image 2");
