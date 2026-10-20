@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createWorkspaceFfmpeg, getStatus } from "@/utils/ffmpeg";
 import { inspectFilm } from "@/utils/media/qc";
+import { exportTimeline } from "@/utils/media/timeline";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 
 export interface ComposeFilm {
@@ -35,6 +36,8 @@ export interface ComposeRequest {
   headTail?: { start: number; end: number }[];
   /** 合成后是否自动跑一遍整片自检，默认开启 */
   verify?: boolean;
+  /** 合成后是否顺手导出一份时间线（OTIO + EDL），默认开启：成片不该只有一个不可编辑的 mp4 */
+  timeline?: boolean;
 }
 
 /** 边缘能量：sobel 后的平均亮度，用来判断处理有没有把画面糊掉。 */
@@ -54,7 +57,7 @@ async function edgeEnergy(ffmpeg: Awaited<ReturnType<typeof createWorkspaceFfmpe
  * 把已生成的镜头按顺序合成为一支片子：先 concat 拼轨（不重编码），再统一做一次调色与响度归一。
  * 只编码一次，避免逐段重编码带来的段间黑闪与音量跳变。
  */
-export async function composeFilm(cwd: string, request: Pick<ComposeRequest, "clips" | "output" | "grade" | "film" | "targetLufs" | "headTail" | "verify">, signal?: AbortSignal) {
+export async function composeFilm(cwd: string, request: Pick<ComposeRequest, "clips" | "output" | "grade" | "film" | "targetLufs" | "headTail" | "verify" | "timeline">, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const sources = await Promise.all(request.clips.map(clip => resolveWorkspacePath(cwd, clip)));
   const target = await resolveWorkspacePath(cwd, request.output, true);
@@ -119,7 +122,13 @@ export async function composeFilm(cwd: string, request: Pick<ComposeRequest, "cl
         return { before: Number(before.toFixed(2)), after: Number(after.toFixed(2)), drop, blurred: drop > 12 };
       })()
       : undefined;
-    return { path: request.output, duration, clips: request.clips.length, qc, sharpness };
+    // 成片同时给一份可编辑时间线：转场、J/L cut、调色交给剪辑器，不用回头重生成。
+    const timeline = request.timeline === false ? undefined : await exportTimeline(cwd, {
+      clips: request.clips.map((clip, index) => ({ path: clip, name: `S${String(index + 1).padStart(2, "0")}` })),
+      name: request.output.replace(/\.[^.]+$/, ""),
+      fps: 24,
+    }).catch(error => ({ error: error instanceof Error ? error.message : String(error) }));
+    return { path: request.output, duration, clips: request.clips.length, qc, sharpness, timeline };
   } finally {
     await rm(listPath, { force: true }).catch(() => undefined);
     await rm(joinedPath, { force: true }).catch(() => undefined);

@@ -125,6 +125,7 @@ metadata:
 | 选角、候选人物、角色生成、系列人像或摄影参考转译 | 读取[选角与角色生成](references/methods/characterCasting.md)，按电影、MV、广告任务区分身份、造型、摄影与当场状态；全局默认干净、完整、清晰，明确例外限定对象和时段 |
 | 妆发、服装搭配、换装、卸妆或持续外观状态 | 读取[妆造设计](references/methods/characterStyling.md)，将人物处境、当前造型、变化时点与参考分工落实到现有资产和镜头；现代真人 MV 人物资产或精致人像参考在出图前应用其中的肤面、妆发与搭配标准 |
 | 对白、倾听、无声反应、情绪变化、群像，或修复僵硬表演 | 规划或修复前读取[表演指导](../cinema/references/performanceDirection.md)，按剧情、唱跳或产品互动选择重点，落实角色目标、触发、目光与节拍；复用现有字段和单一时间线，不叠加上游技能全文 |
+| 需要转场、J/L cut、多轨、字幕、精调切点 | 生成链路只负责素材与顺序，**精剪不进生成**。调 `POST /api/ai/media/timeline` 导出 OpenTimelineIO 与 CMX3600 EDL（`composeFilm` 合成后也会自动导一份到 `assets/timeline/`），交给 filmcraft / 达芬奇 / Premiere 剪。EDL 带 `* SOURCE FILE:` 绝对路径，导入时能自动链接素材 |
 | 批量生成（一次超过 5 镜或合计超过 60 秒） | **先调 `POST /api/ai/media/estimate` 报价**：给 providerId/modelId/duration/resolution，返回这一批的条数、秒数、参考积分，以及最近 24 小时已消耗多少。把报价和「已经烧了多少」一起报给用户，得到明确同意再提交。额度是真实货币，不是沙盒 |
 | 有对白的场景要拆镜、要多轮对白、要判断谁说话给谁镜头 | 拆镜前读取[对白覆盖与正反打](../cinema/references/coverage.md)。先调 `POST /api/ai/media/coverage` 把分镜台词归属算一遍：它返回每镜的轮次、台词容量与拆镜建议，并写入 `assets/coverage.json`。覆盖表判 block 的项目**不能生成视频**，会直接被拦；画外对答、一镜三轮以上都会被点名 |
 | 武打、搏击、追逐、兵器、仙侠法术或复杂身体交互 | 规划或修复前读取[动作编排](../cinema/references/actionChoreography.md)，落实空间、受力、反应与状态衔接；攻防节拍、多人换位、法术及连续长镜头再读[武打导演专项](../cinema/references/manjuActionDirection.md)；同时有表演诉求时结合表演指导 |
