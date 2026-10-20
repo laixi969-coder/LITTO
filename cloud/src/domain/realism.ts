@@ -21,6 +21,19 @@ export const techniqueReviewSchema = z.array(z.object({ id: z.string().min(1), v
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
+export function takeCoverageIssue(s: Scope, shot: Record<string, any>, item: Record<string, any>) {
+  const ranges = qualityReviewPlan(shot, "take").speechRanges;
+  if (!ranges.length) return null;
+  const media = s.get("media", item.mediaId);
+  if (!media?.mime.startsWith("video/") || media.projectId !== shot.projectId || !Number.isFinite(media.duration) || media.duration <= 0) return "当前项目视频缺少实测时长，不能确认整句覆盖或音画同步";
+  const speechEnd = Math.max(...ranges.map(range => range.end));
+  // 剪入尾帧容许 50ms 的封装误差；发声窗口仍须完整落在源视频内。
+  if (speechEnd > media.duration + 0.001 || shot.duration > media.duration + 0.05) {
+    return `当前视频仅 ${media.duration.toFixed(3)} 秒，计划剪入 ${shot.duration} 秒、发声至 ${speechEnd.toFixed(3)} 秒；不能用规划窗口、完整播放勾选、定格、加速或跨镜挪音代替实际覆盖`;
+  }
+  return null;
+}
+
 export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "take" = "take"): string {
   const shot = s.get("shots", shotId);
   if (!shot) throw notFound("shot");
@@ -63,7 +76,11 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
   const latest = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
   const evidence = latest?.evidence;
   const shot = s.get("shots", item.shotId);
-  if (type === "take" && shot) assertSpeechPlan(s, shot);
+  if (type === "take" && shot) {
+    assertSpeechPlan(s, shot);
+    const coverageIssue = takeCoverageIssue(s, shot, item);
+    if (coverageIssue) throw conflict(coverageIssue, "speech_media_coverage_required");
+  }
   const plan = qualityReviewPlan(shot ?? {}, type);
   if (type === "take" && (needsLipSync(shot ?? {}) || shot?.creativeBrief?.dialogue?.lines?.length)) {
     const audio = evidence?.audioReview;

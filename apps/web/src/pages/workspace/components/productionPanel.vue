@@ -305,7 +305,7 @@ const durations = computed(() => [...new Set(selectedModel.value?.durationResolu
 const versions = computed(() => [...(detail.value?.keyframes ?? []).map((item: any) => ({ ...item, type: "keyframe" })), ...(detail.value?.takes ?? []).map((item: any) => ({ ...item, type: "take" }))]);
 const target = computed(() => versions.value.find(item => item.id === targetId.value));
 const targetReports = computed(() => (detail.value?.qc ?? []).filter((report: any) => report.targetId === targetId.value).reverse());
-const priorFindings = computed(() => (targetReports.value[0]?.findings ?? []).filter((item: any) => !item.kind.startsWith("continuity:")));
+const priorFindings = computed(() => (targetReports.value[0]?.findings ?? []).filter((item: any) => !item.kind.startsWith("continuity:") && item.kind !== "speechCoverage"));
 const qualityPlan = computed(() => qualityReviewPlan(detail.value ?? {}, target.value?.type ?? "keyframe"));
 const techniqueNeedsRevision = computed(() => target.value?.type === "take" && Object.values(techniqueReviews.value).some(item => item.verdict === "revise"));
 const techniqueNotesComplete = computed(() => target.value?.type !== "take" || qualityPlan.value.techniques.every(item => (techniqueReviews.value[item.id]?.note.trim().length ?? 0) >= 10 && techniqueReviews.value[item.id]?.verdict !== "unverified"));

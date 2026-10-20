@@ -2,13 +2,14 @@ import { type Scope } from "../db.ts";
 import { notFound } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
 import { generateKeyframes, generateTakes } from "./lifecycle.ts";
-import { realismChecks, shotFingerprint, techniqueReviewSchema } from "./realism.ts";
+import { realismChecks, shotFingerprint, techniqueReviewSchema, takeCoverageIssue } from "./realism.ts";
 import { scheduleLocalRepair } from "./localRepair.ts";
 import { qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
 import { bad } from "../util.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
 const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string; penalty: number; severity: "high" | "medium" | "low" }> = {
+    speechCoverage: { cause: "实际视频未覆盖当前对白和剪入时长", action: "dialogueRevise", detail: "保留旧素材与原句，对照真实配音重新安排可用画面；规划通过不能代替成片通过，不加速、删句、定格或跨镜挪音补时长，也不自动付费重试", penalty: 25, severity: "high" },
     narrativeFailure: { cause: "剧情因果或信息揭示不成立", action: "storyRevise", detail: "先 readStoryImpact 定位源场次和关联镜头，修改故事后只重做受影响段落", penalty: 25, severity: "high" },
     dialogueMismatch: { cause: "对白缺漏、错词或说话人错误", action: "dialogueRevise", detail: "读取源台词与 readVoice，对照实际声音；修正对应句和口型候选，不重做无关画面", penalty: 25, severity: "high" },
     editingPace: { cause: "剪辑入出点导致拖沓或反应被截断", action: "editTrim", detail: "readEdit 定位片段，用 previewCut 和 editTimeline 的 set_cut/trim_clip 修正实际入出点，保留完整对白与有效反应", penalty: 15, severity: "medium" },
@@ -47,12 +48,12 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (target.type === "take" && reviewed.length && plan.techniques.some(item => !techniqueReview.some(check => check.id === item.id))) throw bad("选用技法的视频须逐项填写 techniqueReview 的 id、pass/revise 和真实观察 note；先完整播放，不让用户重做选择确认");
     observations = [...observations, ...techniqueReview.filter(item => item.verdict === "revise").map(item => ({ kind: "creativeMismatch", note: item.note }))];
     if (review.reviewedSegments?.some(range => range.end > (s.get("media", obj.mediaId)?.duration ?? 0))) throw bad("看听区间超出当前素材时长");
-    if (review.audioReview && (target.type !== "take" || !(review.fullPlayback || coversSpeechRanges(plan.speechRanges, review.reviewedSegments ?? [])))) throw bad("声音与口型检查须实际看听全部发声区间");
+    if (review.audioReview && (target.type !== "take" || (review.audioReview.speech === "pass" || review.audioReview.lipSync === "pass") && !(review.fullPlayback || coversSpeechRanges(plan.speechRanges, review.reviewedSegments ?? [])))) throw bad("声音与口型通过须实际看听全部发声区间；局部发现的问题可以记录为 fail");
     if (review.audioReview?.referenceMediaId && (s.get("media", review.audioReview.referenceMediaId)?.projectId !== shot.projectId || !s.get("media", review.audioReview.referenceMediaId)?.mime.startsWith("audio/"))) throw bad("声音参考须为当前项目的真实音频");
     if (plan.fullPlayback && reviewed.length && review.fullPlayback !== true) throw bad("视频检查须确认已完整播放当前版本");
     const fingerprint = shotFingerprint(s, shotId, target.type);
     const previous = s.list("qc_reports", { targetType: target.type, targetId: target.id }, "created_at DESC, rowid DESC")[0];
-    const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind] && item.kind !== "deliveryUnverified") : [];
+    const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind] && !["deliveryUnverified", "speechCoverage"].includes(item.kind)) : [];
     const dismissed = review.dismissedKinds ?? [];
     if (dismissed.length && (!review.actor || !review.note?.trim() || !reviewed.length || dismissed.some(kind => !prior.some((item: any) => item.kind === kind)))) throw bad("排除旧告警须逐项选择，并记录复核依据");
     const sameVersion = previous?.evidence?.mediaId === obj.mediaId && previous.evidence.fingerprint === fingerprint;
@@ -66,6 +67,8 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (reviewed.length && (!review.actor || reviewed.some(key => !realismChecks.includes(key as any)))) throw bad("人工检查须记录检查项和检查者");
     const findings: any[] = [];
     const media = obj.mediaId ? s.get("media", obj.mediaId) : undefined;
+    const coverageIssue = target.type === "take" ? takeCoverageIssue(s, shot, obj) : null;
+    if (coverageIssue) findings.push({ kind: "speechCoverage", ...DIAGNOSIS.speechCoverage, note: coverageIssue });
     const requestedResolution = obj.meta?.parameters?.request?.resolution ?? obj.meta?.parameters?.resolution;
     const requestedSide = typeof requestedResolution === "string" ? Number(/^(\d+)p$/i.exec(requestedResolution)?.[1]) : 0;
     if (target.type === "take" && requestedSide && (!media?.width || !media?.height)) {
@@ -77,7 +80,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     // 1. human / vision observations → diagnosis.
     for (const o of observations) {
         const d = DIAGNOSIS[o.kind];
-        if (d) findings.push({ kind: o.kind, ...d, note: o.note });
+        if (d && !(o.kind === "speechCoverage" && coverageIssue)) findings.push({ kind: o.kind, ...d, note: o.note });
     }
     // 2. automatic: the generation had to degrade a reference role → capability mismatch.
     const refs = (obj.meta?.inputRefs ?? []) as any[];
