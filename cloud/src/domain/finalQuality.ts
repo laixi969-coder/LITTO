@@ -15,6 +15,12 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
   const edit = getEdit(s, sequenceId, false);
   validateTimeline(s, edit);
   const active = edit.clips.filter(clip => !edit.tracks.find(track => track.id === clip.trackId)?.muted);
+  const projectId = s.get("sequences", sequenceId)!.projectId;
+  const hasSpeech = s.list("shots", { projectId }).some(shot => shot.creativeBrief?.dialogue?.lines?.length || needsLipSync(shot));
+  if (hasSpeech && active.some(clip => edit.tracks.find(track => track.id === clip.trackId)?.kind === "video"
+    && (!clip.shotId || s.get("shots", clip.shotId)?.projectId !== projectId))) {
+    throw conflict("对白项目的视频片段须关联本项目对应镜头，才能核对原句、声音与口型；无镜头归属的旧混音只能导出 draft:true 预览，不能直接作为定稿", "speech_export_blocked");
+  }
   for (const shot of s.list("shots", { sequenceId })) {
     for (const line of shot.creativeBrief?.dialogue?.lines ?? []) {
       if (!active.some(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video"
