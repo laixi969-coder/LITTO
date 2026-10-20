@@ -1,13 +1,15 @@
+import { currentTenant } from "@/utils/tenant";
 import { z } from "zod";
 import type { QuestionAnswer, QuestionContext, QuestionRequest } from "@toonflow/tools-scaffold/runtime";
 import type { AgentEvent } from "@/agent/runtime/types";
 
-type PendingQuestion = { cwd: string; request: QuestionRequest; cancel(): void; finish(result: QuestionAnswer | Error): void };
+type PendingQuestion = { cwd: string; userId?: string; workspaceId?: string; request: QuestionRequest; cancel(): void; finish(result: QuestionAnswer | Error): void };
 
 // ACT: 提问随当前流存活，不设用户答题超时；断开或停止时取消，多进程时需共享通道。
 const pendingQuestions = new Map<string, PendingQuestion>();
 
 export function createQuestionContext(cwd: string, send: (event: Extract<AgentEvent, { type: "question" }>) => void, onCancel?: () => void) {
+  const tenant = currentTenant();
   const activeQuestions = new Set<string>();
   let disposed = false;
   const context: QuestionContext = {
@@ -24,7 +26,7 @@ export function createQuestionContext(cwd: string, send: (event: Extract<AgentEv
           else resolve(result);
         };
         const abort = () => finish(new Error("提问已取消"));
-        pendingQuestions.set(callId, { cwd, request, finish, cancel() { onCancel?.(); abort(); } });
+        pendingQuestions.set(callId, { cwd, userId: tenant?.userId, workspaceId: tenant?.workspaceId, request, finish, cancel() { onCancel?.(); abort(); } });
         activeQuestions.add(callId);
         signal?.addEventListener("abort", abort, { once: true });
         try { send({ ...request, type: "question", toolCallId, callId }); }
@@ -43,7 +45,8 @@ export function createQuestionContext(cwd: string, send: (event: Extract<AgentEv
 
 export function answerQuestion(cwd: string, callId: string, response: { answer?: string; values?: unknown; cancelled?: boolean; skipped?: boolean }) {
   const pending = pendingQuestions.get(callId);
-  if (!pending || pending.cwd !== cwd) throw Object.assign(new Error("提问不存在或已结束"), { status: 404 });
+  const tenant = currentTenant();
+  if (!pending || pending.cwd !== cwd || pending.userId !== tenant?.userId || pending.workspaceId !== tenant?.workspaceId) throw Object.assign(new Error("提问不存在或已结束"), { status: 404 });
   if (response.cancelled) {
     pending.cancel();
     return;

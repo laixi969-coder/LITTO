@@ -11,8 +11,9 @@ export async function requestKeyframeApproval(directory: string, toolCallId: str
   const scope = api.scoped(tenant.workspaceId);
   const frames = api.prepareKeyframeApproval(scope, projectId, keyframeIds);
   const pending = frames.filter(item => !item.approved);
+  const reviewRequired = frames.filter(item => item.reviewRequired).map(item => item.id);
   const title = `采用 ${pending.length || frames.length} 个镜头的主关键帧`;
-  if (!pending.length) return { title, approved: true, keyframes: frames.map(item => ({ shotId: item.shotId, heroKeyframeId: item.id })), answer: "这些关键帧已采用，无需再次确认" };
+  if (!pending.length) return { title, approved: true, reviewRequired, keyframes: frames.map(item => ({ shotId: item.shotId, heroKeyframeId: item.id })), answer: reviewRequired.length ? "选图决定已保存，无需重新选择或确认。部分镜头规格或检查记录已变化，助手须复核当前素材；技术门禁仍生效，不能靠重复采用解除。" : "这些关键帧已采用，无需再次确认" };
   const request: QuestionRequest = {
     title,
     question: "请查看下列图片，核对材质、成像、空间关系与电影感。确认后会一次保存为各镜头的主关键帧，可继续生成视频。已有主帧被替换时仍保留旧版本。",
@@ -26,5 +27,5 @@ export async function requestKeyframeApproval(directory: string, toolCallId: str
   if (!member || member.role === "VIEWER") throw new Error("采用关键帧的编辑权限已失效");
   if (workspaceProject(directory) !== projectId) throw new Error("工作目录关联项目已改变，请重新确认");
   const keyframes = api.approveKeyframes(scope, projectId, frames, tenant.userId);
-  return { ...request, approved: true, keyframes, answer: `已保存 ${pending.length} 个镜头的主关键帧，可继续已授权的后续工作` };
+  return { ...request, approved: true, reviewRequired, keyframes, answer: `已保存 ${pending.length} 个镜头的主关键帧，可继续已授权的后续工作` };
 }

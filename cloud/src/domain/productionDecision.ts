@@ -172,8 +172,11 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
         }
       }
       if (action.operation === "reviewOutput" && type === "keyframe" && shot.heroKeyframeId === items[0]!.id && items[0]!.status === "hero") {
-        try { requireReviewed(s, "keyframe", items[0]!); completed = true; selectedId = items[0]!.id; }
+        // 选图偏好和技术检查分别保存；技术检查过期不能撤销用户已采用的选择。
+        try { requireReviewed(s, "keyframe", items[0]!); }
         catch (error) { if ((error as { code?: string }).code !== "review_required") throw error; }
+        completed = true;
+        selectedId = items[0]!.id;
       }
       break;
     }

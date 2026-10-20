@@ -22,15 +22,19 @@ export function prepareKeyframeApproval(s: Scope, projectId: string, input: unkn
     if (report?.findings.some((finding: { severity: string; kind: string }) => finding.severity === "high" && !finding.kind.startsWith("continuity:"))) {
       throw conflict(`「${shot.title}」存在严重画面问题，请修复或复核后再采用`, "qc_blocked");
     }
-    let approved = false;
-    if (shot.heroKeyframeId === id && keyframe.status === "hero") {
-      try { requireReviewed(s, "keyframe", keyframe); approved = true; }
-      catch (error) { if ((error as { code?: string }).code !== "review_required") throw error; }
+    const approved = shot.heroKeyframeId === id && keyframe.status === "hero";
+    let reviewRequired = false;
+    if (approved) {
+      try { requireReviewed(s, "keyframe", keyframe); }
+      catch (error) {
+        if ((error as { code?: string }).code !== "review_required") throw error;
+        reviewRequired = true;
+      }
     }
     return {
       id, shotId: shot.id as string, title: String(shot.title), mediaId: String(media.id),
       fingerprint: shotFingerprint(s, shot.id, "keyframe"), heroKeyframeId: shot.heroKeyframeId ?? null,
-      reportId: report?.id ?? null, approved, media: keyframeView(keyframe).media,
+      reportId: report?.id ?? null, approved, reviewRequired, media: keyframeView(keyframe).media,
     };
   });
 }
@@ -38,12 +42,12 @@ export function prepareKeyframeApproval(s: Scope, projectId: string, input: unkn
 export function approveKeyframes(s: Scope, projectId: string, expected: ReturnType<typeof prepareKeyframeApproval>, actor: string) {
   return tx(() => {
     const current = prepareKeyframeApproval(s, projectId, expected.map(item => item.id));
-    // ACT: 批量采用绑定卡片展示时的状态，任何一镜变化都不提交，避免部分采用或覆盖并发选择。
+    // ACT: 批量采用绑定素材、规格与选择；后台检查报告换号不撤销用户选择，严重缺陷已由 prepare 拦截。
     for (const [index, item] of current.entries()) {
       const before = expected[index]!;
       if (item.shotId !== before.shotId || item.mediaId !== before.mediaId || item.fingerprint !== before.fingerprint
-        || item.heroKeyframeId !== before.heroKeyframeId || item.reportId !== before.reportId) {
-        throw conflict("待采用图片、镜头规格或检查记录已改变，请重新展示确认卡片", "stale");
+        || item.heroKeyframeId !== before.heroKeyframeId) {
+        throw conflict("待采用图片、镜头规格或主帧选择已改变，请重新展示确认卡片", "stale");
       }
     }
     return current.map(item => {

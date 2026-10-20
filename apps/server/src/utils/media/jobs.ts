@@ -33,7 +33,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
   // 覆盖表判 block 的项目不放行视频生成：一镜塞三轮以上对白，成片里必然是「听见他的声音却一直看着另一个人」。
-  if (kind === "video") {
+  if (kind === "video" && !request.shotId) {
     const blocked = await coverageGate(directory);
     if (blocked) throw Object.assign(new Error(`对白覆盖未通过：${blocked}`), { status: 400, retryable: false });
   }
@@ -166,6 +166,10 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
 }
 
 export async function prepareShot(directory: string, kind: "image" | "video", shotId: string, request: MediaGenerationRequest) {
+  if (kind === "video") {
+    const blocked = await coverageGate(directory);
+    if (blocked) throw Object.assign(new Error(`对白覆盖未通过：${blocked}`), { status: 400, retryable: false });
+  }
   assertModelSelection(kind, request.providerId, request.modelId);
   const tenant = currentTenant();
   const api = cloud();
@@ -210,6 +214,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     const blocking = await blockingLine(directory, request.outputName);
     if (blocking) result.compiled.prompt = `${blocking}\n\n${result.compiled.prompt}`;
   }
+  assertPromptPolicy({ ...request, prompt: result.compiled.prompt }, kind);
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, result.compiled.prompt, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
   return { ...result, request: { ...request, shotId, productionFingerprint: result.fingerprint, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
 }

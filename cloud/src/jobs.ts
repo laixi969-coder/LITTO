@@ -31,6 +31,10 @@ export function enqueue(spec: JobSpec) {
             if (receipt.cancelled) throw conflict("生成请求已取消，不会重新提交", "cancelled");
             const previous = scoped(spec.workspaceId).get("generation_jobs", receipt.id);
             if (!previous) throw conflict("原生成任务已不存在，请核查后重试", "missing_job");
+            if (previous.projectId !== spec.projectId || previous.kind !== spec.kind || previous.modelId !== spec.modelId
+                || (previous.targetType ?? null) !== (spec.targetType ?? null) || (previous.targetId ?? null) !== (spec.targetId ?? null)) {
+                throw conflict("请求 ID 与原生成任务的项目、模型或目标不一致", "request_conflict");
+            }
             return { ...jobView(previous), reused: true };
         }
     }
@@ -39,6 +43,10 @@ export function enqueue(spec: JobSpec) {
     const limits = JSON.parse(model.limits);
     if (limits.workspaceId && limits.workspaceId !== spec.workspaceId) throw bad("model unavailable");
     if (spec.projectId && !scoped(spec.workspaceId).get("projects", spec.projectId)) throw bad("project unavailable");
+    for (const reference of spec.inputRefs) {
+        if (reference.sent && reference.mediaId) inputMedia(spec.workspaceId, spec.projectId, reference.mediaId);
+    }
+    if (spec.targetType === "shot" && (!spec.targetId || scoped(spec.workspaceId).get("shots", spec.targetId)?.projectId !== spec.projectId)) throw bad("生成目标镜头不属于当前项目");
     if (spec.parameters.candidateBatchId) {
         const batch = scoped(spec.workspaceId).get("candidate_batches", spec.parameters.candidateBatchId);
         if (!batch || batch.projectId !== spec.projectId || batch.kind !== spec.kind
@@ -132,12 +140,18 @@ async function tick() {
     }
 }
 
-async function loadInputs(refs: any[]) {
+function inputMedia(workspaceId: string, projectId: string | null, mediaId: string) {
+    const media = scoped(workspaceId).get("media", mediaId);
+    if (!media || media.projectId !== projectId) throw Object.assign(bad("生成参考素材不属于当前项目或已被删除"), { retryable: false, fallbackAllowed: false });
+    return media;
+}
+
+async function loadInputs(workspaceId: string, projectId: string | null, refs: any[]) {
     const out: GenRequest["inputs"] = [];
     for (const r of refs) {
         if (!r.sent || !r.mediaId) continue;
-        const m = get("SELECT * FROM media WHERE id=?", r.mediaId);
-        if (m) out.push({ role: r.role, mime: m.mime, data: await storage.get(m.storage_key), weight: r.weight });
+        const m = inputMedia(workspaceId, projectId, r.mediaId);
+        out.push({ role: r.role, mime: m.mime, data: await storage.get(m.storageKey), weight: r.weight });
     }
     return out;
 }
@@ -159,7 +173,7 @@ async function execute(jobId: string) {
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
         const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(prov.timeout_ms)]);
-        const req: GenRequest = { signal, context: { jobId, workspaceId: job.workspaceId, projectId: job.projectId, userId: job.createdBy }, kind: job.kind, externalModelId: model.external_model_id, prompt: job.compiledPrompt, negativePrompt: p.negativePrompt, params: { ...p, seed: job.seed }, inputs: await loadInputs(job.inputRefs ?? []), apiKey, baseUrl: prov.base_url, attempt: job.attempts, label: p.label };
+        const req: GenRequest = { signal, context: { jobId, workspaceId: job.workspaceId, projectId: job.projectId, userId: job.createdBy }, kind: job.kind, externalModelId: model.external_model_id, prompt: job.compiledPrompt, negativePrompt: p.negativePrompt, params: { ...p, seed: job.seed }, inputs: await loadInputs(job.workspaceId, job.projectId, job.inputRefs ?? []), apiKey, baseUrl: prov.base_url, attempt: job.attempts, label: p.label };
         let result: GenResult | null = null;
         let taskId: string | null = raw.provider_task_id; // resume after restart
         const deadline = started + prov.timeout_ms;
@@ -192,7 +206,7 @@ async function execute(jobId: string) {
         await finish(job, result, Date.now() - started);
         if (cred) markCredential(cred.id, null);
     } catch (e) {
-        const err = e as Error & { retryable?: boolean; timeout?: boolean };
+        const err = e as Error & { retryable?: boolean; timeout?: boolean; fallbackAllowed?: boolean };
         if (cred) markCredential(cred.id, err.message);
         if (err.name === "TimeoutError") err.timeout = true;
         await fail(job, err, Date.now() - started);
@@ -227,7 +241,7 @@ async function finish(job: any, result: GenResult, durationMs: number) {
     }
 }
 
-async function fail(job: any, err: Error & { retryable?: boolean; timeout?: boolean }, durationMs: number) {
+async function fail(job: any, err: Error & { retryable?: boolean; timeout?: boolean; fallbackAllowed?: boolean }, durationMs: number) {
     const cur = get("SELECT * FROM generation_jobs WHERE id=?", job.id)!;
     if (cur.status === "CANCELLED") return;
     const p = cur.parameters ? JSON.parse(cur.parameters) : {};
@@ -242,7 +256,7 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
         return;
     }
     // Provider exhausted → fallback to the next-best model that satisfies the same roles.
-    if (!remoteUnresolved && p.fallbackAllowed !== false) {
+    if (!remoteUnresolved && err.fallbackAllowed !== false && p.fallbackAllowed !== false) {
         const roles = (JSON.parse(cur.input_refs ?? "[]") as any[]).map((r) => r.role);
         const excluded = [...(p.excluded ?? []), cur.model_id];
         const chain = JSON.parse(cur.fallback_chain ?? "[]");

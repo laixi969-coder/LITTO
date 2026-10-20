@@ -43,6 +43,12 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
   let tenant: Tenant | null;
   try { tenant = tenantOf(req); } catch { return res.status(403).json(error("无权访问该工作区", null, 403)); }
   if (!tenant) return res.status(401).json(error("请先登录", null, 401));
+  const path = req.path.toLowerCase().replace(/\/+$/, "");
+  const readOnlyPost = req.method === "POST" && (["/ai/media/estimate", "/ai/media/preflight"].includes(path)
+    || path === "/ai/media/blocking" && req.body?.save === false);
+  if (tenant.role === "VIEWER" && !["GET", "HEAD", "OPTIONS"].includes(req.method) && !readOnlyPost) {
+    return res.status(403).json(error("只读成员不能修改工作区或执行任务", null, 403));
+  }
   (req as Request & { tenant?: Tenant }).tenant = tenant;
   tenantStore.run(tenant, next);
 }
