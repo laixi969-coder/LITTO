@@ -262,10 +262,10 @@ export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "
     invalid(`提示词里出现会被生成成脏旧破损的词：${hits.map(word => `「${word}」`).join("、")}。默认不生成脏旧破损的人物、服装与场景。若不是设计需要，换成具体面料、剪裁与颜色；确属设计需要（废墟、贫民窟、战后场景），在提示词里写明「DISTRESSED: 具体理由」，只影响该对象与当前时段`);
   }
 
-  // 纯文本生成没有身份锚点，等于每镜重新选角。人物镜头必须带参考图，只放行无人空镜与建资产用途。
-  if (mediaType === "video" && request.purpose !== "asset" && !request.images?.length && !request.firstFrame && !request.lastFrame) {
+  // 人物原视频也是身份锚点；专用口型模型只接收视频与声音，不能误要求额外参考图。
+  if (mediaType === "video" && request.purpose !== "asset" && !request.images?.length && !request.videos?.length && !request.firstFrame && !request.lastFrame) {
     if (looksLikePersonShot(request.prompt)) {
-      invalid("人物镜头必须提供角色参考图：用 images 传已采用的定妆图，或用 firstFrame 接上一镜末帧。纯文本生成会每镜重新选角，跨镜必然换脸；仅空镜、环境、流体、光效可用纯文本");
+      invalid("人物镜头必须提供身份参考：用 images 传已采用的定妆图、firstFrame 接上一镜末帧，或 videos 传人物原视频。纯文本生成会每镜重新选角，跨镜必然换脸；仅空镜、环境、流体、光效可用纯文本");
     }
   }
 }

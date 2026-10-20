@@ -104,7 +104,8 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     const clipChain = (c: EClip, k: number, extra: string, startShift = false) => {
         const sp = c.speed, inn = c.in, out = c.in + c.duration * sp;
         const head = info[k].image ? `[${k}:v]` : `[${k}:v]trim=start=${r3(inn)}:end=${r3(out)},`;
-        return `${head}setpts=(PTS-STARTPTS)/${sp}${startShift ? `+${r3(c.start)}/TB` : ""},settb=AVTB,fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p${extra ? "," + extra : ""}`;
+        // 片段以素材公共时轴的入点归零，保留音画起始偏移；fps 补齐首帧前的显示区间。
+        return `${head}setpts=(PTS-${info[k].image ? "STARTPTS" : `${r3(inn)}/TB`})/${sp}${startShift ? `+${r3(c.start)}/TB` : ""},settb=AVTB,fps=${fps}:start_time=0,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p${extra ? "," + extra : ""}`;
     };
 
     // ---- V1 layout: black gaps, cuts (concat), dissolves (xfade), dip-to-black (fades)
@@ -172,7 +173,8 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         const tk = tracks.get(a.track)!, c = a.c;
         const gain = c.gainDb + tk.gainDb, sp = c.speed, ms = Math.max(0, Math.round(c.start * 1000));
         const out = c.in + c.duration * sp;
-        const f = [`atrim=start=${r3(c.in)}:end=${r3(out)}`, "asetpts=PTS-STARTPTS", ...atempo(sp), "aformat=sample_rates=48000:channel_layouts=stereo", gain ? `volume=${gain}dB` : "", c.fadeIn > 0 ? `afade=t=in:st=0:d=${r3(c.fadeIn)}` : "", c.fadeOut > 0 ? `afade=t=out:st=${r3(Math.max(0, c.duration - c.fadeOut))}:d=${r3(c.fadeOut)}` : "", `adelay=${ms}|${ms}`].filter(Boolean).join(",");
+        // 先按原时间戳补齐声音空档，再裁切，不能把延迟发声提前到镜头开头。
+        const f = ["aresample=async=1:first_pts=0", `atrim=start=${r3(c.in)}:end=${r3(out)}`, "asetpts=PTS-STARTPTS", ...atempo(sp), "aformat=sample_rates=48000:channel_layouts=stereo", gain ? `volume=${gain}dB` : "", c.fadeIn > 0 ? `afade=t=in:st=0:d=${r3(c.fadeIn)}` : "", c.fadeOut > 0 ? `afade=t=out:st=${r3(Math.max(0, c.duration - c.fadeOut))}:d=${r3(c.fadeOut)}` : "", `adelay=${ms}|${ms}`].filter(Boolean).join(",");
         g.push(`[${a.k}:a]${f}[a${i}]`);
         buses.set(a.role, [...(buses.get(a.role) ?? []), `a${i}`]);
     });

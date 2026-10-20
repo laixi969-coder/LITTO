@@ -24,6 +24,8 @@ import { readStoryContext, readStoryProject, applyStoryAction, checkSources, req
 import { requestKeyframeApproval } from "@/utils/media/keyframeApproval";
 import { requestProductionDecision } from "@/utils/media/productionDecision";
 import { readVoiceProject } from "@/utils/media/voiceDecision";
+import { prepareSpeechAudio, inspectSpeechSync, importSpeechTake } from "@/utils/media/lipSync";
+import { speechSegmentSchema, speechSyncPathsSchema, speechTakeInputSchema } from "@toonflow/tool-media-generation/voiceProject";
 import { readMediaQuality, saveMediaQuality } from "@/utils/media/quality";
 import { listAiModels } from "@/utils/ai";
 
@@ -110,6 +112,12 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       async production(operation, data, signal) {
         signal?.throwIfAborted();
         if (operation === "readVoice") return (await readVoiceProject(cwd)).project;
+        if (operation === "prepareSpeech") return prepareSpeechAudio(cwd, z.strictObject({ audio: speechSegmentSchema }).parse(data).audio, mediaSignal(signal));
+        if (operation === "inspectSpeech") {
+          const input = speechSyncPathsSchema.parse(data);
+          return inspectSpeechSync(cwd, input.audioPath, input.videoPath, mediaSignal(signal), input.sourceVideoPath);
+        }
+        if (operation === "importSpeech") return importSpeechTake(cwd, speechTakeInputSchema.parse(data));
         if (operation === "readQuality") return (await readMediaQuality(cwd)).preferences;
         if (operation === "setQuality") return saveMediaQuality(cwd, data, undefined, signal);
         const api = cloud(), tenant = currentTenant();

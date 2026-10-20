@@ -64,7 +64,8 @@ export function sequenceFingerprint(s: Scope, sequenceId: string) {
   const projectId = s.get("sequences", sequenceId)?.projectId;
   const context = projectId ? ["worlds", "looks", "assets", "reference_bindings"].map(table => s.list(table, { projectId })) : [];
   const sequence = s.get("sequences", sequenceId);
-  return createHash("sha256").update(JSON.stringify({ edit, sources, context, ...(sequence && isAdSequence(sequence) ? { advertising: adContext(s, { sequenceId, projectId }) } : {}) })).digest("hex");
+  // 导出时轴算法更新后，旧文件与其验收记录不能命中当前导出缓存。
+  return createHash("sha256").update(JSON.stringify({ renderVersion: 2, edit, sources, context, ...(sequence && isAdSequence(sequence) ? { advertising: adContext(s, { sequenceId, projectId }) } : {}) })).digest("hex");
 }
 
 function renderMedia(s: Scope, id: string) {

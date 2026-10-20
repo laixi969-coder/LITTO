@@ -11,6 +11,7 @@ import { requireReviewed } from "./realism.ts";
 import { registerCandidates } from "./candidates.ts";
 import { inspectProductionQuality } from "./qualityInspection.ts";
 import { log } from "../util.ts";
+import { selectWorkingTake } from "./nle.ts";
 
 /** Job success → materialise domain objects. Nothing is overwritten: every output is a new Keyframe variant or Take candidate. */
 export function onJobSucceeded(s: Scope, job: any, mediaIds: string[]) {
@@ -118,11 +119,16 @@ export function approveTake(s: Scope, takeId: string, actor: string, override?: 
     const evidence = requireReviewed(s, "take", take);
     if (!evidence.observedStateDelta) throw conflict("请记录视频结束时实际观察到的资产状态", "result_state_required");
     const shot = s.get("shots", take.shotId)!;
-    if (shot.approvedTakeId === takeId && take.status === "approved" && JSON.stringify(take.meta?.observedStateDelta) === JSON.stringify(evidence.observedStateDelta)) return take;
+    if (shot.approvedTakeId === takeId && take.status === "approved" && JSON.stringify(take.meta?.observedStateDelta) === JSON.stringify(evidence.observedStateDelta)) {
+        selectWorkingTake(s, takeId);
+        return take;
+    }
     checkSequence(s, shot.sequenceId);
     const high = openHighIssues(s, shot.id);
     if (high.length && !override?.reason) throw conflict(`${high.length} high-severity continuity issue(s) block approval`, "continuity_blocked", high.map((h: any) => ({ id: h.id, category: h.category, message: h.message })));
     return tx(() => {
+        // 采用与实际剪辑素材一同提交，不能批准了口型结果却仍导出原片。
+        selectWorkingTake(s, takeId);
         if (high.length) {
             for (const h of high) s.update("continuity_issues", h.id, { status: "overridden", override_reason: override!.reason });
             event(s, take.projectId, "take", takeId, "override_continuity", actor, override!.reason, shot.id);
