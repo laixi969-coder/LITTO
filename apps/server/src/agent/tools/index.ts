@@ -178,10 +178,10 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           return api.importWorkspaceKeyframe(scope, projectId, input.shotId, Buffer.from(image.data, "base64"), input.path);
         }
         if (operation === "importAudio") {
-          const input = z.strictObject({ path: z.string().min(1).max(2048) }).parse(data);
+          const input = z.strictObject({ path: z.string().min(1).max(2048), kind: z.enum(["speech", "music", "sfx"]).default("speech") }).parse(data);
           const audio = await readReference(cwd, { path: input.path, mimeType: "audio/wav" }, "audio", signal);
           signal?.throwIfAborted();
-          return api.importWorkspaceAudio(scope, projectId, Buffer.from(audio.data, "base64"));
+          return api.importWorkspaceAudio(scope, projectId, Buffer.from(audio.data, "base64"), input.kind);
         }
         if (operation === "inspectFinal") {
           if (typeof data.renderId !== "string" || scope.get("renders", data.renderId)?.projectId !== projectId) throw new Error("成片不属于当前项目");
@@ -206,6 +206,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           if (operation === "readEdit") return api.editView(scope, api.getEdit(scope, data.sequenceId, true));
           const options = api.renderOptionsSchema.parse(data.options ?? {});
           api.getEdit(scope, data.sequenceId, true);
+          if (!options.draft) api.assertSpeechExport(scope, data.sequenceId);
           const fingerprint = api.sequenceFingerprint(scope, data.sequenceId);
           const existing = scope.list("renders", { sequenceId: data.sequenceId }, "created_at DESC").find(render => ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.sourceFingerprint === fingerprint && JSON.stringify(render.manifest?.options) === JSON.stringify(options));
           return existing ?? api.startRender(tenant.workspaceId, projectId, data.sequenceId, tenant.userId, options);

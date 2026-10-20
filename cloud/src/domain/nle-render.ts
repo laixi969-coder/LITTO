@@ -7,7 +7,8 @@ import { probeFile, runCmd } from "../media-tools.ts";
 import { saveMedia, storage } from "../storage.ts";
 import { bad, conflict, now } from "../util.ts";
 import { gradeFilters, isNeutral } from "./grade.ts";
-import { end, getEdit, resolveClip, type EClip } from "./nle.ts";
+import { end, getEdit, resolveClip, validateTimeline, type EClip } from "./nle.ts";
+import { assertSpeechExport } from "./finalQuality.ts";
 
 const r3 = (n: number) => Number(n.toFixed(3));
 const ext = (mime: string | null) => ({ "video/mp4": "mp4", "video/webm": "webm", "audio/mpeg": "mp3", "audio/wav": "wav", "image/png": "png", "image/jpeg": "jpg" })[mime ?? ""] ?? "bin";
@@ -41,6 +42,10 @@ export async function startNleRender(workspaceId: string, projectId: string, seq
 export async function renderTimeline(s: Scope, sequenceId: string, dir: string, opts: RenderOpts, previewWindow?: { start: number; end: number }) {
     opts = renderOptionsSchema.parse(opts);
     const e = getEdit(s, sequenceId, false);
+    validateTimeline(s, e);
+    if (!opts.draft && !previewWindow) assertSpeechExport(s, sequenceId);
+    // 导出跨越多个 await；固定每段的素材版本，不能在中途采用新 Take 后混用两版音画。
+    for (const clip of e.clips) clip.mediaId = resolveClip(s, clip).mediaId ?? undefined;
     let width = opts.width ?? 0, height = opts.height ?? 0;
     const ff = await runCmd("ffmpeg", ["-version"]);
     if (ff.code !== 0) throw new Error("ffmpeg is not installed on the server; use the export package instead");
@@ -77,6 +82,10 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         }
         const { file, probe: p } = prepared;
         if ((isVideo) && !p.hasVideo) throw new Error(`media ${m.id} has no video stream`);
+        if (isVideo && p.hasAudio && (!needVideoOnly || !c.audioDetached) && e.clips.some(audio => audio.dialogueLineIndex !== undefined
+            && !tracks.get(audio.trackId)?.muted && audio.start < end(c) && end(audio) > c.start)) {
+            throw bad("画面原音轨与后配对白同时启用，会重复发声；请先处理原音轨后再导出");
+        }
         if (!width && c.id === main[0].id) {
             if (!p.width || !p.height) throw bad("无法读取主轨素材尺寸，请指定导出宽高");
             // ACT: 尚无项目画布尺寸时沿用首个主轨素材，偶数向上补齐以兼容 yuv420p。

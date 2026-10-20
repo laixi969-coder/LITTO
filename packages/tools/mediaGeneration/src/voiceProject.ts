@@ -6,7 +6,7 @@ const videoSchema = z.strictObject({ path: pathSchema, mimeType: z.string().rege
 export const speechSegmentSchema = audioSchema.extend({ start: z.number().finite().nonnegative(), duration: z.number().finite().positive().max(600) });
 export const speechInspectionSchema = z.strictObject({
   key: z.string().length(64), audioMatches: z.boolean(), offsetMs: z.number().finite(), correlation: z.number().finite(),
-  audioDuration: z.number().finite().positive(), videoDuration: z.number().finite().positive(), note: z.string(),
+  audioDuration: z.number().finite().positive(), videoDuration: z.number().finite().positive(), sourceVideoDuration: z.number().finite().positive().optional(), note: z.string(),
 });
 export type SpeechInspection = z.infer<typeof speechInspectionSchema>;
 
@@ -15,6 +15,7 @@ export function speechInspectionMessage(inspection: SpeechInspection) {
   if (inspection.correlation < 0.9) issues.push("参考音轨相似度不足，无法可靠判断偏移；不能靠平移声音直接修复");
   else if (Math.abs(inspection.offsetMs) > 80) issues.push(`相似音轨整体偏移 ${inspection.offsetMs} 毫秒`);
   if (Math.abs(inspection.audioDuration - inspection.videoDuration) > 0.15) issues.push(`时长不符：参考声音 ${inspection.audioDuration.toFixed(3)} 秒，视频 ${inspection.videoDuration.toFixed(3)} 秒`);
+  if (inspection.sourceVideoDuration !== undefined && Math.abs(inspection.sourceVideoDuration - inspection.videoDuration) > 0.15) issues.push(`口型结果改变了原片时长：原片 ${inspection.sourceVideoDuration.toFixed(3)} 秒，结果 ${inspection.videoDuration.toFixed(3)} 秒；不能以短句替换整镜`);
   if (!inspection.audioMatches && !issues.length) issues.push("已有检查未通过，请核对当前素材与检查记录");
   return (issues.join("；") || `参考音轨整体匹配，估算偏移 ${inspection.offsetMs} 毫秒`) + "。音轨匹配不证明逐字口型同步；仍需检查可见发声区间。";
 }

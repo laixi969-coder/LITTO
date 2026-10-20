@@ -1,4 +1,5 @@
 import { recordUsage } from "@/utils/usage";
+import { createHash } from "node:crypto";
 import { guardedFetch } from "@/utils/ssrf";
 import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
@@ -16,6 +17,7 @@ import { blockingLine } from "@/utils/media/blocking";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
+import { validateSpeechInputs } from "@/utils/media/lipSync";
 
 const maxMediaSize = 100 * 1024 * 1024;
 const cameraSessions = new Set<string>();
@@ -280,7 +282,7 @@ async function generateMediaUnrecorded(
   await assertMediaModelSelection(mediaType, request, cwd);
   const directory = await realpath(cwd);
   // 静音是交付约束，先确认能处理，避免供应商忽略开关后已经付费却无法交付。
-  const silentFfmpeg = mediaType === "video" && request.generateAudio === false ? await createWorkspaceFfmpeg(directory, signal) : undefined;
+  const silentFfmpeg = mediaType === "video" && request.generateAudio === false ? await createWorkspaceFfmpeg(directory, signal, true) : undefined;
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);
   const providerInfo = await getMediaProvider(request.providerId);
@@ -288,6 +290,7 @@ async function generateMediaUnrecorded(
   access.assert();
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
+  const speechInputs = mediaType === "video" && model.lipSync ? await validateSpeechInputs(directory, request, signal) : undefined;
   validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
   if (mediaType === "audio" && Object.keys(request.audioParameters ?? {}).length && !model.inputSchema) invalid("此模型未提供额外音频参数定义，请清空额外参数");
@@ -318,6 +321,8 @@ async function generateMediaUnrecorded(
     mediaType === "video" && request.firstFrame ? reference(request.firstFrame, "image") : undefined,
     mediaType === "video" && request.lastFrame ? reference(request.lastFrame, "image") : undefined,
   ]);
+  if (speechInputs && (createHash("sha256").update(Buffer.from(videos![0]!.data, "base64")).digest("hex") !== speechInputs.videoHash
+    || createHash("sha256").update(Buffer.from(audios![0]!.data, "base64")).digest("hex") !== speechInputs.audioHash)) invalid("口型参考在检查后被替换，本次未提交生成");
   signal?.throwIfAborted();
   // 兼容尚未上报远端句柄的适配器：进入调用后不能把无回执当作可安全重试。
   await reportTask?.({ status: "submitting" });
@@ -390,6 +395,13 @@ async function generateMediaUnrecorded(
             // ACT: 付费声音已经保存，探测失败只阻止排时间线，不能诱发重新生成或删除结果。
             fileResult.timingWarning = `音频已保存，但实际时长未验证；先 ffprobe，不能估算排轨或重新生成。${error instanceof Error ? error.message : String(error)}`;
           }
+          const { cloud } = await import("@/lib/cloud");
+          const { currentTenant } = await import("@/utils/tenant");
+          const { workspaceProject } = await import("@/utils/media/jobs");
+          const api = cloud(), tenant = currentTenant();
+          const projectId = api && tenant ? workspaceProject(directory, false) : undefined;
+          // 服务端记录真实生成用途；同字节配音不能重命名为 music/sfx 逃过对白校验。
+          if (api && tenant && projectId) await api.importWorkspaceAudio(api.scoped(tenant.workspaceId), projectId, Buffer.from(bytes), model.audioTask === "music" ? "music" : model.audioTask === "soundEffect" ? "sfx" : "speech");
         }
         result.push(fileResult);
       } finally { release(); }
@@ -397,8 +409,12 @@ async function generateMediaUnrecorded(
     signal?.throwIfAborted();
     return result;
   } catch (err) {
-    // ACT: 只回滚本次创建的文件，保留目录中已有的节点资源。
-    await Promise.all(written.map(path => unlink(path).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; })));
+    // 已完成的供应商产物保留：取消或后续探测失败不能删除已付费文件，诱发重复生成。
+    if (written.length) {
+      const savedFiles = written.map(path => relative(directory, path).replaceAll("\\", "/"));
+      const failure = new Error(`${err instanceof Error ? err.message : String(err)}。已保存文件：${savedFiles.join("、")}。请复用文件，仅修复后续处理，不重新生成。`, { cause: err });
+      throw Object.assign(failure, { savedFiles, retryable: false });
+    }
     throw err;
   }
 }

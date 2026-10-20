@@ -6,10 +6,49 @@ import { z } from "zod";
 import type { Scope } from "../db.ts";
 import { storage } from "../storage.ts";
 import { probeFile, runCmd } from "../media-tools.ts";
-import { bad, conflict, notFound, now } from "../util.ts";
-import { getEdit, resolveClip } from "./nle.ts";
+import { bad, conflict, notFound, now, HttpError } from "../util.ts";
+import { getEdit, resolveClip, validateTimeline } from "./nle.ts";
 import { adContext, adReadiness, isAdSequence } from "./adDirection.ts";
-import { needsLipSync } from "./realism.ts";
+import { needsLipSync, requireReviewed, shotFingerprint } from "./realism.ts";
+
+export function assertSpeechExport(s: Scope, sequenceId: string) {
+  const edit = getEdit(s, sequenceId, false);
+  validateTimeline(s, edit);
+  const active = edit.clips.filter(clip => !edit.tracks.find(track => track.id === clip.trackId)?.muted);
+  for (const shot of s.list("shots", { sequenceId })) {
+    for (const line of shot.creativeBrief?.dialogue?.lines ?? []) {
+      if (!active.some(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video"
+        && clip.in <= line.start + 0.001 && clip.in + clip.duration * clip.speed >= line.end - 0.001)) throw conflict("定稿缺少完整的既定对白画面；删除、静音或裁走镜头不能绕过对白覆盖检查", "speech_export_blocked");
+    }
+  }
+  for (const clip of active.filter(clip => edit.tracks.find(track => track.id === clip.trackId)?.kind === "video")) {
+    const shot = clip.shotId ? s.get("shots", clip.shotId) : null;
+    const lines = shot?.creativeBrief?.dialogue?.lines ?? [];
+    if (!shot || !lines.length && !needsLipSync(shot)) continue;
+    const source = resolveClip(s, clip);
+    if (!source.mime?.startsWith("video/")) throw conflict("对白画面缺少真实视频，静帧占位只能作为草稿预览", "speech_export_blocked");
+    const take = s.list("takes", { shotId: shot.id, mediaId: source.mediaId })[0];
+    const relevant = lines.map((line: any, lineIndex: number) => ({ ...line, lineIndex })).filter((line: any) => line.start < clip.in + clip.duration * clip.speed && line.end > clip.in);
+    if (relevant.some((line: any) => line.start < clip.in - 0.001 || line.end > clip.in + clip.duration * clip.speed + 0.001)) throw conflict("定稿剪辑截断了对白，须保留完整发声区间", "speech_export_blocked");
+    if (!relevant.length && lines.length) continue;
+    if (relevant.length && shot.creativeBrief?.dialogue?.mode === "post" && relevant.every((line: any) => line.lipSync !== "visible")) {
+      const complete = relevant.every((line: any) => active.some(audio => audio.linkedClipId === clip.id && audio.dialogueLineIndex === line.lineIndex && audio.dialogueText === line.text
+        && edit.tracks.find(track => track.id === audio.trackId)?.kind === "audio" && audio.gainDb + (edit.tracks.find(track => track.id === audio.trackId)?.gainDb ?? 0) > -60));
+      if (complete) continue;
+    }
+    if (!take || clip.audioDetached || clip.gainDb + (edit.tracks.find(track => track.id === clip.trackId)?.gainDb ?? 0) <= -60) throw conflict("对白缺少当前完整声音或声音已静音；只能导出 draft:true 预览，不能作为定稿", "speech_export_blocked");
+    if (shot.creativeBrief?.dialogue?.mode === "post" && relevant.some((line: any) => line.lipSync === "visible")) {
+      const sync = take.meta?.speechSync;
+      if (!sync?.jobId || !sync.audioMatches || sync.specFingerprint !== shotFingerprint(s, shot.id)) throw conflict("后配音口型缺少当前规格与真实处理任务的检查记录，不能把混音视频当作同步定稿", "speech_export_blocked");
+      const job = s.get("generation_jobs", sync.jobId);
+      const inputs = job?.parameters?.request?.speechSyncInputs;
+      if (job?.status !== "SUCCEEDED" || job.projectId !== shot.projectId || job.kind !== "video" || !inputs || !sync.referenceMediaId || !sync.sourceMediaId
+        || inputs.audioHash !== s.get("media", sync.referenceMediaId)?.hash || inputs.videoHash !== s.get("media", sync.sourceMediaId)?.hash
+        || !s.list("generation_outputs", { jobId: job.id }).some(output => output.mediaId === take.mediaId)) throw conflict("口型任务或输入输出关联已失效，旧检查记录不能用于定稿", "speech_export_blocked");
+    }
+    requireReviewed(s, "take", take);
+  }
+}
 
 function sourceReviews(s: Scope, mediaId: string | null) {
   if (!mediaId) return [];
@@ -44,7 +83,12 @@ export function finalQualityView(s: Scope, render: Record<string, any>) {
   const sequence = s.get("sequences", render.sequenceId);
   const pilotReviewRequired = sequence && isAdSequence(sequence) && !adReadiness(s, sequence.id).ready;
   const storyReviewRequired = ["narrative", "performance", "dialogueCoverage", "editing"].some(key => quality.review?.checks?.[key] !== "pass");
-  return { ...quality, status: stale ? "stale" : (pilotReviewRequired || storyReviewRequired) && quality.status === "pass" ? "unverified" : quality.status };
+  let speechReviewRequired = false;
+  if (quality.status === "pass") {
+    try { assertSpeechExport(s, render.sequenceId); }
+    catch (error) { if (!(error instanceof HttpError)) throw error; speechReviewRequired = true; }
+  }
+  return { ...quality, speechReviewRequired, status: stale ? "stale" : (pilotReviewRequired || storyReviewRequired || speechReviewRequired) && quality.status === "pass" ? "unverified" : quality.status };
 }
 
 export const finalReviewSchema = z.object({
@@ -170,6 +214,7 @@ export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: 
   if (!quality.analysisId || quality.analysisId !== review.analysisId || quality.status === "stale") throw conflict("检测记录已过期，请重新导出或检测", "stale");
   const passing = Object.values(review.checks).every(value => value === "pass");
   if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(needsLipSync) && review.checks.lipSync !== "pass") throw bad("成片包含画内对白或演唱，须完整看听并确认逐字口型同步；不能只以声音检查替代口型验收");
+  if (passing) assertSpeechExport(s, render.sequenceId);
   const sequence = s.get("sequences", render.sequenceId)!;
   if (passing && isAdSequence(sequence)) {
     if (!["emotion", "product", "composition", "color", "editing"].every(key => review.checks[key as keyof typeof review.checks] === "pass")) throw bad("广告成片须检查情绪表达、产品识别、构图、整片色调与剪辑节奏");

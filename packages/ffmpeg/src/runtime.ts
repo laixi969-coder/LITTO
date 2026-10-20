@@ -15,7 +15,7 @@ const require = createRequire(import.meta.url);
 const native = ffmpeg.prototype as FfmpegInternals;
 
 /** 原生 fluent 工厂；文件路径相对工作区解析，不修改库的全局原型。 */
-export function createFfmpeg(directory: string): typeof ffmpeg {
+export function createFfmpeg(directory: string, beforeRun?: (args: string[], outputs: string[]) => void): typeof ffmpeg {
   const root = realpathSync(directory);
   if (!statSync(root).isDirectory()) throw new Error("FFmpeg 工作区必须是目录");
 
@@ -89,7 +89,9 @@ export function createFfmpeg(directory: string): typeof ffmpeg {
   };
   proto._getArguments = function() {
     checkFiles(this);
-    return native._getArguments.call(this);
+    const args = native._getArguments.call(this);
+    beforeRun?.(args, this._outputs.map(output => typeof output.target === "string" ? output.target : "pipe:1"));
+    return args;
   };
   proto.ffprobe = function(...args: unknown[]) {
     try { checkFiles(this); }

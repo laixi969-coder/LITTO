@@ -1,6 +1,6 @@
 import { basename, join } from "node:path";
 import { createHash } from "node:crypto";
-import { mkdir, readFile } from "@toonflow/file";
+import { mkdir, readFile, realpathSync } from "@toonflow/file";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import type { GenRequest, GenResult } from "@/lib/cloud";
 import { cloud } from "@/lib/cloud";
@@ -14,14 +14,22 @@ import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 import { coverageGate } from "@/utils/media/coverage";
 import { blockingLine } from "@/utils/media/blocking";
 import { modelAccess } from "@/utils/modelAvailability";
+import { validateSpeechInputs } from "@/utils/media/lipSync";
 
-export function workspaceProject(directory: string) {
+export function workspaceProject(directory: string, create = true) {
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api) return undefined;
-  const link = api.dbGet("SELECT project_id FROM workspace_project_links WHERE workspace_id=? AND directory=?", tenant.workspaceId, directory);
-  if (link && api.scoped(tenant.workspaceId).get("projects", link.project_id)) return link.project_id as string;
-  if (tenant.role === "VIEWER") return undefined;
+  directory = realpathSync(directory);
+  // ACT: 单工作区按项目数 O(n) 兼容旧路径别名，并拒绝同一真实目录关联不同项目；规模增长时迁移为规范目录唯一索引。
+  const links = api.dbAll("SELECT project_id,directory FROM workspace_project_links WHERE workspace_id=?", tenant.workspaceId).filter(row => {
+    try { return realpathSync(row.directory) === directory; }
+    catch (error) { if (["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) return false; throw error; }
+  }).filter(row => api.scoped(tenant.workspaceId).get("projects", row.project_id));
+  if (new Set(links.map(row => row.project_id)).size > 1) throw Object.assign(new Error("同一工作目录关联了不同项目，请先修复项目关联，不能绕过原项目的制作校验"), { status: 409 });
+  const link = links[0];
+  if (link) return link.project_id as string;
+  if (tenant.role === "VIEWER" || !create) return undefined;
   return api.linkWorkspaceProject(tenant.workspaceId, directory, basename(directory));
 }
 
@@ -38,6 +46,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     if (blocked) throw Object.assign(new Error(`对白覆盖未通过：${blocked}`), { status: 400, retryable: false });
   }
   const production = request.shotId ? await prepareShot(directory, kind, request.shotId, request) : undefined;
+  let speechSyncInputs: Awaited<ReturnType<typeof validateSpeechInputs>> | undefined;
   if (production && request.productionFingerprint !== production.fingerprint) throw Object.assign(new Error("提交参数或镜头规格与已预览版本不一致；请重新 compile 并完整复用返回的 request，保留画幅、精度和 productionFingerprint"), { status: 409 });
   // ACT: 正式镜头以当前规格和指纹为准，提示词由服务端编译，避免模型逐字复制长文本。
   if (production) request = production.request;
@@ -50,6 +59,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
       throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
     }
     request = await applyMediaQuality(directory, kind, request, model);
+    if (kind === "video" && model.lipSync) speechSyncInputs = await validateSpeechInputs(directory, request);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
     const spec = compileShotSpec(request.shotSpec);
     request = { ...request, prompt: withPhotographicBaseline(spec ? `${spec}\n\n${request.prompt}` : request.prompt) };
@@ -89,7 +99,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     projectId,
     directory,
     kind,
-    request: merged,
+    request: { ...merged, ...(speechSyncInputs ? { speechSyncInputs } : {}) },
     seed,
     requestId,
     assetReferenceFingerprint,
@@ -114,8 +124,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
     { userId: member.id, email: member.email, isAdmin: !!member.is_admin, role: member.role, workspaceId: context.workspaceId },
     async () => {
       const directory = await resolveWorkspaceDirectory(String(input.params.directory));
-      const link = api.dbGet("SELECT project_id FROM workspace_project_links WHERE workspace_id=? AND directory=?", context.workspaceId, directory);
-      if (link?.project_id !== context.projectId) throw new Error("工作目录与项目不匹配");
+      if (workspaceProject(directory, false) !== context.projectId) throw new Error("工作目录与项目不匹配");
       const request = { ...input.params.request as MediaGenerationRequest };
       if (request.providerId !== providerId || request.modelId !== modelId) throw new Error("生成模型不匹配");
       if (input.params.fingerprint) {

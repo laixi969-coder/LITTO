@@ -100,7 +100,7 @@ const plugin: ToolPlugin = {
         'inputOptions/outputOptions 按 fluent 原生语法传参，不额外拆分空格。含空格的元数据使用 args:["-metadata","title=a b"]，不要再嵌套数组。先用 operation={"method":"availableEncoders","args":[]} 等查询实际能力，不猜测本机编码器。',
         "除非用户要求覆盖，否则使用新文件名；所有显式路径及参数、滤镜和媒体清单中引用的文件都应位于当前工作区。",
         "合成中间文件设置 publishToCanvas=false；最终视频沿用默认 true 自动展示到画布。读取 published 的结果，已有节点不要重复创建；展示失败仅调用 publishVideo 恢复，不重渲染。",
-        "对白配音先 productionSpec(readEdit) 核对实际剪辑片段、源入点、速度和对白窗口；已有工作版用 importAudio/soundCues/render 排轨，不用手写 adelay 另建一套时间线。composeFilm 导出的旧成片须读取随片 OTIO 并核对实际镜头来源，不能套用另一版 readEdit 或原定分镜时长。音频逐句 ffprobe；超窗先报告，不用 atempo、-shortest、删词或跨镜平移掩盖容量冲突。仅混入配音不能修正嘴形，未做专用口型与完整看听时只能称为未同步预览。",
+        "对白项目的视频输出必须使用 productionSpec(render)，不能绕过时间线自行合成；自由 FFmpeg 仅供抽帧、音频准备及分析。配音先 readEdit 核对实际片段、源入点、速度和对白窗口，用 importAudio/soundCues 排轨，不手写 adelay 另建时间线。旧 composeFilm 素材须核对随片 OTIO 与真实镜头来源后回到领域时间线，不套用另一版剪辑或原定秒数。音频逐句 ffprobe；超窗先报告，不用 atempo、-shortest、删词或跨镜平移掩盖容量冲突。仅混入配音不能修正嘴形，未做专用口型与完整看听时只能 render draft:true 未同步预览。",
         '文字叠加、字幕烧录前先用 operation={"method":"availableFilters","args":[]} 确认 drawtext、subtitles 或 ass 是否可用。缺少滤镜时说明需要安装包含对应滤镜的 FFmpeg，不要反复试运行或用不存在的字幕文件探测。input 只接受工作区文件，不接受 color 等 lavfi 虚拟输入；滤镜验证复用已有素材。',
       ],
       parameters: z.toJSONSchema(processSchema, { io: "input", target: "draft-07" }),

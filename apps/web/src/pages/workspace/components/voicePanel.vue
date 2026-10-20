@@ -55,6 +55,7 @@
           <p v-if="storySourceStale(line)" class="errorMessage">此句来源的剧本场次已改变或移除，请同步已采用剧本后核对台词、表演及人物视频。</p>
           <template v-if="line.kind !== 'narration'">
             <div class="toolbar">
+              <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
               <label class="fileLabel">上传此句人物视频<input type="file" accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm" @change="uploadVideo(line, $event)" /></label>
               <attachmentPreview v-if="line.video" :attachment="{ ...line.video, name: '人物原视频' }" :directory="directory" />
               <el-button v-if="line.video" @click="line.video = undefined">移除人物视频</el-button>
@@ -74,7 +75,6 @@
               <label>可见口型<select v-model="syncDraft(result).mouth"><option value="uncertain">不确定 / 仅局部确认</option><option value="pass">全部可见发声区间匹配</option><option value="fail">存在不同步</option></select></label>
               <textarea v-model="syncDraft(result).note" rows="2" aria-label="同步检查依据与失败或不确定的时间区间" />
               <el-button :disabled="!result.inspection || (!syncDraft(result).watched && (syncDraft(result).speech === 'pass' || syncDraft(result).mouth === 'pass')) || syncDraft(result).note.trim().length < 10 || stale(line) || result.sourceVideo.path !== line.video?.path" @click="run(() => reviewSync(line, result))">保存此版本的检查结果</el-button>
-              <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
               <el-button v-if="shots.length" :disabled="!line.shotId || !syncConfirmed(line, result)" @click="run(() => registerSync(line, result))">登记为镜头候选（保留原片）</el-button>
             </div>
           </template>

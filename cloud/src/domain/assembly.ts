@@ -6,7 +6,7 @@ import { bad, notFound, now } from "../util.ts";
 import { end as clipEnd, getEdit, hasEdit, resolveClip } from "./nle.ts";
 import { startNleRender, renderOptionsSchema } from "./nle-render.ts";
 import type { RenderOpts } from "./nle-render.ts";
-import { sequenceFingerprint } from "./finalQuality.ts";
+import { sequenceFingerprint, assertSpeechExport } from "./finalQuality.ts";
 
 /** Basic assembly timeline (PRD Phase 5 / P2 "基础 Timeline"): approved Take per shot, in shot order, with subtitles and audio references. */
 export type Clip = { shotId: string; order: number; title: string; kind: "take" | "hero" | "missing"; mediaId: string | null; mime: string | null; start: number; duration: number; subtitle: string; clipId?: string; srcIn?: number; srcOut?: number; speed?: number; transition?: { type: string; duration: number } };
@@ -147,6 +147,7 @@ export function startRender(workspaceId: string, projectId: string, sequenceId: 
     getEdit(s, sequenceId, true);
     const tl = buildTimeline(s, sequenceId);
     opts = renderOptionsSchema.parse(opts);
+    if (!opts.draft) assertSpeechExport(s, sequenceId);
     const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts, sourceFingerprint: sequenceFingerprint(s, sequenceId) }, created_by: actor, updated_at: now() });
     void startNleRender(workspaceId, projectId, sequenceId, r.id, opts);
     return r;

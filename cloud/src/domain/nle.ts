@@ -11,7 +11,7 @@ import { parseGrade, type Grade } from "./grade.ts";
  */
 export type Transition = { type: "cut" | "dissolve" | "fade_black"; duration: number };
 export type Track = { id: string; kind: "video" | "audio"; name: string; role?: "dialogue" | "music" | "sfx"; muted: boolean; locked: boolean; gainDb: number };
-export type EClip = { id: string; trackId: string; type: "shot" | "media"; shotId?: string; mediaId?: string; refId?: string; start: number; duration: number; in: number; speed: number; transition: Transition; gainDb: number; fadeIn: number; fadeOut: number; label: string; auto?: boolean; linkedClipId?: string; audioDetached?: boolean };
+export type EClip = { id: string; trackId: string; type: "shot" | "media"; shotId?: string; mediaId?: string; refId?: string; start: number; duration: number; in: number; speed: number; transition: Transition; gainDb: number; fadeIn: number; fadeOut: number; label: string; auto?: boolean; linkedClipId?: string; audioDetached?: boolean; dialogueLineIndex?: number; dialogueText?: string };
 export type Marker = { id: string; t: number; label: string };
 export type Duck = { underRole: "dialogue" | "music" | "sfx"; amountDb: number };
 export type Body = { fps: number; tracks: Track[]; clips: EClip[]; markers: Marker[]; grade: Grade | null; duck: Duck | null };
@@ -114,7 +114,7 @@ export function conform(s: Scope, sequenceId: string, reset: boolean) {
 // ---------------------------------------------------------------- ops
 const num = z.number().finite();
 const tr = z.object({ type: z.enum(["cut", "dissolve", "fade_black"]), duration: num.min(0).max(10) });
-const clipIn = z.object({ trackId: z.string(), type: z.enum(["shot", "media"]), shotId: z.string().optional(), mediaId: z.string().optional(), linkedClipId: z.string().optional(), start: num.min(0), duration: num.optional(), in: num.min(0).default(0), speed: num.min(0.25).max(4).default(1), transition: tr.optional(), gainDb: num.min(-60).max(24).default(0), fadeIn: num.min(0).default(0), fadeOut: num.min(0).default(0), label: z.string().default("") });
+const clipIn = z.object({ trackId: z.string(), type: z.enum(["shot", "media"]), shotId: z.string().optional(), mediaId: z.string().optional(), linkedClipId: z.string().optional(), dialogueLineIndex: z.number().int().nonnegative().optional(), dialogueText: z.string().min(1).optional(), start: num.min(0), duration: num.optional(), in: num.min(0).default(0), speed: num.min(0.25).max(4).default(1), transition: tr.optional(), gainDb: num.min(-60).max(24).default(0), fadeIn: num.min(0).default(0), fadeOut: num.min(0).default(0), label: z.string().default("") });
 export const opSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("set_cut"), leftId: z.string(), rightId: z.string(), sourceOut: num.nonnegative(), sourceIn: num.nonnegative(), leftMediaId: z.string().optional(), rightMediaId: z.string().optional() }),
     z.object({ type: z.literal("bridge_audio"), leftId: z.string(), rightId: z.string(), mode: z.enum(["jCut", "lCut", "crossfade", "none"]), duration: num.min(0).max(3) }),
@@ -157,7 +157,8 @@ function applyTransition(t: Body, c: EClip, tr0: Transition) {
     if (prev && Math.abs(delta) > EPS) { c.start = r3(c.start + delta); shiftLater(t, c, delta, oldEnd - EPS); }
 }
 
-function validate(s: Scope, t: Body) {
+export function validateTimeline(s: Scope, t: Body) {
+    const speechSlots = new Set<string>();
     for (const c of t.clips) {
         const tk = t.tracks.find((x) => x.id === c.trackId);
         if (!tk) throw bad(`clip ${c.id} is on a missing track`);
@@ -165,6 +166,22 @@ function validate(s: Scope, t: Body) {
         if (!Number.isFinite(c.in) || c.in < 0) throw bad("素材入点不能小于零");
         if (c.start < -EPS) throw bad("clip cannot start before 0");
         const src = resolveClip(s, c);
+        const media = src.mediaId ? s.get("media", src.mediaId) : null;
+        if (src.mime?.startsWith("audio/") && (tk.role === "dialogue" || media?.source === "speechReference" || c.dialogueLineIndex !== undefined)) {
+            const parent = t.clips.find(item => item.id === c.linkedClipId);
+            const shot = parent?.shotId ? s.get("shots", parent.shotId) : null;
+            const line = c.dialogueLineIndex === undefined ? null : shot?.creativeBrief?.dialogue?.lines?.[c.dialogueLineIndex];
+            if (tk.kind !== "audio" || !parent || !line || c.shotId !== parent.shotId || c.dialogueText !== line.text) throw bad("对白缺少当前镜头、原句和台词窗口关联；请通过 soundCues 排轨，改轨道名称或角色不能绕过校验");
+            const start = parent.start + (line.start - parent.in) / parent.speed;
+            const stop = parent.start + (line.end - parent.in) / parent.speed;
+            if (line.lipSync === "visible") throw bad("可见发声必须使用已检查的口型视频，不能独立叠加配音");
+            if (line.start < parent.in - EPS || line.end > parent.in + parent.duration * parent.speed + EPS
+                || Math.abs(c.start - start) > EPS || end(c) > stop + EPS) throw bad("对白与当前剪辑的台词窗口不符，不能平移、跨镜或截断后导出");
+            if (c.speed !== 1 || c.in !== 0 || !media?.duration || Math.abs(c.duration - media.duration) > EPS || c.fadeIn || c.fadeOut) throw bad("配音须保留整句原速及完整音量包络，不能变速、裁短或淡出掩盖容量冲突");
+            const key = `${parent.id}:${c.dialogueLineIndex}`;
+            if (speechSlots.has(key)) throw bad("同一台词重复排轨；换轨道不能重复叠加对白");
+            speechSlots.add(key);
+        }
         if (tk.kind === "video" && c.type === "media" && src.mime && !src.mime.startsWith("video/") && !src.mime.startsWith("image/")) throw bad(`clip ${c.id}: ${src.mime} cannot go on a video track`);
         if (tk.kind === "audio" && (c.type !== "media" || (src.mime && !/^(audio|video)\//.test(src.mime)))) throw bad(`clip ${c.id}: only audio media can go on an audio track`);
         if (c.linkedClipId) {
@@ -272,7 +289,7 @@ function apply(s: Scope, t: Body, op: Op) {
             const sh = k.shotId ? s.get("shots", k.shotId) : null;
             const m = k.mediaId ? s.get("media", k.mediaId) : null;
             const dur = k.duration ?? (k.type === "shot" ? Number(sh?.duration ?? 4) : m?.duration ?? 4);
-            const c = newClip({ trackId: k.trackId, type: k.type, shotId: k.shotId, mediaId: k.mediaId, linkedClipId: k.linkedClipId, start: r3(k.start), duration: r3(dur), in: k.in, speed: k.speed, gainDb: k.gainDb, fadeIn: k.fadeIn, fadeOut: k.fadeOut, label: k.label || sh?.title || "" });
+            const c = newClip({ trackId: k.trackId, type: k.type, shotId: k.shotId, mediaId: k.mediaId, linkedClipId: k.linkedClipId, dialogueLineIndex: k.dialogueLineIndex, dialogueText: k.dialogueText, start: r3(k.start), duration: r3(dur), in: k.in, speed: k.speed, gainDb: k.gainDb, fadeIn: k.fadeIn, fadeOut: k.fadeOut, label: k.label || sh?.title || "" });
             t.clips.push(c);
             if (k.transition && k.transition.type !== "cut") applyTransition(t, c, k.transition);
             return;
@@ -402,7 +419,7 @@ export function applyOps(s: Scope, sequenceId: string, ops: unknown[], expectedV
         if (mediaId && s.get("media", mediaId)?.projectId !== seq.projectId) throw bad("素材不属于当前项目");
         if (clip.shotId && s.get("shots", clip.shotId)?.sequenceId !== sequenceId) throw bad("镜头不属于当前序列");
     }
-    validate(s, work);
+    validateTimeline(s, work);
     const next: EditRow = { ...work, version: cur.version + 1, history: [...cur.history, JSON.stringify(body(cur))].slice(-50), future: [] };
     // a never-persisted timeline is created at version 1 with the pre-edit state as its first undo step
     return tx(() => (save(s, seq, next, !ex), next));
@@ -415,6 +432,7 @@ export function undoRedo(s: Scope, sequenceId: string, dir: "undo" | "redo") {
     const from = dir === "undo" ? ex.history : ex.future;
     if (!from.length) throw conflict(`nothing to ${dir}`, "empty_history");
     const snap: Body = JSON.parse(from[from.length - 1]);
+    validateTimeline(s, snap);
     const here = JSON.stringify(body(ex));
     const next: EditRow = { ...snap, version: ex.version + 1, history: dir === "undo" ? ex.history.slice(0, -1) : [...ex.history, here].slice(-50), future: dir === "undo" ? [...ex.future, here] : ex.future.slice(0, -1) };
     return tx(() => (save(s, seq, next, false), next));

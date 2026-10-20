@@ -33,10 +33,11 @@ export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotI
   return frame;
 }
 
-export async function importWorkspaceAudio(s: Scope, projectId: string, bytes: Buffer) {
+export async function importWorkspaceAudio(s: Scope, projectId: string, bytes: Buffer, kind: "speech" | "music" | "sfx" = "speech") {
   if (!s.get("projects", projectId)) throw notFound("project");
   if (!sniff(bytes)?.mime.startsWith("audio/")) throw bad("声音素材须为可识别的音频文件");
-  const media = s.list("media", { projectId, hash: sha256(bytes) })[0] ?? await saveMedia(s.workspaceId, projectId, bytes, { source: "speechReference" });
+  let media = s.list("media", { projectId, hash: sha256(bytes) })[0] ?? await saveMedia(s.workspaceId, projectId, bytes, { source: kind === "speech" ? "speechReference" : "audioReference" });
+  if (kind === "speech" && media.source !== "speechReference") media = s.update("media", media.id, { source: "speechReference" });
   if (!s.get("projects", projectId)) throw notFound("project");
   return mediaView(media);
 }
@@ -119,6 +120,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     const edit = getEdit(s, input.sequenceId, false);
     const seenDialogue = new Set<string>();
     const ops: unknown[] = input.cues.map(({ purpose, videoClipId, dialogueLineIndex, ...cue }) => {
+      let dialogueText: string | undefined;
       const track = edit.tracks.find(track => track.id === cue.trackId);
       const media = s.get("media", cue.mediaId);
       if (!track || track.kind !== "audio" || track.locked || track.muted) throw bad("声音须写入未锁定、未静音的声音轨");
@@ -140,8 +142,9 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
         const key = `${videoClipId}:${dialogueLineIndex}`;
         if (seenDialogue.has(key) || edit.clips.some(item => item.shotId === cue.shotId && edit.tracks.find(track => track.id === item.trackId)?.role === "dialogue" && item.start < end && item.start + item.duration > start)) throw bad("对应台词窗口已有对白，请调整已有音轨，不重复叠加");
         seenDialogue.add(key);
+        dialogueText = line.text;
       }
-      return { type: "add_clip", clip: { ...cue, ...(videoClipId ? { linkedClipId: videoClipId } : {}), type: "media", label: purpose } };
+      return { type: "add_clip", clip: { ...cue, ...(videoClipId ? { linkedClipId: videoClipId, dialogueLineIndex, dialogueText } : {}), type: "media", label: purpose } };
     });
     if (input.duck !== undefined) ops.push({ type: "set_duck", duck: input.duck });
     return editView(s, applyOps(s, input.sequenceId, ops, input.expectedVersion));

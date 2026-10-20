@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { build, createFfmpeg, downloadSources, getToolStatus, installFfmpeg, target } from "@toonflow/ffmpeg";
 import type { DownloadState, FfmpegMode, SourceId } from "@toonflow/ffmpeg";
 import conf from "@/utils/conf";
+import { assertRawSpeechExport } from "@/utils/media/speechGuard";
 
 export { executeRemoteFfmpeg } from "@toonflow/ffmpeg";
 
@@ -18,7 +19,7 @@ export function onRequired(listener: () => void) {
   return () => { requiredListeners.delete(listener); };
 }
 
-export async function createWorkspaceFfmpeg(cwd: string, signal?: AbortSignal) {
+export async function createWorkspaceFfmpeg(cwd: string, signal?: AbortSignal, allowVideoExport = false) {
   signal?.throwIfAborted();
   const { tools } = await getStatus();
   signal?.throwIfAborted();
@@ -28,7 +29,7 @@ export async function createWorkspaceFfmpeg(cwd: string, signal?: AbortSignal) {
       name: "FfmpegRequiredError", code: "FFMPEG_REQUIRED", status: 424,
     });
   }
-  const ffmpeg = createFfmpeg(cwd);
+  const ffmpeg = createFfmpeg(cwd, allowVideoExport ? undefined : (args, outputs) => assertRawSpeechExport(cwd, args, outputs));
   ffmpeg.setFfmpegPath(tools.ffmpeg.path);
   ffmpeg.setFfprobePath(tools.ffprobe.path);
   return ffmpeg;
