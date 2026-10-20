@@ -8,6 +8,8 @@ import { bad, conflict, j, log, now, sleep, ulid } from "./util.ts";
 import { config } from "./config.ts";
 import { onJobSucceeded } from "./domain/lifecycle.ts";
 import { inc, observe } from "./metrics.ts";
+import { assertSpeechPlan } from "./domain/speechPlanning.ts";
+import { shotFingerprint } from "./domain/realism.ts";
 
 export type JobSpec = {
     workspaceId: string; projectId: string | null; kind: "image" | "video"; targetType?: string; targetId?: string; modelId: string;
@@ -47,6 +49,11 @@ export function enqueue(spec: JobSpec) {
         if (reference.sent && reference.mediaId) inputMedia(spec.workspaceId, spec.projectId, reference.mediaId);
     }
     if (spec.targetType === "shot" && (!spec.targetId || scoped(spec.workspaceId).get("shots", spec.targetId)?.projectId !== spec.projectId)) throw bad("生成目标镜头不属于当前项目");
+    if (spec.targetType === "shot" && spec.kind === "video") {
+        const scope = scoped(spec.workspaceId), shot = scope.get("shots", spec.targetId!)!;
+        assertSpeechPlan(scope, shot);
+        if (shot.creativeBrief?.dialogue.lines.length && spec.parameters.specFingerprint !== shotFingerprint(scope, shot.id)) throw conflict("对白规划与提交版本不一致，请重新编译，不能直接重试旧参数", "speech_plan_stale");
+    }
     if (spec.parameters.candidateBatchId) {
         const batch = scoped(spec.workspaceId).get("candidate_batches", spec.parameters.candidateBatchId);
         if (!batch || batch.projectId !== spec.projectId || batch.kind !== spec.kind
@@ -172,6 +179,14 @@ async function execute(jobId: string) {
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
+        if (job.kind === "video" && job.targetType === "shot" && !raw.provider_task_id && !p.remoteTask) {
+            const shot = s.get("shots", job.targetId);
+            try {
+                if (!shot || shot.projectId !== job.projectId) throw bad("排队镜头已失效");
+                assertSpeechPlan(s, shot);
+                if (shot.creativeBrief?.dialogue.lines.length && p.specFingerprint !== shotFingerprint(s, shot.id)) throw conflict("排队后对白或镜头规划已改变，停止旧任务，不自动重新提交", "speech_plan_stale");
+            } catch (cause) { throw Object.assign(cause as Error, { retryable: false, fallbackAllowed: false }); }
+        }
         const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(prov.timeout_ms)]);
         const req: GenRequest = { signal, context: { jobId, workspaceId: job.workspaceId, projectId: job.projectId, userId: job.createdBy }, kind: job.kind, externalModelId: model.external_model_id, prompt: job.compiledPrompt, negativePrompt: p.negativePrompt, params: { ...p, seed: job.seed }, inputs: await loadInputs(job.workspaceId, job.projectId, job.inputRefs ?? []), apiKey, baseUrl: prov.base_url, attempt: job.attempts, label: p.label };
         let result: GenResult | null = null;

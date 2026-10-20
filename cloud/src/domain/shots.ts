@@ -52,10 +52,15 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
     if (patch.intendedStateDelta !== undefined) validateStateDelta(s, shot.projectId, patch.intendedStateDelta);
     const actionChanged = patch.action !== undefined && patch.action !== shot.action;
     const timelineChanged = patch.musicVideo !== undefined && JSON.stringify(patch.musicVideo?.timeline) !== JSON.stringify(shot.musicVideo?.timeline);
-    if (actionChanged || timelineChanged) {
+    const speechWindows = (brief: ShotInput["creativeBrief"]) => [brief?.dialogue.mode, brief?.dialogue.lines.map(line => [line.speakerId, line.text, line.start, line.end, line.lipSync])];
+    const speechChanged = !!shot.creativeBrief?.dialogue.lines.length && (patch.creativeBrief !== undefined && JSON.stringify(speechWindows(patch.creativeBrief)) !== JSON.stringify(speechWindows(shot.creativeBrief))
+        || patch.duration !== undefined && patch.duration !== shot.duration);
+    if (actionChanged || timelineChanged || speechChanged) {
         // ACT: 不用关键词猜测动作矛盾；要求调用方同次复核依赖字段，语义一致性仍由导演检查最终编译文本。
         const missing = [
             shot.camera?.design && patch.camera === undefined && "camera（起止状态、主体路径、运镜与节拍）",
+            speechChanged && patch.action === undefined && "action（对白窗口变化后的实时行动与完整因果）",
+            speechChanged && shot.generationDuration !== undefined && patch.generationDuration === undefined && "generationDuration（不能沿用旧生成时长）",
             shot.musicVideo && patch.musicVideo === undefined && "musicVideo（逐秒动作与声音）",
             shot.creativeBrief && patch.creativeBrief === undefined && "creativeBrief（创作目标、攻防与对白口型）",
             shot.advertising && patch.advertising === undefined && "advertising（情绪节拍、产品展示与剪接声音）",
@@ -64,7 +69,7 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
             Object.values(shot.performance ?? {}).some(value => typeof value === "string" && value.trim()) && patch.performance === undefined && "performance（表演节拍）",
             Object.values(shot.realism ?? {}).some(value => typeof value === "string" && value.trim()) && patch.realism === undefined && "realism（运动与当前状态）",
         ].filter(Boolean);
-        if (missing.length) throw bad(`动作或时间线已修改，请由助手复核并在同一次 updateShot 中提交 ${missing.join("、")}，避免继承旧动作；仍适用的内容可原样提交。这是规格一致性修正，不需要让用户逐项填写或再次确认。`);
+        if (missing.length) throw bad(`动作、对白屏时或时间线已修改，请由助手复核并在同一次 updateShot 中提交 ${missing.join("、")}，避免继承旧动作或旧切镜时点；仍适用的内容可原样提交。这是规格一致性修正，不需要让用户逐项填写或再次确认。`);
     }
     validateMusicVideoTiming({ ...shot, ...patch } as ShotInput);
     if (patch.sequenceId !== undefined && patch.sequenceId !== shot.sequenceId) throw bad("use the sequence workflow to move a shot");

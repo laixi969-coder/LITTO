@@ -3,6 +3,7 @@ import * as desktop from "@/utils/desktop";
 import * as providerDebug from "@/utils/media/debug";
 import * as mediaJobs from "@/utils/media/jobs";
 import * as mediaLipSync from "@/utils/media/lipSync";
+import * as mediaVoice from "@/utils/media/voiceDecision";
 import * as mediaGeneration from "@/utils/media/generation";
 import * as mediaCoverage from "@/utils/media/coverage";
 import * as mediaSpend from "@/utils/media/spend";
@@ -41,6 +42,7 @@ export default {
   mediaTimeline,
   mediaBlocking,
   mediaJobs,
+  mediaVoice,
   mediaLipSync,
   mediaProvider,
   transcription,

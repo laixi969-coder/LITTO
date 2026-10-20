@@ -9,6 +9,7 @@ import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
 import { bad, conflict, notFound, now, HttpError } from "./util.ts";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 import { localRepairSchema, prepareLocalRepair } from "./domain/localRepair.ts";
+import { assertSpeechPlan } from "./domain/speechPlanning.ts";
 
 /** Host-only execution bridge. Tenant identity comes from the stored job, never its parameters. */
 export function configureWorkspaceMedia(execute: (request: GenRequest) => Promise<GenResult>) {
@@ -66,6 +67,11 @@ export function enqueueWorkspaceMedia(input: {
     production?: ReturnType<typeof prepareWorkspaceShot>;
 }) {
   if (input.production?.previewOnly) throw bad("提示词预览不能直接提交生成，请重新执行生成前检查");
+  if (input.kind === "video" && input.production) {
+    const shot = scoped(input.workspaceId).get("shots", input.production.shotId);
+    if (!shot || shot.projectId !== input.projectId) throw notFound("project shot");
+    assertSpeechPlan(scoped(input.workspaceId), shot);
+  }
   const idempotencyKey = "workspaceMedia:" + input.requestId;
   const receipt = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", input.workspaceId, idempotencyKey);
   if (receipt) {
@@ -118,7 +124,7 @@ export function enqueueWorkspaceMedia(input: {
     modelId,
     compiledPrompt: prompt,
     negativePrompt: input.negativePrompt ?? input.request.negativePrompt,
-    parameters: { directory: input.directory, assetReferenceFingerprint: input.assetReferenceFingerprint, request: { ...input.request, prompt, seed: input.seed ?? input.request.seed }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint, ...input.production.repairParameters } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
+    parameters: { directory: input.directory, assetReferenceFingerprint: input.assetReferenceFingerprint, request: { ...input.request, prompt, seed: input.seed ?? input.request.seed }, ...(input.production ? { keyframeId: input.production.keyframeId, fingerprint: input.production.fingerprint, specFingerprint: input.production.specFingerprint, ...input.production.repairParameters } : {}), ...(input.candidateBatchId ? { candidateBatchId: input.candidateBatchId } : {}) },
     seed: input.seed ?? input.request.seed,
     inputRefs: input.production?.compiled.inputs ?? [],
     fallbackAllowed: false,
@@ -144,6 +150,7 @@ export function prepareWorkspaceShot(input: {
   const s = scoped(input.workspaceId);
   const shot = s.get("shots", input.shotId);
   if (!shot || shot.projectId !== input.projectId) throw notFound("shot");
+  if (input.kind === "video" && !previewOnly) assertSpeechPlan(s, shot);
   const mode = input.mode;
   const imageModes = Array.isArray(mode) ? mode : [mode];
   const imageLimit = imageModes.includes("multiReference") ? 64 : imageModes.includes("singleImage") ? 1 : 0;
@@ -211,5 +218,5 @@ export function prepareWorkspaceShot(input: {
   const repairParameters = repair ? { localRepairOf: repair.keyframe.id, localRepairKind: repair.kind, localRepairTarget: repair.target } : undefined;
   const fingerprint = createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), generationInput, keyframe?.id, compiled])).digest("hex");
   compiled.warnings.push(...previewWarnings);
-  return { shotId: shot.id, keyframeId: keyframe?.id, repairParameters, fingerprint, previewOnly, compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
+  return { shotId: shot.id, keyframeId: keyframe?.id, repairParameters, fingerprint, specFingerprint: shotFingerprint(s, shot.id), previewOnly, compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
 }

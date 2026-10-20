@@ -7,6 +7,7 @@ import { adContext } from "./adDirection.ts";
 import { needsLipSync, qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
 import { z } from "zod";
 import { techniqueVersion, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
+import { assertSpeechPlan } from "./speechPlanning.ts";
 export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 // 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
 export const audioReviewSchema = z.object({
@@ -62,6 +63,7 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
   const latest = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
   const evidence = latest?.evidence;
   const shot = s.get("shots", item.shotId);
+  if (type === "take" && shot) assertSpeechPlan(s, shot);
   const plan = qualityReviewPlan(shot ?? {}, type);
   if (type === "take" && (needsLipSync(shot ?? {}) || shot?.creativeBrief?.dialogue?.lines?.length)) {
     const audio = evidence?.audioReview;

@@ -15,6 +15,7 @@ import { coverageGate } from "@/utils/media/coverage";
 import { blockingLine } from "@/utils/media/blocking";
 import { modelAccess } from "@/utils/modelAvailability";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
+import { assertCurrentSpeechAudio } from "@/utils/media/voiceDecision";
 
 export function workspaceProject(directory: string, create = true) {
   const tenant = currentTenant();
@@ -127,6 +128,15 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
       if (workspaceProject(directory, false) !== context.projectId) throw new Error("工作目录与项目不匹配");
       const request = { ...input.params.request as MediaGenerationRequest };
       if (request.providerId !== providerId || request.modelId !== modelId) throw new Error("生成模型不匹配");
+      if (input.kind === "video" && input.params.fingerprint && request.shotId) {
+        try {
+          const shot = api.scoped(context.workspaceId).get("shots", request.shotId);
+          if (!shot || shot.projectId !== context.projectId) throw new Error("生成镜头已失效");
+          if (shot.creativeBrief?.dialogue?.lines?.length && input.params.specFingerprint !== api.shotFingerprint(api.scoped(context.workspaceId), shot.id)) throw new Error("排队后镜头或对白规划已改变，停止旧请求，不自动重新提交");
+          api.assertSpeechPlan(api.scoped(context.workspaceId), shot);
+          await assertCurrentSpeechAudio(directory, shot, input.signal);
+        } catch (cause) { throw Object.assign(cause as Error, { retryable: false, fallbackAllowed: false }); }
+      }
       if (input.params.fingerprint) {
         request.prompt = input.prompt;
         request.images = [];
@@ -208,6 +218,13 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, localRepair: request.localRepair, ...(previewOnly ? { previewOnly: true } : {}) });
+  if (kind === "video") {
+    try { await assertCurrentSpeechAudio(directory, api.scoped(tenant.workspaceId).get("shots", shotId)!); }
+    catch (cause) {
+      if (!previewOnly) throw cause;
+      result.compiled.warnings.push(`配音规划未完成：${cause instanceof Error ? cause.message : String(cause)}`);
+    }
+  }
   if (kind === "video" && request.providerId === "meta" && request.modelId === "MiniMax-H3") {
     result.compiled.prompt = compactVideoPrompt(result.compiled.prompt);
   }

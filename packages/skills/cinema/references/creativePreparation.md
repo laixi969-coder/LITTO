@@ -24,7 +24,13 @@ beats 每项保存 attackerId、defenderId、action、reaction、endState、supp
 
 creativeBrief.dialogue 必填；本镜确实无对白时 lines:[]，但整场台词必须分配到其他镜头，不能因动作隔离验证而从全片消失。
 
-结构为 {mode:"native"|"post",lines:[{speakerId,text,start,end,delivery,lipSync:"visible"|"offscreen",framing}]}。text 保留原文，start/end 是本段秒数，delivery 写语气和气口，framing 写怎样看清说话人的嘴。用户要求可见口型时用 visible，不能静默改画外音。native 使用有声视频模型并开启 generateAudio；post 是明确的后期配音与口型处理任务，不能把生成无声素材当作完成。独立 lipSync 能力和原生音画能力分别判断。
+结构为 {mode:"native"|"post",lines:[{speakerId,text,start,end,delivery,lipSync:"visible"|"offscreen",framing,audio?:{mediaId,text},coverage?:[{start,end,description}]}]}。text 保留原文，start/end 是镜头局部秒数，不能超出实际剪入时长；生成余量不算对白屏时。delivery 写语气和气口，framing 写怎样看清说话人的嘴。用户要求可见口型时用 visible，不能静默改画外音；coverage 显式覆盖整句 start/end，记录对应人物嘴部可见的真实调度，不能只因角色在本镜出现过就视为覆盖。
+
+post 先采用真实配音，再调用 productionSpec(planSpeech) 的 {shotId,bindings?:[{lineIndex,path}]}：自动复用 voiceProject 已选且关联该镜的原句声音；相同角色重复说相同原句时，在 voiceProject.lines 设置 dialogueLineIndex（从0开始），界面「对应台词」可指定，不重新选声音。旧项目尚无配音方案时明确传已有文件与原句索引，不猜路径或按文件顺序匹配。它本地探测声音并返回实测时长、逐句窗口、suggestedDialogue、minimumDuration 和 coverageRequired，不生成或修改镜头。将返回的 audio:{mediaId,text} 与导演复核后的可见 coverage 写回 creativeBrief；只复制容量下限或 coverageRequired 不能算完成调度。
+
+对白超窗时先重排观看与表演，不能先锁7秒再塞10秒配音。完整原句保留在它对应的镜头，不截词、加速、叠说或跨镜移音凑时长；动作与对白可并行，打斗救援仍按实时接触、受力、反应和收势推进。需要更长表演或拆成有意义的对白单元时，同次复核 action、performance、camera.design、duration、generationDuration（如已有）、musicVideo.timeline、techniques 及动作末态，不能只加 duration 留下“3.6秒切座舱”的旧节拍。模型上限不足时保留待规划，不自动换模型或删台词。既有视频、音轨和主帧保留；修改设计不代表旧视频已修好。
+
+native 仅用于明确采用的原生有声路线，开启 generateAudio 并实际看听；不能为绕过后配音容量检查而改成 native。post 仍须专用口型任务及最终实际验收，不能把无声素材、混音或规划通过当作同步完成。独立 lipSync 能力和原生音画能力分别判断。
 
 对白可以在交锋的判断、压迫或短暂脱离中发生，其他人物仍有合理行为；将高难接触放在对白前后，不让所有人站定等待。不用统一语速估算当作同步证据。成片需实际检查说话人、台词、发声起止、嘴部开合与音效遮挡；只看抽帧必须标未核验。
 

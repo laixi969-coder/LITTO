@@ -38,6 +38,8 @@
             <label>语速<input v-model.number="line.speed" type="number" min="0.25" max="4" step="0.05" /></label>
             <label class="fullField">语气与表演说明<textarea v-model="line.delivery" rows="2" maxlength="1800" /></label>
             <label>句后停顿（秒，合成配音时使用）<input v-model.number="line.pauseAfter" type="number" min="0" max="10" step="0.1" /></label>
+            <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
+            <label v-if="line.shotId">对应台词<select v-model.number="line.dialogueLineIndex"><option :value="undefined">按原文与说话人匹配</option><option v-for="(planned, lineIndex) in shots.find(shot => shot.id === line.shotId)?.creativeBrief?.dialogue.lines ?? []" :key="lineIndex" :value="lineIndex">{{ lineIndex + 1 }} · {{ planned.text }}</option></select></label>
           </div>
           <p v-if="lineModel(line) && !lineModel(line)?.speechInstructions" class="hint">此模型未声明支持情绪指令，可生成自然语音；需要表演语气时请选择 Qwen3-TTS 1.7B。</p>
           <div class="toolbar">
@@ -55,7 +57,6 @@
           <p v-if="storySourceStale(line)" class="errorMessage">此句来源的剧本场次已改变或移除，请同步已采用剧本后核对台词、表演及人物视频。</p>
           <template v-if="line.kind !== 'narration'">
             <div class="toolbar">
-              <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
               <label class="fileLabel">上传此句人物视频<input type="file" accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm" @change="uploadVideo(line, $event)" /></label>
               <attachmentPreview v-if="line.video" :attachment="{ ...line.video, name: '人物原视频' }" :directory="directory" />
               <el-button v-if="line.video" @click="line.video = undefined">移除人物视频</el-button>
@@ -114,7 +115,7 @@ const ai = useNodeAi();
 const project = ref<VoiceProject>({ littoVoice: 1, roles: [], lines: [], lipSyncProviderId: "", lipSyncModelId: "", mixes: [] });
 const models = ref<NodeMediaModel[]>([]);
 const workspaceStore = useWorkspaceStore();
-const shots = ref<{ id: string; title: string }[]>([]);
+const shots = ref<{ id: string; title: string; creativeBrief?: { dialogue: { lines: { text: string }[] } } }[]>([]);
 const storyRevision = ref<StoryRevision>();
 const loaded = ref(false);
 const busy = ref(false);

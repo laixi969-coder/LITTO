@@ -14,6 +14,7 @@ import { checkPair } from "./continuity.ts";
 import { physicalInteractionPlan, videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
+import { speechPlanningIssues } from "./speechPlanning.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -147,6 +148,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         })),
     ]));
     const warnings: string[] = [];
+    if (kind === "video") warnings.push(...speechPlanningIssues(s, shot).map(issue => `配音规划未完成：${issue}`));
     const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
     const overrides = s.list("continuity_issues", { shotId, status: "overridden" });
     // ACT: 复用后验规则提前提醒，不写质检记录、不把计划当实测；越轴等启发式不作为新增硬门禁。
@@ -400,6 +402,12 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         sections["Objective" in sections ? "Reference roles" : "referenceUse"] = characterReferenceUse;
     }
     const techniqueDirection = compileTechniqueDirection(shot, kind);
+    if (kind === "video" && brief?.dialogue.lines.length) sections.speechCoverage = brief.dialogue.lines.map((line, index) => {
+        const media = line.audio && s.get("media", line.audio.mediaId);
+        return `第${index + 1}句 ${assetName(line.speakerId)}：${media?.duration ? `原速配音实测 ${media.duration}s；` : "声音时长尚未实测；"}${line.lipSync === "visible"
+            ? (line.coverage ?? []).map(range => `${range.start}–${range.end}s：${range.description}；保持说话者完整嘴部可见，不提前切离`).join("；") || "可见嘴部的完整覆盖尚未设计"
+            : "既定画外声，画内人物不冒认此句"}`;
+    }).join("\n");
     if (techniqueDirection) sections["Objective" in sections ? "Selected techniques" : "selectedTechniques"] = techniqueDirection;
     // 剪辑、声音和叙事仍交各自真实流程，不当作单镜视觉动作；返回待执行项目供导演继续。
     for (const stage of ["edit", "audio", "story"] as const) {

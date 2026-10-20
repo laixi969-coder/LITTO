@@ -16,6 +16,8 @@ import { creativeReviewSchema } from "./creativeDirection.ts";
 import { searchFilmTechniques, techniqueStages } from "@toonflow/tool-media-generation/filmTechniques";
 import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
 import { searchLibrary, setLibraryFavorite, importFromLibrary, publishToLibrary } from "./library.ts";
+import { planShotSpeech } from "./speechPlanning.ts";
+import { probeBuffer } from "../media-tools.ts";
 
 /** 拆格或用户上传的干净单帧进入候选，采用仍复用聊天中的真实检查。 */
 export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string) {
@@ -37,8 +39,10 @@ export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotI
 export async function importWorkspaceAudio(s: Scope, projectId: string, bytes: Buffer, kind: "speech" | "music" | "sfx" = "speech") {
   if (!s.get("projects", projectId)) throw notFound("project");
   if (!sniff(bytes)?.mime.startsWith("audio/")) throw bad("声音素材须为可识别的音频文件");
+  const probe = kind === "speech" ? await probeBuffer(bytes) : null;
+  if (kind === "speech" && (!probe?.hasAudio || !Number.isFinite(probe.duration) || probe.duration! <= 0)) throw bad("配音须有实际可解码音轨与实测时长，不能以文件声明或估时替代");
   let media = s.list("media", { projectId, hash: sha256(bytes) })[0] ?? await saveMedia(s.workspaceId, projectId, bytes, { source: kind === "speech" ? "speechReference" : "audioReference" });
-  if (kind === "speech" && media.source !== "speechReference") media = s.update("media", media.id, { source: "speechReference" });
+  if (kind === "speech") media = s.update("media", media.id, { source: "speechReference", duration: probe!.duration });
   if (!s.get("projects", projectId)) throw notFound("project");
   return mediaView(media);
 }
@@ -84,6 +88,10 @@ export async function readWorkspaceAsset(s: Scope, projectId: string, data: Reco
 /** 草稿可直接保存；采用与变更确认通过聊天决定卡片写入，和制作面板复用领域规则。 */
 export function workspaceProduction(s: Scope, projectId: string, operation: string, data: Record<string, unknown>, actor?: string) {
   if (!s.get("projects", projectId)) throw notFound("project");
+  if (operation === "planSpeech") {
+    const input = z.object({ shotId: z.string().min(1), bindings: z.array(z.object({ lineIndex: z.number().int().nonnegative(), mediaId: z.string().min(1) }).strict()).max(40).default([]) }).strict().parse(data);
+    return planShotSpeech(s, projectId, input.shotId, input.bindings);
+  }
   if (operation === "searchTechniques") return searchFilmTechniques(z.object({
     query: z.string().trim().max(500).optional(), category: z.enum(["camera", "lighting", "composition", "editing", "sound", "story", "effects", "genre"]).optional(),
     stage: z.enum(techniqueStages).optional(), limit: z.number().int().min(1).max(20).optional(),
@@ -136,6 +144,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
         const shot = clip?.shotId ? s.get("shots", clip.shotId) : null;
         const line = dialogueLineIndex === undefined ? null : shot?.creativeBrief?.dialogue?.lines?.[dialogueLineIndex];
         if (!clip || edit.tracks.find(item => item.id === clip.trackId)?.kind !== "video" || !line || cue.shotId !== clip.shotId) throw bad("对白须传 readEdit 的 videoClipId、shotId 和 dialogueLineIndex，不能按场次估算落点");
+        if (line.audio && (line.audio.mediaId !== cue.mediaId || line.audio.text !== line.text)) throw bad("对白音轨不是当前镜头规划绑定的原句配音，请重新 planSpeech，不能用别的声音凑窗口");
         const sourceEnd = clip.in + clip.duration * clip.speed;
         if (line.start < clip.in || line.end > sourceEnd) throw bad("当前剪辑截断了这句对白，请先解决剪辑与台词容量冲突");
         const start = clip.start + (line.start - clip.in) / clip.speed;

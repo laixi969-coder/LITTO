@@ -143,6 +143,8 @@ export const creativeBriefSchema = z.object({
             speakerId: directionText, text: directionText,
             start: z.number().finite().nonnegative(), end: z.number().finite().positive(),
             delivery: directionText, lipSync: z.enum(["visible", "offscreen"]), framing: directionText,
+            audio: z.object({ mediaId: z.string().min(1), text: directionText }).strict().optional(),
+            coverage: z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive(), description: directionText }).strict()).min(1).max(40).optional(),
         }).strict()).max(40),
     }).strict(),
 }).strict();

@@ -172,6 +172,7 @@ export function validateTimeline(s: Scope, t: Body) {
             const shot = parent?.shotId ? s.get("shots", parent.shotId) : null;
             const line = c.dialogueLineIndex === undefined ? null : shot?.creativeBrief?.dialogue?.lines?.[c.dialogueLineIndex];
             if (tk.kind !== "audio" || !parent || !line || c.shotId !== parent.shotId || c.dialogueText !== line.text) throw bad("对白缺少当前镜头、原句和台词窗口关联；请通过 soundCues 排轨，改轨道名称或角色不能绕过校验");
+            if (line.audio && (line.audio.mediaId !== c.mediaId || line.audio.text !== line.text)) throw bad("对白音轨与当前规划绑定的真实配音不符，不能换音轨绕过容量检查");
             const start = parent.start + (line.start - parent.in) / parent.speed;
             const stop = parent.start + (line.end - parent.in) / parent.speed;
             if (line.lipSync === "visible") throw bad("可见发声必须使用已检查的口型视频，不能独立叠加配音");

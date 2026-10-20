@@ -3,6 +3,8 @@ import { z } from "zod";
 const pathSchema = z.string().min(1).max(2048).refine(path => !/^[\\/]|[:\u0000-\u001f]/.test(path) && path.split(/[\\/]/).every(part => part && part !== "." && part !== ".."), "素材路径必须位于工作区内");
 const audioSchema = z.strictObject({ path: pathSchema, mimeType: z.string().regex(/^audio\/[a-z0-9.+-]+$/i) });
 const videoSchema = z.strictObject({ path: pathSchema, mimeType: z.string().regex(/^video\/[a-z0-9.+-]+$/i) });
+export const speechPlanSchema = z.strictObject({ shotId: z.string().min(1).max(128), bindings: z.array(z.strictObject({ lineIndex: z.number().int().nonnegative(), path: pathSchema })).max(40).optional() })
+  .refine(value => !value.bindings || new Set(value.bindings.map(item => item.lineIndex)).size === value.bindings.length, "同一句不能重复绑定配音");
 export const speechSegmentSchema = audioSchema.extend({ start: z.number().finite().nonnegative(), duration: z.number().finite().positive().max(600) });
 export const speechSyncPathsSchema = z.strictObject({ audioPath: pathSchema, videoPath: pathSchema, sourceVideoPath: pathSchema.optional() });
 export const speechTakeInputSchema = speechSyncPathsSchema.extend({
@@ -41,6 +43,7 @@ const lineSchema = z.strictObject({
   id: z.string().uuid(), roleId: z.string().uuid().or(z.literal("")), kind: z.enum(["dialogue", "narration", "singing"]), text: z.string().max(10000),
   sourceAudio: speechSegmentSchema.optional(),
   shotId: z.string().max(128).optional(),
+  dialogueLineIndex: z.number().int().min(0).max(39).optional(),
   emotion: z.string().max(100), delivery: z.string().max(1800), speed: z.number().min(0.25).max(4), pauseAfter: z.number().min(0).max(10),
   video: videoSchema.optional(), takes: z.array(takeSchema).max(100), takeId: z.string().uuid().or(z.literal("")),
 });

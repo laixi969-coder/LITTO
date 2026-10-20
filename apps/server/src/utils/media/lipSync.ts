@@ -9,7 +9,7 @@ import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
 import { workspaceProject } from "@/utils/media/jobs";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
-import { readVoiceProject } from "@/utils/media/voiceDecision";
+import { readVoiceProject, assertCurrentSpeechAudio } from "@/utils/media/voiceDecision";
 
 // ACT: 仅保留本进程最近32份数值结果；每次先核验实际字节，不信任客户端缓存。
 const speechInspections = new Map<string, SpeechInspection>();
@@ -38,6 +38,8 @@ export async function validateSpeechInputs(directory: string, request: MediaGene
     const shot = line?.shotId ? scope.get("shots", line.shotId) : null;
     const planned = shot?.creativeBrief?.dialogue?.lines;
     if (shot?.projectId !== projectId || !planned?.length) throw new Error("请先将采用的声音和人物原片关联到当前项目的对应台词镜头，再对口型；本次未提交生成");
+    api!.assertSpeechPlan(scope!, shot);
+    await assertCurrentSpeechAudio(directory, shot, signal);
     if (planned.length !== 1 || planned[0].text !== line!.text || planned[0].start !== 0) throw new Error("多句或延迟发声的整镜须先按台词窗口拆成对应发声片段；不能让从第0秒开始的一句口型替代整镜。本次未提交生成。");
   }
   const paths = [request.videos[0]!.path, request.audios[0]!.path];
@@ -170,6 +172,7 @@ export async function importSpeechTake(directory: string, input: { shotId: strin
   const projectId = workspaceProject(directory)!;
   const scope = api.scoped(tenant.workspaceId);
   if (scope.get("shots", input.shotId)?.projectId !== projectId) throw new Error("镜头不属于当前工作区项目");
+  api.assertSpeechPlan(scope, scope.get("shots", input.shotId)!);
   const { project } = await readVoiceProject(directory);
   const line = project.lines.find(line => line.shotId === input.shotId && line.video?.path === input.sourceVideoPath && line.kind !== "narration"
     && line.takes.some(take => take.id === line.takeId && take.audio.path === input.audioPath && take.sourceKey === speechSourceKey(line, project.roles.find(role => role.id === line.roleId))));

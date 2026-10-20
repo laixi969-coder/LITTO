@@ -1,7 +1,8 @@
 import { readFile, stat, writeAtomic } from "@toonflow/file";
 import { z } from "zod";
 import type { QuestionContext, QuestionRequest } from "@toonflow/tools-scaffold/runtime";
-import { voiceProjectSchema, speechSourceKey, type VoiceProject } from "@toonflow/tool-media-generation/voiceProject";
+import { voiceProjectSchema, speechPlanSchema, speechSourceKey, type VoiceProject } from "@toonflow/tool-media-generation/voiceProject";
+import { createHash } from "node:crypto";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
@@ -9,11 +10,73 @@ import { readStoryProject } from "@/utils/story";
 import { storyStale } from "@toonflow/tool-scene-list/storyProject";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import { getMediaProvider } from "@/utils/media/provider";
+import { readReference } from "@/utils/media/generation";
+import { workspaceProject } from "@/utils/media/jobs";
 
 export async function readVoiceProject(directory: string) {
   const { path } = await resolveWorkspacePath(directory, "voiceProject.json");
   const content = await readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
   return { path, content, project: content === null ? { littoVoice: 1, roles: [], lines: [], lipSyncProviderId: "", lipSyncModelId: "", mixes: [] } as VoiceProject : voiceProjectSchema.parse(JSON.parse(content)) };
+}
+
+function currentVoiceLine(project: VoiceProject, shot: Record<string, any>, lineIndex: number, speakerName: string) {
+  const planned = shot.creativeBrief.dialogue.lines[lineIndex];
+  const linked = project.lines.filter(line => line.shotId === shot.id && (line.dialogueLineIndex === undefined || line.dialogueLineIndex === lineIndex));
+  const matches = linked.filter(line => line.text.trim() === planned.text && project.roles.find(role => role.id === line.roleId)?.name.trim() === speakerName.trim());
+  if (!matches.length && linked.some(line => line.text.trim() === planned.text || line.dialogueLineIndex === lineIndex)) throw new Error(`第${lineIndex + 1}句的配音原文或角色与镜头不一致，请核对对应台词，不回退到旧声音`);
+  if (matches.length > 1) throw new Error(`第${lineIndex + 1}句对应多个配音记录，请设置 voiceProject.lines 的 dialogueLineIndex（从0开始），不重新生成或猜测版本`);
+  const line = matches[0];
+  if (!line) return null;
+  const take = line.takes.find(take => take.id === line.takeId);
+  if (!take || take.sourceKey !== speechSourceKey(line, project.roles.find(role => role.id === line.roleId))) throw new Error(`第${lineIndex + 1}句尚无当前有效的已选配音；保留旧声音，不自动重新生成`);
+  return take.audio;
+}
+
+/** 复用已选声音或明确的旧素材映射；只导入实测声音并计算方案，不改镜头或音轨。 */
+export async function planWorkspaceSpeech(directory: string, data: unknown, signal?: AbortSignal) {
+  const input = speechPlanSchema.parse(data);
+  const tenant = currentTenant(), api = cloud();
+  if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权规划当前项目配音"), { status: 403 });
+  const projectId = workspaceProject(directory, false);
+  if (!projectId) throw Object.assign(new Error("工作目录尚未关联镜头项目，不能创建空项目代替配音规划"), { status: 404 });
+  const scope = api.scoped(tenant.workspaceId), shot = scope.get("shots", input.shotId);
+  if (!shot || shot.projectId !== projectId) throw Object.assign(new Error("镜头不属于当前项目"), { status: 404 });
+  const lines = shot.creativeBrief?.dialogue?.lines ?? [];
+  if (input.bindings?.some(binding => !lines[binding.lineIndex])) throw Object.assign(new Error("配音绑定索引不属于本镜原句"), { status: 400 });
+  const saved = await readVoiceProject(directory);
+  const snapshot = JSON.stringify(shot);
+  const bindings = [];
+  for (const [lineIndex, line] of lines.entries()) {
+    signal?.throwIfAborted();
+    const explicit = input.bindings?.find(binding => binding.lineIndex === lineIndex);
+    const audio = explicit ? { path: explicit.path, mimeType: "audio/wav" }
+      : currentVoiceLine(saved.project, shot, lineIndex, scope.get("assets", line.speakerId)?.name ?? "");
+    if (!audio) continue; // 已保存且仍有效的领域声音绑定由 planShotSpeech 复用。
+    const reference = await readReference(directory, audio, "audio", signal);
+    const media = await api.importWorkspaceAudio(scope, projectId, Buffer.from(reference.data, "base64"));
+    bindings.push({ lineIndex, mediaId: media.id });
+  }
+  signal?.throwIfAborted();
+  if (JSON.stringify(scope.get("shots", shot.id)) !== snapshot || (await readVoiceProject(directory)).content !== saved.content) throw new Error("测量期间镜头或配音选择已改变，未应用旧规划，请重新核对");
+  return api.workspaceProduction(scope, projectId, "planSpeech", { shotId: shot.id, bindings }, tenant.userId);
+}
+
+/** 已选择的声音被替换或改词后，不能继续用旧领域绑定提交付费画面。 */
+export async function assertCurrentSpeechAudio(directory: string, shot: Record<string, any>, signal?: AbortSignal) {
+  if (!shot.creativeBrief?.dialogue?.lines?.length) return;
+  const tenant = currentTenant(), api = cloud();
+  if (!tenant || !api) throw new Error("缺少配音规划的工作区身份");
+  const scope = api.scoped(tenant.workspaceId);
+  const saved = await readVoiceProject(directory);
+  for (const [index, line] of shot.creativeBrief.dialogue.lines.entries()) {
+    const audio = currentVoiceLine(saved.project, shot, index, scope.get("assets", line.speakerId)?.name ?? "");
+    if (!audio) continue;
+    const reference = await readReference(directory, audio, "audio", signal);
+    const hash = createHash("sha256").update(Buffer.from(reference.data, "base64")).digest("hex");
+    const bound = line.audio && scope.get("media", line.audio.mediaId);
+    if (!bound || bound.projectId !== shot.projectId || bound.hash !== hash || line.audio.text !== line.text) throw new Error(`第${index + 1}句的已选声音与镜头规划不一致，请重新 planSpeech；不沿用旧时长提交生成`);
+  }
+  if ((await readVoiceProject(directory)).content !== saved.content) throw new Error("检查期间配音选择已改变，停止提交生成");
 }
 
 export async function isVoiceSyncRequest(directory: string, request: MediaGenerationRequest) {
