@@ -128,7 +128,7 @@ metadata:
 | 需要转场、J/L cut、多轨、字幕、精调切点 | 生成链路只负责素材与顺序，**精剪不进生成**。调 `POST /api/ai/media/timeline` 导出 OpenTimelineIO 与 CMX3600 EDL（`composeFilm` 合成后也会自动导一份到 `assets/timeline/`），交给 filmcraft / 达芬奇 / Premiere 剪。EDL 带 `* SOURCE FILE:` 绝对路径，导入时能自动链接素材 |
 | 批量生成（一次超过 5 镜或合计超过 60 秒） | **先调 `POST /api/ai/media/estimate` 报价**：给 providerId/modelId/duration/resolution，返回这一批的条数、秒数、参考积分，以及最近 24 小时已消耗多少。把报价和「已经烧了多少」一起报给用户，得到明确同意再提交。额度是真实货币，不是沙盒 |
 | 一镜里的人物在左在右、过谁的肩、机位放哪、有没有跳轴 | 生成前先做**走位板**：调 `POST /api/ai/media/blocking`，给房间尺寸、人物坐标与朝向、每个机位的坐标与视线，返回一张俯视图 SVG、每镜的空间描述（主体居中 + 前景压在哪侧）、以及**跳轴判定**。结构存 `assets/blocking.json`，写提示词时直接取 `blocking` 字段，不要自己编左右 |
-| 有对白的场景要拆镜、要多轮对白、要判断谁说话给谁镜头 | 拆镜前读取[对白覆盖与正反打](../cinema/references/coverage.md)。先调 `POST /api/ai/media/coverage` 把分镜台词归属算一遍：它返回每镜的轮次、台词容量与拆镜建议，并写入 `assets/coverage.json`。覆盖表判 block 的项目**不能生成视频**，会直接被拦；画外对答、一镜三轮以上都会被点名 |
+| 有对白的场景要拆镜、要多轮对白、要判断谁说话给谁镜头 | 拆镜前读取[对白覆盖与正反打](../cinema/references/coverage.md)。先调 `POST /api/ai/media/coverage` 把分镜台词归属算一遍：它返回每镜的轮次、台词容量与拆镜建议，并写入 `assets/coverage.json`。覆盖表中未交代声源或画内发声缺覆盖的 block 会拦截；有依据的画外声和多轮同框可保留。轮次、字数只提示容量风险，不按轮次硬切、不删句或加速；生成配音后使用真实时长与口型检查 |
 | 武打、搏击、追逐、兵器、仙侠法术或复杂身体交互 | 规划或修复前读取[动作编排](../cinema/references/actionChoreography.md)，落实空间、受力、反应与状态衔接；攻防节拍、多人换位、法术及连续长镜头再读[武打导演专项](../cinema/references/manjuActionDirection.md)；同时有表演诉求时结合表演指导 |
 | 多镜头、续作、局部重做、反打或跨镜动作 | 读取[连续性守则](../continuity/SKILL.md)，按实际状态承接身份、光线、情绪、道具与动作 |
 | 只有角色身份资产、无人场景或静物产品图 | 使用[资产制作](references/assets.md)与适用的摄影方法；不自动套哭戏、打斗、眨眼或群像规则 |

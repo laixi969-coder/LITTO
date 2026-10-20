@@ -6,6 +6,7 @@ import { statesOf, validateStateDelta } from "./state.ts";
 import { adContext } from "./adDirection.ts";
 import { needsLipSync, qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
 import { z } from "zod";
+import { techniqueVersion, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 // 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
 export const audioReviewSchema = z.object({
@@ -15,6 +16,7 @@ export const audioReviewSchema = z.object({
 }).strict();
 
 export const reviewedSegmentsSchema = z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).strict().refine(range => range.end > range.start)).max(80).default([]);
+export const techniqueReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(8);
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
@@ -31,6 +33,7 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
   const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
   const advertising = adContext(s, shot);
   const data = {
+    ...(shot.techniques?.length ? { techniqueVersion } : {}),
     ...(advertising ? { advertising } : {}),
     shot: { ...shotData, ...(creativeBrief ? { creativeBrief: type === "keyframe"
       ? { kind: creativeBrief.kind, intent: creativeBrief.intent, visualPayoff: creativeBrief.visualPayoff }
@@ -45,6 +48,11 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
   if (type === "keyframe") {
     // 静帧编译不使用视频音轨/时间线；前镜采用只按实际继承状态影响静帧，不按 Take ID 使其失效。
     delete data.shot.musicVideo;
+    if (data.shot.techniques) {
+      const imageIds = new Set(techniquePlan(shot, "image").map(item => item.id));
+      data.shot.techniques = data.shot.techniques.filter(item => imageIds.has(item.id));
+      if (!data.shot.techniques.length) { delete data.shot.techniques; delete data.techniqueVersion; }
+    }
     data.previousTake = null;
   }
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
@@ -63,6 +71,10 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     if (item.meta?.speechSync && (audio.inspectionKey !== item.meta.speechSync.inspectionKey || !item.meta.speechSync.audioMatches)) throw conflict("口型检查不是当前声音与视频版本，请重新检核当前素材", "speech_review_stale");
   }
   const required = plan.checks;
+  if (type === "take" && plan.techniques.length && (!evidence?.fullPlayback || !plan.techniques.every(item =>
+    evidence.techniqueReview?.some((review: { id: string; verdict: string }) => review.id === item.id && review.verdict === "pass")))) {
+    throw conflict("选用镜头技法的视频须完整播放并逐项记录真实检查依据，检索或编译成功不能代替通过", "technique_review_required");
+  }
   const matches = evidence && (evidence.fingerprint === shotFingerprint(s, item.shotId, type)
     || type === "keyframe" && evidence.fingerprint === shotFingerprint(s, item.shotId));
   if (!evidence || evidence.mediaId !== item.mediaId || !matches

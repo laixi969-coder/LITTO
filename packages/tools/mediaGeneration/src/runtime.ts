@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
+import { techniquePlan } from "./filmTechniques";
 
 export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia, MediaContext } from "@toonflow/tools-scaffold/runtime";
 
@@ -94,13 +95,15 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   const lines = shot.creativeBrief?.dialogue?.lines ?? [];
   const speech = type === "take" && (needsLipSync(shot) || lines.length > 0);
   const interaction = physicalInteractionPlan(type === "keyframe" ? { ...shot, musicVideo: undefined } : shot);
-  const motion = interaction.required || shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|hand|grasp|fight/i.test([shot.action, shot.performance?.gesture].join(" "));
-  const visual = motion || !shot.camera?.shotSize || /^(?:ECU|CU|MCU)$/i.test(shot.camera?.shotSize ?? "") || /近景|特写/.test(shot.camera?.shotSize ?? "")
+  const techniques = techniquePlan(shot, type === "keyframe" ? "image" : "video");
+  const techniqueMotion = techniques.some(item => item.stages.includes("video") && !item.stages.includes("image"));
+  const motion = interaction.required || techniqueMotion || shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|救援|救起|承托|转移伤者|hand|grasp|fight|rescue/i.test([shot.action, shot.performance?.gesture].join(" "));
+  const visual = motion || techniques.length > 0 || !shot.camera?.shotSize || /^(?:ECU|CU|MCU)$/i.test(shot.camera?.shotSize ?? "") || /近景|特写/.test(shot.camera?.shotSize ?? "")
     || !!shot.inspectionRegion;
   // ACT: 分级只安排检查投入，不据此宣称质量通过；未知景别进入重点档。明确的演唱无逐句时间时覆盖整段。
   const tier = speech ? "speech" : visual || !shot.camera?.shotSize ? "visual" : "basic";
   const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
-  return { tier, sampleCount: tier === "basic" ? 3 : 8, fullPlayback: type === "take" && motion,
+  return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take" && (motion || techniques.length > 0), techniques,
     checks: tier === "basic" ? ["imaging", "world", "cinematic"] : type === "keyframe" || !motion ? ["surface", "imaging", "world", "cinematic"] : ["surface", "imaging", "world", "motion", "cinematic"], speechRanges, interaction };
 }
 
@@ -127,6 +130,7 @@ export const agentReviewSchema = z.strictObject({
   reviewedSegments: reviewedSegmentsSchema.describe("实际看听的局部区间，单位秒；覆盖本镜全部发声区间才可用于声音检查，不能把计划区间当作已看听"),
   fullPlayback: z.boolean().default(false).describe("只有实际完整播放当前视频后才为true，抽帧不能替代看听"),
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
+  techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
   creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字，写实际妆造与调度依据。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { findFilmTechnique } from "@toonflow/tool-media-generation/filmTechniques";
 import { bad } from "../util.ts";
 
 export const SCHEMA_VERSION = 1;
@@ -158,6 +159,12 @@ const stateDeltaSchema = z.object({
     motion: z.record(z.any()).optional(), emotional: z.record(z.any()).optional(),
 }).strict();
 
+export const techniqueSelectionSchema = z.object({
+    id: z.string().max(120).refine(id => !!findFilmTechnique(id), "未知镜头技法，请先 searchTechniques"),
+    purpose: z.string().trim().min(1).max(1000), execution: z.string().trim().min(10).max(2000),
+    start: z.number().finite().nonnegative().optional(), end: z.number().finite().positive().optional(),
+}).strict();
+
 export const shotInput = z.object({
     sequenceId: z.string(), sceneId: z.string().optional(), order: z.number().int().optional(),
     title: z.string().default(""),
@@ -182,6 +189,7 @@ export const shotInput = z.object({
     musicVideo: musicVideoSchema.nullable().optional(),
     creativeBrief: creativeBriefSchema.optional(),
     advertising: advertisingSchema.optional(),
+    techniques: z.array(techniqueSelectionSchema).max(8).optional(),
     inspectionRegion: referenceCropSchema.nullable().optional(),
     subtitle: z.string().default(""),
     modelOverride: z.any().optional(),

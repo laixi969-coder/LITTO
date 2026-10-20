@@ -138,6 +138,13 @@
               <summary>最终声画验收</summary>
               <p>每项记录实际观察；有意静默或声音进入需解释告警，未解决则选返修。剪辑或素材改变后须重新导出。</p>
               <label v-for="field in reviewFields" :key="field[0]">{{ field[1] }}<select v-model="qualityDrafts[item.id].checks[field[0]]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
+              <template v-for="technique in item.quality.techniques ?? []" :key="technique.shotId + ':' + technique.id">
+                <p>{{ technique.criterion }}</p>
+                <template v-if="qualityDrafts[item.id].techniques[technique.shotId + ':' + technique.id]">
+                  <label>技法执行<select v-model="qualityDrafts[item.id].techniques[technique.shotId + ':' + technique.id].verdict"><option value="unverified">未验证</option><option value="pass">实际检查通过</option><option value="revise">需要返修</option></select></label>
+                  <label>实际时间点与看听依据<textarea v-model="qualityDrafts[item.id].techniques[technique.shotId + ':' + technique.id].note" rows="2" /></label>
+                </template>
+              </template>
               <label><input v-model="qualityDrafts[item.id].fullPlayback" type="checkbox" />已完整播放并试听此导出文件</label>
               <label>时间码、观察证据与复查结论<textarea v-model="qualityDrafts[item.id].note" rows="3" /></label>
               <div v-for="finding in item.quality.findings" :key="finding.id">
@@ -176,7 +183,7 @@ const reviewFields = computed(() => [...qualityFields, ...(props.shots.some(shot
 const visualLabels: Record<string, string> = { palette: "色彩", light: "用光", materials: "材质", composition: "构图", motion: "运动" };
 const grade = ref({ exposureStops: 0, temperature: 0, saturation: 1, contrast: 1 });
 const qualityLabels: Record<string, string> = { unverified: "未验收", fail: "需要返修", pass: "人工验收通过", stale: "版本已改变，须重新导出验收" };
-const qualityDrafts = ref<Record<string, { analysisId: string; checks: Record<string, string>; fullPlayback: boolean; note: string; reasons: Record<string, string> }>>({});
+const qualityDrafts = ref<Record<string, { analysisId: string; checks: Record<string, string>; fullPlayback: boolean; note: string; techniques: Record<string, { verdict: string; note: string }>; reasons: Record<string, string> }>>({});
 let disposed = false;
 let renderTimer: ReturnType<typeof setTimeout> | undefined;
 let renderLoading = false;
@@ -282,7 +289,7 @@ async function loadRenders() {
     if (disposed || id !== sequenceId.value) return;
     renders.value = values;
     for (const item of values) if (item.quality?.analysisId && qualityDrafts.value[item.id]?.analysisId !== item.quality.analysisId) {
-      qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(reviewFields.value.map(field => [field[0], "unverified"])), fullPlayback: false, note: "", reasons: {} };
+      qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(reviewFields.value.map(field => [field[0], "unverified"])), fullPlayback: false, note: "", techniques: Object.fromEntries((item.quality.techniques ?? []).map((technique: any) => { const prior = item.quality.review?.techniqueReview?.find((check: any) => check.shotId === technique.shotId && check.id === technique.id); return [technique.shotId + ":" + technique.id, { verdict: prior?.verdict ?? "unverified", note: prior?.note ?? "" }]; })), reasons: {} };
     }
     const latest = values.find((item: any) => item.status === "SUCCEEDED" && item.media);
     if (latest && !published.value.has(latest.id) && !publishErrors.value[latest.id]) {
@@ -299,7 +306,7 @@ async function loadRenders() {
 async function analyzeQuality(id: string) { await props.request(`/renders/${id}/quality/analyze`, "POST", {}); await loadRenders(); }
 async function saveQuality(item: any) {
   const draft = qualityDrafts.value[item.id];
-  await props.request(`/renders/${item.id}/quality/review`, "POST", { analysisId: draft.analysisId, checks: draft.checks, fullPlayback: draft.fullPlayback, note: draft.note, acknowledgements: Object.entries(draft.reasons).filter(([, reason]) => reason.trim()).map(([id, reason]) => ({ id, reason })) });
+  await props.request(`/renders/${item.id}/quality/review`, "POST", { analysisId: draft.analysisId, checks: draft.checks, fullPlayback: draft.fullPlayback, note: draft.note, techniqueReview: (item.quality.techniques ?? []).map((technique: any) => ({ shotId: technique.shotId, id: technique.id, ...draft.techniques[technique.shotId + ":" + technique.id] })), acknowledgements: Object.entries(draft.reasons).filter(([, reason]) => reason.trim()).map(([id, reason]) => ({ id, reason })) });
   await loadRenders();
 }
 async function trackRender(id: string, targetSequence: string, binding?: { context: CanvasContext; id: string }) {

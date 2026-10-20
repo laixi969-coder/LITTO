@@ -11,8 +11,9 @@ import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
 import { promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake, applyOps, getEdit, editView } from "./nle.ts";
-import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint } from "./realism.ts";
+import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
+import { searchFilmTechniques, techniqueStages } from "@toonflow/tool-media-generation/filmTechniques";
 import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
 import { searchLibrary, setLibraryFavorite, importFromLibrary, publishToLibrary } from "./library.ts";
 
@@ -83,6 +84,10 @@ export async function readWorkspaceAsset(s: Scope, projectId: string, data: Reco
 /** 草稿可直接保存；采用与变更确认通过聊天决定卡片写入，和制作面板复用领域规则。 */
 export function workspaceProduction(s: Scope, projectId: string, operation: string, data: Record<string, unknown>, actor?: string) {
   if (!s.get("projects", projectId)) throw notFound("project");
+  if (operation === "searchTechniques") return searchFilmTechniques(z.object({
+    query: z.string().trim().max(500).optional(), category: z.enum(["camera", "lighting", "composition", "editing", "sound", "story", "effects", "genre"]).optional(),
+    stage: z.enum(techniqueStages).optional(), limit: z.number().int().min(1).max(20).optional(),
+  }).strict().parse(data));
   if (operation === "readLibrary") return searchLibrary(s, data);
   if (operation === "readAsset") {
     const input = z.object({ assetId: z.string().min(1) }).strict().parse(data);
@@ -163,6 +168,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
       fullPlayback: z.boolean().default(false), reviewedSegments: reviewedSegmentsSchema, audioReview: audioReviewSchema.optional(),
       creativeReview: creativeReviewSchema.optional(),
+      techniqueReview: techniqueReviewSchema.optional(),
       observations: z.array(z.strictObject({ kind: z.string(), note: z.string().min(1) })).max(40).default([]),
     }).parse(data);
     const item = s.get(input.targetType === "keyframe" ? "keyframes" : "takes", input.targetId);
@@ -186,6 +192,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
         && (input.targetType === "take" || plan.checks.every(key => previous.evidence.reviewed?.includes(key)))
         && (!input.fullPlayback || previous.evidence.fullPlayback)
         && (!input.audioReview || JSON.stringify(input.audioReview) === JSON.stringify(previous.evidence.audioReview))
+        && (!plan.techniques.length || JSON.stringify(input.techniqueReview) === JSON.stringify(previous.evidence.techniqueReview))
         && (!input.reviewedSegments.length || JSON.stringify(input.reviewedSegments) === JSON.stringify(previous.evidence.reviewedSegments))) {
         const review = { report: previous, repairActions: s.list("repair_actions", { qcReportId: previous.id }) };
         if (previous.findings.some((finding: { severity: string }) => finding.severity === "high")) {
@@ -198,6 +205,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       const review = runQc(s, shot.id, { type: input.targetType, id: item.id }, input.observations, {
         actor: `agent:${actor}`, note: input.note,
         fullPlayback: input.fullPlayback, reviewedSegments: input.reviewedSegments, audioReview: input.audioReview,
+        techniqueReview: input.techniqueReview,
         reviewed: plan.fullPlayback && !input.fullPlayback ? [] : plan.checks,
         vision: { source: "delegatedAgent", authorization: input.authorization, frameTimes: input.frameTimes, creativeReview: input.creativeReview, audioReview: "notVerified", status: "workingVersion" },
       });

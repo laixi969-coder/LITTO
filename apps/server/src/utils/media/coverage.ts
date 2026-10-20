@@ -6,6 +6,8 @@ import { resolveWorkspacePath } from "@/utils/workspace/files";
 export interface CoverageLine {
   speaker: string;
   line: string;
+  lipSync?: "visible" | "offscreen";
+  framing?: string;
 }
 
 /** 覆盖表的一行 = 一个计划中的镜头。 */
@@ -66,7 +68,7 @@ export interface CoverageSplit {
   }[];
 }
 
-const SPEECH_RATE = 3.5;
+const speechRate = 3.5;
 
 export function countChars(text: string) {
   return String(text ?? "").replace(/[^\u4e00-\u9fa5]/g, "").length;
@@ -98,8 +100,7 @@ function leadSpeaker(shot: CoverageShot) {
 }
 
 /**
- * 覆盖表校验：说话人不在画又没有独立镜头、一轮以上的说话人交替、台词超出时长容量。
- * 这三条都能在开拍前判死，不必等成片出来才发现「听见 B 的声音却一直看着 A 的脸」。
+ * 覆盖表只拦未交代来源的声音；轮次与字数是设计提示，不能替代模型能力和真实音频时长。
  */
 export function evaluateCoverage(shots: CoverageShot[]) {
   const rows: CoverageRow[] = [];
@@ -114,21 +115,22 @@ export function evaluateCoverage(shots: CoverageShot[]) {
     const duration = typeof shot.duration === "number" && shot.duration > 0 ? shot.duration : undefined;
     let problem: CoverageRow["problem"] = "";
     let detail = "";
-    const orphan = !ownShot && lines.find(item => !visible.includes(item.speaker));
+    const orphan = lines.find(item => !visible.includes(item.speaker) && (item.lipSync === "visible"
+      || !ownShot && !(item.lipSync === "offscreen" && item.framing?.trim())));
     if (orphan) {
       problem = "orphan";
-      detail = `${shot.id}：${orphan.speaker} 说话但不在画，也没有他的独立镜头`;
+      detail = `${shot.id}：${orphan.speaker} 不在画，请保留原句并补齐画内覆盖，或明确 offscreen 及 framing 声源依据`;
     } else if (turns >= 3) {
       problem = "overloaded";
-      detail = `${shot.id}：一镜里换了 ${turns} 轮说话人（${lines.map(item => item.speaker).filter((name, index, list) => list.indexOf(name) === index).join("、")}），必须拆成正反打`;
+      detail = `${shot.id}：一镜有 ${turns} 轮说话人，核对同框调度、逐句可见性、模型同步能力和实际声音容量；能完整执行的持续镜头可以保留，不强制拆镜`;
     } else if (turns >= 2 && visible.length === 1) {
       // 画面里只有一个人，却在和画外的人来回对话：观众听见对方说话，却始终看不见他。
       // 「对方在别处有镜头」只能让观众知道是谁在说，不解决这一句该给谁镜头。
       problem = "offscreen";
       detail = `${shot.id}：画面里只有 ${visible[0]}，却有 ${turns} 轮画外对答，观众会听见对方说话却看不见他`;
-    } else if (duration && chars && chars / SPEECH_RATE > duration) {
+    } else if (duration && chars && chars / speechRate > duration) {
       problem = "crowded";
-      detail = `${shot.id}：${chars} 字台词按 ${SPEECH_RATE} 字/秒需要 ${(chars / SPEECH_RATE).toFixed(1)} 秒，计划只有 ${duration} 秒`;
+      detail = `${shot.id}：${chars} 字按 ${speechRate} 字/秒粗估 ${(chars / speechRate).toFixed(1)} 秒，计划 ${duration} 秒；仅提示容量风险，生成配音后以真实时长为准，不自动删词、加速或平均分秒`;
     } else if (turns === 2) {
       problem = "multi";
       detail = `${shot.id}：一镜里换了一轮说话人，同框长镜可以保留，但要给听者可见反应`;
@@ -149,36 +151,36 @@ export function coverageCheck(shots: CoverageShot[] | undefined): CoverageCheck 
       key: "coverage",
       level: "warn",
       passed: false,
-      detail: "没有 assets/coverage.json，对白镜没有排过覆盖表；一轮以上的说话人交替会变成画外音错位",
+      detail: "没有 assets/coverage.json，请核对逐句声音归属、画内/画外覆盖和实际时长；多轮持续镜头并非必然错位",
       rule: "对白覆盖与正反打",
     };
   }
   const { rows, orphans, overloaded, offscreen, multi, crowded } = evaluateCoverage(shots);
   const problems = [
     orphans.length ? `${orphans.length} 行说话人不在画且没有独立镜头（${orphans.slice(0, 3).map(row => row.id).join("、")}），成片会听见他说话却看不见他` : "",
-    overloaded.length ? `${overloaded.length} 行在一镜里换了三轮以上说话人（${overloaded.slice(0, 3).map(row => row.id).join("、")}），等于把对话戏塞进一个机位，必须拆成正反打` : "",
+    overloaded.length ? `${overloaded.length} 行有多轮对白（${overloaded.slice(0, 3).map(row => row.id).join("、")}），须核对同框调度、模型能力和真实声音容量，不强制每句切镜` : "",
     offscreen.length ? `${offscreen.length} 行是「画面一个人 + 画外对答」（${offscreen.slice(0, 4).map(row => row.id).join("、")}），对方说话时没有镜头，属于缺反打` : "",
     multi.length ? `${multi.length} 行换了一轮说话人，同框长镜可保留，但要确认听者有可见反应` : "",
-    crowded.length ? `${crowded.length} 行台词超出时长容量（按 ${SPEECH_RATE} 字/秒）：${crowded.slice(0, 3).map(row => row.id).join("、")}` : "",
+    crowded.length ? `${crowded.length} 行存在粗估容量风险（${speechRate} 字/秒非硬性语速）：${crowded.slice(0, 3).map(row => row.id).join("、")}` : "",
   ].filter(Boolean);
   return {
     key: "coverage",
-    level: orphans.length || overloaded.length ? "block" : "warn",
+    level: orphans.length ? "block" : "warn",
     passed: problems.length === 0,
-    detail: problems.join("；") || `${rows.length} 行对白均有人物归属、无多轮同镜，台词字数与时长匹配`,
+    detail: problems.join("；") || `${rows.length} 行对白已交代声音归属；实际声音、可见口型及动作容量仍需生成后检查`,
     rule: "对白覆盖与正反打",
   };
 }
 
 /**
- * 拆镜建议：把一镜里的台词按说话人连续段切成正反打，配上近景与过肩前景。
- * 只给结构和时长建议，不改台词——台词是作者的东西，工具只负责让它有人演。
+ * 只对有覆盖/容量风险的段落给出备选拆镜，不自动执行，不删台词，不替代实际时长。
  */
 export function suggestSplits(shots: CoverageShot[]): CoverageSplit[] {
   const splits: CoverageSplit[] = [];
   for (const shot of Array.isArray(shots) ? shots : []) {
     const lines = Array.isArray(shot.lines) ? shot.lines.filter(item => item?.speaker) : [];
-    if (!lines.length || countTurns(shot) < 2) continue;
+    const problem = evaluateCoverage([shot]).rows[0]?.problem;
+    if (!lines.length || !["orphan", "offscreen", "crowded"].includes(problem ?? "") || countTurns(shot) < 2) continue;
     const groups: { speaker: string; text: string }[] = [];
     for (const item of lines) {
       const last = groups[groups.length - 1];
@@ -188,7 +190,7 @@ export function suggestSplits(shots: CoverageShot[]): CoverageSplit[] {
     const counterpart = (Array.isArray(shot.visible) ? shot.visible : []).find(name => name !== groups[0].speaker) ?? "";
     const pieces = groups.map((group, index) => {
       const chars = countChars(group.text);
-      const duration = Math.min(15, Math.max(4, Math.ceil(chars / SPEECH_RATE + 1.2)));
+      const duration = Math.max(0.5, Math.ceil(chars / speechRate * 10) / 10);
       const other = group.speaker === counterpart ? groups[0].speaker : counterpart;
       return {
         id: `${shot.id}${String.fromCharCode(97 + index)}`,
@@ -197,7 +199,7 @@ export function suggestSplits(shots: CoverageShot[]): CoverageSplit[] {
         duration,
         shotSize: "近景",
         foreground: other ? `${other}的肩（虚焦，占画面一条边）` : "",
-        note: "首帧取「正在说这句」的那一瞬间；镜内只演这一个节拍",
+        note: "备选覆盖，不自动应用；时长仅为粗估，沿用原句与实际声音，保留触发、反应及动作接续，不强制一镜一个节拍",
       };
     });
     splits.push({ from: shot.id, shots: pieces });
@@ -238,7 +240,7 @@ export async function coverageGate(directory: string): Promise<string | null> {
   if (!file || !Array.isArray(file.shots) || !file.shots.length) return null;
   const check = coverageCheck(file.shots);
   if (check.level === "block" && !check.passed) {
-    return `${check.detail}。先拆镜，或改 assets/coverage.json（可调 /api/ai/media/coverage 自动生成拆镜建议）`;
+    return `${check.detail}。先核对画内/画外计划及真实声源，必要时补覆盖；不删台词或关闭检查绕过。`;
   }
   return null;
 }

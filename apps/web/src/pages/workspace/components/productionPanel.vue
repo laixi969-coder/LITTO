@@ -169,6 +169,13 @@
               <p>辅助检查可能产生模型费用。普通镜头采样 3 帧，重点镜头采样 8 帧，物体交互最多补 6 帧；相同素材与规格复用已完成的检查。采样不能证明声音与口型同步。</p>
               <p class="reviewHint">确认前请对照画面看：{{ reviewFields.map(field => field[1]).join("、") }}{{ qualityPlan.fullPlayback ? "；复杂动作请完整播放一遍" : "；集中预览一次即可" }}。</p>
               <label v-for="field in reviewFields" :key="field[0]"><input v-model="reviewedFields" type="checkbox" :value="field[0]" />已检查 {{ field[1] }}</label>
+              <template v-for="technique in qualityPlan.techniques" :key="technique.id">
+                <p>{{ technique.label }}：{{ technique.criterion }}</p>
+                <template v-if="target.type === 'take' && techniqueReviews[technique.id]">
+                  <label>技法执行<select v-model="techniqueReviews[technique.id].verdict"><option value="unverified">未验证</option><option value="pass">实际检查通过</option><option value="revise">需要返修</option></select></label>
+                  <label>实际时间点与画面依据<textarea v-model="techniqueReviews[technique.id].note" rows="2" /></label>
+                </template>
+              </template>
               <label v-if="qualityPlan.fullPlayback"><input v-model="fullPlayback" type="checkbox" />已完整播放，检查肢体增减、遮挡、手物接触及动作收势</label>
               <template v-if="target.type === 'take' && speechReviewRequired">
                 <label><input v-model="speechChecked" type="checkbox" />已看听以上全部发声区间，实际对白或歌词与采用声音一致</label>
@@ -183,8 +190,8 @@
                 <p class="reviewHint">已按镜头规格预填，只改与画面不符的地方；批准后下一镜继承这些记录。</p>
                 <div class="fieldGrid"><label v-for="item in shotAssets" :key="item.id">{{ item.name }}<textarea v-model="stateNotes[item.id]" rows="2" /></label></div>
               </template>
-              <button v-if="observation" type="button" :disabled="!reviewNote.trim()" @click="run(saveReview)">记录问题</button>
-              <button v-else type="button" :disabled="!reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && ((qualityPlan.fullPlayback && !fullPlayback) || speechReviewRequired && (!speechChecked || needsLipSync(detail) && !lipSyncChecked || speechNote.trim().length < 10)))" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "已检查，批准此 Take" }}</button>
+              <button v-if="observation || techniqueNeedsRevision" type="button" :disabled="(!reviewNote.trim() && !techniqueNeedsRevision) || !techniqueProblemsComplete" @click="run(saveReview)">记录问题</button>
+              <button v-else type="button" :disabled="!techniqueChecksComplete || !reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && ((qualityPlan.fullPlayback && !fullPlayback) || speechReviewRequired && (!speechChecked || needsLipSync(detail) && !lipSyncChecked || speechNote.trim().length < 10)))" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "已检查，批准此 Take" }}</button>
               <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? report.evidence?.vision?.used ? '辅助检查已完成 · 待实际复核' : '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="(item, index) in report.evidence?.vision?.uncertainties ?? []" :key="index">待核实：{{ item.note }}（证据不足，未记为确定缺陷）</p><p v-for="(finding, index) in report.findings" :key="index">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
             </template>
             <template v-if="candidatePool.length">
@@ -286,6 +293,7 @@ const stateNotes = ref<Record<string, string>>({});
 const shotAssets = computed(() => assets.value.filter(item => detail.value?.assetIds?.includes(item.id)));
 const targetId = ref(""), reviewNote = ref(""), observation = ref("");
 const reviewedFields = ref<string[]>([]), dismissedKinds = ref<string[]>([]), fullPlayback = ref(false);
+const techniqueReviews = ref<Record<string, { verdict: string; note: string }>>({});
 const speechChecked = ref(false), lipSyncChecked = ref(false), speechNote = ref("");
 const speechReviewRequired = computed(() => needsLipSync(detail.value ?? {}) || !!detail.value?.creativeBrief?.dialogue?.lines?.length);
 const keyOf = (model: MediaModel) => JSON.stringify([model.providerId, model.modelId]);
@@ -299,6 +307,10 @@ const target = computed(() => versions.value.find(item => item.id === targetId.v
 const targetReports = computed(() => (detail.value?.qc ?? []).filter((report: any) => report.targetId === targetId.value).reverse());
 const priorFindings = computed(() => (targetReports.value[0]?.findings ?? []).filter((item: any) => !item.kind.startsWith("continuity:")));
 const qualityPlan = computed(() => qualityReviewPlan(detail.value ?? {}, target.value?.type ?? "keyframe"));
+const techniqueNeedsRevision = computed(() => target.value?.type === "take" && Object.values(techniqueReviews.value).some(item => item.verdict === "revise"));
+const techniqueNotesComplete = computed(() => target.value?.type !== "take" || qualityPlan.value.techniques.every(item => (techniqueReviews.value[item.id]?.note.trim().length ?? 0) >= 10 && techniqueReviews.value[item.id]?.verdict !== "unverified"));
+const techniqueProblemsComplete = computed(() => Object.values(techniqueReviews.value).filter(item => item.verdict === "revise").every(item => item.note.trim().length >= 10));
+const techniqueChecksComplete = computed(() => techniqueNotesComplete.value && !techniqueNeedsRevision.value);
 const qualityLabel = computed(() => ({ basic: "基础检查 · 集中预览", visual: "重点画面检查", speech: "声音与口型检查" }[qualityPlan.value.tier]));
 const reviewFields = computed(() => realismFields.filter(field => qualityPlan.value.checks.includes(field[0])));
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
@@ -591,9 +603,11 @@ function selectVersion(item: any) {
   targetId.value = item.id; reviewNote.value = ""; observation.value = "";
   reviewedFields.value = []; dismissedKinds.value = []; fullPlayback.value = false;
   speechChecked.value = false; lipSyncChecked.value = false; speechNote.value = "";
+  techniqueReviews.value = Object.fromEntries(qualityReviewPlan(detail.value ?? {}, item.type).techniques.map(technique => [technique.id, { verdict: "unverified", note: "" }]));
   const previous = (detail.value?.qc ?? []).filter((report: any) => report.targetId === item.id).at(-1);
   if (previous?.current) {
     const evidence = previous.evidence;
+    for (const check of evidence.techniqueReview ?? []) if (techniqueReviews.value[check.id]) techniqueReviews.value[check.id] = { verdict: check.verdict, note: check.note };
     reviewedFields.value = [...(evidence.reviewed ?? [])]; fullPlayback.value = evidence.fullPlayback === true;
     speechChecked.value = evidence.audioReview?.speech === "pass"; lipSyncChecked.value = evidence.audioReview?.lipSync === "pass";
     speechNote.value = evidence.audioReview?.note ?? ""; reviewNote.value = evidence.note ?? "";
@@ -612,7 +626,7 @@ async function basicReview() {
 }
 async function autoReview() { const item = target.value; await request(`/shots/${shotId.value}/qc`, "POST", { targetType: item.type, targetId: item.id, auto: true, visionModel: { providerId: JSON.parse(visionModelKey.value)[0], modelId: JSON.parse(visionModelKey.value)[1] } }); await refreshResults(); }
 // 仅提交用户实际确认的维度；不把点击批准转换为所有维度自动通过。
-function reviewPayload(item: any) {
+function reviewPayload(item: any, onlyProblems = false) {
   const observedStateDelta: Record<string, Record<string, unknown>> = {};
   if (item.type === "take") for (const asset of shotAssets.value) {
     const note = stateNotes.value[asset.id]?.trim() || "与开始时一致";
@@ -620,12 +634,13 @@ function reviewPayload(item: any) {
     // 改过的说明以用户为准，规格里的结构化字段可能已不成立，只记文字。
     (observedStateDelta[kindOf(asset.type)] ??= {})[asset.id] = planned && note === planned.note && planned.state ? { ...planned.state, note } : { note };
   }
-  return { targetType: item.type, targetId: item.id, reviewed: reviewedFields.value, note: reviewNote.value, fullPlayback: fullPlayback.value, reviewedSegments: speechChecked.value ? qualityPlan.value.speechRanges : [], dismissedKinds: dismissedKinds.value,
-    ...(item.type === "take" && speechReviewRequired.value ? { audioReview: { speech: speechChecked.value ? "pass" : "fail", lipSync: needsLipSync(detail.value ?? {}) ? lipSyncChecked.value ? "pass" : "fail" : "notApplicable", note: speechNote.value, ...(item.speechSync ? { inspectionKey: item.speechSync.inspectionKey, referenceMediaId: item.speechSync.referenceMediaId } : {}) } } : {}),
-    ...(item.type === "take" ? { observedStateDelta } : {}), observations: observation.value ? [{ kind: observation.value, note: reviewNote.value }] : [] };
+  return { targetType: item.type, targetId: item.id, reviewed: onlyProblems ? [] : reviewedFields.value, note: reviewNote.value, fullPlayback: fullPlayback.value, reviewedSegments: speechChecked.value ? qualityPlan.value.speechRanges : [], dismissedKinds: dismissedKinds.value,
+    ...(item.type === "take" && qualityPlan.value.techniques.length ? { techniqueReview: qualityPlan.value.techniques.map(technique => ({ id: technique.id, ...techniqueReviews.value[technique.id] })).filter(check => !onlyProblems || check.verdict === "revise") } : {}),
+    ...(item.type === "take" && !onlyProblems && speechReviewRequired.value ? { audioReview: { speech: speechChecked.value ? "pass" : "fail", lipSync: needsLipSync(detail.value ?? {}) ? lipSyncChecked.value ? "pass" : "fail" : "notApplicable", note: speechNote.value, ...(item.speechSync ? { inspectionKey: item.speechSync.inspectionKey, referenceMediaId: item.speechSync.referenceMediaId } : {}) } } : {}),
+    ...(item.type === "take" && !onlyProblems ? { observedStateDelta } : {}), observations: observation.value ? [{ kind: observation.value, note: reviewNote.value }] : [] };
 }
 async function saveReview() {
-  await request(`/shots/${shotId.value}/qc`, "POST", reviewPayload(target.value));
+  await request(`/shots/${shotId.value}/qc`, "POST", reviewPayload(target.value, true));
   await refreshResults(); message.value = "问题已记录，已保留原素材；其他镜头可继续，未触发重生成";
 }
 async function confirmVersion() {

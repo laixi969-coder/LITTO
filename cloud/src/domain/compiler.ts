@@ -13,6 +13,7 @@ import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
 import { physicalInteractionPlan, videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
+import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -111,6 +112,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     validateStateDelta(s, shot.projectId, shot.intendedStateDelta);
     validateVisibleAssets(shot as ShotInput);
     validateMusicVideoTiming(shot as ShotInput);
+    const techniqueProblems = techniqueIssues(shot);
+    if (techniqueProblems.length) throw bad(techniqueProblems.join("；"));
     const proj = shot.projectId;
     const world = s.list("worlds", { projectId: proj })[0] as any;
     const look = effectiveLook(s, proj, shot.sequenceId, shotId);
@@ -395,6 +398,13 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     sections["Objective" in sections ? "Visual defaults" : "visualDefaults"] = cleanVisualDefaults;
     if (inputs.length || assets.some(asset => asset.type === "Character" || asset.type === "Creature")) {
         sections["Objective" in sections ? "Reference roles" : "referenceUse"] = characterReferenceUse;
+    }
+    const techniqueDirection = compileTechniqueDirection(shot, kind);
+    if (techniqueDirection) sections["Objective" in sections ? "Selected techniques" : "selectedTechniques"] = techniqueDirection;
+    // 剪辑、声音和叙事仍交各自真实流程，不当作单镜视觉动作；返回待执行项目供导演继续。
+    for (const stage of ["edit", "audio", "story"] as const) {
+        const planned = techniquePlan(shot, stage);
+        if (planned.length) warnings.push(`${stage} 技法须在对应实际流程落实并于定稿完整看听检查：${planned.map(item => item.label).join("、")}；当前视觉生成不代表已完成。`);
     }
     const prompt = renderCompiledPrompt(sections);
     for (const key of ["surface", "imaging", "world", "cinematic", ...(kind === "video" ? ["motion"] : [])]) {

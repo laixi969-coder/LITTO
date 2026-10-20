@@ -2,7 +2,7 @@ import { type Scope } from "../db.ts";
 import { notFound } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
 import { generateKeyframes, generateTakes } from "./lifecycle.ts";
-import { realismChecks, shotFingerprint } from "./realism.ts";
+import { realismChecks, shotFingerprint, techniqueReviewSchema } from "./realism.ts";
 import { scheduleLocalRepair } from "./localRepair.ts";
 import { qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
 import { bad } from "../util.ts";
@@ -34,7 +34,7 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
 };
 export const OBSERVATION_KINDS = Object.keys(DIAGNOSIS);
 
-export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; reviewedSegments?: { start: number; end: number }[]; dismissedKinds?: string[]; audioReview?: { speech: string; lipSync: string; referenceMediaId?: string; inspectionKey?: string; offsetMs?: number; note: string } } = {}) {
+export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; reviewedSegments?: { start: number; end: number }[]; dismissedKinds?: string[]; techniqueReview?: { id: string; verdict: "pass" | "revise"; note: string }[]; audioReview?: { speech: string; lipSync: string; referenceMediaId?: string; inspectionKey?: string; offsetMs?: number; note: string } } = {}) {
     const shot = s.get("shots", shotId);
     if (!shot) throw notFound("shot");
     const obj = s.get(target.type === "take" ? "takes" : "keyframes", target.id);
@@ -42,6 +42,10 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (observations.some(o => !Object.hasOwn(DIAGNOSIS, o.kind))) throw bad(`未知的质检问题类型。observations 只记录实际缺陷，无缺陷传 []，正常表现写入 note 或 creativeReview；不要把 realism、lighting 等检查维度当作缺陷。支持的 kind：${OBSERVATION_KINDS.join("、")}`);
     const reviewed = [...new Set(review.reviewed ?? [])];
     const plan = qualityReviewPlan(shot, target.type);
+    const techniqueReview = techniqueReviewSchema.parse(review.techniqueReview ?? []);
+    if (new Set(techniqueReview.map(item => item.id)).size !== techniqueReview.length || techniqueReview.some(item => !plan.techniques.some(required => required.id === item.id))) throw bad("技法检查须对应本镜当前检查计划，不能重复或引用无关技法");
+    if (target.type === "take" && reviewed.length && plan.techniques.some(item => !techniqueReview.some(check => check.id === item.id))) throw bad("选用技法的视频须逐项填写 techniqueReview 的 id、pass/revise 和真实观察 note；先完整播放，不让用户重做选择确认");
+    observations = [...observations, ...techniqueReview.filter(item => item.verdict === "revise").map(item => ({ kind: "creativeMismatch", note: item.note }))];
     if (review.reviewedSegments?.some(range => range.end > (s.get("media", obj.mediaId)?.duration ?? 0))) throw bad("看听区间超出当前素材时长");
     if (review.audioReview && (target.type !== "take" || !(review.fullPlayback || coversSpeechRanges(plan.speechRanges, review.reviewedSegments ?? [])))) throw bad("声音与口型检查须实际看听全部发声区间");
     if (review.audioReview?.referenceMediaId && (s.get("media", review.audioReview.referenceMediaId)?.projectId !== shot.projectId || !s.get("media", review.audioReview.referenceMediaId)?.mime.startsWith("audio/"))) throw bad("声音参考须为当前项目的真实音频");
@@ -85,7 +89,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
 
     const automaticOnly = !reviewed.length && !review.note && !review.observedStateDelta && !review.fullPlayback && !review.reviewedSegments?.length && !dismissed.length;
     const preserve = automaticOnly && sameVersion;
-    const evidence = preserve ? { ...previous.evidence, vision: review.vision ?? previous.evidence.vision, previousReportId: previous.id } : { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? (sameVersion ? previous.evidence.vision : null), observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, reviewedSegments: review.reviewedSegments ?? [], audioReview: review.audioReview, dismissedKinds: dismissed, previousReportId: previous?.id };
+    const evidence = preserve ? { ...previous.evidence, vision: review.vision ?? previous.evidence.vision, previousReportId: previous.id } : { reviewed, note: review.note ?? "", actor: review.actor, mediaId: obj.mediaId, fingerprint, vision: review.vision ?? (sameVersion ? previous.evidence.vision : null), observedStateDelta: review.observedStateDelta, fullPlayback: review.fullPlayback === true, reviewedSegments: review.reviewedSegments ?? [], audioReview: review.audioReview, techniqueReview, dismissedKinds: dismissed, previousReportId: previous?.id };
     const { previousReportId: _previousReportId, ...priorEvidence } = previous?.evidence ?? {};
     const { previousReportId: _currentReportId, ...currentEvidence } = evidence;
     const complete = plan.checks.every(key => evidence.reviewed?.includes(key));

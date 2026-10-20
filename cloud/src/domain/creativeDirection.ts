@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { creativeBriefSchema, type ShotInput } from "./schema.ts";
+import { techniqueIssues } from "@toonflow/tool-media-generation/filmTechniques";
 
 const stylingSchema = z.object({
   makeup: z.string().trim().min(1), hair: z.string().trim().min(1),
@@ -10,10 +11,10 @@ const stylingSchema = z.object({
 export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; name: string; type: string; attributes?: Record<string, unknown> }[]) {
   const visibleIds = new Set(shot.visibleAssetIds ?? shot.assetIds);
   const characters = assets.filter(asset => asset.type === "Character" && visibleIds.has(asset.id));
-  if (!shot.creativeBrief && !characters.length && !assets.some(asset => asset.type === "Product") && !shot.advertising) return [];
+  if (!shot.creativeBrief && !characters.length && !assets.some(asset => asset.type === "Product") && !shot.advertising) return techniqueIssues(shot);
   const parsed = creativeBriefSchema.safeParse(shot.creativeBrief);
   if (!parsed.success) return ["请由导演补充 creativeBrief：创作目标、可见视觉设计、产品展示或攻防编排（如适用）和对白计划；不要让用户填写技术表单"];
-  const issues: string[] = [];
+  const issues: string[] = techniqueIssues(shot);
   for (const asset of characters) {
     if (!stylingSchema.safeParse(asset.attributes?.styling).success) issues.push(`${asset.name} 缺少 attributes.styling 的 makeup、hair、costume、accessories 设计；可明确自然妆或无配饰及其理由，不默认素衣或华服`);
   }

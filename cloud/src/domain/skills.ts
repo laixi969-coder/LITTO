@@ -17,6 +17,7 @@ export type ShotDraft = {
     intendedStateDelta: Record<string, any>; duration: number; sceneIndex: number; subtitle?: string;
     sourceDialogue?: { speakerId: string; text: string };
     creativeBrief?: ShotInput["creativeBrief"];
+    techniques?: ShotInput["techniques"];
     source?: ShotInput["source"];
     visibleAssetIds?: string[];
 };

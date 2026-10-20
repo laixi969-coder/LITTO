@@ -19,7 +19,7 @@ metadata:
 - [canvas](../canvas/SKILL.md)：查询实际节点、配置、参考顺序并操作画布，不猜节点能力。
 - [continuity](../continuity/SKILL.md)：身份、服装、道具、空间、动作、光线与情绪的跨镜状态；锁定资产与版本修复。
 - 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)，**对白怎么切镜见 [对白覆盖与正反打](references/coverage.md)**。
-- **有对白的段落先出 coverage 表再拆镜**：说话人、是否在画、景别、前景、台词字数、时长六列。出现「说话人不在画且没有独立镜头」的行，就是成片会翻车的行。单镜一轮以上的说话人交替必须拆成 A 镜 / B 镜，不要把换人交给模型在镜内完成。
+- **有对白先核对 coverage 表再决定拆镜**：逐句保留原文、说话人、画内/画外及声源依据、观看对象、实际音频时长和局部窗口。多轮同框、合法画外声和持续镜头可保留；按可读性、真实容量和所选模型能力决定拆镜，不按轮次或字数硬切，不删台词、加速或跨镜挪音。
 - MV 镜头另外读取 [MV 导演编排](../musicfilm/references/musicVideoDirection.md)：沿用 musicfilm 的开场悬念与故事选择，音乐和表演共同占用时间；完整内容保存到 `musicVideo` 后编译，不只写自由提示词。
 - MV 拆镜先 `readSceneList`，使用有效采用版的 `storyContext` 和逐场 `story` 正文、目标、阻碍、变化、知情及因果，再对应音乐段落。`needsUpdate` 时先更新；没有关联正文时回读 `readStoryProject`。把触发、行动、反应和结果落实到 `action/performance/musicVideo.timeline`，核对编译预览；不以情绪摘要代替剧情，也不在每个新镜头重演整场。
 
@@ -80,6 +80,16 @@ Approved 资产、关键帧和 Take 默认锁定。更改建立新版本，写�
 新增 `realism` 对象，分别写 `surface`、`imaging`、`world`、`motion`、`cinematic`。每项必须与本镜资产、动作与摄影设计对应：无人场景不能套“为皮肤曝光”，静止动作不能硬塞预备动作，光滑产品不能强加皮肤毛孔，风格化影片沿用用户的材质目标。各岗位必须留下可检查的依据：视觉导演写 look 与材质；资产导演写 invariants 与参考；摄影写 camera/lighting；分镜写职责/衔接；运动写真实时序和接触；连续性写状态与锁定；诊断记录实际缺陷及修复。禁止将关键词匹配或通用模板视为专业判断完成。
 
 实际结果状态必须在看过输出后填写，未查看时保持「待核对」。工具成功返回对象 ID 才表示规格已保存。
+
+## 4.5 本地镜头技法检索
+
+使用 productionSpec(searchTechniques) 按当前信息、动作或关系目的查询少量候选，字段 query/category/stage/limit。8门类为 camera、lighting、composition、editing、sound、story、effects、genre；阶段为 image、video、edit、audio、story、look。中文、英文和返回id均可查询，不把目录全塞入上下文，不逐项要求用户选术语。
+
+每镜最多保存8个 techniques:[{id,purpose,execution,start?,end?}]；execution至少10字，写本镜对象、触发、路径和可见结果，camera/lighting同步一致。沿用已采用Look和参考，不擅改剧情、删动作、增切镜、换风格或付费生成。慢动作、定格、快放、延时和倒放必须给本镜start/end与理由，不得覆盖对白或原曲同步。打斗救援默认实时紧凑，保留接触、受力、支撑与结果，不平均分秒。
+
+compile只发送当前阶段适用的具体视觉要求；edit/audio/story返回对应真实流程待执行提示。Look继承统一基底，不把声音和剪辑词塞进画面动作。数值、特殊光学及文字路径不保证供应商硬控制，读取模型能力和warnings。
+
+检查计划返回每项criterion。视频完整播放后reviewProduction，techniqueReview逐项写{id,verdict:pass|revise,note}；note至少10字并包含真实时间或画面依据。抽帧、目录命中或编译成功不能填通过。异常保留，不自动重生成。静帧沿用聊天采用，不重复选择确认，动态技法不要求静帧证明动作。剪辑、声音、叙事技法按inspectFinal返回的techniques计划核对，对应editing/sound/narrative；仍须完整成片看听及口型验收。
 
 ## 5. 摄影、表演与运动
 

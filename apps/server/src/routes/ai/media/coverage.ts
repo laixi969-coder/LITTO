@@ -6,7 +6,8 @@ import u from "@/utils";
 import { coverageCheck, evaluateCoverage, readCoverage, suggestSplits, writeCoverage } from "@/utils/media/coverage";
 import { currentTenant } from "@/utils/tenant";
 
-const lineSchema = z.strictObject({ speaker: z.string().trim().min(1).max(40), line: z.string().trim().max(2000) });
+const lineSchema = z.strictObject({ speaker: z.string().trim().min(1).max(40), line: z.string().trim().max(2000),
+  lipSync: z.enum(["visible", "offscreen"]).optional(), framing: z.string().trim().min(1).max(1000).optional() });
 const shotSchema = z.strictObject({
   id: z.string().trim().min(1).max(40),
   duration: z.number().positive().max(600).optional(),
@@ -20,7 +21,7 @@ const shotSchema = z.strictObject({
 
 /**
  * 对白覆盖表：写进来一份分镜台词归属，返回每行的判定与拆镜建议，并落盘 assets/coverage.json。
- * 既是校验接口，也是「一镜多轮台词 → 正反打」的机器建议，省掉人工数轮次。
+ * 按真实声音归属检查；多轮同框可保留，拆镜只作为风险段落的备选。
  */
 export default Router().post("/", validateFields({
   directory: z.string().min(1).max(4096),

@@ -20,7 +20,7 @@ import { mediaView } from "../storage.ts";
 import { estimate } from "../jobs.ts";
 import { autoObserve } from "../domain/qc-vision.ts";
 import { inspectProductionQuality } from "../domain/qualityInspection.ts";
-import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint } from "../domain/realism.ts";
+import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema } from "../domain/realism.ts";
 import { createBatch, listBatches, listCandidates, promoteCandidate, scoreCandidate } from "../domain/candidates.ts";
 import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference, setLibraryFavorite } from "../domain/library.ts";
 import { acceptLocalRepair, repairDirective, scheduleLocalRepair, localRepairSchema } from "../domain/localRepair.ts";
@@ -255,7 +255,7 @@ production.post("/continuity-issues/:id/override", async (c) => {
 production.get("/qc/observation-kinds", (c) => c.json(OBSERVATION_KINDS));
 production.post("/shots/:id/qc", async (c) => {
     const { s, a } = ctx(c, "EDITOR");
-    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), basic: z.boolean().default(false), auto: z.boolean().default(false), visionModel: z.object({ providerId: z.string().min(1), modelId: z.string().min(1) }).optional(), fullPlayback: z.boolean().default(false), reviewedSegments: reviewedSegmentsSchema, audioReview: audioReviewSchema.optional(), dismissedKinds: z.array(z.string()).max(30).default([]), reviewed: z.array(z.enum(["surface", "imaging", "world", "motion", "cinematic"])).default([]), note: z.string().max(4000).optional(), observedStateDelta: z.record(z.any()).optional(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
+    const b = await body(c, z.object({ targetType: z.enum(["keyframe", "take"]), targetId: z.string(), basic: z.boolean().default(false), auto: z.boolean().default(false), visionModel: z.object({ providerId: z.string().min(1), modelId: z.string().min(1) }).optional(), fullPlayback: z.boolean().default(false), reviewedSegments: reviewedSegmentsSchema, audioReview: audioReviewSchema.optional(), techniqueReview: techniqueReviewSchema.optional(), dismissedKinds: z.array(z.string()).max(30).default([]), reviewed: z.array(z.enum(["surface", "imaging", "world", "motion", "cinematic"])).default([]), note: z.string().max(4000).optional(), observedStateDelta: z.record(z.any()).optional(), observations: z.array(z.object({ kind: z.string(), note: z.string().optional() })).default([]) }));
     if (b.basic) {
         const item = s.get(b.targetType === "take" ? "takes" : "keyframes", b.targetId);
         if (!item || item.shotId !== c.req.param("id")) throw notFound("shot output");
@@ -266,7 +266,7 @@ production.post("/shots/:id/qc", async (c) => {
     let vision: any = null;
     if (b.auto) vision = await autoObserve(s, c.req.param("id"), b.targetType, b.targetId, a.user.id, b.visionModel);
     if (vision?.observations) obs.push(...vision.observations);
-    return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs, { reviewed: b.reviewed, note: b.note, actor: a.user.id, vision, observedStateDelta: b.observedStateDelta, fullPlayback: b.fullPlayback, reviewedSegments: b.reviewedSegments, audioReview: b.audioReview, dismissedKinds: b.dismissedKinds }), vision });
+    return c.json({ ...runQc(s, c.req.param("id"), { type: b.targetType, id: b.targetId }, obs, { reviewed: b.reviewed, note: b.note, actor: a.user.id, vision, observedStateDelta: b.observedStateDelta, fullPlayback: b.fullPlayback, reviewedSegments: b.reviewedSegments, audioReview: b.audioReview, techniqueReview: b.techniqueReview, dismissedKinds: b.dismissedKinds }), vision });
 });
 production.post("/repair-actions/:id/apply", async (c) => {
     const { s, a } = ctx(c, "EDITOR");

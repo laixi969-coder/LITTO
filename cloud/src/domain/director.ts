@@ -11,6 +11,7 @@ import { cameraSchema, lightingSchema, NARRATIVE_FUNCTIONS, creativeBriefSchema,
 import { z } from "zod";
 import { tx } from "../db.ts";
 import { validateStateDelta } from "./state.ts";
+import { searchFilmTechniques } from "@toonflow/tool-media-generation/filmTechniques";
 
 type Step = { step: string; status: "done" | "skipped" | "needs_confirmation"; detail: any };
 
@@ -28,15 +29,19 @@ const refined = z.object({ shots: z.array(z.object({
   camera: cameraSchema, lighting: lightingSchema, duration: z.number().finite().min(0.5).max(30),
   intendedStateDelta: shotInput.shape.intendedStateDelta.removeDefault(),
   creativeBrief: creativeBriefSchema,
+  techniques: shotInput.shape.techniques,
 })).min(1).max(180) });
 
 /**
  * 按源节拍映射拆合镜头；场次、事件顺序、资产与逐句对白仍可追踪。失败保留草稿，不自动生成。
  */
 async function refineWithLlm(s: Scope, projectId: string, actor: string, script: string, drafts: ShotDraft[], world: any, goal?: string) {
+  const techniqueCandidates = [...new Map([goal ?? "", ...drafts.map(draft => draft.action)].filter(Boolean)
+    .flatMap(query => searchFilmTechniques({ query: query.slice(0, 500), limit: 4 }).items).map(item => [item.id, item])).values()].slice(0, 8);
   const system = [
     videoMotionTiming,
     videoCoveragePlanning,
+    "TECHNIQUES are local design candidates, not mandatory choices or new events. Choose only useful entries, at most 8 per shot, as techniques:[{id,purpose,execution,start?,end?}]. Execution names the current subject, trigger, path and visible result; match camera/lighting fields. image/video techniques describe generation, look preserves the approved shared Look, edit/audio/story remain plans for their own real workflows, never extra visual actions. Time effects require an explicit local start/end and must not overlap speech or source-track sync. Never add slow motion, equal time slots or idle resets to combat or rescue. A continuous shot can contain several causal beats or multiple speakers when staging, capacity and the selected model permit; never split by line count alone.",
     "You are a film director. Return ONLY JSON {\"shots\":[...]}. Each shot needs sourceIndexes (zero-based draft indexes), visibleAssetIds, title, narrativeFunction, action, performance{emotion,intensity,eyeline,lookTarget,gesture,timing}, blocking{foreground,midground,background}, camera, lighting, duration, intendedStateDelta and creativeBrief. Merge adjacent beats within a scene or split one beat into consecutive shots when motivated. Cover all beats in order without repeating events; repeated sourceIndexes are only for a split beat. Preserve real asset IDs; visibleAssetIds is the subset appearing at some point, excluding voice-only characters.",
     "Preserve SCRIPT facts and GOAL. Design unspecified staging and responses to established intentions without inventing events, props, backstory or dialogue. A shot earns its duration through action, information, relationship change or purposeful stillness. Use the shortest readable duration preserving speech, action and reaction; estimate edit handles separately. Do not fill a draft duration with breathing, blinking, slow pushes or explanatory narration. Select useful behavior from CHARACTERS for the current goal; do not paste biographies, relationships or full habit/knowledge lists into execution fields.",
     "Stage before photography. Anchor each visible performer to existing landmarks; separate body facing, gaze and camera direction, with contact/held props when relevant. camera.design needs technique,purpose,start,end,subjectPath,cameraPath,timing,cut,invariants[],acceptance[],fallback. start describes ONE initial instant, excluding later entrances; end is the visible result. Subject and camera paths are separate. Camera distance, framing, background, depth and focus describe visible results, not just lens numbers. A move needs trigger, path and stopping point; static is valid. Preserve world light source and geography across reverse angles. Acceptance, fallback and neighbouring-shot edit notes are production records, not extra actions.",
@@ -47,7 +52,7 @@ async function refineWithLlm(s: Scope, projectId: string, actor: string, script:
     const usedAssets = new Set(drafts.flatMap(draft => draft.assetIds));
     const characterDirection = s.list("assets", { projectId }).filter(asset => asset.type === "Character" && usedAssets.has(asset.id)).map(asset => ({ id: asset.id, name: asset.name, characterDirection: asset.attributes?.characterDirection }));
     const slim = drafts.map((draft, index) => ({ ...draft, visibleAssetIds: draft.visibleAssetIds ?? draft.assetIds, sourceIndexes: [index] }));
-    const r = await runText({ workspaceId: s.workspaceId, projectId, actor, system, prompt: `GOAL: ${JSON.stringify(goal ?? "Follow the script's intended tone and intensity")}\nCHARACTERS: ${JSON.stringify(characterDirection)}\nWORLD: ${JSON.stringify(world ?? {})}\nSCRIPT:\n${script}\nDRAFT:\n${JSON.stringify({ shots: slim })}`, json: true, label: "director.refine", mockEcho: JSON.stringify({ shots: slim }) });
+    const r = await runText({ workspaceId: s.workspaceId, projectId, actor, system, prompt: `GOAL: ${JSON.stringify(goal ?? "Follow the script's intended tone and intensity")}\nCHARACTERS: ${JSON.stringify(characterDirection)}\nWORLD: ${JSON.stringify(world ?? {})}\nTECHNIQUES: ${JSON.stringify(techniqueCandidates)}\nSCRIPT:\n${script}\nDRAFT:\n${JSON.stringify({ shots: slim })}`, json: true, label: "director.refine", mockEcho: JSON.stringify({ shots: slim }) });
     if (!r) return { used: false, reason: "no usable text model" };
     try {
         const parsed = refined.parse(parseJson(r.text));

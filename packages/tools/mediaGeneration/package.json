@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     "./runtime": "./src/runtime.ts",
-    "./voiceProject": "./src/voiceProject.ts"
+    "./voiceProject": "./src/voiceProject.ts",
+    "./filmTechniques": "./src/filmTechniques.ts"
   },
   "scripts": {
     "build": "bun build.ts",

@@ -46,7 +46,7 @@ const fieldLabels: Record<string, string> = {
   era: "年代", locationLogic: "地点关系", architecture: "建筑", culture: "文化", weather: "天气", time: "时间", material: "材质", physics: "物理规则", realism: "真实感", environmentalConstraints: "环境约束",
   contrast: "对比度", saturation: "饱和度", palette: "色彩", skinTone: "肤色", blackLevel: "黑位", highlightRolloff: "高光过渡", shadowBehavior: "暗部", grain: "颗粒", halation: "光晕", bloom: "泛光", lensCharacter: "镜头质感", texture: "纹理", sharpnessPhilosophy: "锐度", colorReferenceIds: "色彩参考",
   name: "名称", type: "类型", description: "说明", attributes: "设定", references: "参考", invariants: "固定特征", allowedVariations: "允许变化", forbiddenChanges: "禁止变化", personaTags: "气质标签",
-  title: "标题", narrativeFunction: "叙事作用", action: "动作", performance: "表演", blocking: "调度", camera: "摄影", lighting: "光线", duration: "时长", generationDuration: "生成时长", intendedStateDelta: "计划状态变化", assetIds: "使用资产", constraints: "约束", subtitle: "字幕", musicVideo: "音乐编排", freedomMap: "变化范围",
+  techniques: "镜头技法", title: "标题", narrativeFunction: "叙事作用", action: "动作", performance: "表演", blocking: "调度", camera: "摄影", lighting: "光线", duration: "时长", generationDuration: "生成时长", intendedStateDelta: "计划状态变化", assetIds: "使用资产", constraints: "约束", subtitle: "字幕", musicVideo: "音乐编排", freedomMap: "变化范围",
   trackId: "轨道", start: "开始时间", in: "素材入点", out: "素材出点", sourceIn: "后镜入点", sourceOut: "前镜出点", speed: "速度", transition: "转场", gainDb: "音量（dB）", fadeIn: "淡入", fadeOut: "淡出", label: "说明", t: "时间", segments: "分段", mode: "方式", clip: "片段", ripple: "后续顺排",
 };
 function describe(value: unknown): string {
