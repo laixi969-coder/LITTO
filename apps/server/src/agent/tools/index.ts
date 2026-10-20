@@ -177,6 +177,12 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           signal?.throwIfAborted();
           return api.importWorkspaceKeyframe(scope, projectId, input.shotId, Buffer.from(image.data, "base64"), input.path);
         }
+        if (operation === "importAudio") {
+          const input = z.strictObject({ path: z.string().min(1).max(2048) }).parse(data);
+          const audio = await readReference(cwd, { path: input.path, mimeType: "audio/wav" }, "audio", signal);
+          signal?.throwIfAborted();
+          return api.importWorkspaceAudio(scope, projectId, Buffer.from(audio.data, "base64"));
+        }
         if (operation === "inspectFinal") {
           if (typeof data.renderId !== "string" || scope.get("renders", data.renderId)?.projectId !== projectId) throw new Error("成片不属于当前项目");
           return api.inspectFinalQuality(scope, data.renderId);

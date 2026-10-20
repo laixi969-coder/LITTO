@@ -84,8 +84,8 @@
         <label>模型<select :value="modelKey({ providerId: project.lipSyncProviderId, modelId: project.lipSyncModelId })" @change="selectLipSyncModel(($event.target as HTMLSelectElement).value)"><option value="">选择模型</option><option v-for="model in lipSyncModels" :key="modelKey(model)" :value="modelKey(model)">{{ model.providerLabel }} · {{ model.label }}</option></select></label>
         <p class="hint">仅使用明确声明对口型能力的模型，普通视频模型的音频参考不能保证原曲保留。每句使用一个清晰可见的说话人镜头；多人同框请先拆分。MuseTalk 会按音频长度生成，原片过短可能往返重复，请先裁好镜头并检查完整输出。停止本地等待后，远端推理可能仍需在服务端停止。</p>
         <h3>合成配音</h3>
-        <el-button :disabled="!canMix || project.mixes.length >= 100" @click="run(mixSpeech, true)">按台词顺序合成 WAV</el-button>
-        <p class="hint">合并每句选定版本并保留句后停顿，原始配音与口型视频均保留。需要已配置的 FFmpeg。</p>
+        <el-button :disabled="!canMix || project.mixes.length >= 100" @click="run(mixSpeech, true)">合成顺序试听 WAV</el-button>
+        <p class="hint">仅按台词顺序合并供试听，保留句后停顿；不对应视频剪辑时间线，也不处理口型，不能直接作为同步成片音轨。需要已配置的 FFmpeg。</p>
         <div class="toolbar"><attachmentPreview v-for="(mix, index) in project.mixes" :key="mix.id" :attachment="{ ...mix.audio, name: `合成配音 ${index + 1}${mix.sourceKey === mixSourceKey ? '' : '（旧方案）'}` }" :directory="directory" /></div>
       </fieldset>
     </div>
@@ -388,7 +388,7 @@ async function mixSpeech() {
   const path = `${outputDirectory}/voice.wav`;
   await new Promise<void>((resolve, reject) => command.complexFilter(filters).outputOptions(["-map [voiceMix]"]).audioCodec("pcm_s16le").format("wav").on("end", () => resolve()).on("error", reject).save(path));
   project.value.mixes.push({ id: crypto.randomUUID(), audio: { path, mimeType: "audio/wav" }, sourceKey });
-  await save(); message.value = "整段配音已合成，可试听并从项目素材中使用";
+  await save(); message.value = "顺序试听配音已合成；用于成片前须按实际画面排轨，可见发声另做口型处理";
 }
 
 async function stop() {

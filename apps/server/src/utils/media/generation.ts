@@ -378,7 +378,20 @@ async function generateMediaUnrecorded(
             } finally { signal?.removeEventListener("abort", cancel); }
           }
         } else written.push(path);
-        result.push({ path: relative(directory, deliveredPath).replace(/\\/g, "/"), mimeType, mediaType });
+        const fileResult: GeneratedMedia = { path: relative(directory, deliveredPath).replace(/\\/g, "/"), mimeType, mediaType };
+        if (mediaType === "audio") {
+          try {
+            const ffmpeg = await createWorkspaceFfmpeg(directory, signal);
+            const probe = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => ffmpeg.ffprobe(file, (error, data) => error ? reject(error) : resolve(data)));
+            const actualDuration = Number(probe.format.duration);
+            if (!probe.streams.some(stream => stream.codec_type === "audio") || !Number.isFinite(actualDuration) || actualDuration <= 0) throw new Error("无法取得有效音轨时长");
+            fileResult.duration = actualDuration;
+          } catch (error) {
+            // ACT: 付费声音已经保存，探测失败只阻止排时间线，不能诱发重新生成或删除结果。
+            fileResult.timingWarning = `音频已保存，但实际时长未验证；先 ffprobe，不能估算排轨或重新生成。${error instanceof Error ? error.message : String(error)}`;
+          }
+        }
+        result.push(fileResult);
       } finally { release(); }
     }
     signal?.throwIfAborted();

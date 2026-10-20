@@ -172,7 +172,7 @@ export const audioGenerationSchema = z.strictObject({
   audioParameters: z.record(z.string().min(1).max(100), z.union([z.string().max(20000), z.number().finite(), z.boolean()])).refine(value => Object.keys(value).length <= 40, "音频参数最多 40 项").optional().describe("仅使用供应商已同步参数定义中的额外音频参数，例如音乐的 lyrics、instrumental、duration。不能覆盖 model、text、prompt、音色或格式等已有字段。"),
   providerId: sharedFields.providerId,
   modelId: sharedFields.modelId,
-  prompt: z.string().trim().min(1).max(100000),
+  prompt: z.string().trim().min(1).max(100000).describe("语音模型只写实际要念的完整台词，不夹入说话人介绍、声音描述或表演指令；表演写 instructions 并核实模型支持。音乐/音效模型写对应内容提示。"),
   outputDirectory: sharedFields.outputDirectory,
   audios: z.array(audioReference).max(64).optional(),
   instructions: z.string().trim().max(2000).optional(),

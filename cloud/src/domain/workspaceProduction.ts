@@ -33,6 +33,14 @@ export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotI
   return frame;
 }
 
+export async function importWorkspaceAudio(s: Scope, projectId: string, bytes: Buffer) {
+  if (!s.get("projects", projectId)) throw notFound("project");
+  if (!sniff(bytes)?.mime.startsWith("audio/")) throw bad("声音素材须为可识别的音频文件");
+  const media = s.list("media", { projectId, hash: sha256(bytes) })[0] ?? await saveMedia(s.workspaceId, projectId, bytes, { source: "speechReference" });
+  if (!s.get("projects", projectId)) throw notFound("project");
+  return mediaView(media);
+}
+
 export async function importWorkspaceSpeechTake(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string, audioBytes: Buffer, audioPath: string, speechSync: Record<string, unknown>) {
   const shot = s.get("shots", shotId);
   if (!shot || shot.projectId !== projectId) throw notFound("project shot");
@@ -100,6 +108,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       sequenceId: z.string().min(1), expectedVersion: z.number().int().nonnegative(),
       cues: z.array(z.strictObject({
         trackId: z.string().min(1), mediaId: z.string().min(1), shotId: z.string().min(1).optional(),
+        videoClipId: z.string().min(1).optional(), dialogueLineIndex: z.number().int().nonnegative().optional(),
         start: z.number().finite().nonnegative(), duration: z.number().finite().positive(), in: z.number().finite().nonnegative().default(0),
         gainDb: z.number().min(-60).max(24).default(0), fadeIn: z.number().finite().nonnegative().default(0), fadeOut: z.number().finite().nonnegative().default(0),
         purpose: z.string().trim().min(1).max(1000),
@@ -108,12 +117,31 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     }).parse(data);
     if (s.get("sequences", input.sequenceId)?.projectId !== projectId) throw notFound("project sequence");
     const edit = getEdit(s, input.sequenceId, false);
-    const ops: unknown[] = input.cues.map(({ purpose, ...cue }) => {
+    const seenDialogue = new Set<string>();
+    const ops: unknown[] = input.cues.map(({ purpose, videoClipId, dialogueLineIndex, ...cue }) => {
       const track = edit.tracks.find(track => track.id === cue.trackId);
       const media = s.get("media", cue.mediaId);
       if (!track || track.kind !== "audio" || track.locked || track.muted) throw bad("声音须写入未锁定、未静音的声音轨");
       if (!media || media.projectId !== projectId || !media.mime.startsWith("audio/")) throw bad("声音段须引用当前项目的真实音频素材");
-      return { type: "add_clip", clip: { ...cue, type: "media", label: purpose } };
+      if (cue.shotId && s.get("shots", cue.shotId)?.sequenceId !== input.sequenceId) throw bad("声音对应镜头不属于当前序列");
+      if (track.role === "dialogue" || videoClipId !== undefined || dialogueLineIndex !== undefined) {
+        const clip = edit.clips.find(item => item.id === videoClipId);
+        const shot = clip?.shotId ? s.get("shots", clip.shotId) : null;
+        const line = dialogueLineIndex === undefined ? null : shot?.creativeBrief?.dialogue?.lines?.[dialogueLineIndex];
+        if (!clip || edit.tracks.find(item => item.id === clip.trackId)?.kind !== "video" || !line || cue.shotId !== clip.shotId) throw bad("对白须传 readEdit 的 videoClipId、shotId 和 dialogueLineIndex，不能按场次估算落点");
+        const sourceEnd = clip.in + clip.duration * clip.speed;
+        if (line.start < clip.in || line.end > sourceEnd) throw bad("当前剪辑截断了这句对白，请先解决剪辑与台词容量冲突");
+        const start = clip.start + (line.start - clip.in) / clip.speed;
+        const end = clip.start + (line.end - clip.in) / clip.speed;
+        if (Math.abs(cue.start - start) > 0.001) throw bad(`对白落点不符：当前画面要求 ${start.toFixed(3)} 秒，提交的是 ${cue.start.toFixed(3)} 秒，请重新 readEdit`);
+        if (cue.start + cue.duration > end + 0.001) throw bad(`配音超出对应台词窗口：${cue.duration.toFixed(3)} 秒声音，可用 ${(end - start).toFixed(3)} 秒。台词：${line.text}。保留完整台词，不自动挪到下一镜、删词、加速或截断`);
+        if (!Number.isFinite(media.duration) || media.duration <= 0 || cue.in !== 0 || Math.abs(cue.duration - media.duration) > 0.02) throw bad("对白须使用已探测的整句音频时长，不能裁掉台词以塞入画面");
+        if (line.lipSync === "visible") throw bad("这句需要可见口型同步；不能将独立 TTS 直接叠到旧画面，请使用专用对口型候选并完成实际看听检查");
+        const key = `${videoClipId}:${dialogueLineIndex}`;
+        if (seenDialogue.has(key) || edit.clips.some(item => item.shotId === cue.shotId && edit.tracks.find(track => track.id === item.trackId)?.role === "dialogue" && item.start < end && item.start + item.duration > start)) throw bad("对应台词窗口已有对白，请调整已有音轨，不重复叠加");
+        seenDialogue.add(key);
+      }
+      return { type: "add_clip", clip: { ...cue, ...(videoClipId ? { linkedClipId: videoClipId } : {}), type: "media", label: purpose } };
     });
     if (input.duck !== undefined) ops.push({ type: "set_duck", duck: input.duck });
     return editView(s, applyOps(s, input.sequenceId, ops, input.expectedVersion));

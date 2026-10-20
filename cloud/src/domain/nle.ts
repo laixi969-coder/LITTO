@@ -114,7 +114,7 @@ export function conform(s: Scope, sequenceId: string, reset: boolean) {
 // ---------------------------------------------------------------- ops
 const num = z.number().finite();
 const tr = z.object({ type: z.enum(["cut", "dissolve", "fade_black"]), duration: num.min(0).max(10) });
-const clipIn = z.object({ trackId: z.string(), type: z.enum(["shot", "media"]), shotId: z.string().optional(), mediaId: z.string().optional(), start: num.min(0), duration: num.optional(), in: num.min(0).default(0), speed: num.min(0.25).max(4).default(1), transition: tr.optional(), gainDb: num.min(-60).max(24).default(0), fadeIn: num.min(0).default(0), fadeOut: num.min(0).default(0), label: z.string().default("") });
+const clipIn = z.object({ trackId: z.string(), type: z.enum(["shot", "media"]), shotId: z.string().optional(), mediaId: z.string().optional(), linkedClipId: z.string().optional(), start: num.min(0), duration: num.optional(), in: num.min(0).default(0), speed: num.min(0.25).max(4).default(1), transition: tr.optional(), gainDb: num.min(-60).max(24).default(0), fadeIn: num.min(0).default(0), fadeOut: num.min(0).default(0), label: z.string().default("") });
 export const opSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("set_cut"), leftId: z.string(), rightId: z.string(), sourceOut: num.nonnegative(), sourceIn: num.nonnegative(), leftMediaId: z.string().optional(), rightMediaId: z.string().optional() }),
     z.object({ type: z.literal("bridge_audio"), leftId: z.string(), rightId: z.string(), mode: z.enum(["jCut", "lCut", "crossfade", "none"]), duration: num.min(0).max(3) }),
@@ -167,6 +167,11 @@ function validate(s: Scope, t: Body) {
         const src = resolveClip(s, c);
         if (tk.kind === "video" && c.type === "media" && src.mime && !src.mime.startsWith("video/") && !src.mime.startsWith("image/")) throw bad(`clip ${c.id}: ${src.mime} cannot go on a video track`);
         if (tk.kind === "audio" && (c.type !== "media" || (src.mime && !/^(audio|video)\//.test(src.mime)))) throw bad(`clip ${c.id}: only audio media can go on an audio track`);
+        if (c.linkedClipId) {
+            const parent = t.clips.find(item => item.id === c.linkedClipId);
+            if (tk.kind !== "audio" || !parent || t.tracks.find(track => track.id === parent.trackId)?.kind !== "video") throw bad("关联声音必须对应当前时间线的视频片段");
+            if (c.shotId && (c.shotId !== parent.shotId || c.start < parent.start - EPS || end(c) > end(parent) + EPS)) throw bad("对白已超出对应画面，请先解决剪辑与声音的同步冲突");
+        }
         if (src.srcDuration != null && c.in + c.duration * c.speed > src.srcDuration + 0.05) throw bad(`clip ${c.id}: trim exceeds the source duration (${src.srcDuration.toFixed(2)}s)`, { max: src.srcDuration });
     }
     for (const tk of t.tracks) {
@@ -193,6 +198,7 @@ export function adjacentClips(t: Body, leftId: string, rightId: string) {
 }
 
 function detachAudio(s: Scope, t: Body, clip: EClip) {
+    if (t.clips.some(item => item.linkedClipId === clip.id && item.shotId)) throw bad("画面已有按句关联的配音，请直接调整已有声音片段，不能用原片音轨覆盖");
     const source = resolveClip(s, clip);
     if (!source.mediaId || !source.mime?.startsWith("video/")) throw bad("片段没有可用的视频音轨");
     let track = t.tracks.find(item => item.kind === "audio" && item.role === "dialogue" && !item.locked);
@@ -266,7 +272,7 @@ function apply(s: Scope, t: Body, op: Op) {
             const sh = k.shotId ? s.get("shots", k.shotId) : null;
             const m = k.mediaId ? s.get("media", k.mediaId) : null;
             const dur = k.duration ?? (k.type === "shot" ? Number(sh?.duration ?? 4) : m?.duration ?? 4);
-            const c = newClip({ trackId: k.trackId, type: k.type, shotId: k.shotId, mediaId: k.mediaId, start: r3(k.start), duration: r3(dur), in: k.in, speed: k.speed, gainDb: k.gainDb, fadeIn: k.fadeIn, fadeOut: k.fadeOut, label: k.label || sh?.title || "" });
+            const c = newClip({ trackId: k.trackId, type: k.type, shotId: k.shotId, mediaId: k.mediaId, linkedClipId: k.linkedClipId, start: r3(k.start), duration: r3(dur), in: k.in, speed: k.speed, gainDb: k.gainDb, fadeIn: k.fadeIn, fadeOut: k.fadeOut, label: k.label || sh?.title || "" });
             t.clips.push(c);
             if (k.transition && k.transition.type !== "cut") applyTransition(t, c, k.transition);
             return;
@@ -421,9 +427,9 @@ export function editView(s: Scope, row: EditRow) {
             const resolved = resolveClip(s, c);
             const shot = c.shotId ? s.get("shots", c.shotId) : null;
             const isVideo = row.tracks.find(track => track.id === c.trackId)?.kind === "video";
-            const dialogue = (isVideo ? shot?.creativeBrief?.dialogue?.lines ?? [] : []).flatMap((line: any) => {
+            const dialogue = (isVideo ? shot?.creativeBrief?.dialogue?.lines ?? [] : []).flatMap((line: any, lineIndex: number) => {
                 const from = Math.max(line.start, c.in), to = Math.min(line.end, c.in + c.duration * c.speed);
-                return to > from ? [{ ...line, start: r3(c.start + (from - c.in) / c.speed), end: r3(c.start + (to - c.in) / c.speed), truncated: from > line.start || to < line.end }] : [];
+                return to > from ? [{ ...line, lineIndex, sourceStart: line.start, sourceEnd: line.end, start: r3(c.start + (from - c.in) / c.speed), end: r3(c.start + (to - c.in) / c.speed), truncated: from > line.start || to < line.end }] : [];
             });
             return { ...c, out: r3(c.in + c.duration * c.speed),
                 source: { kind: resolved.kind, mediaId: resolved.mediaId, mime: resolved.mime, srcDuration: resolved.srcDuration, media: resolved.mediaId ? mediaView(s.get("media", resolved.mediaId)) : null },

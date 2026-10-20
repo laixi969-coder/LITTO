@@ -166,6 +166,8 @@ export interface GeneratedMedia {
   path: string;
   mimeType: string;
   mediaType: "image" | "video" | "audio";
+  duration?: number;
+  timingWarning?: string;
 }
 
 export interface MediaContext {
