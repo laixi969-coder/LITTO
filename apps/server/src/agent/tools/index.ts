@@ -223,7 +223,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           if (data.kind !== "image" && data.kind !== "video" || typeof data.shotId !== "string") throw new Error("须提供 kind 和 shotId");
           const schema = data.kind === "image" ? imageGenerationSchema : videoGenerationSchema;
           const request = schema.parse(data.request);
-          return prepareShot(cwd, data.kind, data.shotId, request);
+          return prepareShot(cwd, data.kind, data.shotId, request, true);
         }
         return api.workspaceProduction(api.scoped(tenant.workspaceId), workspaceProject(cwd)!, operation, data, tenant.userId);
       },

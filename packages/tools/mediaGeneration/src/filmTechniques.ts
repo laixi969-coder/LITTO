@@ -353,8 +353,13 @@ export function searchFilmTechniques(input: { query?: string; category?: string;
     .map(item => {
       const names = `${item.id} ${item.name} ${item.label}`.toLowerCase();
       const text = `${names} ${item.instruction} ${item.parameters} ${item.checks}`.toLowerCase();
-      const hits = terms.filter(term => text.includes(term)).length;
-      return { item, score: !query ? 1 : names.includes(query) ? 100 : preferred.has(item.id) ? 50 : hits === terms.length && hits > 0 ? 10 + terms.filter(term => names.includes(term)).length : 0 };
+      // 自然语言查询按部分命中排序；英文按完整词匹配，避免 pan 命中 animation。
+      const matches = (value: string, term: string) => /^[a-z0-9]+$/.test(term)
+        ? value.split(/[^a-z0-9]+/).includes(term) || item.id.toLowerCase() === term
+        : value.includes(term);
+      const hits = terms.filter(term => matches(text, term)).length;
+      const exact = [item.id, item.name, item.label].some(value => value.toLowerCase() === query);
+      return { item, score: !query ? 1 : exact ? 100 : preferred.has(item.id) ? 50 : hits > 0 ? hits + terms.filter(term => matches(names, term)).length * 5 : 0 };
     }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
   return { version: techniqueVersion, total: filmTechniques.length, matched: ranked.length,
     categories: [...new Set(filmTechniques.map(item => item.category))],

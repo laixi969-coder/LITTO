@@ -240,7 +240,7 @@ function recommendedDuration(map: unknown, requested: number | undefined) {
  * 提示词红线：主动做旧、以及纯文本生成人物镜。
  * 入队前也调用一次——排在队列里执行时才失败，用户看到的是「提交成功然后红了一片」，说不清哪一步错了。
  */
-export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "image" | "video" | "audio") {
+export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "image" | "video" | "audio", compiledInputs: { sent: boolean; mediaId: string | null; role: string }[] = []) {
   // 禁止主动做旧：默认干净完整是产品底线，只有明确标注设计意图的破败场景才放行。
   const DISTRESSED = /脏|污渍|油污|污垢|破烂|腐烂|发霉|霉斑|生锈|锈蚀|破洞|破损|陈旧|做旧|衰败|荒废|废墟|残破|\bdirty\b|\brusted\b|\bdecayed\b|\bderelict\b|\bgrimy\b/i;
   // 只检查作者自己写的部分：系统注入的基底与锚点段落本身含有「污渍/破损」这类词，
@@ -263,7 +263,8 @@ export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "
   }
 
   // 人物原视频也是身份锚点；专用口型模型只接收视频与声音，不能误要求额外参考图。
-  if (mediaType === "video" && request.purpose !== "asset" && !request.images?.length && !request.videos?.length && !request.firstFrame && !request.lastFrame) {
+  const hasCompiledIdentity = compiledInputs.some(ref => ref.sent && ref.mediaId && ["IDENTITY", "START_FRAME", "PERFORMANCE"].includes(ref.role));
+  if (mediaType === "video" && request.purpose !== "asset" && !hasCompiledIdentity && !request.images?.length && !request.videos?.length && !request.firstFrame && !request.lastFrame) {
     if (looksLikePersonShot(request.prompt)) {
       invalid("人物镜头必须提供身份参考：用 images 传已采用的定妆图、firstFrame 接上一镜末帧，或 videos 传人物原视频。纯文本生成会每镜重新选角，跨镜必然换脸；仅空镜、环境、流体、光效可用纯文本");
     }

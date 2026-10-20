@@ -72,7 +72,7 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
     // ACT: 尚无已采用视频时，首次补齐创作简报属于制作准备；仍更新规格指纹，不能沿用旧检查。
     const changed = CORE.filter((k) => patch[k] !== undefined && JSON.stringify(patch[k]) !== JSON.stringify(shot[k])
         && !(k === "creativeBrief" && !shot.creativeBrief && !shot.approvedTakeId));
-    if (changed.length && (shot.heroKeyframeId || shot.approvedTakeId) && !confirm) throw conflict(`changing ${changed.join(", ")} affects an approved Hero Frame/Take; resend with confirm:true`, "needs_confirmation", { fields: changed, heroKeyframeId: shot.heroKeyframeId, approvedTakeId: shot.approvedTakeId });
+    if (changed.length && (shot.heroKeyframeId || shot.approvedTakeId) && !confirm) throw conflict(`修改 ${changed.join("、")} 会影响已采用的主帧或视频；聊天请用 requestProductionDecision(operation:updateShot,data:{shotId,patch}) 确认具体变更，不要传 confirm:true 或重新选图。`, "needs_confirmation", { fields: changed, heroKeyframeId: shot.heroKeyframeId, approvedTakeId: shot.approvedTakeId });
     for (const aid of patch.assetIds ?? []) if (s.get("assets", aid)?.projectId !== shot.projectId) throw bad(`unknown project asset ${aid}`);
     const { id: _i, workspaceId, projectId, sequenceId, sceneId, ord, schemaVersion, status, heroKeyframeId, approvedTakeId, createdAt, updatedAt, deletedAt, ...data } = shot;
     const { sequenceId: _s, sceneId: _c, order, ...rest } = patch;

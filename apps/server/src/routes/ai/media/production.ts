@@ -17,7 +17,7 @@ export default Router().post("/", validateFields({
   const parsed = (kind === "image" ? imageGenerationSchema : videoGenerationSchema).safeParse({ ...req.body.request, prompt: "compile" });
   if (!parsed.success) return res.status(400).json(error("生成参数无效", parsed.error.issues));
   const request = parsed.data;
-  const production = await u.mediaJobs.prepareShot(directory, kind, shotId, request);
+  const production = await u.mediaJobs.prepareShot(directory, kind, shotId, request, !requestId);
   if (!requestId) return res.json(success(production));
   if (fingerprint !== production.fingerprint) return res.status(409).json(error("镜头规格已改变，请重新预览", null, 409));
   const tenant = currentTenant()!;

@@ -6,7 +6,7 @@ import { ADAPTERS, upsertModel, upsertProvider } from "./providers/registry.ts";
 import { ProviderError, type GenRequest, type GenResult } from "./providers/adapter.ts";
 import { compileShot, compileWorkspacePrompt, requireCompiledInputs, renderCompiledPrompt } from "./domain/compiler.ts";
 import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
-import { bad, conflict, notFound, now } from "./util.ts";
+import { bad, conflict, notFound, now, HttpError } from "./util.ts";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 import { localRepairSchema, prepareLocalRepair } from "./domain/localRepair.ts";
 
@@ -65,6 +65,7 @@ export function enqueueWorkspaceMedia(input: {
     assetReferenceFingerprint?: string;
     production?: ReturnType<typeof prepareWorkspaceShot>;
 }) {
+  if (input.production?.previewOnly) throw bad("提示词预览不能直接提交生成，请重新执行生成前检查");
   const idempotencyKey = "workspaceMedia:" + input.requestId;
   const receipt = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", input.workspaceId, idempotencyKey);
   if (receipt) {
@@ -136,8 +137,10 @@ function generationSignature(request: Record<string, unknown>, prompt: string, n
 
 export function prepareWorkspaceShot(input: {
   workspaceId: string; projectId: string; shotId: string; kind: "image" | "video";
-  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean; localRepair?: unknown;
+  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean; localRepair?: unknown; previewOnly?: boolean;
 }) {
+  const { previewOnly = false, ...generationInput } = input;
+  const previewWarnings: string[] = [];
   const s = scoped(input.workspaceId);
   const shot = s.get("shots", input.shotId);
   if (!shot || shot.projectId !== input.projectId) throw notFound("shot");
@@ -160,7 +163,11 @@ export function prepareWorkspaceShot(input: {
   if (input.kind === "video") {
     keyframe = shot.heroKeyframeId ? s.get("keyframes", shot.heroKeyframeId) : null;
     if (!keyframe || keyframe.shotId !== shot.id || keyframe.status !== "hero") throw conflict("请先调用 requestKeyframeApproval，在聊天中展示并采用本镜头的关键帧（可合并多个镜头一次确认），再重新 compile。不要让用户去制作面板点击，不用 START_FRAME 绑定或 updateShot 代替采用", "no_hero_frame");
-    requireReviewed(s, "keyframe", keyframe);
+    try { requireReviewed(s, "keyframe", keyframe); }
+    catch (cause) {
+      if (!previewOnly || !(cause instanceof HttpError) || !["review_required", "qc_blocked"].includes(cause.code)) throw cause;
+      previewWarnings.push(`仅预览：主关键帧检查待完成，提交生成仍会阻止；${cause.message}`);
+    }
     if (!capabilities.image2video) throw bad("当前模式不能接收主关键帧，请选择图生视频模式");
   }
   const repair = input.localRepair === undefined ? undefined : prepareLocalRepair(s, localRepairSchema.parse(input.localRepair));
@@ -202,5 +209,7 @@ export function prepareWorkspaceShot(input: {
   compiled.prompt = renderCompiledPrompt(compiled.sections);
   const nativeDialogue = shot.creativeBrief?.dialogue?.mode === "native" && shot.creativeBrief.dialogue.lines.length > 0;
   const repairParameters = repair ? { localRepairOf: repair.keyframe.id, localRepairKind: repair.kind, localRepairTarget: repair.target } : undefined;
-  return { shotId: shot.id, keyframeId: keyframe?.id, repairParameters, fingerprint: createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), input, keyframe?.id, compiled])).digest("hex"), compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
+  const fingerprint = createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), generationInput, keyframe?.id, compiled])).digest("hex");
+  compiled.warnings.push(...previewWarnings);
+  return { shotId: shot.id, keyframeId: keyframe?.id, repairParameters, fingerprint, previewOnly, compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
 }

@@ -320,7 +320,12 @@ watch([kind, modelKey, modeKey, resolution, duration, size, ratio, shotId, gener
 watch(selectedModel, model => { modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? ""; ratio.value = model?.cameraTrajectory ? "20:11" : model?.imageRatios?.[0] ?? "16:9"; });
 watch([cameraTrajectory, imageAndCameraOnly], () => { preview.value = null; pendingRequestId = ""; }, { deep: true });
 watch([shotId, modelKey], () => { cameraTrajectory.value = undefined; imageAndCameraOnly.value = false; });
-watch(durations, values => { if (!values.includes(duration.value)) duration.value = values[0] ?? 4; });
+watch(durations, values => {
+  // 模型/分辨率切换时列表会暂空；保留已定时长，不把预览变成默认4秒的规格修改。
+  if (!values.length || values.includes(duration.value)) return;
+  const planned = draft.value?.generationDuration ?? draft.value?.duration;
+  if (values.includes(planned)) duration.value = planned;
+});
 async function request(path: string, method = "GET", body?: unknown) {
   const response = await fetch(`/cloud${path}`, { method, signal: controller.signal, headers: { "Content-Type": "application/json", "x-milimili-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const result = await response.json();
@@ -527,7 +532,7 @@ async function production(requestId?: string, candidateBatchId?: string) {
   const response = await fetch("/api/ai/media/production", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory: props.directory, shotId: shotId.value, kind: kind.value, request: generationRequest(), requestId, fingerprint: preview.value?.fingerprint, ...(candidateBatchId ? { candidateBatchId } : {}) }) });
   const result = await response.json(); if (!response.ok) throw new Error(result.message || "镜头生成失败"); return result.data;
 }
-async function compile() { if (kind.value === "video" && draft.value.generationDuration !== duration.value) { draft.value.generationDuration = duration.value; dirty.value = true; } await saveShot(); if (worldDirty.value) await saveWorld(); preview.value = await production(); compiledMedia.value = await Promise.all(preview.value.compiled.inputs.filter((item: any) => item.sent && item.mediaId).map(async (item: any) => ({ ...await request(`/media/${item.mediaId}`), role: item.role }))); pendingRequestId = ""; }
+async function compile() { if (kind.value === "video" && (draft.value.generationDuration ?? draft.value.duration) !== duration.value) { draft.value.generationDuration = duration.value; dirty.value = true; } await saveShot(); if (worldDirty.value) await saveWorld(); preview.value = await production(); compiledMedia.value = await Promise.all(preview.value.compiled.inputs.filter((item: any) => item.sent && item.mediaId).map(async (item: any) => ({ ...await request(`/media/${item.mediaId}`), role: item.role }))); pendingRequestId = ""; }
 async function generate() {
   pendingRequestId ||= crypto.randomUUID();
   let candidateBatchId = asBatch.value ? batchId.value || undefined : undefined;

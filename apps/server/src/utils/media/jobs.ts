@@ -92,7 +92,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     const blocking = await blockingLine(directory, merged.outputName);
     if (blocking) merged.prompt = `${blocking}\n\n${merged.prompt}`;
   }
-  assertPromptPolicy(merged as Parameters<typeof assertPromptPolicy>[0], kind);
+  assertPromptPolicy(merged as Parameters<typeof assertPromptPolicy>[0], kind, compiled?.inputs);
   return api.enqueueWorkspaceMedia({
     workspaceId: tenant.workspaceId,
     userId: tenant.userId,
@@ -174,7 +174,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
   );
 }
 
-export async function prepareShot(directory: string, kind: "image" | "video", shotId: string, request: MediaGenerationRequest) {
+export async function prepareShot(directory: string, kind: "image" | "video", shotId: string, request: MediaGenerationRequest, previewOnly = false) {
   if (kind === "video") {
     const blocked = await coverageGate(directory);
     if (blocked) throw Object.assign(new Error(`对白覆盖未通过：${blocked}`), { status: 400, retryable: false });
@@ -207,7 +207,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     if (model.durationResolutionMap?.length && !model.durationResolutionMap.some(rule => rule.duration.includes(request.duration!) && rule.resolution.includes(request.resolution!))) throw Object.assign(new Error("时长与分辨率组合不受模型支持"), { status: 400 });
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
-    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, localRepair: request.localRepair });
+    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, localRepair: request.localRepair, ...(previewOnly ? { previewOnly: true } : {}) });
   if (kind === "video" && request.providerId === "meta" && request.modelId === "MiniMax-H3") {
     result.compiled.prompt = compactVideoPrompt(result.compiled.prompt);
   }
@@ -223,7 +223,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     const blocking = await blockingLine(directory, request.outputName);
     if (blocking) result.compiled.prompt = `${blocking}\n\n${result.compiled.prompt}`;
   }
-  assertPromptPolicy({ ...request, prompt: result.compiled.prompt }, kind);
+  assertPromptPolicy({ ...request, prompt: result.compiled.prompt }, kind, result.compiled.inputs);
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, result.compiled.prompt, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
   return { ...result, request: { ...request, shotId, productionFingerprint: result.fingerprint, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
 }
