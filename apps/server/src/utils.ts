@@ -7,6 +7,7 @@ import * as mediaGeneration from "@/utils/media/generation";
 import * as mediaCoverage from "@/utils/media/coverage";
 import * as mediaSpend from "@/utils/media/spend";
 import * as mediaTimeline from "@/utils/media/timeline";
+import * as mediaBlocking from "@/utils/media/blocking";
 import * as mediaProvider from "@/utils/media/provider";
 import * as transcription from "@/utils/media/transcription";
 import * as ffmpeg from "@/utils/ffmpeg";
@@ -38,6 +39,7 @@ export default {
   mediaCoverage,
   mediaSpend,
   mediaTimeline,
+  mediaBlocking,
   mediaJobs,
   mediaLipSync,
   mediaProvider,
