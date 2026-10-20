@@ -12,6 +12,7 @@ import { assertMediaModelSelection, assertModelSelection } from "@/utils/modelSe
 import { applyMediaQuality } from "@/utils/media/quality";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 import { coverageGate } from "@/utils/media/coverage";
+import { blockingLine } from "@/utils/media/blocking";
 import { modelAccess } from "@/utils/modelAvailability";
 
 export function workspaceProject(directory: string) {
@@ -77,6 +78,12 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   }
   // 提示词红线放在入队前：否则任务先排进队列、执行时才失败，用户只看到「提交成功」然后一片红。
   assertPromptPolicy(merged as Parameters<typeof assertPromptPolicy>[0], kind);
+  // 走位补位也放在入队前：作者没写空间关系时按镜头号取走位板，这样 compiled_prompt 与实发一致。
+  // 只对视频注入：图片没有机位与景别，塞进去是噪音。
+  if (kind === "video" && !merged.prompt.includes("BLOCKING:")) {
+    const blocking = await blockingLine(directory, merged.outputName);
+    if (blocking) merged.prompt = `${blocking}\n\n${merged.prompt}`;
+  }
   return api.enqueueWorkspaceMedia({
     workspaceId: tenant.workspaceId,
     userId: tenant.userId,

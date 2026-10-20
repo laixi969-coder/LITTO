@@ -1,4 +1,4 @@
-import { mkdir, writeAtomic } from "@toonflow/file";
+import { mkdir, readFile, writeAtomic } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 
@@ -198,4 +198,40 @@ export async function buildBlocking(cwd: string, request: { scene: BlockingScene
       ? "机位分在轴线两侧，剪起来观众会以为两人换了位置。把一侧机位挪到同一侧，或补一个换轴的过渡镜。"
       : "机位都在轴线同一侧，正反打可以对切。",
   };
+}
+
+export interface BlockingRecord {
+  scene?: BlockingScene;
+  axis?: AxisCheck;
+  cameras?: { id: string; blocking: string; side: number }[];
+  generated?: string;
+}
+
+/** 读已落盘的走位板；不存在返回 null，不抛错。 */
+export async function readBlocking(cwd: string): Promise<BlockingRecord | null> {
+  const resolved = await resolveWorkspacePath(cwd, "assets/blocking.json", true).catch(() => null);
+  if (!resolved) return null;
+  const content = await readFile(resolved.path, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content) as BlockingRecord;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 按镜头号取走位描述，注入提示词。
+ * 只做「没写就补」：作者自己写了 BLOCKING 就以作者为准，工具不覆盖。
+ */
+export async function blockingLine(cwd: string, shotId?: string): Promise<string> {
+  if (!shotId) return "";
+  const record = await readBlocking(cwd);
+  const camera = record?.cameras?.find(item => item.id === shotId || shotId.startsWith(item.id));
+  if (!camera?.blocking) return "";
+  return `BLOCKING: ${camera.blocking}`;
 }

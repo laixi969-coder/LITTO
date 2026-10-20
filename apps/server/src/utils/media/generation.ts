@@ -298,7 +298,9 @@ async function generateMediaUnrecorded(
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
   const spec = request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
-  const prompt = withPhotographicBaseline(spec ? `${spec}\n\n${request.prompt}` : request.prompt);
+  // 走位板补位：作者没写空间关系时，用 assets/blocking.json 里对应机位的描述，避免左右靠猜。
+  const blocking = request.prompt.includes("BLOCKING:") ? "" : await blockingLine(directory, request.outputName);
+  const prompt = withPhotographicBaseline([spec, blocking, request.prompt].filter(Boolean).join("\n\n"));
   // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
   const referenceReads = new Map<string, ReturnType<typeof readReference>>();
   const reference = (item: MediaReference, type: string) => {

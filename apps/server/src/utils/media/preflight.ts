@@ -6,6 +6,7 @@ import { getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { coverageCheck, readCoverage } from "@/utils/media/coverage";
 import { dailySpend } from "@/utils/media/spend";
+import { readBlocking } from "@/utils/media/blocking";
 
 export type CheckLevel = "block" | "warn" | "info";
 
@@ -106,6 +107,23 @@ export async function preflight(cwd: string, options: { shotSpec?: Record<string
 
   // 3.5 对白覆盖：说话人不在画、自己又没有独立镜头，成片里必然出现「听见 B 的声音却一直看着 A 的脸」。
   items.push(coverageCheck((await readCoverage(cwd))?.shots));
+
+  // 3.55 走位：空间没定，关键帧再准也接不上；机位跨在轴线两侧剪起来就是跳轴。
+  const blocking = await readBlocking(cwd).catch(() => null);
+  const cameras = Array.isArray(blocking?.cameras) ? blocking!.cameras! : [];
+  const crossing = Boolean(blocking?.axis?.crossing);
+  const sides = [...new Set(cameras.map(camera => camera.side).filter(side => side !== 0))];
+  items.push({
+    key: "blocking",
+    level: crossing ? "block" : cameras.length ? "info" : "warn",
+    passed: cameras.length > 0 && !crossing,
+    detail: !cameras.length
+      ? "没有 assets/blocking.json，还没做走位板；提示词里的左右只能靠手写，跨镜容易反"
+      : crossing
+        ? `机位分在轴线两侧（${cameras.map(camera => `${camera.id}:${camera.side > 0 ? "东" : "西"}`).join("、")}），剪起来观众会以为两人换了位置`
+        : `${cameras.length} 个机位都在轴线同一侧，${sides.length} 侧，正反打可以对切`,
+    rule: "场次走位板与 180° 轴线",
+  });
 
   // 3.6 消耗：项目今天烧了多少，和「这一批要多少」是两个数，混在一起就会以为没花多少。
   const spend = await dailySpend(cwd).catch(() => null);
