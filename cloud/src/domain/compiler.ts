@@ -266,8 +266,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             shot.performance?.lookTarget && `looking at ${shot.performance.lookTarget}`,
             !shot.performance?.gesture && shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`,
         ]) : "",
+        continuityContext: Object.values(start).some(group => Object.keys(group).length)
+            ? `Continuity ledger for present subjects, not additional action instructions. Retain compatible injuries, identity and prop ownership; previous poses or contacts may predate this shot. Follow the explicit starting state and current causal action order; never reinstate completed contact, restore lost power or replay an earlier event to fill speech: ${JSON.stringify(start)}` : "",
         blocking: J([
-            Object.values(start).some(group => Object.keys(group).length) && `Inherited continuity for present subjects only; starting-frame occupancy/positions take precedence: ${JSON.stringify(start)}`,
             (kind === "video" || !cam.design?.start) && shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`,
             (kind === "video" || !cam.design?.start) && shot.blocking?.midground && `midground: ${shot.blocking.midground}`,
             (kind === "video" || !cam.design?.start) && shot.blocking?.background && `background: ${shot.blocking.background}`,
@@ -371,6 +372,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
                 : "从首帧正在发生的动作继续，保持画内人物、兵器和空间关系。" : "",
             subjects: J([sections.subject, sections.assetDetails]),
             staging: J([sections.blocking, sections.shotDesign, sections.view]),
+            continuityContext: sections.continuityContext,
             performance: sections.performance,
             camera: sections.camera,
             appearance: J([sections.world, sections.lighting, sections.look, sections.realism, sections.opticalTexture]),
