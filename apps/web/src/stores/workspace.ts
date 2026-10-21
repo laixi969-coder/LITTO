@@ -14,12 +14,15 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   const project = ref<Project | null>(null);
   const projectList = ref<Project[]>([]);
   const pendingAgentMessage = ref<{ directory: string; prompt: string; attachments?: AgentAttachment[]; model: string; reasoningEffort: string } | null>(null);
+  let openRequest = 0;
 
   async function openProject(path: string, previousDirectory = path, signal?: AbortSignal) {
+    const request = ++openRequest;
     const { data } = await axios.get<{ code: number; data?: { directory: string; projectId?: string }; message?: string }>("/api/workspaces/check", {
       params: { directory: path }, headers: { "x-toonflow-workspace": "1" }, signal,
     });
     signal?.throwIfAborted();
+    if (request !== openRequest) throw new Error("已选择其他项目，本次打开已取消");
     if (data.code !== 200 || !data.data?.directory) throw new Error(data.message || "工作目录校验失败");
     const checkedDirectory = data.data.directory;
     pendingAgentMessage.value = null;

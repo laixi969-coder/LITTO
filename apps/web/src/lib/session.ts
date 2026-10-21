@@ -31,16 +31,23 @@ const post = (path: string, body: unknown) => cloudRequest(path, "POST", body);
 export const requestCode = (email: string) => post("/auth/request-code", { email }) as Promise<{ devCode?: string }>;
 export async function verifyCode(email: string, code: string) { await post("/auth/verify", { email, code, client: "web" }); await loadMe(true); }
 export async function verifyPassword(email: string, password: string) { await post("/auth/password/login", { email, password, client: "web" }); await loadMe(true); }
-export async function logout() { await post("/auth/logout", {}).catch(() => {}); me = null; location.hash = "#/login"; location.reload(); }
+export async function logout() { await post("/auth/logout", {}); me = null; location.hash = "#/login"; location.reload(); }
 
-/** Any 401 from the engine API means the session ended: go back to the login page. */
+/** 请求绑定页面加载时的账号，其他标签页更换 Cookie 后拒绝跨账号操作并保留草稿。 */
 export function registerSessionGuard() {
   const nativeFetch = window.fetch.bind(window);
   // 保留原 fetch 上的静态成员（如 preconnect），包装后的类型与 typeof fetch 一致。
   window.fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
+    const url = new URL(typeof args[0] === "string" ? args[0] : args[0] instanceof Request ? args[0].url : String(args[0]), location.href);
+    const applicationRequest = url.origin === location.origin && (url.pathname.startsWith("/api/") || url.pathname.startsWith("/cloud/"));
+    if (applicationRequest && me && (!url.pathname.startsWith("/cloud/auth/") || url.pathname === "/cloud/auth/logout")) {
+      const headers = new Headers(args[1]?.headers ?? (args[0] instanceof Request ? args[0].headers : undefined));
+      headers.set("x-milimili-user", me.user.id);
+      headers.set("x-workspace-id", me.workspaceId);
+      args[1] = { ...args[1], headers };
+    }
+    // 保存失败交给调用方显示并保留输入，不能因过期会话强制刷新丢掉草稿。
     const response = await nativeFetch(...args);
-    const url = typeof args[0] === "string" ? args[0] : args[0] instanceof Request ? args[0].url : String(args[0]);
-    if (response.status === 401 && url.includes("/api/") && !authDisabled) { location.hash = "#/login"; location.reload(); }
     return response;
   }, window.fetch);
 }

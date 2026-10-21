@@ -210,6 +210,7 @@ export async function authenticate(c: Context, next: Next) {
     if (!bearer && !["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("x-milimili-csrf") !== "1") throw forbidden("csrf check failed");
     const auth = resolveSession(token, c.req.header("x-workspace-id"));
     if (!auth) throw new HttpError(401, "session invalid", "unauthenticated");
+    if (c.req.header("x-milimili-user") && c.req.header("x-milimili-user") !== auth.user.id) throw new HttpError(409, "账号已在其他页面切换，请重新登录原账号后保存", "account_changed");
     c.set("auth", auth);
     await next();
 }

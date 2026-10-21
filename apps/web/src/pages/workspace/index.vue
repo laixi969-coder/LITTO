@@ -1,7 +1,7 @@
 <template>
   <main class="workspacePage" :style="{ '--agentWidth': `${agentVisible ? agentWidth : 0}px` }">
     <aside class="workspaceRail" aria-label="项目任务">
-      <router-link class="railBrand" to="/home">MILI MILI <small>里头</small></router-link>
+      <router-link class="railBrand" to="/home"><brandLogo theme="dark" /></router-link>
       <span class="projectTitle" :title="workspaceStore.project?.name">{{ workspaceStore.project?.name }}</span>
       <div ref="historyTarget" class="historyTarget" />
       <div class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起助手' : '打开助手' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
@@ -56,6 +56,7 @@ import { onBeforeRouteLeave, useRoute } from "vue-router";
 import axios from "axios";
 import { IconLayoutDashboard, IconFileText, IconLayoutSidebarRight, IconSettings } from "@tabler/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import brandLogo from "@/components/brandLogo.vue";
 import settings from "@/components/settings/index.vue";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { registerWorkspaceControl, waitForControlValue } from "@/lib/mcpControl";

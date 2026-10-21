@@ -1,4 +1,5 @@
 import axios from "axios";
+import { isAuthDisabled } from "@/lib/session";
 import { normalizeLocale } from "@toonflow/i18n";
 import { computed, nextTick, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
@@ -9,6 +10,12 @@ import "element-plus/es/components/message/style/css";
 export const settings = ref<Record<string, unknown>>({});
 // ACT: 页面在 loadSettings 完成后才挂载，加载标记仅保留在设置初始化与自动保存内部。
 let settingsReady = false;
+let settingsRevision: string | undefined;
+let settingsBaseline = "";
+function settingsWithoutSelection(value: Record<string, unknown>) {
+  const { modelSelection, ...rest } = value;
+  return JSON.stringify(rest);
+}
 let saveQueue = Promise.resolve();
 let applyingSettings = false;
 
@@ -16,6 +23,8 @@ export const settingsStorage = {
   getItem(key: string) {
     const stores = settings.value.stores as Record<string, unknown> | undefined;
     if (stores && Object.hasOwn(stores, key)) return JSON.stringify(stores[key]);
+    // 无租户归属的旧缓存仅供单机迁移，不能写入新登录账号的设置。
+    if (!isAuthDisabled()) return null;
     // ACT: 只迁移当前来源可读取的旧缓存，保留原值；不同端口的 localStorage 不能互读。
     const value = localStorage.getItem(key);
     if (value !== null) settingsStorage.setItem(key, value);
@@ -133,11 +142,13 @@ export const modelChoices = computed(() => languageProviders.value.flatMap(provi
 
 export async function loadSettings() {
   if (settingsReady) return;
-  const { data } = await axios.get("/api/settings/get", { headers: { "Cache-Control": "no-cache", "x-toonflow-workspace": "1" } });
+  const { data, headers } = await axios.get("/api/settings/get", { headers: { "Cache-Control": "no-cache", "x-toonflow-workspace": "1" } });
   if (settingsReady) return;
   if (data.code !== 200 || !data.data || typeof data.data !== "object" || Array.isArray(data.data)) {
     throw new Error("读取设置失败");
   }
+  settingsRevision = headers["x-settings-revision"];
+  settingsBaseline = settingsWithoutSelection(data.data);
   settings.value = data.data;
   // 等初始化引发的监听执行完，再允许自动保存。
   await nextTick();
@@ -147,8 +158,10 @@ export async function loadSettings() {
 }
 
 async function syncModelSelection() {
-  const { data } = await axios.get("/api/settings/get", { timeout: 15000, headers: { "Cache-Control": "no-cache", "x-toonflow-workspace": "1" } });
+  const { data, headers } = await axios.get("/api/settings/get", { timeout: 15000, headers: { "Cache-Control": "no-cache", "x-toonflow-workspace": "1" } });
   if (data.code !== 200 || !data.data || typeof data.data !== "object") throw new Error("读取最新模型选择失败，未覆盖设置");
+  if (settingsWithoutSelection(data.data) !== settingsBaseline) throw new Error("设置或项目列表已在其他页面修改，当前修改仍保留，请重新打开核对");
+  settingsRevision = headers["x-settings-revision"];
   const selection = data.data.modelSelection ?? {};
   if (JSON.stringify(settings.value.modelSelection ?? {}) === JSON.stringify(selection)) return;
   applyingSettings = true;
@@ -171,8 +184,11 @@ export function saveSettings(update?: (current: Record<string, unknown>) => Reco
     await syncModelSelection();
     const patch = update?.(settings.value);
     if (update && !patch) return false;
-    const { data } = await axios.put("/api/settings/save", { settings: { ...settings.value, ...patch } }, { headers: { "x-toonflow-workspace": "1" } });
+    const snapshot = JSON.parse(JSON.stringify({ ...settings.value, ...patch }));
+    const { data, headers } = await axios.put("/api/settings/save", { settings: snapshot }, { headers: { "x-toonflow-workspace": "1", "x-settings-revision": settingsRevision } });
     if (data.code !== 200) throw new Error("保存设置失败");
+    settingsRevision = headers["x-settings-revision"];
+    settingsBaseline = settingsWithoutSelection(data.data);
     if (patch && Object.hasOwn(patch, "customProviders")) invalidateNodeModels("language");
     if (patch) {
       applyingSettings = true;
@@ -188,5 +204,5 @@ export function saveSettings(update?: (current: Record<string, unknown>) => Reco
 
 watch(settings, () => {
   if (!settingsReady || applyingSettings) return;
-  void saveSettings().catch(() => { ElMessage.error("设置保存失败，请稍后重试"); });
+  void saveSettings().catch(error => { ElMessage.error(axios.isAxiosError(error) ? error.response?.data?.message || "设置保存失败，请稍后重试" : error instanceof Error ? error.message : "设置保存失败，请稍后重试"); });
 }, { deep: true, flush: "sync" });

@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import { guardedFetch } from "@/utils/ssrf";
 import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider, type ProviderTools } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
@@ -428,40 +427,44 @@ const canvasWriteQueue = new Map<string, Promise<unknown>>();
  */
 async function registerOnCanvas(cwd: string, file: GeneratedMedia, request: MediaGenerationRequest) {
   if (file.mediaType === "audio") return;
-  const canvasPath = join(cwd, "画布1.json");
+  const { path: canvasPath } = await resolveWorkspacePath(cwd, "画布1.json");
   const dataType = file.mediaType === "video" ? "VIDEO" : "IMAGE";
   const handle = file.mediaType === "video" ? "video" : "image";
   const label = request.outputName?.trim() || file.path.split("/").pop()?.replace(/\.[^.]+$/, "") || "未命名";
   const previous = canvasWriteQueue.get(canvasPath) ?? Promise.resolve();
-  const task = previous.then(async () => {
-    let canvas: Record<string, unknown> = { milimiliCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 0.5 } };
+  const task = previous.catch(() => {}).then(async () => {
+    const release = lockWorkspaceFiles([canvasPath]);
     try {
-      if (existsSync(canvasPath)) {
-        const parsed: unknown = JSON.parse(readFileSync(canvasPath, "utf8"));
-        if (parsed && typeof parsed === "object" && ((parsed as { milimiliCanvas?: unknown }).milimiliCanvas === true || (parsed as { littoCanvas?: unknown }).littoCanvas === true || (parsed as { toonflowCanvas?: unknown }).toonflowCanvas === true)) canvas = parsed as Record<string, unknown>;
-      }
-    } catch { /* 画布损坏：按默认结构重建，避免一个坏文件卡死后续登记 */ }
-    const nodes = Array.isArray(canvas.nodes) ? (canvas.nodes as Record<string, unknown>[]) : [];
-    if (nodes.some(node => (node?.data as { sourcePath?: string } | undefined)?.sourcePath === file.path)) return;
-    const index = nodes.length;
-    nodes.push({
-      id: `shot-${crypto.randomUUID()}`,
-      type: file.mediaType === "video" ? "remote-videoNode" : "remote-imageNode",
-      initialized: true,
-      position: { x: (index % 4) * 420, y: Math.floor(index / 4) * 340 },
-      data: {
-        label,
-        sourcePath: file.path,
-        outputs: { [handle]: { dataType, value: { url: file.path, mimeType: file.mimeType } } },
-        handles: [{ id: handle, type: "source", dataType, label: file.mediaType === "video" ? "视频输出" : "图像输出" }],
-        lineageLabel: label,
-      },
-    });
-    canvas.nodes = nodes;
-    writeFileSync(canvasPath, JSON.stringify(canvas, null, 1), "utf8");
-  }).catch(() => { /* 画布登记失败不影响已生成的素材本身 */ });
+      let canvas: Record<string, unknown> = { milimiliCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 0.5 } };
+      try {
+        const parsed = JSON.parse(await readFile(canvasPath, "utf8"));
+        if (!parsed || typeof parsed !== "object" || !(parsed.milimiliCanvas === true || parsed.littoCanvas === true || parsed.toonflowCanvas === true)
+          || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) throw new Error("画布结构无效，已保留原文件，请修复后再登记素材");
+        canvas = parsed;
+      } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+      const nodes = canvas.nodes as Record<string, unknown>[];
+      if (nodes.some(node => (node?.data as { sourcePath?: string } | undefined)?.sourcePath === file.path)) return;
+      const index = nodes.length;
+      nodes.push({
+        id: `shot-${crypto.randomUUID()}`,
+        type: file.mediaType === "video" ? "remote-videoNode" : "remote-imageNode",
+        initialized: true,
+        position: { x: (index % 4) * 420, y: Math.floor(index / 4) * 340 },
+        data: {
+          label,
+          sourcePath: file.path,
+          outputs: { [handle]: { dataType, value: { url: file.path, mimeType: file.mimeType } } },
+          handles: [{ id: handle, type: "source", dataType, label: file.mediaType === "video" ? "视频输出" : "图像输出" }],
+          lineageLabel: label,
+        },
+      });
+      canvas.nodes = nodes;
+      await writeWorkspaceFile(canvasPath, JSON.stringify(canvas, null, 1));
+    } finally { release(); }
+  });
   canvasWriteQueue.set(canvasPath, task);
-  return task;
+  try { await task; }
+  finally { if (canvasWriteQueue.get(canvasPath) === task) canvasWriteQueue.delete(canvasPath); }
 }
 
 /** Every media generation (from the canvas nodes, the agent tools, or the HTTP route) is recorded for the user's usage receipts. */
@@ -477,7 +480,12 @@ export async function generateMediaDirect(
   try {
     const files = await generateMediaUnrecorded(cwd, mediaType, request, signal, reportTask);
     // 先登记画布再计费返回：用户在 UI 里看到的节点与磁盘文件必须同时存在。
-    for (const file of files) await registerOnCanvas(cwd, file, request);
+    try {
+      for (const file of files) await registerOnCanvas(cwd, file, request);
+    } catch (cause) {
+      const savedFiles = files.map(file => file.path);
+      throw Object.assign(new Error(`画布登记失败：${cause instanceof Error ? cause.message : String(cause)}。已保存文件：${savedFiles.join("、")}。请复用文件修复画布，不要重新生成。`, { cause }), { savedFiles, retryable: false, fallbackAllowed: false });
+    }
     const seconds = (request as { duration?: number }).duration;
     recordUsage(mediaType === "video" && seconds ? { ...base, units: seconds, unit: "second", durationMs: Date.now() - started }
       : { ...base, units: Math.max(1, files.length), unit: mediaType === "image" ? "image" : "call", durationMs: Date.now() - started });

@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch, type Component } from "vue";
+import { computed, inject, onMounted, onBeforeUnmount, ref, watch, type Component } from "vue";
 import { ElButton, ElCard, ElInput, ElSelect, ElDrawer, ElOption, ElOptionGroup, ElMessage } from "element-plus";
 import { IconEdit, IconFileText, IconSparkles, IconArrowUp } from "@tabler/icons-vue";
 import { groupNodeModels, nodeSkeleton, nodeTools, useNode, useNodeReferences, z, type NodeAiModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
@@ -107,6 +107,22 @@ const textPath = `assets/${node.id}/content.md`;
 let textFiles: ReturnType<typeof files.getWorkspaceFiles>;
 let textLoading: Promise<void> | undefined;
 let textSaving = Promise.resolve();
+function protectPendingSave(event: BeforeUnloadEvent) {
+  if (saveState.value === "saved") return;
+  event.preventDefault();
+  event.returnValue = "";
+}
+function recoverSave() {
+  if (saveState.value === "error") void retrySave();
+}
+onMounted(() => {
+  window.addEventListener("beforeunload", protectPendingSave);
+  window.addEventListener("online", recoverSave);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", protectPendingSave);
+  window.removeEventListener("online", recoverSave);
+});
 function saveText(value: string) {
   saveState.value = "saving";
   const pending = textSaving.catch(() => {}).then(() => textFiles.write(textPath, value));
@@ -151,7 +167,7 @@ async function loadText() {
           if (error.response?.data?.data?.code !== "EEXIST") throw error;
         });
       }
-      await textFiles.write(textPath, value);
+      await textFiles.write(textPath, value, true);
     }
     outputs.value.text.value = value;
     data.value.textPath = textPath;

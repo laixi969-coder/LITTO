@@ -37,6 +37,8 @@ const canvasId = computed(() => activeInstance.value?.canvasId ?? "");
 const canvasReady = computed(() => activeInstance.value?.canvasReady ?? false);
 const lifetime = new AbortController();
 const workspaceStore = useWorkspaceStore();
+const projectDirectory = workspaceStore.project?.directory;
+provide("projectCanvasFiles", useWorkspaceFiles(() => projectDirectory));
 const canvases = shallowRef<{ id: string }[]>([]);
 provide("canvasList", canvases);
 provide("canvasAssetNodes", (id: string) => [...instances.values()].find(panel => panel.canvasId === id)?.getRetainedNodes() ?? []);

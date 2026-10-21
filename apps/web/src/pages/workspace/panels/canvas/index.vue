@@ -61,7 +61,7 @@
           :loading="nodeLoads.has(type) || (nodeListLoading && !nodeTypes[type] && !nodeErrors[type])" />
       </template>
       <background :gap="16" patternColor="var(--el-border-color)" />
-      <canvasMenu ref="canvasMenuRef" v-model:canvasId="canvasId" :directory="project?.directory" :initialCanvasId="initialCanvasId" :activateCanvas="activateCanvas" :flushSave="flushCanvases ?? flushCanvasSave">
+      <canvasMenu ref="canvasMenuRef" v-model:canvasId="canvasId" :directory="project?.directory" :canvasFiles="canvasFiles" :initialCanvasId="initialCanvasId" :activateCanvas="activateCanvas" :flushSave="flushCanvases ?? flushCanvasSave">
         <assetLibrary ref="assetLibraryRef" v-model="assetsVisible" :directory="project?.directory" />
       </canvasMenu>
       <canvasControls
@@ -117,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, onScopeDispose, provide, ref, shallowReactive, shallowRef, watch } from "vue";
+import { computed, inject, markRaw, nextTick, onBeforeUnmount, onMounted, onScopeDispose, provide, ref, shallowReactive, shallowRef, watch } from "vue";
 import axios from "axios";
 import { debounce } from "lodash-es";
 import { ElMessage } from "element-plus";
@@ -187,6 +187,8 @@ const props = withDefaults(defineProps<{
   flushCanvases?: (action?: () => Promise<void>) => Promise<void>;
 }>(), { active: true, settingsVisible: false });
 const { project } = storeToRefs(useWorkspaceStore());
+const canvasDirectory = project.value?.directory;
+const canvasFiles = inject<ReturnType<typeof useWorkspaceFiles>>("projectCanvasFiles") ?? useWorkspaceFiles(() => canvasDirectory);
 
 const canvasElement = ref<HTMLElement>();
 const flowData = ref<(Node | Edge)[]>([]);
@@ -399,7 +401,7 @@ function dragFilesOver(event: DragEvent) {
 }
 
 async function dropFiles(event: DragEvent) {
-  const directory = project.value?.directory;
+  const directory = canvasDirectory;
   if (!directory || !dragFilesOver(event)) return;
   try {
     await canvasHistory.batch(() => dropCanvasFiles(event, { directory, availableNodes: availableNodes.value, signal: canvasController.signal, flow }));
@@ -409,7 +411,7 @@ async function dropFiles(event: DragEvent) {
 }
 
 function selectFiles(position: { x: number; y: number }) {
-  const directory = project.value?.directory;
+  const directory = canvasDirectory;
   if (!props.active || props.settingsVisible || !canvasId.value || !directory) return;
   const context = { directory, availableNodes: availableNodes.value, signal: canvasController.signal, flow };
   const input = document.createElement("input");
@@ -460,13 +462,17 @@ let savePaused = false;
 let saveCancelled = false;
 let changedWhilePaused = false;
 let saveRevision = 0;
+let savedRevision = 0;
 const saveCanvas = debounce((directory: string, fileName: string) => {
   const flow = toObject();
-  // ACT: 同页保存按顺序完成，防止慢请求覆盖后续修改；不处理多个客户端的并发编辑。
+  const revision = saveRevision;
+  // 同页顺序保存；跨页面由读取时取得的版本保护，拒绝旧快照覆盖。
   saving = saving.then(async () => {
     try {
-      await useWorkspaceFiles(directory).writeJson(fileName, { milimiliCanvas: true, nodes: flow.nodes, edges: flow.edges, viewport: flow.viewport });
+      if (directory !== canvasDirectory) throw new Error("项目已切换，停止保存");
+      await canvasFiles.writeJson(fileName, { milimiliCanvas: true, nodes: flow.nodes, edges: flow.edges, viewport: flow.viewport });
       saveError = undefined;
+      savedRevision = revision;
     } catch (err) {
       saveError = err;
       ElMessage.error(
@@ -480,6 +486,17 @@ const saveCanvas = debounce((directory: string, fileName: string) => {
   });
 }, 500);
 
+function recoverSave() {
+  if (!saveError || saveCancelled) return;
+  void flushCanvasSave().catch(() => {}); // 保存错误已由队列显示，保留未保存状态。
+}
+function protectPendingSave(event: BeforeUnloadEvent) {
+  if (saveCancelled || (savedRevision === saveRevision && !saveError)) return;
+  saveCanvas.flush();
+  event.preventDefault();
+  event.returnValue = "";
+}
+
 function scheduleCanvasSave() {
   if (saveCancelled) return;
   saveRevision++;
@@ -487,7 +504,7 @@ function scheduleCanvasSave() {
     changedWhilePaused = true;
     return;
   }
-  const directory = project.value?.directory;
+  const directory = canvasDirectory;
   if (directory && canvasId.value) saveCanvas(directory, canvasId.value);
 }
 
@@ -595,15 +612,15 @@ async function saveCanvasState(action?: () => Promise<void>) {
   await Promise.all(flow.getNodes.value.map((node) => useNodeEvent(node.id, flow).emit("save")));
   await nextTick();
   if (saveCancelled) throw new Error("画布保存已取消");
-  if (saveError && project.value?.directory && canvasId.value) saveCanvas(project.value.directory, canvasId.value);
+  if (saveError && canvasDirectory && canvasId.value) saveCanvas(canvasDirectory, canvasId.value);
   if (action) savePaused = true;
   try {
     let revision: number;
     do {
       if (saveCancelled) throw new Error("画布保存已取消");
       revision = saveRevision;
-      if (changedWhilePaused && project.value?.directory && canvasId.value) {
-        saveCanvas(project.value.directory, canvasId.value);
+      if (changedWhilePaused && canvasDirectory && canvasId.value) {
+        saveCanvas(canvasDirectory, canvasId.value);
         changedWhilePaused = false;
       }
       saveCanvas.flush();
@@ -618,7 +635,7 @@ async function saveCanvasState(action?: () => Promise<void>) {
   } finally {
     if (action && !saveCancelled) {
       savePaused = false;
-      if (changedWhilePaused && project.value?.directory && canvasId.value) saveCanvas(project.value.directory, canvasId.value);
+      if (changedWhilePaused && canvasDirectory && canvasId.value) saveCanvas(canvasDirectory, canvasId.value);
       changedWhilePaused = false;
     }
   }
@@ -844,6 +861,8 @@ function refreshInstalled(event: WindowEventMap["toonflow:plugin-installed"]) {
 const refreshNodeConfig = () => { void loadRemoteNodes(); };
 
 onMounted(() => {
+  window.addEventListener("beforeunload", protectPendingSave);
+  window.addEventListener("online", recoverSave);
   // 在捕获阶段同步修饰键，避免节点编辑器截断 keydown/keyup 后缩放状态丢失或卡住。
   window.addEventListener("keydown", updateCanvasKeys, true);
   window.addEventListener("keyup", updateCanvasKeys, true);
@@ -857,6 +876,8 @@ onMounted(() => {
   void loadRemoteNodes();
 });
 onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", protectPendingSave);
+  window.removeEventListener("online", recoverSave);
   window.removeEventListener("keydown", updateCanvasKeys, true);
   window.removeEventListener("keyup", updateCanvasKeys, true);
   window.removeEventListener("blur", resetCanvasKeys);
@@ -879,12 +900,12 @@ const nodeWindow = window as typeof window & {
 nodeWindow.toonflowNodeHost = { vue: vueRuntime, vueFlow: vueFlowRuntime, elementPlus: elementPlusRuntime, ai: { runAgentLoop, createAssistantMessageEventStream } };
 provide("nodeConfig", (nodeType: string) => nodeConfigs.value[nodeType] ?? {});
 provide("workspaceFiles", () => {
-  const directory = project.value?.directory;
+  const directory = canvasDirectory;
   if (!directory) throw new Error("请先选择工作目录");
   return useWorkspaceFiles(directory);
 });
 provide("workspaceDirectory", () => {
-  const directory = project.value?.directory;
+  const directory = canvasDirectory;
   if (!directory) throw new Error("请先选择工作目录");
   return directory;
 });

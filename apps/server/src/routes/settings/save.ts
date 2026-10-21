@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import u from "@/utils";
 import { Router } from "express";
 import { z } from "zod";
@@ -5,7 +6,7 @@ import { validateFields } from "@/lib/middleware";
 import { success } from "@/lib/responseFormat";
 import { maxSystemPromptLength } from "@/agent/runtime/prompt";
 import { t } from "@/lib/i18n";
-import { restoreSecrets } from "@/utils/secrets";
+import { maskSecrets, restoreSecrets } from "@/utils/secrets";
 import { assertPublicHttpUrl } from "@/utils/ssrf";
 import { modelSelectionSchema } from "@/utils/modelSelection";
 
@@ -42,7 +43,12 @@ export default router.put("/", validateFields({ settings: z.record(z.string(), z
     if (typeof address === "string" && address) await assertPublicHttpUrl(address, { strictDns: false });
   }
   u.removeLegacySettings(settings);
+  const expected = req.get("x-settings-revision");
+  const currentRevision = createHash("sha256").update(JSON.stringify(u.conf.get("settings", {}))).digest("hex");
+  const revision = createHash("sha256").update(JSON.stringify(settings)).digest("hex");
+  if (expected && expected !== currentRevision && revision !== currentRevision) throw Object.assign(new Error("设置或项目列表已在其他页面修改，未覆盖最新数据，请重新打开页面核对"), { status: 409 });
   u.conf.set("settings", settings);
+  res.set("x-settings-revision", revision);
   await u.mcpRuntime.reloadMcpRuntime();
-  res.json(success(null, "设置已保存"));
+  res.json(success(maskSecrets(settings), "设置已保存"));
 });

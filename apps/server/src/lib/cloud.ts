@@ -43,6 +43,7 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
   let tenant: Tenant | null;
   try { tenant = tenantOf(req); } catch { return res.status(403).json(error("无权访问该工作区", null, 403)); }
   if (!tenant) return res.status(401).json(error("请先登录", null, 401));
+  if (req.get("x-milimili-user") && req.get("x-milimili-user") !== tenant.userId) return res.status(409).json(error("账号已在其他页面切换，当前编辑仍保留，请重新登录原账号后保存", null, 409));
   const path = req.path.toLowerCase().replace(/\/+$/, "");
   const readOnlyPost = req.method === "POST" && (["/ai/media/estimate", "/ai/media/preflight"].includes(path)
     || path === "/ai/media/blocking" && req.body?.save === false);
@@ -54,10 +55,13 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
 }
 
 /** Routes that install or execute third-party code, or mutate platform-wide assets, are for platform admins only. */
-const ADMIN_ONLY = /^\/(nodes|tools|providers|plugins|agents|skills)\/(?!get|list|read|models|test|reenable|files|renderers|client|export)/;
+const pluginPath = /^\/(nodes|tools|providers|plugins|agents|skills)(?:\/|$)/i;
+const memberProviderPath = /^\/providers\/(models|test|reenable)\/?$/i;
 export function requireAdminForPlugins(req: Request, res: Response, next: NextFunction) {
   if (!authEnabled() || req.method === "GET" || req.method === "HEAD") return next();
   const tenant = (req as Request & { tenant?: Tenant }).tenant;
-  if (ADMIN_ONLY.test(req.path) && !tenant?.isAdmin) return res.status(403).json(error("仅平台管理员可以安装或修改插件与供应商", null, 403));
+  // 与 Express 的大小写匹配规则一致；普通成员仅能调用明确允许的供应商操作。
+  const memberOperation = req.method === "POST" && memberProviderPath.test(req.path);
+  if (pluginPath.test(req.path) && !memberOperation && !tenant?.isAdmin) return res.status(403).json(error("仅平台管理员可以安装或修改插件与供应商", null, 403));
   next();
 }

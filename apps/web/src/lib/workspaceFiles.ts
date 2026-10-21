@@ -23,6 +23,7 @@ function invalidateUrls(directory: string, path: string) {
 }
 
 export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | undefined>) {
+  const revisions = new Map<string, string>();
   const workspace = directory === undefined ? useWorkspaceStore() : undefined;
   function getDirectory() {
     const path = directory === undefined ? workspace?.project?.directory : toValue(directory);
@@ -71,10 +72,12 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
   async function readText(path: string, maxBytes?: number) {
     if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes < 1)) throw new Error("读取字节数必须为正整数");
     try {
-      const { data } = await client.get<string>("/read", {
-        params: { directory: getDirectory(), path }, responseType: "text", transformResponse: [],
-        headers: maxBytes === undefined ? undefined : { Range: `bytes=0-${maxBytes - 1}` },
+      const directory = getDirectory();
+      const { data, headers } = await client.get<string>("/read", {
+        params: { directory, path }, responseType: "text", transformResponse: [],
+        headers: maxBytes === undefined ? { "x-file-revision": "1" } : { Range: `bytes=0-${maxBytes - 1}` },
       });
+      if (maxBytes === undefined && headers["x-file-revision"]) revisions.set(JSON.stringify([directory, path]), headers["x-file-revision"]);
       return data;
     } catch (error) {
       if (maxBytes !== undefined && axios.isAxiosError(error) && error.response?.status === 416 && error.response.headers["content-range"] === "bytes */0") return "";
@@ -88,7 +91,9 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
 
   async function write(path: string, content: string | Blob | ArrayBuffer, exclusive = false, signal?: AbortSignal) {
     const directory = getDirectory();
-    await client.put("/write", content, { params: { directory, path, exclusive }, signal, headers: { "Content-Type": "application/octet-stream" } });
+    const key = JSON.stringify([directory, path]);
+    const { headers } = await client.put("/write", content, { params: { directory, path, exclusive }, signal, headers: { "Content-Type": "application/octet-stream", "x-file-revision": exclusive ? undefined : revisions.get(key) } });
+    if (headers["x-file-revision"]) revisions.set(key, headers["x-file-revision"]);
     invalidateUrls(directory, path);
   }
 
@@ -100,6 +105,10 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
     const directory = getDirectory();
     await client.post("/rename", { directory, path, target });
     invalidateUrls(directory, path);
+    const key = JSON.stringify([directory, path]);
+    const revision = revisions.get(key);
+    if (revision) revisions.set(JSON.stringify([directory, target]), revision);
+    revisions.delete(key);
     invalidateUrls(directory, target);
   }
 

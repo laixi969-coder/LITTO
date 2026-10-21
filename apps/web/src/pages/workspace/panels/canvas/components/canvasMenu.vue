@@ -51,6 +51,7 @@ import { getCanvasAssetDirectories, isCanvasFile } from "@/pages/workspace/canva
 
 const props = defineProps<{
   directory?: string;
+  canvasFiles: ReturnType<typeof useWorkspaceFiles>;
   initialCanvasId?: string;
   activateCanvas?: (id: string, signal?: AbortSignal) => Promise<void>;
   flushSave: (action?: () => Promise<void>) => Promise<void>;
@@ -169,7 +170,7 @@ async function applyCanvas(canvasId: string, directory: string, signal?: AbortSi
   await props.flushSave();
   checkCanvasDirectory(directory, signal);
   {
-    const data = await useWorkspaceFiles(directory).readJson<Partial<NonNullable<Canvas["flow"]>> & { milimiliCanvas?: boolean; littoCanvas?: boolean; toonflowCanvas?: boolean } | null>(nextCanvas.id);
+    const data = await props.canvasFiles.readJson<Partial<NonNullable<Canvas["flow"]>> & { milimiliCanvas?: boolean; littoCanvas?: boolean; toonflowCanvas?: boolean } | null>(nextCanvas.id);
     checkCanvasDirectory(directory, signal);
     if (data?.milimiliCanvas !== true && data?.littoCanvas !== true && data?.toonflowCanvas !== true || !Array.isArray(data?.nodes) || !Array.isArray(data.edges) || !data.viewport
       || ![data.viewport.x, data.viewport.y, data.viewport.zoom].every(Number.isFinite) || data.viewport.zoom <= 0) throw new Error("画布文件格式无效");
@@ -363,7 +364,7 @@ async function renameCanvasFile(id: string, name: string, directory: string, sig
   await props.flushSave(async () => {
     checkCanvasDirectory(directory, signal);
     const target = `${name}.json`;
-    await useWorkspaceFiles(directory).rename(id, target);
+    await props.canvasFiles.rename(id, target);
     checkCanvasDirectory(directory);
     // 文件已改名时先更新保存路径，再响应取消，避免自动保存重新创建旧文件。
     if (activeCanvasId.value === id) activeCanvasId.value = target;

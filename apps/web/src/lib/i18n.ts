@@ -1,3 +1,4 @@
+import { getMe } from "@/lib/session";
 import axios, { type AxiosInstance } from "axios";
 import { computed, watch } from "vue";
 import { detectLocale, isRtlLocale } from "@toonflow/i18n";
@@ -29,7 +30,14 @@ export function registerApiLanguage(client: AxiosInstance) {
   const interceptor = client.interceptors.request.use(config => {
     const url = new URL(client.getUri(config), window.location.href);
     // ACT: 仅本应用 API 接收界面语言，不改变供应商等外部请求。
-    if (url.origin === window.location.origin && url.pathname.startsWith("/api/")) config.headers.set("Accept-Language", locale.value);
+    if (url.origin === window.location.origin && url.pathname.startsWith("/api/")) {
+      config.headers.set("Accept-Language", locale.value);
+      const account = getMe();
+      if (account) {
+        config.headers.set("x-milimili-user", account.user.id);
+        config.headers.set("x-workspace-id", account.workspaceId);
+      }
+    }
     return config;
   });
   return () => client.interceptors.request.eject(interceptor);
