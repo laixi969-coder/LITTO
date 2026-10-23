@@ -1,9 +1,9 @@
-import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { all, audit, get, run, setting, tx } from "./db.ts";
 import { config } from "./config.ts";
-import { bad, forbidden, HttpError, log, now, sha256, ulid } from "./util.ts";
+import { bad, forbidden, HttpError, now, sha256, ulid } from "./util.ts";
 import { grant } from "./credits.ts";
 import { purgeWorkspace } from "./storage.ts";
 import { assertNotSsoEnforced } from "./sso-policy.ts";
@@ -13,7 +13,6 @@ const RANK: Record<Role, number> = { VIEWER: 0, EDITOR: 1, ADMIN: 2, OWNER: 3 };
 
 export type Auth = { user: { id: string; email: string; isAdmin: boolean }; workspaceId: string; role: Role };
 
-const CODE_TTL_MS = 10 * 60_000;
 const SESSION_TTL_MS = 30 * 24 * 3600_000;
 
 function accountAllowed(email: string, isAdmin: boolean) {
@@ -24,19 +23,6 @@ function accountAllowed(email: string, isAdmin: boolean) {
 function requireAccountAccess(email: string) {
   const user = get("SELECT is_admin FROM users WHERE email=? AND deleted_at IS NULL", email);
   if (!accountAllowed(email, !!user?.is_admin)) throw forbidden("此邮箱未在账户白名单中，请联系管理员");
-}
-
-// 每次发码都会重置错误次数，不限制发码频率就等于可无限次猜码，也能被用来对任意邮箱轰炸发信。
-// ACT: 进程内计数，单实例部署足够；多实例需改为数据库或共享缓存。
-const codeRequests = new Map<string, number[]>();
-function throttleCodeRequest(email: string) {
-    if (process.env.MILIMILI_NO_RATELIMIT) return;
-    const at = Date.now();
-    if (codeRequests.size > 10_000) for (const [key, times] of codeRequests) if (at - times[times.length - 1] > 3600_000) codeRequests.delete(key);
-    const recent = (codeRequests.get(email) ?? []).filter((t) => at - t < 3600_000);
-    if (recent.length && at - recent[recent.length - 1] < 60_000) throw new HttpError(429, "验证码发送太频繁，请 1 分钟后再试", "rate_limited");
-    if (recent.length >= 5) throw new HttpError(429, "这个邮箱本小时获取验证码次数过多，请稍后再试", "rate_limited");
-    codeRequests.set(email, [...recent, at]);
 }
 
 function derivePassword(password: string, salt: string): Promise<Buffer> {
@@ -95,45 +81,7 @@ export async function verifyPassword(email: string, password: string) {
   return result;
 }
 
-function requireCodeLogin(email: string) {
-  // 当前尚未接入邮件投递，不能让开发模式返回的验证码绕过密码。
-  if (get("SELECT p.user_id FROM user_passwords p JOIN users u ON u.id=p.user_id WHERE u.email=?", email)) {
-    throw forbidden("此账号已设置密码，请使用密码登录");
-  }
-}
-
-export function requestCode(email: string): { devCode?: string } {
-    email = email.trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw bad("邮箱格式不正确，请检查后重试");
-    assertNotSsoEnforced(email);
-    requireAccountAccess(email);
-    requireCodeLogin(email);
-    const existing = get("SELECT id FROM users WHERE email=? AND deleted_at IS NULL", email);
-    if (!existing && !setting("registrationOpen", true)) throw forbidden("暂未开放新用户注册");
-    throttleCodeRequest(email);
-    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-    run("INSERT INTO login_codes VALUES(?,?,?,0) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at, attempts=0", email, sha256(email + code), new Date(Date.now() + CODE_TTL_MS).toISOString());
-    // Mail transport is pluggable; without SMTP the code is printed (dev) and echoed only outside production.
-    log.info(`[mail] login code for ${email}: ${config.production ? "(hidden)" : code}`);
-    return config.production ? {} : { devCode: code };
-}
-
-export function verifyCode(email: string, code: string) {
-    email = email.trim().toLowerCase();
-    assertNotSsoEnforced(email);
-    requireAccountAccess(email);
-    requireCodeLogin(email);
-    const rec = get("SELECT * FROM login_codes WHERE email=?", email);
-    if (!rec || rec.expires_at < now() || rec.attempts >= 5) throw new HttpError(401, "验证码已过期或错误次数过多，请重新获取", "bad_code");
-    if (rec.code_hash !== sha256(email + code)) {
-        run("UPDATE login_codes SET attempts=attempts+1 WHERE email=?", email);
-        throw new HttpError(401, "验证码不正确，请检查后重新输入", "bad_code");
-    }
-    run("DELETE FROM login_codes WHERE email=?", email);
-    return loginUser(email);
-}
-
-/** Shared by OTP and OAuth: find-or-create the user (+ Personal Workspace), apply pending invites, open a session. */
+/** Shared by password login and OAuth: find-or-create the user (+ Personal Workspace), apply pending invites, open a session. */
 export function loginUser(email: string, identity?: { provider: string; subject: string }) {
     email = email.trim().toLowerCase();
     requireAccountAccess(email);

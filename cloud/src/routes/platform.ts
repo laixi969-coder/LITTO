@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { authOf, deleteAccount, logout, requestCode, requireRole, setSessionCookie, verifyCode, verifyPassword } from "../auth.ts";
+import { authOf, deleteAccount, logout, requireRole, setSessionCookie, verifyPassword } from "../auth.ts";
 import { all, audit, get, run, scoped } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { accountOf, grant } from "../credits.ts";
@@ -8,19 +8,16 @@ import { addCredential, credentialView, listModels, listProviders, testProvider 
 import { resolvePolicy, route } from "../providers/router.ts";
 import { cancelJob, jobView, retryJob } from "../jobs.ts";
 import { checkSignedUrl, mediaView, saveMedia, softDeleteMedia, storage, usage } from "../storage.ts";
-import { bad, forbidden, notFound, now } from "../util.ts";
+import { bad, forbidden, HttpError, notFound, now } from "../util.ts";
 import { ROLES } from "../domain/schema.ts";
 
 export const platform = new Hono();
 
 // ---- /auth (public part is mounted in app.ts) ----
 export const authPublic = new Hono();
-authPublic.post("/request-code", async (c) => c.json(requestCode((await body(c, z.object({ email: z.string() }))).email)));
-authPublic.post("/verify", async (c) => {
-    const b = await body(c, z.object({ email: z.string(), code: z.string(), client: z.enum(["web", "api"]).default("web") }));
-    const r = verifyCode(b.email, b.code);
-    if (b.client === "web") setSessionCookie(c, r.token);
-    return c.json({ user: r.user, ...(b.client === "api" ? { token: r.token } : {}) });
+// 尚未接入可信邮件投递：同时关闭发码和验码，已泄露的旧验证码也不能建立会话。
+authPublic.on("POST", ["/request-code", "/verify"], () => {
+  throw new HttpError(503, "验证码登录暂不可用，请使用已设置的密码登录；未设置密码请联系管理员。", "code_login_unavailable");
 });
 authPublic.post("/password/login", async (c) => {
   const b = await body(c, z.object({ email: z.string().trim().email().max(254), password: z.string().min(1).max(256), client: z.enum(["web", "api"]).default("web") }));

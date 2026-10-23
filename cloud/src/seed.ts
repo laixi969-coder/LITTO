@@ -1,4 +1,4 @@
-export {};// Usage: with the server running → `npm run seed` creates demo@milimili.local with a ready-to-explore project
+export {};// Usage: with the server running, DEMO_EMAIL and DEMO_PASSWORD select an existing account for the demo project.
 // (World/Look, approved assets, a script broken into shots, references bound). Generation is left for you to click.
 const BASE = process.env.MILIMILI_URL ?? "http://localhost:8787";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
@@ -12,9 +12,9 @@ async function call(method: string, path: string, body?: unknown, raw?: Buffer) 
 }
 
 const email = process.env.DEMO_EMAIL ?? "demo@milimili.local";
-const { devCode } = await call("POST", "/auth/request-code", { email });
-if (!devCode) throw new Error("server is in production mode; log in through the UI instead");
-token = (await call("POST", "/auth/verify", { email, code: devCode, client: "api" })).token;
+const password = process.env.DEMO_PASSWORD;
+if (!password) throw new Error("请先为演示账号设置密码，并通过 DEMO_PASSWORD 提供；不再支持开发验证码登录。");
+token = (await call("POST", "/auth/password/login", { email, password, client: "api" })).token;
 
 const p = await call("POST", "/projects", { name: "Night Letter (demo)" });
 await call("PUT", `/projects/${p.id}/world`, { era: "present day", locationLogic: "rainy coastal city", architecture: "1960s concrete apartment block", weather: "heavy rain", time: "night", material: "concrete, worn wood, glass" });
@@ -43,4 +43,4 @@ for (const sh of shots) for (const id of sh.assetIds) {
     const role = x.asset.type === "Character" ? "IDENTITY" : x.asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
     await call("POST", `/shots/${sh.id}/bindings`, { referenceId: x.ref.id, role, lockLevel: role === "IDENTITY" ? "LOCK" : "CONTROL" });
 }
-console.log(`Demo ready: ${run.shotIds.length} shots. Log in as ${email} (dev code is printed by the server) and open project "${p.name}".`);
+console.log(`Demo ready: ${run.shotIds.length} shots. Log in as ${email} with your existing password and open project "${p.name}".`);

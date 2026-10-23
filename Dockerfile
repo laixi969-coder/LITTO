@@ -16,6 +16,7 @@ RUN bun run build:server \
     && chown -R bun:bun data
 
 ENV NODE_ENV=production
+ENV MILIMILI_HOST=0.0.0.0
 ENV TOONFLOW_DATA_DIR=/app/data
 
 USER bun

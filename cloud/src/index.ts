@@ -11,4 +11,5 @@ seedProviders();
 seedSkills();
 startWorker();
 setInterval(() => sweepUploads(), 3600_000).unref();
-serve({ fetch: app.fetch, port: config.port }, (i) => log.info(`MILI MILI server on http://localhost:${i.port}  (data: ${config.dataDir})`));
+const host = process.env.MILIMILI_HOST?.trim() || "127.0.0.1";
+serve({ fetch: app.fetch, port: config.port, hostname: host }, (i) => log.info(`MILI MILI server on http://localhost:${i.port}  (data: ${config.dataDir})`));
