@@ -32,7 +32,7 @@ export { renderOptionsSchema } from "./domain/nle-render.ts";
 export { configureWorkspaceVision } from "./domain/qc-vision.ts";
 export { inspectAd } from "./domain/adReview.ts";
 export { accountOf, adminAdjust, creditsFor, hold, charge, release } from "./credits.ts";
-export { trialProviderId, trialStatus, trialModelAccess, chargeTrialTokens } from "./trial.ts";
+export { trialProviderId, trialStatus, trialModelAccess, reserveTrialTokens, settleTrialTokens } from "./trial.ts";
 export const cloudRequestListener = getRequestListener(app.fetch);
 
 let started = false;

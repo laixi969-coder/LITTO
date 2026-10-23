@@ -1,7 +1,7 @@
-import { all, get, setting } from "./db.ts";
-import { available, chargeUsage } from "./credits.ts";
+import { all, get, run, setting, tx } from "./db.ts";
+import { available, charge, hold, release } from "./credits.ts";
 import { credentialFor, secretOf } from "./providers/registry.ts";
-import { HttpError } from "./util.ts";
+import { HttpError, now, ulid } from "./util.ts";
 
 /**
  * 平台试用（实验 1）：没有自带 Key 的新用户直接用平台文本模型写故事，按 token 从注册赠送的积分里扣。
@@ -11,6 +11,9 @@ export const trialProviderId = "littoPlatform";
 
 type TrialSetting = { enabled?: boolean; creditsPer1kTokens?: number };
 const trialSetting = () => setting<TrialSetting>("platformTrial", { enabled: false });
+const trialRunId = ulid();
+// 回执写入失败时本进程也要停止继续调用；重启后由 run_id 不一致识别这类遗留预占。
+const unconfirmedReservations = new Map<string, string>();
 
 function trialModelRows() {
     if (!trialSetting().enabled) return [];
@@ -21,6 +24,7 @@ function trialModelRows() {
 
 /** 当前工作区可用的试用模型和剩余积分；未开启或没有可用模型时 models 为空。 */
 export function trialStatus(workspaceId: string) {
+    recoverTrialCharges(workspaceId);
     const models = trialModelRows().map((m) => {
         const limits = JSON.parse(m.limits ?? "{}");
         return { id: m.external_model_id as string, label: m.name as string, contextWindow: limits.contextWindow as number | undefined, maxOutputTokens: limits.maxOutputTokens as number | undefined };
@@ -30,6 +34,7 @@ export function trialStatus(workspaceId: string) {
 
 /** 发起调用前取连接信息；积分用完直接拒绝，提示接入自己的模型。 */
 export function trialModelAccess(workspaceId: string, modelId: string) {
+    recoverTrialCharges(workspaceId);
     // 助手运行时把模型 id 原样当作上游模型名发送，所以对外用 external_model_id。
     // ACT: 多个平台供应商配置了同名模型时取优先级最高的一个。
     const m = trialModelRows().find((row) => row.external_model_id === modelId);
@@ -41,11 +46,75 @@ export function trialModelAccess(workspaceId: string, modelId: string) {
         contextWindow: limits.contextWindow as number | undefined, maxOutputTokens: limits.maxOutputTokens as number | undefined };
 }
 
-/** 回复结束后才知道用量，无法预扣；按实际 token 扣费，最后一次允许略微透支，下一次调用前会被拦下。 */
-export function chargeTrialTokens(workspaceId: string, modelId: string, tokens: number) {
-    if (tokens <= 0) return;
-    const credits = Math.ceil(tokens / 1000 * (trialSetting().creditsPer1kTokens ?? 1));
-    chargeUsage(workspaceId, credits, `platform trial ${modelId} ${tokens} tokens`);
+/** 用量回执先持久化，再与积分账本原子结算；失败时保留预占，下次调用前重做，不能重复扣费。 */
+function recoverTrialCharges(workspaceId: string) {
+  try {
+    tx(() => {
+      for (const reservation of all("SELECT * FROM trial_reservations WHERE workspace_id=? AND status='pending'", workspaceId)) {
+        const credits = Math.ceil(reservation.tokens / 1000 * reservation.rate);
+        if (credits > reservation.held) throw new HttpError(409, "平台用量超过预占上限，请联系管理员核对", "trial_usage_unconfirmed");
+        if (credits) charge(workspaceId, reservation.id, reservation.held, credits, null);
+        else release(workspaceId, reservation.id, reservation.held, "platform trial request not sent or rejected");
+        run("UPDATE trial_reservations SET status='settled', updated_at=? WHERE id=?", now(), reservation.id);
+      }
+    });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw Object.assign(new HttpError(503, "平台用量已记录，但积分结算暂未完成；预占额度已保留，请稍后重试", "trial_settlement_pending"), { cause: error });
+  }
+}
+
+/** 每个实际模型请求独立预占；文本按输入上界加输出上限，媒体输入按整个上下文窗口预占。 */
+export function reserveTrialTokens(workspaceId: string, modelId: string, inputTokens: number, outputTokens: number, contextWindow: number, hasMedia = false) {
+  for (const value of [inputTokens, outputTokens, contextWindow]) {
+    if (!Number.isSafeInteger(value) || value <= 0) throw new HttpError(400, "平台模型的 token 预算无效", "trial_invalid_budget");
+  }
+  return tx(() => {
+    trialModelAccess(workspaceId, modelId);
+    for (const [id, owner] of unconfirmedReservations) {
+      if (owner === workspaceId && get("SELECT status FROM trial_reservations WHERE id=?", id)?.status === "settled") unconfirmedReservations.delete(id);
+    }
+    if ([...unconfirmedReservations.values()].includes(workspaceId) || get("SELECT id FROM trial_reservations WHERE workspace_id=? AND (status='unknown' OR (status='reserved' AND run_id!=?)) LIMIT 1", workspaceId, trialRunId)) {
+      throw new HttpError(409, "平台模型有尚未确认的用量，预占额度已保留，请联系管理员核对后继续", "trial_usage_unconfirmed");
+    }
+    const rate = trialSetting().creditsPer1kTokens ?? 1;
+    if (!Number.isFinite(rate) || rate <= 0) throw new HttpError(400, "平台积分费率无效，请联系管理员", "trial_invalid_rate");
+    const credits = Math.floor(available(workspaceId));
+    const affordableTokens = Math.floor(credits / rate * 1000);
+    const maxOutputTokens = Math.min(outputTokens, contextWindow - (hasMedia ? 1 : inputTokens), hasMedia ? outputTokens : affordableTokens - inputTokens);
+    const maxTokens = hasMedia ? contextWindow : inputTokens + maxOutputTokens;
+    const held = Math.ceil(maxTokens / 1000 * rate);
+    if (maxOutputTokens < 1 || !Number.isSafeInteger(held) || held > credits) {
+      throw new HttpError(402, "可用积分不足以覆盖本次输入和输出上限，请缩短上下文、等待其他调用结束或接入自己的模型", "trial_exhausted");
+    }
+    const id = ulid();
+    hold(workspaceId, id, held);
+    run("INSERT INTO trial_reservations VALUES(?,?,?,?,?,?,?,'reserved',NULL,?,?)", id, workspaceId, modelId, trialRunId, maxTokens, rate, held, now(), now());
+    return { id, maxOutputTokens, maxTokens, held };
+  });
+}
+
+/** null 表示断流、取消或缺失用量：不能证明未计费，保留预占等待可信回执，不自动退款或重发。 */
+export function settleTrialTokens(workspaceId: string, id: string, tokens: number | null) {
+  let outcome: string;
+  try {
+    outcome = tx(() => {
+      const reservation = get("SELECT * FROM trial_reservations WHERE id=? AND workspace_id=?", id, workspaceId);
+      if (!reservation) throw new HttpError(404, "平台用量预占记录不存在", "trial_reservation_missing");
+      if (reservation.status === "settled" || reservation.status === "pending") return reservation.status;
+      const valid = tokens !== null && Number.isSafeInteger(tokens) && tokens >= 0 && tokens <= reservation.max_tokens;
+      const status = valid ? "pending" : "unknown";
+      run("UPDATE trial_reservations SET tokens=?, status=?, updated_at=? WHERE id=?", Number.isSafeInteger(tokens) ? tokens : null, status, now(), id);
+      return status;
+    });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    unconfirmedReservations.set(id, workspaceId);
+    throw Object.assign(new HttpError(503, "平台用量回执暂未保存，预占额度已保留，请联系管理员核对后继续", "trial_usage_unconfirmed"), { cause: error });
+  }
+  unconfirmedReservations.delete(id);
+  if (outcome === "unknown") throw new HttpError(409, "本次平台用量尚未确认，预占额度已保留，请联系管理员核对；未自动重发请求", "trial_usage_unconfirmed");
+  if (outcome === "pending") recoverTrialCharges(workspaceId);
 }
 
 /**

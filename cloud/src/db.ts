@@ -123,6 +123,11 @@ CREATE INDEX idx_library_type ON library_assets(workspace_id, type);
             ? ""
             : "ALTER TABLE library_assets ADD COLUMN deleted_at TEXT;",
     },
+    {
+        id: "0011_trialReservations",
+        sql: `CREATE TABLE trial_reservations(id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, model_id TEXT NOT NULL, run_id TEXT NOT NULL, max_tokens INTEGER NOT NULL, rate REAL NOT NULL, held REAL NOT NULL, status TEXT NOT NULL, tokens INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX idx_trial_reservations_workspace ON trial_reservations(workspace_id,status);`,
+    },
 ];
 
 export const db = await openSqlite(config.dbFile);

@@ -3,6 +3,8 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { assertConfiguredUpstream, getConfiguredModel, prepareModelPayload } from "@/utils/ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import modelFetch from "@/utils/ai/modelFetch";
+import { streamTrial } from "@/utils/ai/trialStream";
+import { cloud } from "@/lib/cloud";
 
 export const agentContextWindow = 262144;
 
@@ -14,7 +16,11 @@ export async function createAgentModel(providerId: string, modelId: string, thin
   runtime.registerProvider(providerId, {
     api: provider.protocol,
     baseUrl,
-    streamSimple: provider.protocol === "openai-completions" && ["https://api.deepseek.com", "https://open.bigmodel.cn", "https://api.z.ai"].includes(new URL(baseUrl).origin)
+    streamSimple: providerId === cloud()?.trialProviderId
+      ? (model, context, options) => streamTrial({ ...model, contextWindow: configured.model.contextWindow }, context, { ...options,
+        onPayload: async (payload, requestModel) => prepareModelPayload(configured, await options?.onPayload?.(payload, requestModel) ?? payload, thinkingLevel),
+      })
+      : provider.protocol === "openai-completions" && ["https://api.deepseek.com", "https://open.bigmodel.cn", "https://api.z.ai"].includes(new URL(baseUrl).origin)
       ? (model, context, options) => openAICompletionsApi().streamSimple({ ...model, api: "openai-completions" }, context, { ...options, fetch: modelFetch,
         onPayload: async (payload, requestModel) => prepareModelPayload(configured, await options?.onPayload?.(payload, requestModel) ?? payload, thinkingLevel),
       })

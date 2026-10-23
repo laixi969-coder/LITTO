@@ -9,6 +9,7 @@ import { assertPublicHttpUrl, assertPublicUrlLiteral } from "@/utils/ssrf";
 import { readReference } from "@/utils/media/generation";
 import modelContextLimits from "@/utils/ai/modelContextLimits";
 import modelFetch from "@/utils/ai/modelFetch";
+import { streamTrial } from "@/utils/ai/trialStream";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 import { modelAccess } from "@/utils/modelAvailability";
@@ -213,8 +214,7 @@ export function streamAi(
   const { provider, model: configuredModel, baseUrl } = configured;
   assertModelSelection("text", configured.providerId, configuredModel.id);
   const model: Model<typeof provider.protocol> = {
-    // 回复里的 provider 恒为 "toonflow"；记录用量和平台试用扣费须用 configured.providerId。
-    id: configuredModel.id, name: configuredModel.label, provider: "toonflow", api: provider.protocol, baseUrl,
+    id: configuredModel.id, name: configuredModel.label, provider: configured.providerId === cloud()?.trialProviderId ? configured.providerId : "toonflow", api: provider.protocol, baseUrl,
     reasoning: false, input: ["text", "image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: configuredModel.contextWindow,
@@ -223,7 +223,8 @@ export function streamAi(
   // ACT: 不按模型名预判附件能力；按供应商协议传递，是否支持由上游接口决定。
   const access = configured.providerId === cloud()?.trialProviderId ? undefined : modelAccess("text", configured.providerId, configuredModel.id);
   access?.assert();
-  const stream = aiApis[provider.protocol].streamSimple(model, context, {
+  const streamFunction = configured.providerId === cloud()?.trialProviderId ? streamTrial : aiApis[provider.protocol].streamSimple;
+  const stream = streamFunction(model, context, {
     fetch: modelFetch,
     apiKey: provider.apiKey,
     signal,

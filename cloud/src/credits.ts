@@ -43,8 +43,6 @@ export function release(ws: string, jobId: string, held: number, why: string) {
     if (held <= 0) return;
     tx(() => post(ws, "REFUND", 0, -held, { jobId, note: why }));
 }
-/** 按实际用量直接扣费：平台试用的文本 token 在回复结束后才知道，无法预扣。 */
-export const chargeUsage = (ws: string, amount: number, note: string) => post(ws, "GENERATION_CHARGE", -amount, 0, { note });
 export function adminAdjust(ws: string, amount: number, note: string) {
   if (!Number.isFinite(amount) || amount === 0) throw bad("积分调整须为非零有限数值");
   return tx(() => {
