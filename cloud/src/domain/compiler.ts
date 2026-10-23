@@ -6,7 +6,7 @@ import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
 import { ensureReferenceCrop } from "./referenceCrop.ts";
-import { lookSchema, validateMusicVideoTiming } from "./schema.ts";
+import { lookSchema, validateActionTimeline, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
 import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
@@ -113,6 +113,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     validateStateDelta(s, shot.projectId, shot.intendedStateDelta);
     validateVisibleAssets(shot as ShotInput);
     validateMusicVideoTiming(shot as ShotInput);
+    validateActionTimeline(shot as ShotInput);
     const techniqueProblems = techniqueIssues(shot);
     if (techniqueProblems.length) throw bad(techniqueProblems.join("；"));
     const proj = shot.projectId;
@@ -323,6 +324,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         repair: extra.repair?.note ?? "",
     };
     if (kind === "video") {
+        if (cam.design?.timeline) {
+            sections.timeline = cam.design.timeline.map((item: { start: number; end: number; description: string; transition?: string }) => `【${item.start}-${item.end}s · ${item.transition === "cut" ? "切镜" : "连续动作"}】${item.description}`).join("\n");
+        }
         // ACT: 时间线是执行节拍的唯一来源；验收标准、备用方案和跨镜剪点留在规格中，不发给生成模型执行。
         sections.shotDesign = cam.design ? J([
             cam.design.start && `Starting state: ${cam.design.start}`,
@@ -332,8 +336,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             cam.design.invariants?.length && `Invariants: ${cam.design.invariants.join("; ")}`,
         ]) : "";
         sections.motionTiming = J([
-            musicVideo && "The execution timeline defines the action order, timing and explicitly timed camera changes. Apply untimed path and camera descriptions only where compatible; never introduce an extra action, cut or pause from background context.",
-            !musicVideo && cam.design?.timing && `Action timing: ${cam.design.timing}`,
+            (musicVideo || cam.design?.timeline) && "The execution timeline defines the action order, timing and explicitly timed camera changes. Apply untimed path and camera descriptions only where compatible; never introduce an extra action, cut or pause from background context.",
+            !musicVideo && !cam.design?.timeline && cam.design?.timing && `Action timing: ${cam.design.timing}`,
             videoMotionTiming,
         ]);
         sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
@@ -341,7 +345,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }
     let negativePrompt = J(shotAvoid(freedom));
     if (kind === "video" && musicVideo) {
-        const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}】${item.description}`).join("\n");
+        const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}${item.transition ? ` · ${item.transition === "cut" ? "切镜" : "连续动作"}` : ""}】${item.description}`).join("\n");
         const audio = J([
             musicVideo.audioMode === "sourceTrack" && `原曲从 ${musicVideo.sourceStart}s 起对应本段 0s；最终剪辑沿用同一原曲，不在切镜处重启或重作歌曲`,
             musicVideo.audioMode === "generated" && "按以下声音设计生成本段声音；未要求音乐时不要自行配乐",
@@ -394,7 +398,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             timeline: sections.timeline,
             startingFrame: extra.startFrameMediaId ? extra.startFrameAsReference
                 ? "参考图用于人物外貌与构图；动作起点按本镜规格执行。"
-                : "从首帧正在发生的动作继续，保持画内人物、兵器和空间关系。" : "",
+                : "从首帧的实际姿态接续动作，保持人物身份、持物与空间关系；参考姿态不是全片静止要求。" : "",
             subjects: J([sections.subject, sections.assetDetails]),
             staging: J([sections.blocking, sections.shotDesign, sections.view]),
             continuityContext: sections.continuityContext,
@@ -408,6 +412,11 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             forbiddenChanges: sections.forbiddenChanges,
             variations: J([...(shot.freedomMap?.CONTROL ?? []), sections.allow, sections.random]),
         };
+    }
+    if (kind === "video" && cam.design?.mode) {
+        sections["Objective" in sections ? "Shot execution" : "shotExecution"] = cam.design.mode === "singleTake"
+            ? "One uninterrupted take. Timeline boundaries are action beats, not edits. Keep movement, prop contact and camera travel continuous across beats; change framing through motivated blocking and camera movement without cuts, dissolves, resets or repeated starts. Preserve planned stillness and speech/music timing."
+            : "Execute the planned action timeline. Cut only at explicitly planned transitions; match pose, held objects, eyeline and screen direction across each cut. Keep core action at its planned speed; extra generation duration is editing handle, not permission to slow the action.";
     }
     const interaction = physicalInteractionPlan(kind === "image" ? { ...shot, musicVideo: undefined } : shot);
     if (interaction.required) {

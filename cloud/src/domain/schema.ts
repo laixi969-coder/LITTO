@@ -71,8 +71,23 @@ export const bindingInput = z.object({
     lockLevel: z.enum(LOCK_LEVELS).default("CONTROL"), crop: referenceCropSchema.nullable().optional(), notes: z.string().optional(),
 });
 
+const actionTimelineSchema = z.array(z.object({
+    start: z.number().finite().nonnegative(), end: z.number().finite().positive(),
+    description: z.string().trim().min(1).max(4000),
+    transition: z.enum(["continuous", "cut"]).optional(),
+}).strict()).min(1).max(120).superRefine((items, context) => {
+    items.forEach((item, index) => {
+        if (item.end <= item.start || Math.abs(item.start - (index ? items[index - 1].end : 0)) > 0.000001) {
+            context.addIssue({ code: "custom", path: [index], message: "动作节拍须从0连续排列，无空隙、重叠或倒序" });
+        }
+        if (!index && item.transition === "cut") context.addIssue({ code: "custom", path: [index, "transition"], message: "首个节拍没有镜内前镜，不能标记切镜" });
+    });
+});
+
 export const cameraSchema = z.object({
     design: z.object({
+        mode: z.enum(["singleTake", "multiShot"]).optional().describe("singleTake为本生成段内连续镜头，multiShot允许明确标记的镜内切镜；不代表多段拼接是真正一镜到底"),
+        timeline: actionTimelineSchema.optional().describe("剧情和广告的唯一执行节拍，description写身体任务、路径、接触结果与构图变化；MV沿用musicVideo.timeline，不同时填写两份"),
         technique: z.string().max(200), purpose: z.string().max(2000),
         start: z.string().max(2000), end: z.string().max(2000),
         subjectPath: z.string().max(2000), cameraPath: z.string().max(2000),
@@ -105,11 +120,7 @@ export const musicVideoSchema = z.object({
     audioDirection: z.string().trim().min(1).max(8000),
     sourceStart: z.number().finite().nonnegative().optional(),
     lipSyncRequired: z.boolean().optional().describe("画内人物唱歌时为true，旁白或画外歌曲为false；必须对采用声音检查逐字口型"),
-    timeline: z.array(z.object({
-        start: z.number().finite().nonnegative(),
-        end: z.number().finite().positive(),
-        description: z.string().trim().min(1).max(4000),
-    }).strict()).min(1).max(120),
+    timeline: actionTimelineSchema,
 }).strict().superRefine((value, context) => {
     if (value.audioMode === "sourceTrack" && value.sourceStart === undefined) {
         context.addIssue({ code: "custom", path: ["sourceStart"], message: "使用原曲须记录本段对应的歌曲起点秒数" });
@@ -204,6 +215,19 @@ export const shotInput = z.object({
     }).default({}),
 });
 export type ShotInput = z.infer<typeof shotInput>;
+
+export function validateActionTimeline(shot: Pick<ShotInput, "camera" | "musicVideo" | "duration" | "generationDuration">) {
+    const design = shot.camera?.design;
+    if (design?.timeline && shot.musicVideo) throw bad("动作时间线只能有一份；MV请使用musicVideo.timeline并移除camera.design.timeline，由助手合并节拍，不需用户重复确认");
+    const timeline = design?.timeline ?? shot.musicVideo?.timeline;
+    if (design?.mode && !timeline) throw bad("已指定连续或切镜模式，请先补齐动作时间线；不能以一行慢推或转头替代完整设计");
+    if (!timeline) return;
+    const parsed = actionTimelineSchema.safeParse(timeline);
+    if (!parsed.success) throw bad("动作时间线无效", parsed.error.issues);
+    const duration = shot.generationDuration ?? shot.duration;
+    if (!Number.isFinite(duration) || duration < shot.duration || Math.abs(parsed.data.at(-1)!.end - duration) > 0.000001) throw bad("动作时间线须覆盖实际生成时长，生成时长不能短于计划使用时长；多余部分作为剪辑余量，不拉慢核心动作");
+    if (design?.mode === "singleTake" && parsed.data.some(item => item.transition === "cut")) throw bad("一镜到底不能包含镜内切镜；请改用连续走位和构图变化，或明确改为多镜方案");
+}
 
 export function validateMusicVideoTiming(shot: Pick<ShotInput, "musicVideo" | "duration" | "generationDuration">) {
     if (!shot.musicVideo) return;

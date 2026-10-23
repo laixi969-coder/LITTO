@@ -1,6 +1,6 @@
 import { all, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
-import { SCHEMA_VERSION, shotInput, cameraSchema, lightingSchema, validateMusicVideoTiming, type ShotInput } from "./schema.ts";
+import { SCHEMA_VERSION, shotInput, cameraSchema, lightingSchema, validateActionTimeline, validateMusicVideoTiming, type ShotInput } from "./schema.ts";
 import { recomputeStates, validateStateDelta } from "./state.ts";
 import type { ShotDraft } from "./skills.ts";
 import type { z } from "zod";
@@ -20,6 +20,7 @@ const dataOf = (i: ShotInput) => {
 };
 
 function validateTechniques(input: Record<string, any>) {
+    validateActionTimeline(input as ShotInput);
     const issues = techniqueIssues(input);
     if (issues.length) throw bad(issues.join("；"));
 }
@@ -51,7 +52,8 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
     validateTechniques({ ...shot, ...patch } as ShotInput);
     if (patch.intendedStateDelta !== undefined) validateStateDelta(s, shot.projectId, patch.intendedStateDelta);
     const actionChanged = patch.action !== undefined && patch.action !== shot.action;
-    const timelineChanged = patch.musicVideo !== undefined && JSON.stringify(patch.musicVideo?.timeline) !== JSON.stringify(shot.musicVideo?.timeline);
+    const timelineChanged = patch.musicVideo !== undefined && JSON.stringify(patch.musicVideo?.timeline) !== JSON.stringify(shot.musicVideo?.timeline)
+        || patch.camera !== undefined && JSON.stringify(patch.camera.design?.timeline) !== JSON.stringify(shot.camera?.design?.timeline);
     const speechWindows = (brief: ShotInput["creativeBrief"]) => [brief?.dialogue.mode, brief?.dialogue.lines.map(line => [line.speakerId, line.text, line.start, line.end, line.lipSync])];
     const speechChanged = !!shot.creativeBrief?.dialogue.lines.length && (patch.creativeBrief !== undefined && JSON.stringify(speechWindows(patch.creativeBrief)) !== JSON.stringify(speechWindows(shot.creativeBrief))
         || patch.duration !== undefined && patch.duration !== shot.duration);
@@ -59,6 +61,7 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
         // ACT: 不用关键词猜测动作矛盾；要求调用方同次复核依赖字段，语义一致性仍由导演检查最终编译文本。
         const missing = [
             shot.camera?.design && patch.camera === undefined && "camera（起止状态、主体路径、运镜与节拍）",
+            timelineChanged && patch.action === undefined && "action（与新时间线一致的行动概述）",
             speechChanged && patch.action === undefined && "action（对白窗口变化后的实时行动与完整因果）",
             speechChanged && shot.generationDuration !== undefined && patch.generationDuration === undefined && "generationDuration（不能沿用旧生成时长）",
             shot.musicVideo && patch.musicVideo === undefined && "musicVideo（逐秒动作与声音）",

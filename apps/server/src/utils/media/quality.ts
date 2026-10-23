@@ -19,6 +19,39 @@ export async function readMediaQuality(directory: string) {
   return { path, content, preferences: content === null ? [] : preferencesSchema.parse(JSON.parse(content)) };
 }
 
+/** 只读预检：先暴露整批缺项和单段上限，再组织一次具体确认；不入队、不改模型。 */
+export async function planMediaGeneration(directory: string, input: unknown) {
+  const { requests } = z.strictObject({ requests: z.array(z.strictObject({
+    kind: z.enum(["image", "video"]), count: z.number().int().min(1).max(100),
+    quality: z.string().min(1).max(64).optional(), duration: z.number().finite().positive().max(3600).optional(),
+    mode: z.union([z.string().min(1).max(100), z.array(z.string().regex(/^(image|video|audio)Reference:\d+$/)).min(1).max(3)]).optional(),
+    referenceCount: z.number().int().min(0).max(100).optional(), singleTake: z.boolean().optional(),
+  })).min(1).max(60) }).parse(input);
+  const [models, saved] = await Promise.all([listMediaModels(), readMediaQuality(directory)]);
+  const plans = requests.map(request => {
+    const model = models.find(item => item.type === request.kind && !item.lipSync);
+    if (!model) return { ...request, ready: false, issues: ["当前没有可用的已选模型，先合并说明所需模型与规格，不能自行换模型"] };
+    const options = qualityOptions(model);
+    const quality = request.quality ?? saved.preferences.find(item => item.kind === request.kind && item.providerId === model.providerId && item.modelId === model.modelId)?.value ?? (options.length === 1 ? options[0] : undefined);
+    const durations = [...new Set(model.durationResolutionMap?.filter(rule => !quality || rule.resolution.includes(quality)).flatMap(rule => rule.duration) ?? [])].sort((a, b) => a - b);
+    const modes = Array.isArray(model.mode) ? model.mode : [];
+    const mode = request.mode ?? (modes.length === 1 && typeof modes[0] === "string" ? modes[0] : undefined);
+    const requiredReferenceCount = mode === "startEndRequired" ? 2 : mode === "singleImage" || mode === "multiReference" ? 1 : 0;
+    const issues: string[] = [];
+    if (request.mode && !modes.some(item => JSON.stringify(item) === JSON.stringify(request.mode))) issues.push("所需输入模式未受当前模型明确支持，先核对参考条件，不能到生成后再要求改模型");
+    if (requiredReferenceCount && (request.referenceCount ?? 0) < requiredReferenceCount) issues.push(`当前模式至少需要${requiredReferenceCount}张实际参考图，先核对已有素材或把缺图制作纳入同一批方案；不能只确认额度后再发现输入不足`);
+    if (!quality && options.length > 1) issues.push("精度尚未确定；用户已指定时直接保存，否则纳入本批方案一次询问");
+    if (quality && options.length && !options.includes(quality)) issues.push("所选精度不受当前模型支持，不会自动降级");
+    if (request.kind === "video" && (!request.duration || !durations.includes(request.duration))) issues.push(request.singleTake
+      ? "所需一镜到底时长未受当前模型明确支持；保留长镜头方案，不自动切成短段或把拼接冒充一镜到底"
+      : "生成段时长尚未确定或不受当前规格支持；按动作单元规划素材与剪辑，不按上限机械均分");
+    return { ...request, mode, requiredReferenceCount, providerId: model.providerId, modelId: model.modelId, quality, qualityOptions: options, supportedDurations: durations,
+      maxSingleGenerationDuration: durations.at(-1) ?? null, modes: model.mode, audio: model.audio, ready: issues.length === 0, issues };
+  });
+  return { ready: plans.every(plan => plan.ready), plans, generated: false,
+    note: "本地只读能力预检，不代表参考齐备、已获生成授权或画质通过。先核对实际模式和参考输入，再compile；已授权范围无需重问，缺项集中呈现，真正新增消耗才确认。" };
+}
+
 function checkPermission() {
   const tenant = currentTenant();
   if (!tenant) return;

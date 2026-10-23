@@ -28,7 +28,8 @@ export async function loadProductionSkillContext(cwd: string, tools: Pick<ToolDe
   const kind = music ? "musicFilm" : advertising ? "adfilm" : story ? "story"
     : savedKind;
   const primary = kind === "musicFilm" ? "musicfilm" : ["adfilm", "brandFilm"].includes(kind) ? "adfilm" : "story";
-  const names = ["workflow", primary, "cinema", "videoPromptDirector"];
+  const primaryNames = [story && "story", advertising && "adfilm", music && "musicfilm"].filter((name): name is string => !!name);
+  const names = ["workflow", ...(primaryNames.length ? primaryNames : [primary]), "cinema", "continuity", "videoPromptDirector"];
   if (/旅拍|婚礼|旅行写真/.test(task)) names.push("travelWeddingDirector");
   if (/小清新|自然光|清透色彩/.test(task)) names.push("lightFreshDirector");
   if (/中式园林|月洞门|游廊/.test(task)) names.push("chineseGardenDirector");
@@ -43,7 +44,7 @@ export async function loadProductionSkillContext(cwd: string, tools: Pick<ToolDe
       warnings.push(`${name} 已关闭自动调用，未加载`);
       continue;
     }
-    for (const path of [undefined, ...(name === "videoPromptDirector" ? ["references/cleanPortrait.md"] : [])]) {
+    for (const path of [undefined, ...(name === "videoPromptDirector" ? ["references/cleanPortrait.md"] : name === "cinema" ? ["references/movementDirection.md"] : [])]) {
       try {
         const document = await context.read({ name, path });
         documents.push(`### ${document.name} / ${document.scope} / ${document.path}\n${document.content}`);

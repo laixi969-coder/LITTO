@@ -57,7 +57,8 @@ export async function requestProductionDecision(directory: string, toolCallId: s
   const projectId = workspaceProject(directory)!;
   const scope = api.scoped(tenant.workspaceId);
   const prepared = api.prepareProductionDecision(scope, projectId, input, input.reconsider);
-  if (prepared.completed) return { title: prepared.request.title, applied: true, selectedId: prepared.selectedId, answer: "此决定已保存且仍有效，无需重复确认" };
+  if (prepared.completed) return { title: prepared.request.title, applied: true, selectedId: prepared.selectedId, reviewRequired: prepared.reviewRequired,
+    answer: prepared.reviewRequired ? "选择已保存，无需重复确认；技术检查须由助手复核，原生成与导出门禁仍生效" : "此决定已保存且仍有效，无需重复确认" };
   if (prepared.action.operation === "updateShot" && !input.reconsider) {
     try {
       const { shotId, patch } = prepared.action.data;

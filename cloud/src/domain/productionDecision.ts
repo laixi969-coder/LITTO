@@ -63,6 +63,7 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
   let completed = false;
   let selectedId: string | undefined;
   let feedbackFingerprint: string | undefined;
+  let reviewRequired = false;
   const record = (table: string, targetId: string, projectScoped = true) => {
     const item = s.get(table, targetId);
     if (!item || projectScoped && item.projectId !== projectId) throw notFound("当前项目记录");
@@ -151,11 +152,24 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       const items = (action.operation === "approveTake" ? action.data.takeIds : [action.data.targetId]).map(itemId => record(type === "take" ? "takes" : "keyframes", itemId));
       if (items.some(item => item.shotId !== items[0]!.shotId)) throw bad("一次比较同一镜头的候选");
       const contexts = items.map(item => outputContext(type, item));
+      for (const item of items) {
+        try { requireReviewed(s, type, item); }
+        catch (error) {
+          // 技术缺项不阻止用户表达偏好；生成和导出仍调用原有严格门禁。
+          if ((error as { status?: number }).status !== 409) throw error;
+          reviewRequired = true;
+        }
+      }
       const shot = contexts[0]!.shot;
       // ACT: 满意度绑定素材和规格；技术检查记录更新不重问，等待期间仍校验完整状态。
-      if (action.operation === "reviewOutput") feedbackFingerprint = hash(items.map(item => ({ id: item.id, mediaId: item.mediaId, fingerprint: shotFingerprint(s, item.shotId, type) })));
+      const selectionContext = action.operation === "approveTake"
+        ? getEdit(s, shot.sequenceId, true).clips.filter(clip => clip.shotId === shot.id).map(clip => ({ id: clip.id, mediaId: clip.mediaId })) : [];
+      const feedbackItems = items.map(item => ({ id: item.id, mediaId: item.mediaId, fingerprint: shotFingerprint(s, item.shotId, type) }));
+      feedbackFingerprint = hash(action.operation === "approveTake" ? {
+        items: feedbackItems.map(item => ({ ...item, mediaHash: s.get("media", item.mediaId)?.hash })), selectionContext,
+      } : feedbackItems);
       // ACT: 选片只绑定本镜在剪辑中的素材选择；其他镜头或本镜裁切不改变已确认的候选偏好。
-      if (action.operation === "approveTake") records.push(getEdit(s, shot.sequenceId, true).clips.filter(clip => clip.shotId === shot.id).map(clip => ({ id: clip.id, mediaId: clip.mediaId })));
+      if (action.operation === "approveTake") records.push(selectionContext);
       request.media!.forEach((item, index) => { item.title = `候选 ${index + 1} · ${shot.title}`; });
       request.title = "这个画面怎么样：" + shot.title;
       request.question = "看看下方画面，按你的感受选择就好。不需要懂专业术语；哪里不喜欢可以直接说，例如‘人物不像了’‘动作不够有力’。具体检查和修复由助手处理。";
@@ -288,12 +302,13 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
   const receipt = s.list("approval_events", { projectId, entityType: "production_decision", entityId: key }, "created_at DESC, rowid DESC")[0];
   const receiptFingerprint = feedbackFingerprint ?? fingerprint;
   if (receipt?.reason === fingerprint || receipt?.reason === receiptFingerprint) completed = true;
-  return { action, request, fingerprint, receiptFingerprint, key, completed: completed && !reconsider, selectedId };
+  return { action, request, fingerprint, receiptFingerprint, key, completed: completed && !reconsider, selectedId, reviewRequired };
 }
 
 export async function applyProductionDecision(s: Scope, projectId: string, prepared: ReturnType<typeof prepareProductionDecision>, response: QuestionAnswer, actor: string) {
   const current = prepareProductionDecision(s, projectId, prepared.action, true);
-  if (current.fingerprint !== prepared.fingerprint) throw conflict("展示的素材、规格或检查记录已改变，请重新核对；本次未覆盖", "stale");
+  const sameTakeChoice = prepared.action.operation === "approveTake" && current.receiptFingerprint === prepared.receiptFingerprint;
+  if (current.fingerprint !== prepared.fingerprint && !sameTakeChoice) throw conflict("展示的素材、规格或检查记录已改变，请重新核对；本次未覆盖", "stale");
   const { action, request } = prepared;
   const values = response.values ?? {};
   const feedbackDecision = request.fields?.find(field => field.field === "decision")?.options?.includes("满意，继续");

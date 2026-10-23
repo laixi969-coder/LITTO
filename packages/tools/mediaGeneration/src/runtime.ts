@@ -113,14 +113,16 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   const interaction = physicalInteractionPlan(type === "keyframe" ? { ...shot, musicVideo: undefined } : shot);
   const techniques = techniquePlan(shot, type === "keyframe" ? "image" : "video");
   const techniqueMotion = techniques.some(item => item.stages.includes("video") && !item.stages.includes("image"));
-  const motion = interaction.required || techniqueMotion || shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|救援|救起|承托|转移伤者|hand|grasp|fight|rescue/i.test([shot.action, shot.performance?.gesture].join(" "));
+  const motionBeats = type === "take" ? shot.camera?.design?.timeline ?? shot.musicVideo?.timeline ?? [] : [];
+  const motion = motionBeats.length > 0 || interaction.required || techniqueMotion || shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|救援|救起|承托|转移伤者|hand|grasp|fight|rescue/i.test([shot.action, shot.performance?.gesture].join(" "));
   const visual = motion || techniques.length > 0 || !shot.camera?.shotSize || /^(?:ECU|CU|MCU)$/i.test(shot.camera?.shotSize ?? "") || /近景|特写/.test(shot.camera?.shotSize ?? "")
     || !!shot.inspectionRegion;
   // ACT: 分级只安排检查投入，不据此宣称质量通过；未知景别进入重点档。明确的演唱无逐句时间时覆盖整段。
   const tier = speech ? "speech" : visual || !shot.camera?.shotSize ? "visual" : "basic";
   const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
   return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take" && (motion || techniques.length > 0), techniques,
-    checks: tier === "basic" ? ["imaging", "world", "cinematic"] : type === "keyframe" || !motion ? ["surface", "imaging", "world", "cinematic"] : ["surface", "imaging", "world", "motion", "cinematic"], speechRanges, interaction };
+    checks: tier === "basic" ? ["imaging", "world", "cinematic"] : type === "keyframe" || !motion ? ["surface", "imaging", "world", "cinematic"] : ["surface", "imaging", "world", "motion", "cinematic"], speechRanges, interaction,
+    motionPlan: type === "take" ? { mode: shot.camera?.design?.mode, beats: motionBeats, note: "逐段对照实际身体任务、接触结果、位移与接点；singleTake的节拍边界不能跳切或复位。此处是计划，不是观察证据，须完整看听后记录偏差。" } : undefined };
 }
 
 export const reviewedSegmentsSchema = z.array(z.strictObject({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).refine(range => range.end > range.start)).max(80).default([]);
