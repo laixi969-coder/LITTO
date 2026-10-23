@@ -1,7 +1,8 @@
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "@toonflow/file";
+import { uploadMaxBytes } from "./upload.ts";
 import { join, dirname } from "node:path";
 import { config } from "./config.ts";
-import { all, get, run, scoped } from "./db.ts";
+import { all, get, run, scoped, tx } from "./db.ts";
 import { sign, verifySig } from "./crypto.ts";
 import { bad, conflict, now, sha256, ulid } from "./util.ts";
 import { makeDerivatives, probeBuffer } from "./media-tools.ts";
@@ -20,6 +21,7 @@ export interface StorageAdapter {
 class LocalStorage implements StorageAdapter {
     private path = (k: string) => join(config.mediaDir, k);
     async put(key: string, data: Buffer) {
+        if (get("SELECT deleted_at FROM workspaces WHERE id=?", key.split("/")[0])?.deleted_at) throw conflict("工作区已注销，停止写入");
         mkdirSync(dirname(this.path(key)), { recursive: true });
         writeFileSync(this.path(key), data);
     }
@@ -27,6 +29,7 @@ class LocalStorage implements StorageAdapter {
         return readFileSync(this.path(key));
     }
     putSync(key: string, data: Buffer) {
+        if (get("SELECT deleted_at FROM workspaces WHERE id=?", key.split("/")[0])?.deleted_at) throw conflict("工作区已注销，停止写入");
         mkdirSync(dirname(this.path(key)), { recursive: true });
         writeFileSync(this.path(key), data);
     }
@@ -47,7 +50,6 @@ export function checkSignedUrl(mediaId: string, exp: string, sig: string) {
     return Number(exp) > Date.now() / 1000 && verifySig(`${mediaId}.${exp}`, sig);
 }
 
-const MAX_BYTES = 200 * 1024 * 1024;
 type Sniffed = { mime: string; width?: number; height?: number };
 
 /** Validate by magic bytes, never by client-declared type. */
@@ -79,7 +81,7 @@ export function usage(workspaceId: string) {
 }
 
 export async function saveMedia(workspaceId: string, projectId: string | null, data: Buffer, opts: { source: string; mime?: string; duration?: number; allowUnsniffed?: boolean }) {
-    if (data.length > MAX_BYTES) throw bad("file too large");
+    if (data.length > uploadMaxBytes) throw bad("file too large");
     const s = sniff(data);
     if (!s && !opts.allowUnsniffed) throw bad("unsupported or unrecognised file type");
     const mime = s?.mime ?? opts.mime ?? "application/octet-stream";
@@ -137,10 +139,43 @@ export async function cleanupMedia(olderThanMs = 0) {
 
 /** Workspace deletion: hard-remove every tenant row and file. */
 export async function purgeWorkspace(workspaceId: string) {
-    for (const m of all("SELECT storage_key FROM media WHERE workspace_id=?", workspaceId)) await storage.delete(m.storage_key).catch(() => {});
-    const tables = all("SELECT name FROM sqlite_master WHERE type='table'").map((r) => r.name).filter((n) => all(`PRAGMA table_info(${n})`).some((c) => c.name === "workspace_id") && !["credit_ledger", "audit_logs", "workspaces"].includes(n));
-    for (const t of tables) run(`DELETE FROM ${t} WHERE workspace_id=?`, workspaceId);
-    run("UPDATE workspaces SET name='[purged]' WHERE id=?", workspaceId);
-    if (existsSync(join(config.mediaDir, workspaceId))) rmSync(join(config.mediaDir, workspaceId), { recursive: true, force: true });
-    void now;
+    if (!/^[0-9A-Z]{26}$/.test(workspaceId) || !get("SELECT id FROM workspaces WHERE id=? AND deleted_at IS NOT NULL", workspaceId)) throw bad("只能清理已注销的工作区");
+    const { settleWorkspaceJobs } = await import("./jobs.ts");
+    await settleWorkspaceJobs(workspaceId);
+    if (get("SELECT id FROM renders WHERE workspace_id=? AND status IN ('QUEUED','RUNNING')", workspaceId)) throw conflict("等待渲染结束后重试清理");
+    await purgeTenantFiles(workspaceId);
+    for (const directory of [join(config.mediaDir, workspaceId), join(config.dataDir, "uploads", workspaceId)]) rmSync(directory, { recursive: true, force: true });
+    tx(() => {
+      run("DELETE FROM webhook_events WHERE job_id IN (SELECT id FROM generation_jobs WHERE workspace_id=?)", workspaceId);
+      run("UPDATE audit_logs SET detail=NULL WHERE workspace_id=?", workspaceId);
+      const tables = all("SELECT name FROM sqlite_master WHERE type='table'").map((r) => r.name).filter((name) => /^[a-zA-Z0-9_]+$/.test(name) && all(`PRAGMA table_info(${name})`).some((column) => column.name === "workspace_id") && !["credit_ledger", "audit_logs", "workspaces", "workspace_purges"].includes(name));
+      for (const table of tables) run(`DELETE FROM ${table} WHERE workspace_id=?`, workspaceId);
+      run("UPDATE workspaces SET name='[purged]' WHERE id=?", workspaceId);
+    });
+}
+
+let purgeTenantFiles: (workspaceId: string) => Promise<void> = async () => {
+  if (process.env.TOONFLOW_DATA_DIR) throw new Error("租户目录清理器尚未初始化");
+};
+export function configureWorkspacePurge(handler: typeof purgeTenantFiles) { purgeTenantFiles = handler; }
+
+export function queueWorkspacePurge(workspaceId: string) {
+  run("INSERT OR IGNORE INTO workspace_purges(workspace_id,created_at,updated_at) VALUES(?,?,?)", workspaceId, now(), now());
+}
+
+let purging = false;
+/** 删除意图与注销事务一同持久化；失败保留记录，启动与定时任务继续执行。 */
+export async function sweepWorkspacePurges() {
+  if (purging) return;
+  purging = true;
+  try {
+    for (const row of all("SELECT workspace_id FROM workspace_purges WHERE status!='complete'")) {
+      try {
+        await purgeWorkspace(row.workspace_id);
+        run("UPDATE workspace_purges SET status='complete', error=NULL, updated_at=? WHERE workspace_id=?", now(), row.workspace_id);
+      } catch (error) {
+        run("UPDATE workspace_purges SET status='pending', error=?, updated_at=? WHERE workspace_id=?", String(error).slice(0, 500), now(), row.workspace_id);
+      }
+    }
+  } finally { purging = false; }
 }

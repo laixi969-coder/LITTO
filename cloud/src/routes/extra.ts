@@ -5,15 +5,16 @@ import { z } from "zod";
 import { authOf, requireAdmin } from "../auth.ts";
 import { all, audit, get, run, setting, setSetting, tx } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
-import { checkout, fulfil, packs, paymentsOf, plans, setPlan, subscriptionOf, verifyStripe, paymentProvider } from "../billing.ts";
+import { checkout, fulfilStripe, packs, paymentsOf, plans, setPlan, subscriptionOf, verifyStripe, paymentProvider } from "../billing.ts";
 import { buildTimeline, exportPackage, startRender, toEdl, toSrt } from "../domain/assembly.ts";
 import { decrypt, encrypt } from "../crypto.ts";
 import { kick } from "../jobs.ts";
 import { snapshot } from "../metrics.ts";
 import { storage, mediaView, saveMedia, usage } from "../storage.ts";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeAtomicSync } from "@toonflow/file";
+import { readUpload, uploadMaxBytes, uploadSlot } from "../upload.ts";
 import { join } from "node:path";
-import { bad, forbidden, notFound, now, ulid } from "../util.ts";
+import { bad, forbidden, HttpError, notFound, now, ulid } from "../util.ts";
 import { config } from "../config.ts";
 import { finalQualityView } from "../domain/finalQuality.ts";
 import { exportCsv, summary } from "../usage.ts";
@@ -56,6 +57,7 @@ extra.put("/sequences/:id/subtitles", async (c) => {
 // init → PUT parts (any order, retriable, idempotent) → GET status (resume) → complete. Parts live on disk until complete; stale sessions are swept.
 const upDir = (ws: string, id: string) => join(config.dataDir, "uploads", ws, id);
 const PART_MAX = 16 * 1024 * 1024;
+extra.use("/media/uploads/*", uploadSlot);
 extra.post("/media/uploads", async (c) => {
     const { a, s } = ctx(c, "EDITOR");
     const b = await body(c, z.object({ size: z.number().int().positive().max(200 * 1024 * 1024), parts: z.number().int().min(1).max(2000), projectId: z.string().optional() }));
@@ -64,7 +66,7 @@ extra.post("/media/uploads", async (c) => {
     if (usage(a.workspaceId).bytes + b.size > q.quota_bytes) throw bad("storage quota exceeded");
     const id = ulid();
     mkdirSync(upDir(a.workspaceId, id), { recursive: true });
-    writeFileSync(join(upDir(a.workspaceId, id), "meta.json"), JSON.stringify({ ...b, createdAt: Date.now() }));
+    writeAtomicSync(join(upDir(a.workspaceId, id), "meta.json"), JSON.stringify({ ...b, createdAt: Date.now() }));
     return c.json({ uploadId: id, partMaxBytes: PART_MAX }, 201);
 });
 const upMeta = (ws: string, id: string) => {
@@ -76,9 +78,13 @@ extra.put("/media/uploads/:id/:part", async (c) => {
     const meta = upMeta(a.workspaceId, c.req.param("id"));
     const n = Number(c.req.param("part"));
     if (!Number.isInteger(n) || n < 0 || n >= meta.parts) throw bad("part out of range");
-    const buf = Buffer.from(await c.req.arrayBuffer());
+    const buf = await readUpload(c.req.raw, Math.min(PART_MAX, meta.size));
     if (!buf.length || buf.length > PART_MAX) throw bad("bad part size");
-    writeFileSync(join(upDir(a.workspaceId, c.req.param("id")), `part-${n}`), buf);
+    const directory = upDir(a.workspaceId, c.req.param("id"));
+    const received = readdirSync(directory).filter(name => /^part-\d+$/.test(name) && name !== `part-${n}`)
+      .reduce((size, name) => size + statSync(join(directory, name)).size, 0);
+    if (received + buf.length > meta.size) throw bad("upload parts exceed declared size");
+    writeAtomicSync(join(directory, `part-${n}`), buf);
     return c.json({ part: n, bytes: buf.length });
 });
 extra.get("/media/uploads/:id", (c) => {
@@ -90,11 +96,20 @@ extra.get("/media/uploads/:id", (c) => {
 extra.post("/media/uploads/:id/complete", async (c) => {
     const { a } = ctx(c, "EDITOR");
     const id = c.req.param("id"), meta = upMeta(a.workspaceId, id), d = upDir(a.workspaceId, id);
-    const bufs: Buffer[] = [];
-    for (let i = 0; i < meta.parts; i++) { const f = join(d, `part-${i}`); if (!existsSync(f)) throw bad(`part ${i} missing`, { missing: [i] }); bufs.push(readFileSync(f)); }
-    const all = Buffer.concat(bufs);
-    if (all.length !== meta.size) throw bad(`size mismatch: expected ${meta.size}, got ${all.length}`);
-    const m = await saveMedia(a.workspaceId, meta.projectId ?? null, all, { source: "upload" }); // same magic-byte / quota validation as single-shot upload
+    if (!Number.isSafeInteger(meta.size) || meta.size < 1 || meta.size > uploadMaxBytes || !Number.isSafeInteger(meta.parts) || meta.parts < 1 || meta.parts > 2000) throw bad("invalid upload metadata");
+    let size = 0;
+    for (let i = 0; i < meta.parts; i++) {
+      const path = join(d, `part-${i}`);
+      if (!existsSync(path)) throw bad(`part ${i} missing`, { missing: [i] });
+      const bytes = statSync(path).size;
+      size += bytes;
+      if (bytes > PART_MAX || size > meta.size) throw bad("upload size exceeds declared size");
+    }
+    if (size !== meta.size) throw bad("upload size mismatch");
+    const data = Buffer.alloc(size);
+    let offset = 0;
+    for (let i = 0; i < meta.parts; i++) offset += readFileSync(join(d, `part-${i}`)).copy(data, offset);
+    const m = await saveMedia(a.workspaceId, meta.projectId ?? null, data, { source: "upload" });
     rmSync(d, { recursive: true, force: true });
     return c.json(mediaView(m), 201);
 });
@@ -130,8 +145,11 @@ extra.post("/webhooks/stripe", async (c) => {
     if (!secret) return c.json({ error: "not configured" }, 404);
     const raw = await c.req.text();
     if (!verifyStripe(raw, c.req.header("stripe-signature"), secret)) return c.json({ error: "bad signature" }, 400);
-    const ev = JSON.parse(raw);
-    if (ev.type === "checkout.session.completed") { const id = ev.data?.object?.client_reference_id; if (id && get("SELECT 1 FROM payments WHERE id=?", id)) fulfil(id); }
+    try { fulfilStripe(JSON.parse(raw)); }
+    catch (error) {
+      if (error instanceof SyntaxError || error instanceof HttpError && error.status === 400) return c.json({ error: "invalid payment event" }, 400);
+      throw error;
+    }
     return c.json({ received: true });
 });
 

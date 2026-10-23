@@ -38,6 +38,11 @@ export function registerSessionGuard() {
   window.fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
     const url = new URL(typeof args[0] === "string" ? args[0] : args[0] instanceof Request ? args[0].url : String(args[0]), location.href);
     const applicationRequest = url.origin === location.origin && (url.pathname.startsWith("/api/") || url.pathname.startsWith("/cloud/"));
+    if (applicationRequest) {
+      const headers = new Headers(args[1]?.headers ?? (args[0] instanceof Request ? args[0].headers : undefined));
+      headers.set("x-milimili-csrf", "1");
+      args[1] = { ...args[1], headers };
+    }
     if (applicationRequest && me && (!url.pathname.startsWith("/cloud/auth/") || url.pathname === "/cloud/auth/logout")) {
       const headers = new Headers(args[1]?.headers ?? (args[0] instanceof Request ? args[0].headers : undefined));
       headers.set("x-milimili-user", me.user.id);

@@ -51,7 +51,7 @@ const stripe: PaymentProvider = {
         const key = process.env.MILIMILI_STRIPE_SECRET;
         if (!key) throw bad("stripe is not configured (MILIMILI_STRIPE_SECRET)");
         const body = new URLSearchParams({ mode: "payment", "line_items[0][quantity]": "1", "line_items[0][price_data][currency]": "usd", "line_items[0][price_data][unit_amount]": String(Math.round(amountUsd * 100)), "line_items[0][price_data][product_data][name]": title, success_url: returnUrl, cancel_url: returnUrl, client_reference_id: paymentId });
-        const r = await fetch(`${process.env.MILIMILI_STRIPE_API ?? "https://api.stripe.com"}/v1/checkout/sessions`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded" }, body });
+        const r = await fetch(`${process.env.MILIMILI_STRIPE_API ?? "https://api.stripe.com"}/v1/checkout/sessions`, { method: "POST", headers: { authorization: `Bearer ${key}`, "content-type": "application/x-www-form-urlencoded", "Idempotency-Key": paymentId }, body });
         const j: any = await r.json();
         if (!r.ok) throw bad(`stripe: ${j.error?.message ?? r.status}`);
         return { url: j.url, ref: j.id };
@@ -78,23 +78,38 @@ export async function checkout(ws: string, kind: "pack" | "plan", itemId: string
 
 /** Idempotent: a payment is fulfilled exactly once (webhook retries are safe). */
 export function fulfil(paymentId: string) {
-    const p = get("SELECT * FROM payments WHERE id=?", paymentId);
-    if (!p) throw notFound("payment");
-    if (p.status === "paid") return false;
-    tx(() => {
+    return tx(() => {
+        const p = get("SELECT * FROM payments WHERE id=?", paymentId);
+        if (!p) throw notFound("payment");
+        if (p.status === "paid") return false;
         run("UPDATE payments SET status='paid', updated_at=? WHERE id=? AND status!='paid'", now(), paymentId);
         if (p.kind === "pack") grant(p.workspace_id, p.credits, "PURCHASE", `credit pack ${p.item_id}`);
         // 积分与已下单金额一起固定，后台改价不能改变待支付订单的权益。
         else { const plan = plans().find((x) => x.id === p.item_id); if (plan) setPlan(p.workspace_id, { ...plan, credits: p.credits }, true, "purchase"); }
+        audit(null, "payment.paid", paymentId, { kind: p.kind, item: p.item_id }, p.workspace_id);
+        return true;
     });
-    audit(null, "payment.paid", paymentId, { kind: p.kind, item: p.item_id }, p.workspace_id);
-    return true;
+}
+
+/** 已签名的 Checkout 事件仍必须匹配订单、金额、币种和到账状态。 */
+export function fulfilStripe(event: any) {
+  if (!["checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.async_payment_failed"].includes(event.type)) return;
+  const session = event.data?.object;
+  const payment = typeof session?.client_reference_id === "string" ? get("SELECT * FROM payments WHERE id=?", session.client_reference_id) : null;
+  if (!payment || payment.provider !== "stripe" || !payment.provider_ref || session.id !== payment.provider_ref
+      || session.object !== "checkout.session" || session.mode !== "payment" || session.currency !== "usd"
+      || !Number.isSafeInteger(session.amount_total) || session.amount_total !== Math.round(payment.amount_usd * 100)) throw bad("支付回执与订单不一致");
+  if (event.type === "checkout.session.async_payment_failed") {
+    run("UPDATE payments SET status='failed', updated_at=? WHERE id=? AND status='pending'", now(), payment.id);
+    return;
+  }
+  if ((session.payment_status === "paid" || session.payment_status === "no_payment_required" && session.amount_total === 0) && session.status === "complete") fulfil(payment.id);
 }
 
 /** Stripe signature: header `t=…,v1=hex(hmac_sha256(secret, `${t}.${rawBody}`))`, 5 minute tolerance. */
 export function verifyStripe(raw: string, header: string | undefined, secret: string) {
     const parts = Object.fromEntries((header ?? "").split(",").map((kv) => kv.split("=") as [string, string]));
-    if (!parts.t || !parts.v1 || Math.abs(Date.now() / 1000 - Number(parts.t)) > 300) return false;
+    if (!parts.t || !/^\d+$/.test(parts.t) || !parts.v1 || !/^[a-f0-9]{64}$/i.test(parts.v1) || Math.abs(Date.now() / 1000 - Number(parts.t)) > 300) return false;
     const exp = createHmac("sha256", secret).update(`${parts.t}.${raw}`).digest("hex");
     return exp.length === parts.v1.length && timingSafeEqual(Buffer.from(exp), Buffer.from(parts.v1));
 }

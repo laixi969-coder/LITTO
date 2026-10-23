@@ -102,10 +102,13 @@ team.delete("/workspaces/current", async (c) => {
     const w = get("SELECT kind FROM workspaces WHERE id=?", a.workspaceId)!;
     if (w.kind === "personal") throw bad("delete your account to remove a personal workspace");
     await body(c, z.object({ confirm: z.literal("DELETE") }));
-    run("UPDATE workspaces SET deleted_at=? WHERE id=?", now(), a.workspaceId);
+    const { queueWorkspacePurge, sweepWorkspacePurges } = await import("../storage.ts");
+    tx(() => {
+      run("UPDATE workspaces SET deleted_at=? WHERE id=?", now(), a.workspaceId);
+      queueWorkspacePurge(a.workspaceId);
+    });
     au("workspace.delete", a.workspaceId);
-    const { purgeWorkspace } = await import("../storage.ts");
-    setTimeout(() => void purgeWorkspace(a.workspaceId), 0); // async thorough cleanup
+    void sweepWorkspacePurges();
     return c.json({ ok: true });
 });
 void requireRole;

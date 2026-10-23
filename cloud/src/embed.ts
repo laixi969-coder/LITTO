@@ -10,8 +10,11 @@ import { startWorker } from "./jobs.ts";
 import { seedProviders } from "./providers/registry.ts";
 import { seedSkills } from "./domain/market-seed.ts";
 import { sweepUploads } from "./routes/extra.ts";
+import { sweepWorkspacePurges } from "./storage.ts";
+export { configureWorkspacePurge } from "./storage.ts";
 
 export { resolveSession } from "./auth.ts";
+export { validMutationSource } from "./requestSecurity.ts";
 export type { Auth, Role } from "./auth.ts";
 export { scoped, get as dbGet, all as dbAll, run as dbRun, audit, setting } from "./db.ts";
 export { recordUsage } from "./usage.ts";
@@ -42,6 +45,8 @@ export function initCloud() {
     seedProviders();
     seedSkills();
     startWorker();
+    void sweepWorkspacePurges();
+    setInterval(() => void sweepWorkspacePurges(), 60_000).unref();
     setInterval(() => sweepUploads(), 3600_000).unref();
 }
 

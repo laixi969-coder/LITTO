@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { createApp } from "./app";
+import { startDataBackups } from "./utils/dataBackup";
 
 const startTime = Date.now();
 const realPort = 3000;
@@ -18,6 +19,7 @@ const app = await createApp({
   skillsRoot: resolve(appDirectory, fromSource ? "packages/skills" : "build/skills"),
 });
 const { initializeMcpRuntime } = await import("./utils/mcp/runtime");
+startDataBackups(dataDirectory);
 app.listen(realPort, host, async () => {
   if (process.env.MILIMILI_AUTH === "off") await initializeMcpRuntime(app, `http://127.0.0.1:${realPort}`, resolve(appDirectory, fromSource ? "packages/mcp/src/stdio.ts" : "build/mcp/stdio.js"));
   console.log(`[服务启动成功]: http://localhost:${realPort}`);

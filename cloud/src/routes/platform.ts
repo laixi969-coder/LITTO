@@ -10,6 +10,7 @@ import { cancelJob, jobView, retryJob } from "../jobs.ts";
 import { checkSignedUrl, mediaView, saveMedia, softDeleteMedia, storage, usage } from "../storage.ts";
 import { bad, forbidden, HttpError, notFound, now } from "../util.ts";
 import { ROLES } from "../domain/schema.ts";
+import { readUpload, uploadSlot } from "../upload.ts";
 
 export const platform = new Hono();
 
@@ -134,11 +135,12 @@ platform.post("/generations/:id/retry", (c) => {
 });
 
 // ---- /media ----
+platform.use("/media", uploadSlot);
 platform.post("/media", async (c) => {
     const { a, s } = ctx(c, "EDITOR");
     const projectId = c.req.query("projectId") ?? null;
     if (projectId && !s.get("projects", projectId)) throw notFound("project");
-    const buf = Buffer.from(await c.req.arrayBuffer());
+    const buf = await readUpload(c.req.raw);
     if (!buf.length) throw bad("empty body");
     const m = await saveMedia(a.workspaceId, projectId, buf, { source: "upload" });
     return c.json(mediaView(m), 201);

@@ -44,3 +44,4 @@ apps/server/data/
 
 # 本地临时目录（测试库探针等）
 .tmp/
+dataBackups/

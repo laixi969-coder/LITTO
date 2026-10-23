@@ -32,6 +32,7 @@ export function registerApiLanguage(client: AxiosInstance) {
     // ACT: 仅本应用 API 接收界面语言，不改变供应商等外部请求。
     if (url.origin === window.location.origin && url.pathname.startsWith("/api/")) {
       config.headers.set("Accept-Language", locale.value);
+      config.headers.set("x-milimili-csrf", "1");
       const account = getMe();
       if (account) {
         config.headers.set("x-milimili-user", account.user.id);

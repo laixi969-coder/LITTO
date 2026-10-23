@@ -25,7 +25,7 @@ app.use("*", secureHeaders({ contentSecurityPolicy: { defaultSrc: ["'self'"], im
 app.use("*", async (c, next) => {
     const origin = c.req.header("origin");
     // 只在开发环境放行本机来源；生产环境不允许任意 localhost 页面携带 Cookie 跨域调用账号接口。
-    if (origin && !config.production && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    if (origin && (process.env.MILIMILI_CORS_ORIGINS ?? "").split(",").map(value => value.trim()).includes(origin)) {
         c.header("Access-Control-Allow-Origin", origin);
         c.header("Access-Control-Allow-Credentials", "true");
         c.header("Access-Control-Allow-Headers", "content-type, authorization, x-workspace-id, x-milimili-csrf, idempotency-key");

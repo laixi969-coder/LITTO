@@ -5,7 +5,8 @@ import { all, audit, get, run, setting, tx } from "./db.ts";
 import { config } from "./config.ts";
 import { bad, forbidden, HttpError, now, sha256, ulid } from "./util.ts";
 import { grant } from "./credits.ts";
-import { purgeWorkspace } from "./storage.ts";
+import { queueWorkspacePurge, sweepWorkspacePurges } from "./storage.ts";
+import { validMutationSource } from "./requestSecurity.ts";
 import { assertNotSsoEnforced } from "./sso-policy.ts";
 
 export type Role = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
@@ -151,11 +152,10 @@ export function resolveSession(token: string | null | undefined, wantedWorkspace
 
 /** Resolve session → user and the active workspace (header X-Workspace-Id, default: personal). Membership is verified server-side. */
 export async function authenticate(c: Context, next: Next) {
-    const bearer = c.req.header("authorization")?.startsWith("Bearer ");
     const token = tokenOf(c);
     if (!token) throw new HttpError(401, "not authenticated", "unauthenticated");
     // Cookie sessions require a custom header on mutations (CSRF defence; cross-site forms cannot set it).
-    if (!bearer && !["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("x-milimili-csrf") !== "1") throw forbidden("csrf check failed");
+    if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method) && !validMutationSource({ authorization: c.req.header("authorization"), origin: c.req.header("origin"), referer: c.req.header("referer"), marker: c.req.header("x-milimili-csrf") }, c.req.url)) throw forbidden("csrf check failed");
     const auth = resolveSession(token, c.req.header("x-workspace-id"));
     if (!auth) throw new HttpError(401, "session invalid", "unauthenticated");
     if (c.req.header("x-milimili-user") && c.req.header("x-milimili-user") !== auth.user.id) throw new HttpError(409, "账号已在其他页面切换，请重新登录原账号后保存", "account_changed");
@@ -177,10 +177,17 @@ export const requireAdmin = async (c: Context, next: Next) => {
 export function deleteAccount(userId: string) {
     const ws = all("SELECT id FROM workspaces WHERE owner_id=? AND deleted_at IS NULL", userId);
     tx(() => {
-        run("UPDATE users SET deleted_at=?, status='deleted', email=email||'#deleted#'||id WHERE id=?", now(), userId);
+        run("DELETE FROM login_codes WHERE email=(SELECT email FROM users WHERE id=?)", userId);
+        run("UPDATE users SET deleted_at=?, status='deleted', email='deleted+'||id||'@invalid.local' WHERE id=?", now(), userId);
         run("DELETE FROM sessions WHERE user_id=?", userId);
-        for (const w of ws) run("UPDATE workspaces SET deleted_at=? WHERE id=?", now(), w.id);
+        run("DELETE FROM user_passwords WHERE user_id=?", userId);
+        run("DELETE FROM oauth_identities WHERE user_id=?", userId);
+        run("DELETE FROM workspace_members WHERE user_id=?", userId);
+        for (const w of ws) {
+            run("UPDATE workspaces SET deleted_at=? WHERE id=?", now(), w.id);
+            queueWorkspacePurge(w.id);
+        }
     });
     audit(userId, "account.delete", userId, { workspaces: ws.map((w) => w.id) });
-    setTimeout(() => ws.forEach((w) => purgeWorkspace(w.id)), 0);
+    void sweepWorkspacePurges();
 }

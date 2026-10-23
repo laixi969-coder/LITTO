@@ -1,7 +1,8 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { join } from "node:path";
+import { rm } from "@toonflow/file";
 import { error } from "@/lib/responseFormat";
-import { authEnabled, tenantStore, type Tenant } from "@/utils/tenant";
+import { authEnabled, tenantDir, tenantStore, type Tenant } from "@/utils/tenant";
 
 /**
  * MILI MILI cloud layer (accounts, workspaces, credit ledger, admin, domain APIs) lives in /cloud and is mounted into this Express app:
@@ -12,6 +13,7 @@ export type { GenRequest, GenResult } from "../../../../cloud/src/embed";
 type Embed = typeof import("../../../../cloud/src/embed");
 let embed: Embed | null = null;
 export const cloud = () => embed;
+const activeRequests = new Map<string, number>();
 
 export async function mountCloud(app: Express) {
   if (!authEnabled()) return;
@@ -27,6 +29,13 @@ export async function mountCloud(app: Express) {
   embed.configureWorkspaceMedia(executeMediaJob);
   const { inspectFrames } = await import("@/utils/media/vision");
   embed.configureWorkspaceVision(inspectFrames);
+  embed.configureWorkspacePurge(async workspaceId => {
+    const { abortDirectorySessions } = await import("@/agent/runtime/sessions");
+    const directory = tenantDir(workspaceId);
+    await abortDirectorySessions(directory);
+    if (activeRequests.get(workspaceId)) throw new Error("等待工作区请求结束后重试清理");
+    await rm(directory, { recursive: true, force: true });
+  });
   embed.initCloud();
   // Hono handler expects a raw request stream: mount before any body parser.
   app.use("/cloud", (req, res) => void embed!.cloudRequestListener(req, res));
@@ -43,6 +52,9 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
   let tenant: Tenant | null;
   try { tenant = tenantOf(req); } catch { return res.status(403).json(error("无权访问该工作区", null, 403)); }
   if (!tenant) return res.status(401).json(error("请先登录", null, 401));
+  if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && !embed.validMutationSource({ authorization: req.get("authorization"), origin: req.get("origin"), referer: req.get("referer"), marker: req.get("x-milimili-csrf") }, `${req.protocol}://${req.get("host")}`)) {
+    return res.status(403).json(error("页面来源校验失败，请从应用页面重试", null, 403));
+  }
   if (req.get("x-milimili-user") && req.get("x-milimili-user") !== tenant.userId) return res.status(409).json(error("账号已在其他页面切换，当前编辑仍保留，请重新登录原账号后保存", null, 409));
   const path = req.path.toLowerCase().replace(/\/+$/, "");
   const readOnlyPost = req.method === "POST" && (["/ai/media/estimate", "/ai/media/preflight"].includes(path)
@@ -51,6 +63,17 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
     return res.status(403).json(error("只读成员不能修改工作区或执行任务", null, 403));
   }
   (req as Request & { tenant?: Tenant }).tenant = tenant;
+  const workspaceId = tenant.workspaceId;
+  activeRequests.set(workspaceId, (activeRequests.get(workspaceId) ?? 0) + 1);
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    const remaining = (activeRequests.get(workspaceId) ?? 1) - 1;
+    if (remaining) activeRequests.set(workspaceId, remaining); else activeRequests.delete(workspaceId);
+  };
+  res.once("finish", release);
+  res.once("close", release);
   tenantStore.run(tenant, next);
 }
 

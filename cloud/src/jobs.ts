@@ -118,12 +118,19 @@ export function startWorker() {
             release(job.workspace_id, job.id, job.held, "server interrupted");
         });
     }
-    // Crash recovery: anything RUNNING at boot either resumes polling (has provider task) or re-queues.
+    // 无句柄的已提交请求不能证明未受理，重启也不能重新付费提交。
+    run("UPDATE generation_jobs SET status='FAILED', parameters=json_set(COALESCE(parameters,'{}'), '$.remoteTask.status', 'unknown'), finished_at=?, error='提交结果待核查，未自动重发' WHERE status='RUNNING' AND provider_task_id IS NULL", now());
+    // 有远端任务号的请求仅恢复查询。
     run("UPDATE generation_jobs SET status='QUEUED', run_after=? WHERE status='RUNNING'", now());
     if (!timer) timer = setInterval(() => void tick(), config.workerPollMs);
 }
 export const stopWorker = () => { if (timer) clearInterval(timer); timer = null; };
 export const kick = () => { if (timer) setTimeout(() => void tick(), 0); };
+
+export async function settleWorkspaceJobs(workspaceId: string) {
+    for (const job of all("SELECT id FROM generation_jobs WHERE workspace_id=? AND status IN ('QUEUED','RUNNING')", workspaceId)) cancelJob(workspaceId, job.id, "workspaceDeletion");
+    if (all("SELECT id FROM generation_jobs WHERE workspace_id=?", workspaceId).some(job => inflight.has(job.id))) throw conflict("等待运行任务停止后重试清理");
+}
 
 function runningCount(providerId: string) {
     return all("SELECT id FROM generation_jobs WHERE provider_id=? AND status='RUNNING'", providerId).length;
@@ -193,6 +200,10 @@ async function execute(jobId: string) {
         let taskId: string | null = raw.provider_task_id; // resume after restart
         const deadline = started + prov.timeout_ms;
         if (!taskId) {
+            if (job.providerId !== "workspaceMedia") {
+                if (p.remoteTask && !["failed", "rejected"].includes(p.remoteTask.status)) throw Object.assign(new Error("供应商提交结果待核查，不能重复提交"), { retryable: false, fallbackAllowed: false });
+                run("UPDATE generation_jobs SET parameters=? WHERE id=?", j({ ...p, remoteTask: { status: "submitting", updatedAt: now() } }), jobId);
+            }
             const sub = await adapter.submit(req);
             if ("done" in sub) result = sub.done;
             else { taskId = sub.taskId; run("UPDATE generation_jobs SET provider_task_id=? WHERE id=?", taskId, jobId); }
@@ -204,7 +215,10 @@ async function execute(jobId: string) {
             const ev = get("SELECT payload FROM webhook_events WHERE job_id=? ORDER BY id DESC LIMIT 1", jobId);
             if (ev) {
                 const hook = JSON.parse(ev.payload);
-                if (hook.status === "failed") throw Object.assign(new Error(hook.error ?? "provider reported failure"), { retryable: false });
+                if (hook.status === "failed") {
+                    run("UPDATE generation_jobs SET parameters=?, provider_task_id=NULL WHERE id=?", j({ ...p, remoteTask: { status: "failed", updatedAt: now() } }), jobId);
+                    throw Object.assign(new Error(hook.error ?? "provider reported failure"), { retryable: false });
+                }
                 const outputs = [];
                 for (const o of hook.outputs ?? []) outputs.push(o.b64 ? { data: Buffer.from(o.b64, "base64"), mime: o.mime ?? "image/png", duration: o.duration } : await (async () => { const r = await fetch(o.url); if (!r.ok) throw new Error(`callback output HTTP ${r.status}`); return { data: Buffer.from(await r.arrayBuffer()), mime: o.mime ?? r.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream", duration: o.duration }; })());
                 result = { outputs, costUsd: typeof hook.costUsd === "number" && Number.isFinite(hook.costUsd) && hook.costUsd >= 0 ? hook.costUsd : null };
@@ -214,7 +228,10 @@ async function execute(jobId: string) {
             const r = await adapter.poll(taskId!, { apiKey, baseUrl: prov.base_url, signal });
             observe(`provider_${prov.id}_poll_ms`, Date.now() - t0);
             if (r.status === "done") result = r.result;
-            else if (r.status === "failed") throw Object.assign(new Error(r.error), { retryable: r.retryable });
+            else if (r.status === "failed") {
+                run("UPDATE generation_jobs SET parameters=?, provider_task_id=NULL WHERE id=?", j({ ...p, remoteTask: { status: "failed", updatedAt: now() } }), jobId);
+                throw Object.assign(new Error(r.error), { retryable: r.retryable });
+            }
             else await sleep(Math.min(config.workerPollMs, 250));
         }
         if (get("SELECT status FROM generation_jobs WHERE id=?", jobId)?.status === "CANCELLED") return;
@@ -260,14 +277,14 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
     const cur = get("SELECT * FROM generation_jobs WHERE id=?", job.id)!;
     if (cur.status === "CANCELLED") return;
     const p = cur.parameters ? JSON.parse(cur.parameters) : {};
-    const remoteUnresolved = cur.provider_id === "workspaceMedia" && p.remoteTask && !["failed", "rejected"].includes(p.remoteTask.status);
-    const retryable = err.retryable !== false && !remoteUnresolved;
+    const remoteUnresolved = !!cur.provider_task_id || p.remoteTask && !["failed", "rejected"].includes(p.remoteTask.status);
+    const retryable = err.retryable !== false && (!remoteUnresolved || !!cur.provider_task_id);
     inc(`provider_${cur.provider_id}_errors`);
     if (retryable && cur.attempts < cur.max_attempts) {
         inc("job_retries");
         const prov = get("SELECT retry_policy FROM providers WHERE id=?", cur.provider_id)!;
         const backoff = (JSON.parse(prov.retry_policy).backoffMs ?? 500) * cur.attempts;
-        run("UPDATE generation_jobs SET status='QUEUED', provider_task_id=NULL, run_after=?, error=? WHERE id=?", new Date(Date.now() + backoff).toISOString(), err.message.slice(0, 300), job.id);
+        run("UPDATE generation_jobs SET status='QUEUED', run_after=?, error=? WHERE id=?", new Date(Date.now() + backoff).toISOString(), err.message.slice(0, 300), job.id);
         return;
     }
     // Provider exhausted → fallback to the next-best model that satisfies the same roles.
@@ -292,6 +309,10 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
         }
     }
     inc(`job_failed_model_${cur.model_id}`);
+    if (remoteUnresolved) {
+        run("UPDATE generation_jobs SET status=?, error=?, duration_ms=?, finished_at=? WHERE id=?", err.timeout ? "TIMEOUT" : "FAILED", `供应商结果待核查；未重新提交：${err.message}`.slice(0, 300), durationMs, now(), job.id);
+        return;
+    }
     tx(() => {
         run("UPDATE generation_jobs SET status=?, error=?, duration_ms=?, finished_at=?, held=0 WHERE id=?", err.timeout ? "TIMEOUT" : "FAILED", err.message.slice(0, 300), durationMs, now(), job.id);
         release(cur.workspace_id, cur.id, cur.held, "job failed: refund hold");
@@ -317,7 +338,16 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     if (["QUEUED", "RUNNING"].includes(o.status)) throw conflict("job still active");
     if (o.status === "SUCCEEDED") throw conflict("任务已完成，请复用已有结果", "job_already_completed");
     if (inflight.has(id)) throw conflict("原任务仍在停止或收取结果，不能同时重发", "job_still_settling");
-    if (o.providerId === "workspaceMedia" && o.parameters?.remoteTask && !["failed", "rejected"].includes(o.parameters.remoteTask.status)) throw conflict("供应商结果尚未核清或已完成，请先查询并恢复原任务，不得重复提交", "remote_result_unresolved");
+    if (o.providerTaskId) {
+        tx(() => {
+            const held = o.held || estimate(o.modelId, o.kind, o.parameters).credits;
+            if (!o.held) hold(workspaceId, id, held);
+            run("UPDATE generation_jobs SET status='QUEUED', attempts=0, held=?, run_after=?, finished_at=NULL WHERE id=?", held, now(), id);
+        });
+        kick();
+        return { ...jobView(scoped(workspaceId).get("generation_jobs", id, true)), reused: true };
+    }
+    if (o.parameters?.remoteTask && !["failed", "rejected"].includes(o.parameters.remoteTask.status)) throw conflict("供应商结果尚未核清或已完成，请先查询并恢复原任务，不得重复提交", "remote_result_unresolved");
     const { negativePrompt, label, remoteTask, ...rest } = o.parameters ?? {};
     return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label, idempotencyKey: `retry:${o.id}` });
 }

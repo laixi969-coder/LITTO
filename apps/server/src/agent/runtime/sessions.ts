@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, resolve, sep } from "node:path";
 import { readFile, readdir } from "@toonflow/file";
 import { calculateContextTokens, estimateTokens, getLastAssistantUsage, parseSessionEntries, SessionManager } from "@earendil-works/pi-coding-agent";
 import type { AgentSession, FileEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
@@ -35,6 +35,11 @@ type SessionMessage = {
 // ACT: 复用正在运行的 SDK 会话，文件锁仍由 run 持有；多进程部署时需共享会话所有权。
 const activeSessions = new Map<string, ActiveAgentSession>();
 const sessionKey = (path: string) => process.platform === "win32" ? resolve(path).toLowerCase() : resolve(path);
+
+export async function abortDirectorySessions(directory: string) {
+  const prefix = sessionKey(directory) + sep;
+  await Promise.all([...activeSessions].filter(([path]) => path.startsWith(prefix)).map(([, active]) => active.abort()));
+}
 
 export function getActiveAgentSession(path: string) {
   return activeSessions.get(sessionKey(path));
