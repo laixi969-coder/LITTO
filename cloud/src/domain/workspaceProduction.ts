@@ -1,23 +1,62 @@
 import { z } from "zod";
+import { mkdtemp, readFile, writeFile, rm } from "@toonflow/file";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { finalQualityView, finalReviewSchema, reviewFinalQuality } from "./finalQuality.ts";
 import { tx, type Scope } from "../db.ts";
-import { assetInput, bindingInput, shotInput, worldSchema, lookSchema } from "./schema.ts";
+import { assetInput, bindingInput, shotInput, worldSchema, lookSchema, stateDeltaSchema } from "./schema.ts";
 import { createAsset, assetVersions } from "./assets.ts";
 import { bindReference, createShot, updateShot, shotPartial } from "./shots.ts";
 import { bad, conflict, notFound, sha256 } from "../util.ts";
-import { finalQualityView } from "./finalQuality.ts";
 import { mediaView, saveMedia, sniff, storage } from "../storage.ts";
 import { compactProductionRead, qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
 import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
-import { promoteHero } from "./lifecycle.ts";
+import { approveTake, promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake, applyOps, getEdit, editView } from "./nle.ts";
-import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema } from "./realism.ts";
+import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema, motionReviewSchema } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
 import { searchFilmTechniques, techniqueStages } from "@toonflow/tool-media-generation/filmTechniques";
-import { adReadiness, saveAdDirection, sequenceKindSchema } from "./adDirection.ts";
+import { adReadiness, saveAdDirection } from "./adDirection.ts";
+import { createSequence, sequenceInput } from "./sequences.ts";
 import { searchLibrary, setLibraryFavorite, importFromLibrary, publishToLibrary } from "./library.ts";
 import { planShotSpeech } from "./speechPlanning.ts";
-import { probeBuffer } from "../media-tools.ts";
+import { probeBuffer, probeFile, runCmd } from "../media-tools.ts";
+import { continuityPredecessor } from "./state.ts";
+
+/** 接戏只从已返回的真实视频取帧；候选和检查状态保留，不代填完整看听。 */
+export async function extractContinuationFrame(s: Scope, projectId: string, data: unknown) {
+  const input = z.object({ shotId: z.string().min(1), takeId: z.string().min(1), seconds: z.number().finite().nonnegative().optional() }).strict().parse(data);
+  const shot = s.get("shots", input.shotId), take = s.get("takes", input.takeId);
+  const sourceShot = take && s.get("shots", take.shotId), media = take && s.get("media", take.mediaId);
+  if (!shot || !take || !sourceShot || !media || [shot, take, sourceShot, media].some(item => item.projectId !== projectId)) throw notFound("project continuation source");
+  if (continuityPredecessor(s, shot)?.id !== sourceShot.id) throw bad("接戏帧必须来自本镜明确接续的前镜视频");
+  if (!media.mime.startsWith("video/")) throw bad("接戏来源必须是实际视频，不能使用静态主帧代替");
+  const fingerprint = shotFingerprint(s, sourceShot.id);
+  const directory = await mkdtemp(join(tmpdir(), "milimiliContinuation"));
+  try {
+    const bytes = await storage.get(media.storageKey);
+    if (sha256(bytes) !== media.hash) throw conflict("前镜视频与记录不符", "stale");
+    const source = join(directory, "source.mp4"), output = join(directory, "frame.png");
+    await writeFile(source, bytes);
+    const probe = await probeFile(source);
+    if (!probe?.hasVideo || !probe.duration) throw bad("前镜视频不可读取");
+    const seconds = input.seconds ?? Math.max(0, Math.min(sourceShot.duration, probe.duration) - 0.1);
+    if (seconds >= probe.duration) throw bad("接戏时间须在实际视频内");
+    const extracted = await runCmd("ffmpeg", ["-v", "error", "-ss", String(seconds), "-i", source, "-frames:v", "1", output]);
+    if (extracted.code !== 0) throw bad("前镜接戏帧提取失败");
+    const image = await readFile(output);
+    if (s.get("takes", take.id)?.mediaId !== media.id || shotFingerprint(s, sourceShot.id) !== fingerprint || continuityPredecessor(s, s.get("shots", shot.id)!)?.id !== sourceShot.id) throw conflict("提取期间前镜或接戏来源已改变", "stale");
+    const sourceKey = sha256(JSON.stringify([take.id, media.hash, fingerprint, seconds]));
+    let frame = s.list("keyframes", { shotId: shot.id }).find(item => item.meta?.continuationSource?.key === sourceKey);
+    if (!frame) {
+      const saved = s.list("media", { projectId, hash: sha256(image) })[0] ?? await saveMedia(s.workspaceId, projectId, image, { source: "continuationFrame" });
+      if (shotFingerprint(s, sourceShot.id) !== fingerprint || s.get("shots", shot.id)?.projectId !== projectId) throw conflict("保存期间接戏规格已改变", "stale");
+      frame = s.insert("keyframes", { project_id: projectId, shot_id: shot.id, media_id: saved.id, status: "variant", meta: { source: "continuationFrame", continuationSource: { key: sourceKey, takeId: take.id, mediaId: media.id, hash: media.hash, fingerprint, seconds } } });
+    }
+    return { keyframe: frame, image, seconds, sourceTakeId: take.id, reviewStatus: "unverified" };
+  } finally { await rm(directory, { recursive: true, force: true }); }
+}
 
 /** 拆格或用户上传的干净单帧进入候选，采用仍复用聊天中的真实检查。 */
 export async function importWorkspaceKeyframe(s: Scope, projectId: string, shotId: string, bytes: Buffer, path: string) {
@@ -169,15 +208,22 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     if (operation === "adDirection") return saveAdDirection(s, projectId, sequenceId, data.direction);
     return { sequence: s.get("sequences", sequenceId), readiness: adReadiness(s, sequenceId) };
   }
+  if (operation === "agentReviewFinal") {
+    if (!actor) throw bad("成片代理审阅须有已认证的操作人");
+    const input = z.object({ renderId: z.string().min(1), authorization: z.string().trim().min(1).max(2000), review: finalReviewSchema }).strict().parse(data);
+    if (s.get("renders", input.renderId)?.projectId !== projectId) throw notFound("project render");
+    return reviewFinalQuality(s, input.renderId, input.review, `agent:${actor}`, input.authorization);
+  }
   if (operation === "agentReview") {
     if (!actor) throw bad("代理审阅须有已认证的操作人");
     const input = z.strictObject({
       targetType: z.enum(["keyframe", "take"]), targetId: z.string().min(1),
       authorization: z.string().trim().min(1).max(2000), note: z.string().trim().min(10).max(8000),
       frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
-      fullPlayback: z.boolean().default(false), reviewedSegments: reviewedSegmentsSchema, audioReview: audioReviewSchema.optional(),
+      fullPlayback: z.boolean().default(false), observedStateDelta: stateDeltaSchema.optional(), reviewedSegments: reviewedSegmentsSchema, audioReview: audioReviewSchema.optional(),
       creativeReview: creativeReviewSchema.optional(),
       techniqueReview: techniqueReviewSchema.optional(),
+      motionReview: motionReviewSchema.optional(),
       observations: z.array(z.strictObject({ kind: z.string(), note: z.string().min(1) })).max(40).default([]),
     }).parse(data);
     const item = s.get(input.targetType === "keyframe" ? "keyframes" : "takes", input.targetId);
@@ -198,31 +244,39 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       if (!input.observations.length && input.creativeReview?.verdict !== "revise"
         && previous?.evidence?.mediaId === item.mediaId && previous.evidence.fingerprint === shotFingerprint(s, shot.id, input.targetType)
         && previous.evidence.vision?.source === "delegatedAgent"
-        && (input.targetType === "take" || plan.checks.every(key => previous.evidence.reviewed?.includes(key)))
+        && plan.checks.every(key => previous.evidence.reviewed?.includes(key))
         && (!input.fullPlayback || previous.evidence.fullPlayback)
+        && (!input.observedStateDelta || JSON.stringify(input.observedStateDelta) === JSON.stringify(previous.evidence.observedStateDelta))
         && (!input.audioReview || JSON.stringify(input.audioReview) === JSON.stringify(previous.evidence.audioReview))
         && (!plan.techniques.length || JSON.stringify(input.techniqueReview) === JSON.stringify(previous.evidence.techniqueReview))
+        && (!plan.motionPlan?.checkpoints.length || plan.motionPlan.checkpoints.every(checkpoint => previous.evidence.motionReview?.some((check: { id: string }) => check.id === checkpoint.id))
+          && (!input.motionReview || JSON.stringify(input.motionReview) === JSON.stringify(previous.evidence.motionReview)))
         && (!input.reviewedSegments.length || JSON.stringify(input.reviewedSegments) === JSON.stringify(previous.evidence.reviewedSegments))) {
         const review = { report: previous, repairActions: s.list("repair_actions", { qcReportId: previous.id }) };
         if (previous.findings.some((finding: { severity: string }) => finding.severity === "high")) {
           return { selected: false, reused: true, review, reason: "已有严重问题记录。重复检查不能消除缺陷；请报告阻塞，不自动重生成" };
         }
         if (input.targetType === "keyframe" && shot.heroKeyframeId !== item.id) promoteHero(s, item.id, `agent:${actor}`);
-        if (input.targetType === "take") selectWorkingTake(s, item.id);
-        return { selected: true, reused: true, status: "workingVersion", finalReviewRequired: true, review };
+        if (input.targetType === "take") {
+          if (input.fullPlayback && input.observedStateDelta) approveTake(s, item.id, `agent:${actor}`);
+          else selectWorkingTake(s, item.id);
+        }
+        return { selected: true, reused: true, status: s.get("shots", shot.id)?.approvedTakeId === item.id ? "approved" : "workingVersion", finalReviewRequired: true, review };
       }
       const review = runQc(s, shot.id, { type: input.targetType, id: item.id }, input.observations, {
-        actor: `agent:${actor}`, note: input.note,
+        actor: `agent:${actor}`, note: input.note, observedStateDelta: input.observedStateDelta,
         fullPlayback: input.fullPlayback, reviewedSegments: input.reviewedSegments, audioReview: input.audioReview,
         techniqueReview: input.techniqueReview,
+        motionReview: input.motionReview,
         reviewed: plan.fullPlayback && !input.fullPlayback ? [] : plan.checks,
         vision: { source: "delegatedAgent", authorization: input.authorization, frameTimes: input.frameTimes, creativeReview: input.creativeReview, audioReview: "notVerified", status: "workingVersion" },
       });
       if (review.report.findings.some(finding => finding.severity === "high")) return { selected: false, review, reason: "存在严重问题，已保留检查记录，未采用" };
       if (input.targetType === "keyframe") promoteHero(s, item.id, `agent:${actor}`);
+      else if (input.fullPlayback && input.observedStateDelta) approveTake(s, item.id, `agent:${actor}`);
       else selectWorkingTake(s, item.id);
 
-      return { selected: true, status: "workingVersion", finalReviewRequired: true, review, answer: "代理检查已记录并选入工作版；未声明用户已完整播放或最终声画验收通过" };
+      return { selected: true, status: s.get("shots", shot.id)?.approvedTakeId === item.id ? "approved" : "workingVersion", finalReviewRequired: true, review, answer: "代理检查已记录；完整检查和实际末态齐备时已采用正式镜头，否则保留工作版。成片仍需最终看听验收" };
     });
   }
   const shots = s.list("shots", { projectId }, "sequence_id, ord");
@@ -259,8 +313,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       ?? s.insert("refs", { project_id: projectId, kind, name: name ?? null, media_id: mediaId, source: media.source ?? "upload" });
   }
   if (operation === "sequence") {
-    const { kind, storyRevisionId, ...parsed } = z.object({ name: z.string().min(1).max(120), script: z.string().max(100000).default(""), kind: sequenceKindSchema.default("story"), storyRevisionId: z.string().min(1).optional() }).parse(data);
-    return s.insert("sequences", { project_id: projectId, ...parsed, ord: s.list("sequences", { projectId }).length, data: { kind, storyRevisionId } });
+    return createSequence(s, projectId, sequenceInput.parse(data));
   }
   if (operation === "shot") return createShot(s, projectId, shotInput.parse(data));
   const shot = typeof data.shotId === "string" && s.get("shots", data.shotId);

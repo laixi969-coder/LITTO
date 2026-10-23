@@ -97,7 +97,7 @@ const plugin: ToolPlugin = {
               const context = await checkStory(saved);
               if (context?.approved) return json({
                 ...saved,
-                storyContext: { revisionId: context.approved.id, title: context.approved.title, outline: context.approved.outline, canon: context.approved.canon, threads: context.approved.threads, visualReferences: context.visualReferences },
+                storyContext: { revisionId: context.approved.id, brief: context.approved.brief, title: context.approved.title, outline: context.approved.outline, canon: context.approved.canon, threads: context.approved.threads, visualReferences: context.visualReferences },
                 // ACT: 从采用版本即时关联正文，不在场次表再存一份可能过期的故事。
                 scenes: saved.scenes.map((scene, index) => ({ ...scene, story: context.approved.scenes[index] })),
               });

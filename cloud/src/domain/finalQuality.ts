@@ -11,18 +11,16 @@ import { getEdit, resolveClip, validateTimeline } from "./nle.ts";
 import { adContext, adReadiness, isAdSequence } from "./adDirection.ts";
 import { needsLipSync, requireReviewed, shotFingerprint } from "./realism.ts";
 import { techniquePlan, techniqueVersion } from "@toonflow/tool-media-generation/filmTechniques";
+import { checkSequence, openHighIssues } from "./continuity.ts";
+import { finalReviewFields } from "@toonflow/tool-media-generation/runtime";
+import { validateMusicEdit } from "./music.ts";
 
 export function assertSpeechExport(s: Scope, sequenceId: string) {
   const edit = getEdit(s, sequenceId, false);
   validateTimeline(s, edit);
+  validateMusicEdit(s, edit);
   const active = edit.clips.filter(clip => !edit.tracks.find(track => track.id === clip.trackId)?.muted);
-  const projectId = s.get("sequences", sequenceId)!.projectId;
-  const hasSpeech = s.list("shots", { projectId }).some(shot => shot.creativeBrief?.dialogue?.lines?.length || needsLipSync(shot));
-  const hasTechniques = s.list("shots", { projectId }).some(shot => shot.techniques?.length);
-  if ((hasSpeech || hasTechniques) && active.some(clip => edit.tracks.find(track => track.id === clip.trackId)?.kind === "video"
-    && (!clip.shotId || s.get("shots", clip.shotId)?.projectId !== projectId))) {
-    throw conflict("有对白或镜头技法的项目，视频片段须关联本项目对应镜头才能核对原句、声音、口型与技法；无镜头归属的素材只能导出 draft:true 预览，不能直接作为定稿", "speech_export_blocked");
-  }
+  checkSequence(s, sequenceId);
   for (const shot of s.list("shots", { sequenceId })) {
     for (const line of shot.creativeBrief?.dialogue?.lines ?? []) {
       if (!active.some(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video"
@@ -31,26 +29,32 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
   }
   for (const clip of active.filter(clip => edit.tracks.find(track => track.id === clip.trackId)?.kind === "video")) {
     const shot = clip.shotId ? s.get("shots", clip.shotId) : null;
-    if (shot && techniquePlan(shot, "video").length) {
-      const source = resolveClip(s, clip);
-      const take = s.list("takes", { shotId: shot.id, mediaId: source.mediaId })[0];
-      if (!source.mime?.startsWith("video/") || !take) throw conflict("选用镜头技法的画面须使用已检查的真实视频候选，不能靠静帧或自由导入绕过检查", "technique_review_required");
-      requireReviewed(s, "take", take);
-    }
-    const lines = shot?.creativeBrief?.dialogue?.lines ?? [];
-    if (!shot || !lines.length && !needsLipSync(shot)) continue;
     const source = resolveClip(s, clip);
-    if (!source.mime?.startsWith("video/")) throw conflict("对白画面缺少真实视频，静帧占位只能作为草稿预览", "speech_export_blocked");
-    const take = s.list("takes", { shotId: shot.id, mediaId: source.mediaId })[0];
+    // 显式静态落版沿用已检查的主帧；不能把它当运动镜头、对白或演唱的替身。
+    if (clip.type === "media" && source.mime?.startsWith("image/") && shot?.sequenceId === sequenceId) {
+      const hero = shot.heroKeyframeId ? s.get("keyframes", shot.heroKeyframeId) : null;
+      if (hero?.mediaId === source.mediaId && !shot.creativeBrief?.dialogue?.lines?.length && !needsLipSync(shot) && !techniquePlan(shot, "video").length) {
+        if (openHighIssues(s, shot.id).length) throw conflict("静态落版仍有未解决的连续性问题", "continuity_blocked");
+        requireReviewed(s, "keyframe", hero);
+        continue;
+      }
+    }
+    const take = shot?.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
+    if (!shot || shot.sequenceId !== sequenceId || !take || take.mediaId !== source.mediaId || !source.mime?.startsWith("video/")) throw conflict("定稿须使用本序列已采用且经过检查的镜头视频；工作版本可用 draft:true 预览", "production_export_blocked");
+    if (openHighIssues(s, shot.id).length) throw conflict("本序列仍有未解决的高严重度连续性问题，请先处理后导出定稿", "continuity_blocked");
+    requireReviewed(s, "take", take);
+    const lines = shot.creativeBrief?.dialogue?.lines ?? [];
+    if (!lines.length && !needsLipSync(shot)) continue;
     const relevant = lines.map((line: any, lineIndex: number) => ({ ...line, lineIndex })).filter((line: any) => line.start < clip.in + clip.duration * clip.speed && line.end > clip.in);
     if (relevant.some((line: any) => line.start < clip.in - 0.001 || line.end > clip.in + clip.duration * clip.speed + 0.001)) throw conflict("定稿剪辑截断了对白，须保留完整发声区间", "speech_export_blocked");
     if (!relevant.length && lines.length) continue;
+    if (shot.musicVideo?.audioMode === "sourceTrack" && !lines.length) continue; // 原曲覆盖已由 validateMusicEdit 核对，口型由 requireReviewed 核对。
     if (relevant.length && shot.creativeBrief?.dialogue?.mode === "post" && relevant.every((line: any) => line.lipSync !== "visible")) {
       const complete = relevant.every((line: any) => active.some(audio => audio.linkedClipId === clip.id && audio.dialogueLineIndex === line.lineIndex && audio.dialogueText === line.text
         && edit.tracks.find(track => track.id === audio.trackId)?.kind === "audio" && audio.gainDb + (edit.tracks.find(track => track.id === audio.trackId)?.gainDb ?? 0) > -60));
       if (complete) continue;
     }
-    if (!take || clip.audioDetached || clip.gainDb + (edit.tracks.find(track => track.id === clip.trackId)?.gainDb ?? 0) <= -60) throw conflict("对白缺少当前完整声音或声音已静音；只能导出 draft:true 预览，不能作为定稿", "speech_export_blocked");
+    if (clip.audioDetached || clip.gainDb + (edit.tracks.find(track => track.id === clip.trackId)?.gainDb ?? 0) <= -60) throw conflict("对白缺少当前完整声音或声音已静音；只能导出 draft:true 预览，不能作为定稿", "speech_export_blocked");
     if (shot.creativeBrief?.dialogue?.mode === "post" && relevant.some((line: any) => line.lipSync === "visible")) {
       const sync = take.meta?.speechSync;
       if (!sync?.jobId || !sync.audioMatches || sync.specFingerprint !== shotFingerprint(s, shot.id)) throw conflict("后配音口型缺少当前规格与真实处理任务的检查记录，不能把混音视频当作同步定稿", "speech_export_blocked");
@@ -60,7 +64,6 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
         || inputs.audioHash !== s.get("media", sync.referenceMediaId)?.hash || inputs.videoHash !== s.get("media", sync.sourceMediaId)?.hash
         || !s.list("generation_outputs", { jobId: job.id }).some(output => output.mediaId === take.mediaId)) throw conflict("口型任务或输入输出关联已失效，旧检查记录不能用于定稿", "speech_export_blocked");
     }
-    requireReviewed(s, "take", take);
   }
 }
 
@@ -73,7 +76,8 @@ export function sequenceFingerprint(s: Scope, sequenceId: string) {
   const { history, future, ...edit } = getEdit(s, sequenceId, false);
   const sources = edit.clips.map(clip => {
     const source = resolveClip(s, clip);
-    return { source, shot: clip.shotId ? s.get("shots", clip.shotId) : null, reviews: sourceReviews(s, source.mediaId).map(report => report.id) };
+    const shot = clip.shotId ? s.get("shots", clip.shotId) : null;
+    return { source, shot, fingerprint: shot ? shotFingerprint(s, shot.id) : null, reviews: sourceReviews(s, source.mediaId).map(report => report.id) };
   });
   const projectId = s.get("sequences", sequenceId)?.projectId;
   const context = projectId ? ["worlds", "looks", "assets", "reference_bindings"].map(table => s.list(table, { projectId })) : [];
@@ -100,26 +104,42 @@ function finalTechniquePlan(s: Scope, sequenceId: string) {
   });
 }
 
+export function finalReviewPlan(s: Scope, sequenceId: string) {
+  const sequence = s.get("sequences", sequenceId);
+  if (!sequence) throw notFound("sequence");
+  const shots = s.list("shots", { sequenceId });
+  const edit = getEdit(s, sequenceId, false);
+  const cuts = edit.tracks.filter(track => track.kind === "video" && !track.muted).flatMap(track => {
+    const clips = edit.clips.filter(clip => clip.trackId === track.id).sort((a, b) => a.start - b.start);
+    return clips.slice(1).map((clip, index) => ({ id: clip.id, seconds: clip.start, leftShotId: clips[index].shotId, rightShotId: clip.shotId }));
+  });
+  return { fields: finalReviewFields(sequence.kind ?? "story", shots.some(needsLipSync), shots.some(shot => !!shot.musicVideo)), cuts };
+}
+
 export function finalQualityView(s: Scope, render: Record<string, any>) {
   const quality = render.manifest?.quality;
   const techniques = finalTechniquePlan(s, render.sequenceId);
-  if (!quality) return { status: "unverified", techniques };
+  const plan = finalReviewPlan(s, render.sequenceId);
+  if (!quality) return { status: "unverified", techniques, plan };
   const stale = !render.manifest?.sourceFingerprint || render.manifest.sourceFingerprint !== sequenceFingerprint(s, render.sequenceId) || quality.mediaId !== render.mediaId;
   const sequence = s.get("sequences", render.sequenceId);
   const pilotReviewRequired = sequence && isAdSequence(sequence) && !adReadiness(s, sequence.id).ready;
-  const storyReviewRequired = ["narrative", "performance", "dialogueCoverage", "editing"].some(key => quality.review?.checks?.[key] !== "pass");
+  const storyReviewRequired = plan.fields.some(field => quality.review?.checks?.[field.id] !== "pass")
+    || plan.cuts.some(cut => !quality.review?.cutReview?.some((item: any) => item.id === cut.id && Math.abs(item.seconds - cut.seconds) < 0.001 && item.verdict === "pass" && item.note?.trim().length >= 10));
   const techniqueReviewRequired = techniques.some(item => !quality.review?.techniqueReview?.some((check: { shotId: string; id: string; verdict: string }) => check.shotId === item.shotId && check.id === item.id && check.verdict === "pass"));
   let speechReviewRequired = false;
   if (quality.status === "pass") {
     try { assertSpeechExport(s, render.sequenceId); }
     catch (error) { if (!(error instanceof HttpError)) throw error; speechReviewRequired = true; }
   }
-  return { ...quality, techniques, techniqueReviewRequired, speechReviewRequired, status: stale ? "stale" : (pilotReviewRequired || storyReviewRequired || techniqueReviewRequired || speechReviewRequired) && quality.status === "pass" ? "unverified" : quality.status };
+  return { ...quality, techniques, plan, techniqueReviewRequired, speechReviewRequired, status: stale ? "stale" : (pilotReviewRequired || storyReviewRequired || techniqueReviewRequired || speechReviewRequired) && quality.status === "pass" ? "unverified" : quality.status };
 }
 
 export const finalReviewSchema = z.object({
   analysisId: z.string().min(1),
   fullPlayback: z.literal(true),
+  cutReview: z.array(z.object({ id: z.string().min(1), seconds: z.number().finite().nonnegative(), verdict: z.enum(["pass", "fail", "unverified"]), note: z.string().trim().max(2000) }).strict()
+    .refine(item => item.verdict === "unverified" || item.note.length >= 10, "切点须记录实际声画衔接或缺陷及保留项，至少10字")).max(600).default([]),
   techniqueReview: z.array(z.object({ shotId: z.string().min(1), id: z.string().min(1), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().max(2000).default("") }).strict()
     .refine(item => item.verdict === "unverified" || item.note.length >= 10, "技法检查须记录至少10字的实际观察依据")).max(1440).default([]),
   checks: z.object({
@@ -136,6 +156,8 @@ export const finalReviewSchema = z.object({
     product: z.enum(["pass", "fail", "unverified"]).optional(),
     composition: z.enum(["pass", "fail", "unverified"]).optional(),
     color: z.enum(["pass", "fail", "unverified"]).optional(),
+    musicAlignment: z.enum(["pass", "fail", "unverified"]).optional(),
+    musicProgression: z.enum(["pass", "fail", "unverified"]).optional(),
     editing: z.enum(["pass", "fail", "unverified"]).default("unverified"),
   }),
   note: z.string().trim().min(10).max(4000),
@@ -235,15 +257,20 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
   } finally { await rm(directory, { recursive: true, force: true }); }
 }
 
-export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: string) {
+export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: string, authorization?: string) {
   const review = finalReviewSchema.parse(input);
   const { render } = renderMedia(s, id);
   const quality = finalQualityView(s, render);
   if (!quality.analysisId || quality.analysisId !== review.analysisId || quality.status === "stale") throw conflict("检测记录已过期，请重新导出或检测", "stale");
   const techniques = finalTechniquePlan(s, render.sequenceId);
+  const plan = finalReviewPlan(s, render.sequenceId);
+  const cutIds = review.cutReview.map(item => item.id);
+  if (new Set(cutIds).size !== cutIds.length || review.cutReview.some(item => !plan.cuts.some(cut => cut.id === item.id && Math.abs(cut.seconds - item.seconds) < 0.001))) throw bad("切点验收须对应当前导出时间线，不得重复或沿用旧时间码");
   const keys = review.techniqueReview.map(item => `${item.shotId}:${item.id}`);
   if (new Set(keys).size !== keys.length || review.techniqueReview.some(item => !techniques.some(required => required.shotId === item.shotId && required.id === item.id))) throw bad("成片技法检查须对应当前镜头和计划，不能重复或引用无关项目");
-  const passing = Object.values(review.checks).every(value => value === "pass") && !review.techniqueReview.some(item => item.verdict === "revise");
+  const passing = plan.fields.every(field => review.checks[field.id as keyof typeof review.checks] === "pass")
+    && Object.values(review.checks).every(value => value === "pass") && !review.techniqueReview.some(item => item.verdict === "revise")
+    && plan.cuts.every(cut => review.cutReview.some(item => item.id === cut.id && item.verdict === "pass"));
   if (passing && techniques.some(item => !review.techniqueReview.some(check => check.shotId === item.shotId && check.id === item.id && check.verdict === "pass"))) throw bad("成片的剪辑、声音和叙事技法须按 techniques 计划完整看听并逐项记录，不能跳过检查或用提示词替代");
   if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(needsLipSync) && review.checks.lipSync !== "pass") throw bad("成片包含画内对白或演唱，须完整看听并确认逐字口型同步；不能只以声音检查替代口型验收");
   if (passing) assertSpeechExport(s, render.sequenceId);
@@ -255,8 +282,9 @@ export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: 
   }
   if (passing && quality.findings.some((item: Finding) => item.severity === "block")) throw conflict("最终文件或源素材存在阻断问题", "qc_blocked");
   if (passing && quality.findings.some((item: Finding) => !review.acknowledgements.some(ack => ack.id === item.id))) throw bad("请逐项填写声音、时长或广告表达告警的复核依据；尚未解决则标记返修");
-  const status = passing ? "pass" : Object.values(review.checks).includes("fail") || review.techniqueReview.some(item => item.verdict === "revise") ? "fail" : "unverified";
-  const next = { ...quality, status, review: { ...review, actor, reviewedAt: now() } };
+  const status = passing ? "pass" : Object.values(review.checks).includes("fail") || review.cutReview.some(item => item.verdict === "fail") || review.techniqueReview.some(item => item.verdict === "revise") ? "fail" : "unverified";
+  const { plan: reviewPlan, techniques: reviewTechniques, techniqueReviewRequired, speechReviewRequired, ...inspection } = quality;
+  const next = { ...inspection, status, review: { ...review, actor, ...(authorization ? { authorization } : {}), reviewedAt: now() } };
   s.update("renders", id, { manifest: { ...render.manifest, quality: next } });
   return next;
 }

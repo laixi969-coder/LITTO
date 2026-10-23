@@ -1,6 +1,6 @@
 import { all, run, type Scope } from "../db.ts";
 import { now } from "../util.ts";
-import { statesOf, type State } from "./state.ts";
+import { statesOf, continuityPredecessor, type State } from "./state.ts";
 
 export type Issue = { shotId: string; relatedShotId?: string; category: string; severity: "high" | "medium" | "low"; message: string; repair: { action: string; detail: string } };
 
@@ -75,13 +75,12 @@ export function checkSequence(s: Scope, sequenceId: string): Issue[] {
     const assets = new Map(s.list("assets").map((a) => [a.id, a]));
     const bindings = s.list("reference_bindings", { targetType: "shot" });
     const issues: Issue[] = [];
-    let prev: any = null, prevSt: any = null;
     for (const shot of shots) {
+        const prev = continuityPredecessor(s, shot);
+        const prevSt = prev ? statesOf(s, prev.id) : null;
         const st = statesOf(s, shot.id);
         const sh = { ...shot, bindings: bindings.filter((b) => b.targetId === shot.id) };
         issues.push(...checkPair(prev, sh, prevSt, st, assets));
-        prev = sh;
-        prevSt = st;
     }
     // Persist: replace open issues, keep overridden ones.
     const old = all("SELECT * FROM continuity_issues WHERE workspace_id=? AND shot_id IN (" + (shots.map(() => "?").join(",") || "''") + ")", s.workspaceId, ...shots.map((x) => x.id));

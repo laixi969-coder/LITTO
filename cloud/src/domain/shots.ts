@@ -5,6 +5,7 @@ import { recomputeStates, validateStateDelta } from "./state.ts";
 import type { ShotDraft } from "./skills.ts";
 import type { z } from "zod";
 import { techniqueIssues } from "@toonflow/tool-media-generation/filmTechniques";
+import { musicSource } from "./music.ts";
 
 export const shotPartial = shotInput.partial();
 
@@ -19,16 +20,28 @@ const dataOf = (i: ShotInput) => {
     return data;
 };
 
-function validateTechniques(input: Record<string, any>) {
+function validateEpisode(s: Scope, input: Pick<ShotInput, "sequenceId" | "source">) {
+  const sequence = s.get("sequences", input.sequenceId);
+  if (input.source?.episodeNumber !== undefined && sequence?.episodeNumber !== input.source.episodeNumber) throw bad("镜头来源场次的集号与制作序列不一致，请选择对应集的序列");
+}
+
+function validateShotDirection(input: Record<string, any>) {
     validateActionTimeline(input as ShotInput);
     const issues = techniqueIssues(input);
     if (issues.length) throw bad(issues.join("；"));
+    const duration = input.generationDuration ?? input.duration;
+    for (const event of input.interactions ?? []) {
+        if (event.start > event.contactAt || event.contactAt >= event.end || event.end > duration) throw bad("接触动作须按起势、接触、完成排列且在生成时长内");
+        if (new Set(event.assetIds).size !== event.assetIds.length || event.assetIds.some((id: string) => !(input.visibleAssetIds ?? input.assetIds).includes(id))) throw bad("接触参与者须为本镜实际出镜的资产，不能重复或借用其他镜头角色");
+    }
 }
 
 export function createShot(s: Scope, projectId: string, input: ShotInput) {
+    validateEpisode(s, input);
     validateVisibleAssets(input);
-    validateTechniques(input);
+    validateShotDirection(input);
     validateMusicVideoTiming(input);
+    musicSource(s, { ...input, projectId });
     validateStateDelta(s, projectId, input.intendedStateDelta);
     const seq = s.get("sequences", input.sequenceId);
     if (!seq || seq.projectId !== projectId) throw notFound("sequence");
@@ -44,12 +57,13 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["source", "continuityFromShotId", "sceneId", "narrativeFunction", "action", "assetIds", "visibleAssetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "creativeBrief", "advertising", "techniques"] as const;
+const CORE = ["source", "continuityFromShotId", "sceneId", "narrativeFunction", "action", "assetIds", "visibleAssetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "interactions", "creativeBrief", "advertising", "techniques"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
+    validateEpisode(s, { ...shot, ...patch } as ShotInput);
     validateVisibleAssets({ ...shot, ...patch } as ShotInput);
-    validateTechniques({ ...shot, ...patch } as ShotInput);
+    validateShotDirection({ ...shot, ...patch } as ShotInput);
     if (patch.intendedStateDelta !== undefined) validateStateDelta(s, shot.projectId, patch.intendedStateDelta);
     const actionChanged = patch.action !== undefined && patch.action !== shot.action;
     const timelineChanged = patch.musicVideo !== undefined && JSON.stringify(patch.musicVideo?.timeline) !== JSON.stringify(shot.musicVideo?.timeline)
@@ -65,6 +79,7 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
             speechChanged && patch.action === undefined && "action（对白窗口变化后的实时行动与完整因果）",
             speechChanged && shot.generationDuration !== undefined && patch.generationDuration === undefined && "generationDuration（不能沿用旧生成时长）",
             shot.musicVideo && patch.musicVideo === undefined && "musicVideo（逐秒动作与声音）",
+            shot.interactions?.length && patch.interactions === undefined && "interactions（接触与受力链）",
             shot.creativeBrief && patch.creativeBrief === undefined && "creativeBrief（创作目标、攻防与对白口型）",
             shot.advertising && patch.advertising === undefined && "advertising（情绪节拍、产品展示与剪接声音）",
             shot.constraints?.length && patch.constraints === undefined && "constraints（镜数、速度与保持项）",
@@ -75,6 +90,7 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
         if (missing.length) throw bad(`动作、对白屏时或时间线已修改，请由助手复核并在同一次 updateShot 中提交 ${missing.join("、")}，避免继承旧动作或旧切镜时点；仍适用的内容可原样提交。这是规格一致性修正，不需要让用户逐项填写或再次确认。`);
     }
     validateMusicVideoTiming({ ...shot, ...patch } as ShotInput);
+    musicSource(s, { ...shot, ...patch });
     if (patch.sequenceId !== undefined && patch.sequenceId !== shot.sequenceId) throw bad("use the sequence workflow to move a shot");
     if (patch.sceneId && s.get("scenes", patch.sceneId)?.sequenceId !== shot.sequenceId) throw bad("scene does not belong to sequence");
     // ACT: 尚无已采用视频时，首次补齐创作简报属于制作准备；仍更新规格指纹，不能沿用旧检查。
@@ -128,7 +144,7 @@ export function createShotsFromDrafts(s: Scope, projectId: string, sequenceId: s
         if (opts.replace) for (const sh of s.list("shots", { sequenceId })) if (!sh.approvedTakeId && !sh.heroKeyframeId) s.softDelete("shots", sh.id);
         for (const d of drafts) {
             validateVisibleAssets(d);
-            validateTechniques(d);
+            validateShotDirection(d);
             if (!scenes.has(d.sceneIndex)) scenes.set(d.sceneIndex, s.insert("scenes", { project_id: projectId, sequence_id: sequenceId, name: d.sceneName, ord: d.sceneIndex, data: {} }).id);
             const ord = all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", sequenceId, s.workspaceId)[0].n;
             const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, ...(d.visibleAssetIds !== undefined ? { visibleAssetIds: d.visibleAssetIds } : {}), action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration, ...(d.source ? { source: d.source } : {}), ...(d.creativeBrief ? { creativeBrief: d.creativeBrief } : {}), ...(d.techniques ? { techniques: d.techniques } : {}) } });

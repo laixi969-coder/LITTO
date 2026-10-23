@@ -44,7 +44,7 @@ export async function loadProductionSkillContext(cwd: string, tools: Pick<ToolDe
       warnings.push(`${name} 已关闭自动调用，未加载`);
       continue;
     }
-    for (const path of [undefined, ...(name === "videoPromptDirector" ? ["references/cleanPortrait.md"] : name === "cinema" ? ["references/movementDirection.md"] : [])]) {
+    for (const path of [undefined, ...(name === "videoPromptDirector" ? ["references/cleanPortrait.md"] : name === "cinema" ? ["references/movementDirection.md", "references/referenceQuality.md"] : [])]) {
       try {
         const document = await context.read({ name, path });
         documents.push(`### ${document.name} / ${document.scope} / ${document.path}\n${document.content}`);

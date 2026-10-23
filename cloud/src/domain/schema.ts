@@ -119,6 +119,7 @@ export const musicVideoSchema = z.object({
     audioMode: z.enum(["sourceTrack", "generated", "silent"]),
     audioDirection: z.string().trim().min(1).max(8000),
     sourceStart: z.number().finite().nonnegative().optional(),
+    sourceMediaId: z.string().min(1).max(128).optional().describe("当前项目已导入的原曲音频；sourceStart 对应镜头本地 0 秒，剪辑实际按此入点排轨"),
     lipSyncRequired: z.boolean().optional().describe("画内人物唱歌时为true，旁白或画外歌曲为false；必须对采用声音检查逐字口型"),
     timeline: actionTimelineSchema,
 }).strict().superRefine((value, context) => {
@@ -143,6 +144,7 @@ export const creativeBriefSchema = z.object({
         signature: directionText,
         coverage: directionText,
         beats: z.array(z.object({
+            timelineIndex: z.number().int().min(0).max(119).optional().describe("对应唯一执行时间线的零起始节拍序号；攻防设计不另建秒数，正式生成前必须绑定"),
             attackerId: directionText, defenderId: directionText,
             action: directionText, reaction: directionText, endState: directionText,
             supportingAction: directionText,
@@ -166,7 +168,7 @@ export const advertisingSchema = z.object({
 }).strict();
 
 const assetStateDelta = z.record(z.record(z.any()).nullable());
-const stateDeltaSchema = z.object({
+export const stateDeltaSchema = z.object({
     characters: assetStateDelta.optional(), wardrobe: assetStateDelta.optional(), props: assetStateDelta.optional(),
     environment: z.record(z.any()).optional(), lighting: z.record(z.any()).optional(),
     motion: z.record(z.any()).optional(), emotional: z.record(z.any()).optional(),
@@ -186,9 +188,10 @@ export const shotInput = z.object({
         beatIndexes: z.array(z.number().int().nonnegative()).max(1000).default([]),
         beats: z.array(z.string().max(12000)).max(1000).default([]),
         revisionId: z.string().max(100).optional(), sceneId: z.string().regex(/^s\d{2,3}$/).optional(),
+        episodeNumber: z.number().int().min(1).max(100).optional(),
         sceneText: z.string().max(12000).optional(), speech: z.string().max(6000).optional(), knowledge: z.string().max(2000).optional(),
     }).strict().optional(),
-    continuityFromShotId: z.string().min(1).max(128).nullable().optional().describe("明确返回同一时刻/空间时引用更早的镜头；不自动按场景名推断倒叙或时间跳跃"),
+    continuityFromShotId: z.string().min(1).max(128).nullable().optional().describe("明确接续本项目更早序列或本序列更早镜头的末态；分集首镜显式指定，不按场景名推断倒叙或时间跳跃"),
     narrativeFunction: z.enum(NARRATIVE_FUNCTIONS).default("Establish"),
     assetIds: z.array(z.string()).default([]),
     visibleAssetIds: z.array(z.string()).optional().describe("本镜实际出镜的资产，须为 assetIds 的子集；画外声音保留在对白中。省略时兼容旧镜头，沿用 assetIds；空数组表示无人无物出镜"),
@@ -200,6 +203,12 @@ export const shotInput = z.object({
     duration: z.number().finite().positive().max(3600).default(4),
     generationDuration: z.number().finite().positive().max(3600).optional(),
     musicVideo: musicVideoSchema.nullable().optional(),
+    interactions: z.array(z.object({
+        assetIds: z.array(z.string().min(1)).min(1).max(6),
+        start: z.number().finite().nonnegative(), contactAt: z.number().finite().nonnegative(), end: z.number().finite().positive(),
+        approach: directionText, contact: directionText, force: directionText, support: directionText,
+        release: directionText, endState: directionText,
+    }).strict()).max(12).optional().describe("关键接触动作的实际受力链；镜内秒数，持握未释放可明确仍由谁承托，不能为填字段编造动作"),
     creativeBrief: creativeBriefSchema.optional(),
     advertising: advertisingSchema.optional(),
     techniques: z.array(techniqueSelectionSchema).max(8).optional(),

@@ -137,13 +137,18 @@
             <details v-if="!item.draft && qualityDrafts[item.id] && item.quality?.analysisId">
               <summary>最终声画验收</summary>
               <p>每项记录实际观察；有意静默或声音进入需解释告警，未解决则选返修。剪辑或素材改变后须重新导出。</p>
-              <label v-for="field in reviewFields" :key="field[0]">{{ field[1] }}<select v-model="qualityDrafts[item.id].checks[field[0]]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
+              <label v-for="field in item.quality.plan.fields" :key="field.id">{{ field.label }}<select v-model="qualityDrafts[item.id].checks[field.id]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
               <template v-for="technique in item.quality.techniques ?? []" :key="technique.shotId + ':' + technique.id">
                 <p>{{ technique.criterion }}</p>
                 <template v-if="qualityDrafts[item.id].techniques[technique.shotId + ':' + technique.id]">
                   <label>技法执行<select v-model="qualityDrafts[item.id].techniques[technique.shotId + ':' + technique.id].verdict"><option value="unverified">未验证</option><option value="pass">实际检查通过</option><option value="revise">需要返修</option></select></label>
                   <label>实际时间点与看听依据<textarea v-model="qualityDrafts[item.id].techniques[technique.shotId + ':' + technique.id].note" rows="2" /></label>
                 </template>
+              </template>
+              <template v-for="cut in item.quality.plan.cuts" :key="cut.id">
+                <p>{{ cut.seconds.toFixed(3) }} 秒 · 邻镜声画交接</p>
+                <label>衔接结论<select v-model="qualityDrafts[item.id].cuts[cut.id].verdict"><option value="unverified">未验证</option><option value="pass">已检查通过</option><option value="fail">需要返修</option></select></label>
+                <label>动作阶段、视线方向、光色与声音的实际依据；返修注明问题和保留项<textarea v-model="qualityDrafts[item.id].cuts[cut.id].note" rows="2" /></label>
               </template>
               <label><input v-model="qualityDrafts[item.id].fullPlayback" type="checkbox" />已完整播放并试听此导出文件</label>
               <label>时间码、观察证据与复查结论<textarea v-model="qualityDrafts[item.id].note" rows="3" /></label>
@@ -167,7 +172,7 @@ import saveFile from "@/lib/saveFile";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 import { ElMessageBox } from "element-plus";
-import { needsLipSync } from "@toonflow/tool-media-generation/runtime";
+
 const props = defineProps<{ directory: string; sequences: any[]; shots: any[]; references: any[]; request: (path: string, method?: string, body?: unknown) => Promise<any> }>();
 const sequenceId = ref(""), edit = ref<any>(null), busy = ref(false), error = ref(""), message = ref("");
 const ranges = ref<Record<string, { in: number; out: number }>>({});
@@ -176,14 +181,12 @@ const transition = ref("cut"), transitionDuration = ref(0.3), soundMode = ref("j
 const audioMediaId = ref(""), audioRole = ref("sfx"), audioStart = ref(0), audioDuration = ref(1);
 const segmentMediaId = ref(""), segments = ref<{ shotId: string; in: number; out: number }[]>([]);
 const exportSize = ref("source"), renders = ref<any[]>([]);
-const qualityFields = [["surface", "皮肤、头发与商品材质"], ["motion", "肢体、动作受力与手物接触"], ["lighting", "场景光源、曝光与光色"], ["continuity", "人物、服装、场景与剪点连续"], ["sound", "对白、环境声、音画同步与接缝"], ["narrative", "事件、信息或关系有推进，画面承担叙事"], ["performance", "角色有目的、可见反应与明确调度"], ["dialogueCoverage", "原文台词真实发声，说话人与声音通道正确"], ["editing", "节奏、留白与邻镜连接"]];
 const adQualityFields = [["emotion", "情绪与创意表达"], ["product", "产品识别与结尾品牌记忆"], ["composition", "构图与视觉主次"], ["color", "整片色调、肤色与产品本色"], ["editing", "节奏、留白与邻镜连接"]];
 const adPlan = ref<any>(null);
-const reviewFields = computed(() => [...qualityFields, ...(props.shots.some(shot => shot.sequenceId === sequenceId.value && needsLipSync(shot)) ? [["lipSync", "画内对白或演唱的逐字口型"]] : []), ...(adPlan.value?.readiness.required ? adQualityFields.filter(field => field[0] !== "editing") : [])]);
 const visualLabels: Record<string, string> = { palette: "色彩", light: "用光", materials: "材质", composition: "构图", motion: "运动" };
 const grade = ref({ exposureStops: 0, temperature: 0, saturation: 1, contrast: 1 });
 const qualityLabels: Record<string, string> = { unverified: "未验收", fail: "需要返修", pass: "人工验收通过", stale: "版本已改变，须重新导出验收" };
-const qualityDrafts = ref<Record<string, { analysisId: string; checks: Record<string, string>; fullPlayback: boolean; note: string; techniques: Record<string, { verdict: string; note: string }>; reasons: Record<string, string> }>>({});
+const qualityDrafts = ref<Record<string, { analysisId: string; checks: Record<string, string>; fullPlayback: boolean; note: string; techniques: Record<string, { verdict: string; note: string }>; cuts: Record<string, { verdict: string; note: string }>; reasons: Record<string, string> }>>({});
 let disposed = false;
 let renderTimer: ReturnType<typeof setTimeout> | undefined;
 let renderLoading = false;
@@ -289,7 +292,7 @@ async function loadRenders() {
     if (disposed || id !== sequenceId.value) return;
     renders.value = values;
     for (const item of values) if (item.quality?.analysisId && qualityDrafts.value[item.id]?.analysisId !== item.quality.analysisId) {
-      qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(reviewFields.value.map(field => [field[0], "unverified"])), fullPlayback: false, note: "", techniques: Object.fromEntries((item.quality.techniques ?? []).map((technique: any) => { const prior = item.quality.review?.techniqueReview?.find((check: any) => check.shotId === technique.shotId && check.id === technique.id); return [technique.shotId + ":" + technique.id, { verdict: prior?.verdict ?? "unverified", note: prior?.note ?? "" }]; })), reasons: {} };
+      qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(item.quality.plan.fields.map((field: any) => [field.id, "unverified"])), fullPlayback: false, note: "", cuts: Object.fromEntries(item.quality.plan.cuts.map((cut: any) => [cut.id, { verdict: "unverified", note: "" }])), techniques: Object.fromEntries((item.quality.techniques ?? []).map((technique: any) => { const prior = item.quality.review?.techniqueReview?.find((check: any) => check.shotId === technique.shotId && check.id === technique.id); return [technique.shotId + ":" + technique.id, { verdict: prior?.verdict ?? "unverified", note: prior?.note ?? "" }]; })), reasons: {} };
     }
     const latest = values.find((item: any) => item.status === "SUCCEEDED" && item.media);
     if (latest && !published.value.has(latest.id) && !publishErrors.value[latest.id]) {
@@ -306,7 +309,7 @@ async function loadRenders() {
 async function analyzeQuality(id: string) { await props.request(`/renders/${id}/quality/analyze`, "POST", {}); await loadRenders(); }
 async function saveQuality(item: any) {
   const draft = qualityDrafts.value[item.id];
-  await props.request(`/renders/${item.id}/quality/review`, "POST", { analysisId: draft.analysisId, checks: draft.checks, fullPlayback: draft.fullPlayback, note: draft.note, techniqueReview: (item.quality.techniques ?? []).map((technique: any) => ({ shotId: technique.shotId, id: technique.id, ...draft.techniques[technique.shotId + ":" + technique.id] })), acknowledgements: Object.entries(draft.reasons).filter(([, reason]) => reason.trim()).map(([id, reason]) => ({ id, reason })) });
+  await props.request(`/renders/${item.id}/quality/review`, "POST", { analysisId: draft.analysisId, checks: draft.checks, fullPlayback: draft.fullPlayback, note: draft.note, cutReview: item.quality.plan.cuts.map((cut: any) => ({ id: cut.id, seconds: cut.seconds, ...draft.cuts[cut.id] })), techniqueReview: (item.quality.techniques ?? []).map((technique: any) => ({ shotId: technique.shotId, id: technique.id, ...draft.techniques[technique.shotId + ":" + technique.id] })), acknowledgements: Object.entries(draft.reasons).filter(([, reason]) => reason.trim()).map(([id, reason]) => ({ id, reason })) });
   await loadRenders();
 }
 async function trackRender(id: string, targetSequence: string, binding?: { context: CanvasContext; id: string }) {

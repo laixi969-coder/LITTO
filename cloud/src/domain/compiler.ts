@@ -1,7 +1,7 @@
-import { bad, notFound } from "../util.ts";
+import { bad, notFound, HttpError } from "../util.ts";
 import { all, get, type Row, type Scope } from "../db.ts";
 import { validateVisibleAssets } from "./shots.ts";
-import { statesOf, validateStateDelta } from "./state.ts";
+import { statesOf, validateStateDelta, continuityPredecessor } from "./state.ts";
 import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
@@ -12,9 +12,11 @@ import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
 import { physicalInteractionPlan, videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
+import { musicSource } from "./music.ts";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 import { speechPlanningIssues } from "./speechPlanning.ts";
+import { requireReviewed } from "./realism.ts";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -162,7 +164,20 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     ]));
     const warnings: string[] = [];
     if (kind === "video") warnings.push(...speechPlanningIssues(s, shot).map(issue => `配音规划未完成：${issue}`));
-    const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
+    const previous = continuityPredecessor(s, shot);
+    // ACT: 仅显式接戏形成生成依赖；意象蒙太奇和独立镜头仍可并行，计划末态不能冒充实际末态。
+    if (shot.continuityFromShotId && previous) {
+        const take = previous.approvedTakeId ? s.get("takes", previous.approvedTakeId) : null;
+        if (!take || take.status !== "approved" || !take.meta?.observedStateDelta) {
+            warnings.push("创作准备未完成：明确接续的前镜尚无已采用视频与实际末态；先完成前镜实际审阅，再编译本镜，不用计划末态并行猜测接戏");
+        } else {
+            try { requireReviewed(s, "take", take); }
+            catch (error) {
+                if (!(error instanceof HttpError)) throw error;
+                warnings.push(`创作准备未完成：接戏来源检查无效，先复核前镜；${error.message}`);
+            }
+        }
+    }
     const overrides = s.list("continuity_issues", { shotId, status: "overridden" });
     // ACT: 复用后验规则提前提醒，不写质检记录、不把计划当实测；越轴等启发式不作为新增硬门禁。
     const continuity = checkPair(previous ?? null, { ...shot, bindings }, previous ? statesOf(s, previous.id) : null, state, projectAssets);
@@ -210,6 +225,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const sorted = [...bindings].sort((a, b) => b.weight - a.weight);
     const textFallback: string[] = [];
     for (const b of sorted) {
+        // 静帧不消费声音或运动视频；这些锁定参考保留给视频编译，不能因此阻断图片生成。
         if (kind === "image" && ["AUDIO", "PERFORMANCE", "CAMERA_MOTION"].includes(b.role)) continue;
         if (kind === "video" && extra.startFrameMediaId && b.role === "START_FRAME") continue;
         const ref = s.get("refs", b.referenceId);
@@ -261,6 +277,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
 
     const cam = shot.camera ?? {}, lt = shot.lighting ?? {};
     const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
+    musicSource(s, shot, kind === "video");
     const lock: string[] = [...(shot.freedomMap?.LOCK ?? [])];
     for (const a of assets) {
         if (a.approvalStatus === "approved") lock.push(...(a.invariants ?? []).map((i: string) => `${a.name}: ${i}`));
@@ -277,7 +294,11 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     let sections: Record<string, string> = {
         creativeIntent: kind === "video" && shot.creativeBrief ? J([shot.creativeBrief.intent, shot.creativeBrief.visualPayoff]) : "",
         combatDesign: kind === "video" && brief?.combat ? J([brief.combat.dramaticTurn, brief.combat.signature,
-            ...brief.combat.beats.map(beat => `${assetName(beat.attackerId)}对${assetName(beat.defenderId)}：${beat.action} → ${beat.reaction} → ${beat.endState}；其他人物：${beat.supportingAction}`)]) : "",
+            `摄影覆盖：${brief.combat.coverage}；只在唯一执行时间线明确标记的切点切换机位，连续节拍不新增切镜。`,
+            ...brief.combat.beats.map(beat => {
+                const timing = (cam.design?.timeline ?? musicVideo?.timeline)?.[beat.timelineIndex!];
+                return `${timing ? `${timing.start}–${timing.end}s` : "待绑定执行节拍"} ${assetName(beat.attackerId)}对${assetName(beat.defenderId)}：${beat.action} → ${beat.reaction} → ${beat.endState}；其他人物：${beat.supportingAction}`;
+            })]) : "",
         dialogue: kind === "video" && brief?.dialogue.lines.length
             ? `${brief.dialogue.mode === "native" ? "生成以下原文对白及声音，并按要求同步人物口型" : "后期配音及口型处理计划，当前素材不代表声画同步已完成"}：\n${brief.dialogue.lines.map(line => `${musicTimecode(line.start)}–${musicTimecode(line.end)} ${assetName(line.speakerId)}${!visibleIds.has(line.speakerId) ? "（仅画外声音，不出镜）" : ""}说：${JSON.stringify(line.text)}；${line.delivery}；${line.lipSync === "visible" ? "可见嘴部与此句逐字同步" : "画外音，不要求画内人物说此句"}；${line.framing}`).join("\n")}` : "",
         // 整段动作的不变量可能含后续持物或落位；首帧只投影明确起点，视频保留完整约束。
@@ -418,7 +439,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             ? "One uninterrupted take. Timeline boundaries are action beats, not edits. Keep movement, prop contact and camera travel continuous across beats; change framing through motivated blocking and camera movement without cuts, dissolves, resets or repeated starts. Preserve planned stillness and speech/music timing."
             : "Execute the planned action timeline. Cut only at explicitly planned transitions; match pose, held objects, eyeline and screen direction across each cut. Keep core action at its planned speed; extra generation duration is editing handle, not permission to slow the action.";
     }
-    const interaction = physicalInteractionPlan(kind === "image" ? { ...shot, musicVideo: undefined } : shot);
+    const interaction = physicalInteractionPlan(kind === "image" ? { ...shot, camera: undefined, musicVideo: undefined, interactions: undefined }
+        : { ...shot, interactions: shot.interactions?.map((event: any) => ({ ...event, assetIds: event.assetIds.map(assetName) })) });
     if (interaction.required) {
         sections.objectInteraction = kind === "video" ? interaction.instruction : "Preserve the reference object's geometry, openings and support surfaces. Show the actual interaction opening or contact surface clearly enough to establish the planned action; do not invent an opening or hide impossible contact.";
         warnings.push("物体交互预检：核对参考与起始画面中的真实入口、承托面、尺寸和动作路径；文字约束不代表视觉已核实。结果需检查接近、接触、进入或交接及释放后的承托，无法看清时不得记为通过。");

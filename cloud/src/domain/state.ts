@@ -1,4 +1,4 @@
-import { all, run, type Scope } from "../db.ts";
+import { all, run, tx, type Scope } from "../db.ts";
 import { bad, j } from "../util.ts";
 import { shotInput } from "./schema.ts";
 
@@ -53,32 +53,48 @@ function seed(state: State, shot: any, assets: Map<string, any>, newScene: boole
 
 /**
  * PreviousState → IntendedDelta → ResultState. Next shot inherits ResultState.
- * Recomputed for the whole sequence whenever shots, order or deltas change.
+ * 按项目序列顺序传播跨集状态，未指定跨集来源的序列仍从独立基线开始。
  */
 export function recomputeStates(s: Scope, sequenceId: string) {
-    const shots = s.list("shots", { sequenceId }, "ord");
-    const assets = new Map(s.list("assets").map((a) => [a.id, a]));
-    let prev: State | null = null;
-    let prevScene: string | null = null;
-    const results = new Map<string, { state: State; sceneId: string }>();
-    for (const shot of shots) {
+  const sequence = s.get("sequences", sequenceId);
+  if (!sequence) throw bad("接戏序列不存在");
+  const sequences = s.list("sequences", { projectId: sequence.projectId }, "ord, id");
+  const assets = new Map(s.list("assets", { projectId: sequence.projectId }).map((a) => [a.id, a]));
+  const results = new Map<string, { state: State; sceneId: string }>();
+  // ACT: 按项目顺序重算以传播跨集修改，复杂度 O(项目镜头数)；更大项目可按接戏依赖缩小重算范围。
+  tx(() => {
+    for (const current of sequences) {
+      const shots = s.list("shots", { sequenceId: current.id }, "ord, id");
+      let previousState: State | null = null;
+      let previousScene: string | null = null;
+      for (const shot of shots) {
         const reference = shot.continuityFromShotId ? results.get(shot.continuityFromShotId) : undefined;
-        if (shot.continuityFromShotId && !reference) throw bad("接戏来源必须是本序列中更早且未删除的镜头；请先调整依赖再删除或重排");
-        const start = seed(reference?.state ?? prev ?? emptyState(), shot, assets, shot.sceneId !== (reference?.sceneId ?? prevScene));
-        prevScene = shot.sceneId;
-        const delta = shot.intendedStateDelta ?? {};
+        if (shot.continuityFromShotId && !reference) throw bad("接戏来源须为同项目中更早序列的镜头或本序列更早镜头，不能跨项目、向后引用或引用已删除镜头；请先调整接戏依赖");
+        const start = seed(reference?.state ?? previousState ?? emptyState(), shot, assets, shot.sceneId !== (reference?.sceneId ?? previousScene));
         const approved = shot.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
-        const result = applyDelta(start, approved?.meta?.observedStateDelta ?? delta);
-        const upsert = (kind: string, data: State) => {
-            const ex = all("SELECT id FROM shot_states WHERE shot_id=? AND kind=? AND workspace_id=?", shot.id, kind, s.workspaceId)[0];
-            if (ex) run("UPDATE shot_states SET data=?, updated_at=? WHERE id=?", j(data), new Date().toISOString(), ex.id);
-            else s.insert("shot_states", { project_id: shot.projectId, shot_id: shot.id, kind, data });
-        };
-        upsert("start", start);
-        upsert("result", result);
+        const result = applyDelta(start, approved?.meta?.observedStateDelta ?? shot.intendedStateDelta ?? {});
+        for (const [kind, data] of [["start", start], ["result", result]] as const) {
+          const existing = all("SELECT id FROM shot_states WHERE shot_id=? AND kind=? AND workspace_id=?", shot.id, kind, s.workspaceId)[0];
+          if (existing) run("UPDATE shot_states SET data=?, updated_at=? WHERE id=?", j(data), new Date().toISOString(), existing.id);
+          else s.insert("shot_states", { project_id: shot.projectId, shot_id: shot.id, kind, data });
+        }
         results.set(shot.id, { state: result, sceneId: shot.sceneId });
-        prev = result;
+        previousState = result;
+        previousScene = shot.sceneId;
+      }
     }
+  });
+}
+
+export function continuityPredecessor(s: Scope, shot: Record<string, any>) {
+  if (!shot.continuityFromShotId) return s.list("shots", { sequenceId: shot.sequenceId }, "ord, id").filter(item => item.ord < shot.ord).at(-1) ?? null;
+  const previous = s.get("shots", shot.continuityFromShotId);
+  const sequences = s.list("sequences", { projectId: shot.projectId }, "ord, id");
+  const previousIndex = sequences.findIndex(item => item.id === previous?.sequenceId);
+  const currentIndex = sequences.findIndex(item => item.id === shot.sequenceId);
+  if (!previous || previous.projectId !== shot.projectId || previousIndex < 0 || currentIndex < 0
+    || !(previousIndex < currentIndex || previousIndex === currentIndex && previous.ord < shot.ord)) throw bad("接戏来源必须是本项目中更早且未删除的镜头");
+  return previous;
 }
 
 export function statesOf(s: Scope, shotId: string): { start: State; result: State; source: "observed" | "planned" } {

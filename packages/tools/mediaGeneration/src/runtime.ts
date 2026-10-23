@@ -82,7 +82,7 @@ const referenceMode = z.templateLiteral([z.enum(["image", "video", "audio"]), "R
 
 export const listMediaModelsSchema = z.strictObject({ all: z.boolean().optional().describe("列出可供用户选择的全部已配置媒体模型；不代表已授权切换") });
 export const audioReviewSchema = z.strictObject({
-  speech: z.enum(["pass", "fail", "notApplicable"]), lipSync: z.enum(["pass", "fail", "notApplicable"]),
+  speech: z.enum(["pass", "fail", "unverified", "notApplicable"]), lipSync: z.enum(["pass", "fail", "unverified", "notApplicable"]),
   referenceMediaId: z.string().min(1).optional(), inspectionKey: z.string().length(64).optional(),
   offsetMs: z.number().finite().min(-5000).max(5000).optional(), note: z.string().trim().min(10).max(4000),
 });
@@ -94,35 +94,60 @@ export function needsLipSync(shot: Record<string, any>) {
   return shot.musicVideo?.audioMode === "sourceTrack" && /演唱段|本人唱/.test(shot.musicVideo.audioDirection ?? "");
 }
 export function physicalInteractionPlan(shot: Record<string, any>) {
-  // ACT: 文本启发式只安排约束与观察，不证明物理可行；复杂动作仍需实际播放，后续可接结构化接触事件。
+  // ACT: 旧镜头仍用文本筛查；结构化事件只定义观察窗口，不能证明生成结果符合物理。
   const interaction = /放[进入回到在]|插[进入回在]|塞[进入回]|收[进入回]|取出|拿[起出]|抽出|拔出|装入|倒入|倒出|倾倒|递给|递交|接过|放下|摆放|搁在|立在|铺平|展开|对折|折叠|撕|剥|拧开|调整肩带|拉着.{0,8}行李|\b(?:insert|pour|place|grasp|handover|fold|unfold|peel|tear)\b|\b(?:put|slide|push|pull|take|hand)\b.{0,40}\b(?:into|inside|onto|out of|over|to)\b/i;
-  const timeline = Array.isArray(shot.musicVideo?.timeline) ? shot.musicVideo.timeline : [];
-  const required = interaction.test([shot.action, shot.performance?.gesture, ...timeline.map((beat: any) => beat.description)].join(" "));
+  const timeline = shot.camera?.design?.timeline ?? shot.musicVideo?.timeline ?? [];
+  const events = shot.interactions ?? [];
+  const required = events.length > 0 || interaction.test([shot.action, shot.performance?.gesture, ...timeline.map((beat: any) => beat.description)].join(" "));
   const duration = Number(shot.generationDuration ?? shot.duration);
   const ranges: { start: number; end: number }[] = timeline.filter((beat: any) => interaction.test(beat.description ?? "") && Number.isFinite(beat.start) && Number.isFinite(beat.end)
     && beat.start >= 0 && beat.end > beat.start && Number.isFinite(duration) && beat.start < duration)
     .map((beat: any) => ({ start: beat.start as number, end: Math.min(beat.end, duration) }));
   const instruction = required ? "Follow the specified action and world physics. Establish the actual opening or supporting surface before contact. Keep its location, shape and scale consistent with the reference and earlier frames, including across cuts and occlusion. Align the object with that existing opening or surface; show approach, contact, passage or transfer, then supported settling before release. Preserve grip and object continuity. Do not invent or move an opening, pass through a closed wall, teleport an object, or hide a geometry change with a cut. Apply only explicitly planned transformations." : "";
-  return { required, ranges, instruction };
+  return { required, contactTimes: events.map((event: any) => event.contactAt as number), ranges: events.length ? events.map((event: any) => ({ start: event.start, end: event.end })) : ranges,
+    instruction: instruction + (events.length ? `\nExecute these contact events in local seconds; preserve each named participant, support and visible result: ${JSON.stringify(events)}` : "") };
 }
 
 export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | "take" = "take") {
   const duration = Number(shot.generationDuration ?? shot.duration);
   const lines = shot.creativeBrief?.dialogue?.lines ?? [];
   const speech = type === "take" && (needsLipSync(shot) || lines.length > 0);
-  const interaction = physicalInteractionPlan(type === "keyframe" ? { ...shot, musicVideo: undefined } : shot);
+  const interaction = physicalInteractionPlan(type === "keyframe" ? { ...shot, camera: undefined, musicVideo: undefined, interactions: undefined } : shot);
   const techniques = techniquePlan(shot, type === "keyframe" ? "image" : "video");
   const techniqueMotion = techniques.some(item => item.stages.includes("video") && !item.stages.includes("image"));
   const motionBeats = type === "take" ? shot.camera?.design?.timeline ?? shot.musicVideo?.timeline ?? [] : [];
+  // ACT: 检查点从同一执行规格生成，不推断动作是否合格；每项仍须真实播放观察，未观察不填通过。
+  const checkpoints: { id: string; start: number; end: number; criterion: string }[] = type === "take" ? [
+    ...motionBeats.map((beat: any, index: number) => ({ id: `beat${index}`, start: beat.start, end: beat.end,
+      criterion: `${beat.description}；${beat.transition === "cut" ? "检查切点前后姿态、持物、视线和运动方向" : "检查动作持续推进，无无故停顿、复位或隐藏切镜"}` })),
+    ...(shot.interactions ?? []).map((event: any, index: number) => ({ id: `contact${index}`, start: event.start, end: event.end,
+      criterion: `${event.assetIds.join("、")}：${event.approach} → ${event.contactAt}s ${event.contact}；受力 ${event.force}；承托 ${event.support}；释放 ${event.release}；结果 ${event.endState}` })),
+    ...(shot.creativeBrief?.combat?.beats ?? []).map((beat: any, index: number) => ({ id: `combat${index}`,
+      start: motionBeats[beat.timelineIndex]?.start ?? 0, end: motionBeats[beat.timelineIndex]?.end ?? duration,
+      criterion: `${beat.attackerId} → ${beat.defenderId}：${beat.action} → ${beat.reaction} → ${beat.endState}；其他人物 ${beat.supportingAction}。检查因果、速度、位移、遮挡及接触，不能以身份稳定代替动作达标。` })),
+  ] : [];
   const motion = motionBeats.length > 0 || interaction.required || techniqueMotion || shot.creativeBrief?.kind === "combat" || /手指|双手|握住|递给|抓握|打斗|搏斗|救援|救起|承托|转移伤者|hand|grasp|fight|rescue/i.test([shot.action, shot.performance?.gesture].join(" "));
   const visual = motion || techniques.length > 0 || !shot.camera?.shotSize || /^(?:ECU|CU|MCU)$/i.test(shot.camera?.shotSize ?? "") || /近景|特写/.test(shot.camera?.shotSize ?? "")
     || !!shot.inspectionRegion;
   // ACT: 分级只安排检查投入，不据此宣称质量通过；未知景别进入重点档。明确的演唱无逐句时间时覆盖整段。
   const tier = speech ? "speech" : visual || !shot.camera?.shotSize ? "visual" : "basic";
   const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
-  return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take" && (motion || techniques.length > 0), techniques,
-    checks: tier === "basic" ? ["imaging", "world", "cinematic"] : type === "keyframe" || !motion ? ["surface", "imaging", "world", "cinematic"] : ["surface", "imaging", "world", "motion", "cinematic"], speechRanges, interaction,
-    motionPlan: type === "take" ? { mode: shot.camera?.design?.mode, beats: motionBeats, note: "逐段对照实际身体任务、接触结果、位移与接点；singleTake的节拍边界不能跳切或复位。此处是计划，不是观察证据，须完整看听后记录偏差。" } : undefined };
+  return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take", techniques,
+    checks: type === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"], speechRanges, interaction,
+    motionPlan: type === "take" ? { mode: shot.camera?.design?.mode, beats: motionBeats, checkpoints, note: "逐段对照实际身体任务、接触结果、位移与接点；singleTake的节拍边界不能跳切或复位。完整播放后用 motionReview 逐项记录实际时间点、观察与 pass/revise；计划不是观察证据，未检查保持未验证。" } : undefined };
+}
+
+export function finalReviewFields(kind: string, lipSync: boolean, music: boolean) {
+  return [
+    ["surface", "皮肤、头发与商品材质"], ["motion", "肢体、动作受力与手物接触"],
+    ["lighting", "场景光源、曝光与光色"], ["continuity", "人物、服装、空间与动作阶段连续"],
+    ["sound", "对白、环境声、音画同步与接缝"], ["narrative", "事件、信息或关系推进"],
+    ["performance", "角色目的、触发、反应与调度"], ["dialogueCoverage", "原文台词、说话人与声音通道"],
+    ["editing", "节奏、留白与邻镜连接"], ["composition", "构图与视觉主次"], ["color", "整片色调、肤色与产品本色"],
+    ...(lipSync ? [["lipSync", "画内对白或演唱的逐字口型"]] : []),
+    ...(["adfilm", "brandFilm"].includes(kind) ? [["emotion", "情绪与创意表达"], ["product", "产品证明、识别与品牌记忆"]] : []),
+    ...(kind === "musicFilm" || music ? [["musicAlignment", "原曲、乐句、演唱与画面同步"], ["musicProgression", "主副歌层次、视觉母题的发展与回收"]] : []),
+  ].map(([id, label]) => ({ id, label }));
 }
 
 export const reviewedSegmentsSchema = z.array(z.strictObject({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).refine(range => range.end > range.start)).max(80).default([]);
@@ -147,8 +172,10 @@ export const agentReviewSchema = z.strictObject({
   frameTimes: z.array(z.number().finite().nonnegative()).max(600).default([]),
   reviewedSegments: reviewedSegmentsSchema.describe("实际看听的局部区间，单位秒；覆盖本镜全部发声区间才可用于声音检查，不能把计划区间当作已看听"),
   fullPlayback: z.boolean().default(false).describe("只有实际完整播放当前视频后才为true，抽帧不能替代看听"),
+  observedStateDelta: z.record(z.string(), z.json()).optional().describe("实际观察到的镜尾状态变化，沿用 intendedStateDelta 分组但不得照抄计划；无变化传 {}。完整视频检查通过且提供实际末态时采用为正式镜头，并传递给后镜"),
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
   techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
+  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(144).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
   creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字，写实际妆造与调度依据。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),

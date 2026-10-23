@@ -44,8 +44,9 @@
 
 先 readStoryProject，再依照本轮工具 schema 更新；没有工具时交付可读文本并说明未保存。复用当前项目和版本，不创建第二套 .drama-state.json 或另一个故事状态系统。
 
-- 连载可使用已有 brief.kind=serial；集数、单集范围、主方法与约束写入 brief.constraints，当前制作范围的时长使用 brief.duration，不虚构 totalEpisodes 等顶层字段。
-- 方向阶段使用已有 directions；有实际逐场正文后才保存 draft。分集规划写在 draft.outline，场次 title 标明所属集次；正文仍使用稳定且在当前版本中唯一的 sceneId，跨集不重新从 s01 编号。
+- 连载使用 brief.kind=serial，serialFormat=short 或 medium 区分短剧与中剧，episodeCount 保存计划集数，brief.duration 保存单集目标秒数。当前写作范围、主方法与约束写入 brief.constraints，不虚构其他顶层字段。
+- 方向阶段使用已有 directions；有实际逐场正文后才保存 draft。分集规划写在 draft.outline，场次 episodeNumber 保存所属集号；正文使用跨集唯一且稳定的 sceneId，跨集不重新从 s01 编号。中剧按人物与事件需要发展完整场次，不照搬短视频切镜密度。
+- 每集建立 kind=serial、episodeNumber、storyRevisionId 的制作序列，共用同项目已采用角色、服装、场景、定妆参考、Look 与音色。镜头用 source:{sceneId} 关联采用正文；跨集接戏明确 continuityFromShotId，引用本项目更早集的对应镜头，状态变更复用 intendedStateDelta。先解决未发送的锁定参考和连续性问题，再生成与逐集导出；真实画面、声音与接点仍须看听验收。
 - draft.canon 保存已确立事实及来源场次；draft.threads 保存线索的埋设、兑现和状态。causes、setupSceneId、payoffSceneId 只能引用当前版本有效场次，不能用“第几集”冒充场次 ID。
 - 当前故事版本最多 100 场，outline 最多 12000 字符。大体量连载先明确当前可制作范围，保留完整计划于通过现有文件工具保存的文档，并作为来源读取；已采用前集的事实要注明真实文档与版本出处。不能把跨文档来源伪装为当前 sceneId，也不能静默截断、创建占位场次或声称全集已结构化入库。
 - 局部改写生成新版本，列明受影响的前后集与伏笔；不改未授权场次。用户采用后沿用 saveSceneList 与 breakdown / cinema 制作，已生成素材按依赖复用。

@@ -48,7 +48,8 @@ MILI MILI 独立编写。用于把已选故事、音乐和参考素材转成可�
 | --- | --- |
 | `audioMode` | `sourceTrack` 沿用已有歌曲；`generated` 按已确认方案生成声音；`silent` 只生成无声素材 |
 | `audioDirection` | 本段歌曲来源、声音身份、演唱/画外音、声部变化、音效和后期处理；无声时说明后续音轨方案 |
-| `sourceStart` | 原曲中对应本生成段第 0 秒的位置，`sourceTrack` 必填；只是对齐记录，不会自动裁切或发送音频 |
+| `sourceMediaId` | 已导入原曲的真实媒体 ID；从 importAudio 获取，须属于当前项目或其已登记参考并有实测时长。正式视频生成和定稿必填 |
+| `sourceStart` | 原曲中对应本生成段第 0 秒的位置，`sourceTrack` 必填；自动排轨使用此入点加画面剪入点，不从零重启歌曲。不会自动把音频发送给生成模型 |
 | `timeline` | `{ start, end, description }` 数组，单位秒，从本生成段 0 开始连续覆盖 `generationDuration ?? duration`；描述写真实可见的剧情、表演、歌词触发、运镜和剪接 |
 
 整段 `musicVideo` 可用 `null` 清除；修改其中任一项后重新编译。已有 Hero/Take 时同样遵守确认和重验规则，不偷偷改音乐或时间。没有相应工具时交付完整文字，说明尚未保存，不手写项目 JSON 冒充成功。
@@ -74,3 +75,5 @@ Seedance 2.5 沿用 [模型文本组织](../../workflow/references/seedanceDirec
 7. 保存内容是否仍在最终请求中？是否因生成音频开关关闭而只有画面？是否把原曲重新作了一遍？
 
 反馈修订只改受影响故事节拍及其时间、参考、接点依赖，保留已采用资产与其他段落；提示词交付给出完整修订段。文字审查不能证明成片吸引人、音乐准确或口型通过；只有看听实际结果后才能记录相应验收。
+
+原曲排轨与验收：自动时间线将 sourceTrack 视频本身的歌曲静音，并在音乐轨按真实原曲入点排入。手工剪辑保留；改入点、片段顺序或时长后重新核对音乐轨，定稿会拒绝错位、断音、叠音和变速。可合并成同一连续主音轨，不能叠加多条同曲人声。演唱检查的 audioReview.referenceMediaId 必须指向当前 sourceMediaId，并实际把画面与该段原曲同步看听。成片另验 musicAlignment、musicProgression 和全部 plan.cuts；未看听不得填 pass。

@@ -14,7 +14,11 @@
           <h3>作品目标</h3>
           <div class="fields">
             <label>作品类型<select v-model="brief.kind"><option v-for="item in kinds" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
-            <label>目标时长（秒）<input v-model.number="brief.duration" type="number" min="1" max="3600" /></label>
+            <label>{{ brief.kind === 'serial' ? '单集目标时长（秒）' : '目标时长（秒）' }}<input v-model.number="brief.duration" type="number" min="1" max="3600" /></label>
+            <template v-if="brief.kind === 'serial'">
+              <label>剧集形态<select v-model="brief.serialFormat"><option :value="undefined">未指定</option><option value="short">短剧</option><option value="medium">中剧</option></select></label>
+              <label>计划集数<input v-model.number="brief.episodeCount" type="number" min="1" max="100" /></label>
+            </template>
             <label v-for="field in briefFields" :key="field.key" :class="{ fullField: field.key === 'idea' || field.key === 'constraints' }">{{ field.label }}<textarea v-model="brief[field.key]" rows="2" /></label>
           </div>
           <el-button @click="run(saveBrief)">保存作品目标</el-button>
@@ -55,6 +59,7 @@
             <article v-for="(scene, index) in draft.scenes" :key="scene.sceneId">
               <div class="toolbar"><strong>{{ scene.sceneId }}</strong><el-button :disabled="index === 0" @click="moveScene(index, -1)">上移</el-button><el-button :disabled="index === draft.scenes.length - 1" @click="moveScene(index, 1)">下移</el-button><el-button @click="removeScene(index)">移除此场</el-button></div>
               <label>场次标题<input v-model="scene.title" /></label><label>正文<textarea v-model="scene.text" rows="6" /></label>
+              <label v-if="brief.kind === 'serial'">所属集号<input v-model.number="scene.episodeNumber" type="number" min="1" :max="brief.episodeCount || 100" /></label>
               <details><summary>因果、信息与声音</summary><div class="fields"><label v-for="field in sceneFields" :key="field.key">{{ field.label }}<textarea v-model="scene[field.key]" rows="2" /></label><label>依据场次 ID（逗号分隔）<input :value="scene.causes.join(',')" @input="scene.causes = ($event.target as HTMLInputElement).value.split(/[,，\s]+/).filter(Boolean)" /></label><label>估计时长（秒）<input v-model.number="scene.duration" type="number" min="1" max="180" /></label></div></details>
               <el-button :disabled="!revision || !modelKey || draftDirty" @click="rewriteSceneId = scene.sceneId">只改这一场</el-button>
             </article>
@@ -113,7 +118,7 @@ const previewRef = ref<InstanceType<typeof storyPreview>>(), feedbackRef = ref<I
 let controller: AbortController | undefined;
 const tabs = [{ id: "sources", label: "目标与资料" }, { id: "directions", label: "创意方向" }, { id: "script", label: "剧本与审稿" }, { id: "visual", label: "视觉参考" }, { id: "preview", label: "动态分镜" }, { id: "feedback", label: "发布反馈" }];
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === modelKey.value));
-const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "musicFilm", label: "音乐影像" }];
+const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "musicFilm", label: "音乐影像" }];
 const briefFields = [{ key: "idea", label: "想法 / 创作需求" }, { key: "audience", label: "谁会看 / 在什么情境下看" }, { key: "channel", label: "观看渠道" }, { key: "intent", label: "希望观众感受什么或做什么" }, { key: "genre", label: "类型" }, { key: "tone", label: "语气与风格" }, { key: "ending", label: "结尾选择" }, { key: "constraints", label: "不可改变的内容与制作预算 / 限制" }] as const;
 const sceneFields = [{ key: "goal", label: "人物目标" }, { key: "obstacle", label: "阻碍" }, { key: "change", label: "此场改变了什么" }, { key: "knowledge", label: "人物与观众分别知道什么" }, { key: "speech", label: "实际对白 / 旁白（不含角色名与表演说明）" }] as const;
 const issueLabels = { contradiction: "明确矛盾", comprehension: "理解风险", taste: "审美建议" };

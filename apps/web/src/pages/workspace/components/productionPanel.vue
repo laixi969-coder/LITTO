@@ -75,12 +75,15 @@
         </template>
         <template v-else-if="section !== 'edit'">
           <div class="shotNavigation">
-            <label>当前镜头<select :value="shotId" @change="run(() => selectShot(($event.target as HTMLSelectElement).value))"><option value="">选择镜头</option><option v-for="item in shots" :key="item.id" :value="item.id">{{ item.ord + 1 }} · {{ item.title }}</option></select></label>
+            <label>当前集 / 序列<select :value="sequenceId" @change="run(() => selectSequence(($event.target as HTMLSelectElement).value))"><option value="">选择集 / 序列</option><option v-for="item in sequences" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+            <button type="button" @click="run(createEpisode)">新建下一集</button>
+            <label>当前镜头<select :value="shotId" @change="run(() => selectShot(($event.target as HTMLSelectElement).value))"><option value="">选择镜头</option><option v-for="item in sequenceShots" :key="item.id" :value="item.id">{{ item.ord + 1 }} · {{ item.title }}</option></select></label>
             <button type="button" @click="run(createShot)">新建镜头</button>
           </div>
           <template v-if="draft && section === 'shot'">
             <div class="fieldGrid" @input="dirty = true" @change="dirty = true">
               <label>镜头名称<input v-model="draft.title" /></label>
+              <label>接戏来源<select v-model="draft.continuityFromShotId"><option :value="null">沿用本集前镜（首镜从资产基线开始）</option><option v-for="item in continuityShots" :key="item.id" :value="item.id">{{ sequences.find(sequence => sequence.id === item.sequenceId)?.name }} · {{ item.ord + 1 }} · {{ item.title }}</option></select></label>
               <label>镜头职责<select v-model="draft.narrativeFunction"><option v-for="item in functions" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
               <label>动作与起止<textarea v-model="draft.action" /></label>
               <label>计划使用时长（秒）<input v-model.number="draft.duration" type="number" min="1" max="3600" /></label>
@@ -177,6 +180,13 @@
                 </template>
               </template>
               <label v-if="qualityPlan.fullPlayback"><input v-model="fullPlayback" type="checkbox" />已完整播放，检查肢体增减、遮挡、手物接触及动作收势</label>
+              <template v-for="checkpoint in qualityPlan.motionPlan?.checkpoints ?? []" :key="checkpoint.id">
+                <p>{{ checkpoint.start }}–{{ checkpoint.end }} 秒：{{ checkpoint.criterion }}</p>
+                <template v-if="motionReviews[checkpoint.id]">
+                  <label>动作与衔接<select v-model="motionReviews[checkpoint.id].verdict"><option value="unverified">未验证</option><option value="pass">实际检查通过</option><option value="revise">需要返修</option></select></label>
+                  <label>实际时间点与观察<textarea v-model="motionReviews[checkpoint.id].note" rows="2" /></label>
+                </template>
+              </template>
               <template v-if="target.type === 'take' && speechReviewRequired">
                 <label><input v-model="speechChecked" type="checkbox" />已看听以上全部发声区间，实际对白或歌词与采用声音一致</label>
                 <label v-if="needsLipSync(detail)"><input v-model="lipSyncChecked" type="checkbox" />已核对可见口型与发声逐字匹配</label>
@@ -190,8 +200,8 @@
                 <p class="reviewHint">已按镜头规格预填，只改与画面不符的地方；批准后下一镜继承这些记录。</p>
                 <div class="fieldGrid"><label v-for="item in shotAssets" :key="item.id">{{ item.name }}<textarea v-model="stateNotes[item.id]" rows="2" /></label></div>
               </template>
-              <button v-if="observation || techniqueNeedsRevision" type="button" :disabled="(!reviewNote.trim() && !techniqueNeedsRevision) || !techniqueProblemsComplete" @click="run(saveReview)">记录问题</button>
-              <button v-else type="button" :disabled="!techniqueChecksComplete || !reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && ((qualityPlan.fullPlayback && !fullPlayback) || speechReviewRequired && (!speechChecked || needsLipSync(detail) && !lipSyncChecked || speechNote.trim().length < 10)))" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "已检查，批准此 Take" }}</button>
+              <button v-if="observation || techniqueNeedsRevision || motionNeedsRevision" type="button" :disabled="(!reviewNote.trim() && !techniqueNeedsRevision && !motionNeedsRevision) || !techniqueProblemsComplete || !motionProblemsComplete" @click="run(saveReview)">记录问题</button>
+              <button v-else type="button" :disabled="!techniqueChecksComplete || !motionChecksComplete || !reviewFields.every(field => reviewedFields.includes(field[0])) || (target.type === 'take' && ((qualityPlan.fullPlayback && !fullPlayback) || speechReviewRequired && (!speechChecked || needsLipSync(detail) && !lipSyncChecked || speechNote.trim().length < 10)))" @click="run(confirmVersion)">{{ target.type === "keyframe" ? "看过画面，选为主关键帧" : "已检查，批准此 Take" }}</button>
               <article v-for="report in targetReports" :key="report.id" class="reviewReport"><strong>{{ report.score === null ? report.evidence?.vision?.used ? '辅助检查已完成 · 待实际复核' : '检查未完成' : '已记录检查' }}</strong><p>{{ report.evidence?.note }}</p><p v-if="report.evidence?.vision?.reason">{{ report.evidence.vision.reason }}</p><p v-for="(item, index) in report.evidence?.vision?.uncertainties ?? []" :key="index">待核实：{{ item.note }}（证据不足，未记为确定缺陷）</p><p v-for="(finding, index) in report.findings" :key="index">{{ finding.cause }}：{{ finding.note }}<br />修复：{{ finding.detail }}</p></article>
             </template>
             <template v-if="candidatePool.length">
@@ -281,6 +291,13 @@ const cropEnabled = ref(false), referenceCrop = ref({ x: 0, y: 0, width: 1, heig
 const compiledMedia = ref<any[]>([]);
 let baseUpdatedAt: string | undefined;
 const shotId = ref(""), draft = ref<any>(null), detail = ref<any>(null), dirty = ref(false);
+const sequenceId = ref("");
+const sequenceShots = computed(() => shots.value.filter(item => item.sequenceId === sequenceId.value).sort((left, right) => left.ord - right.ord));
+const continuityShots = computed(() => {
+  const sequence = sequences.value.find(item => item.id === draft.value?.sequenceId);
+  return shots.value.filter(item => item.sequenceId === sequence?.id ? item.ord < draft.value.ord
+    : sequences.value.find(value => value.id === item.sequenceId)?.ord < sequence?.ord);
+});
 const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref(""), ratio = ref("16:9");
 const visualModels = ref<any[]>([]), visionModelKey = ref("");
 const models = ref<MediaModel[]>([]), preview = ref<any>(null), jobs = ref<any[]>([]);
@@ -294,6 +311,7 @@ const shotAssets = computed(() => assets.value.filter(item => detail.value?.asse
 const targetId = ref(""), reviewNote = ref(""), observation = ref("");
 const reviewedFields = ref<string[]>([]), dismissedKinds = ref<string[]>([]), fullPlayback = ref(false);
 const techniqueReviews = ref<Record<string, { verdict: string; note: string }>>({});
+const motionReviews = ref<Record<string, { verdict: string; note: string }>>({});
 const speechChecked = ref(false), lipSyncChecked = ref(false), speechNote = ref("");
 const speechReviewRequired = computed(() => needsLipSync(detail.value ?? {}) || !!detail.value?.creativeBrief?.dialogue?.lines?.length);
 const keyOf = (model: MediaModel) => JSON.stringify([model.providerId, model.modelId]);
@@ -311,6 +329,9 @@ const techniqueNeedsRevision = computed(() => target.value?.type === "take" && O
 const techniqueNotesComplete = computed(() => target.value?.type !== "take" || qualityPlan.value.techniques.every(item => (techniqueReviews.value[item.id]?.note.trim().length ?? 0) >= 10 && techniqueReviews.value[item.id]?.verdict !== "unverified"));
 const techniqueProblemsComplete = computed(() => Object.values(techniqueReviews.value).filter(item => item.verdict === "revise").every(item => item.note.trim().length >= 10));
 const techniqueChecksComplete = computed(() => techniqueNotesComplete.value && !techniqueNeedsRevision.value);
+const motionNeedsRevision = computed(() => Object.values(motionReviews.value).some(item => item.verdict === "revise"));
+const motionProblemsComplete = computed(() => Object.values(motionReviews.value).filter(item => item.verdict === "revise").every(item => item.note.trim().length >= 10));
+const motionChecksComplete = computed(() => (qualityPlan.value.motionPlan?.checkpoints ?? []).every(item => motionReviews.value[item.id]?.verdict === "pass" && motionReviews.value[item.id].note.trim().length >= 10));
 const qualityLabel = computed(() => ({ basic: "基础检查 · 集中预览", visual: "重点画面检查", speech: "声音与口型检查" }[qualityPlan.value.tier]));
 const reviewFields = computed(() => realismFields.filter(field => qualityPlan.value.checks.includes(field[0])));
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
@@ -344,6 +365,7 @@ async function load() {
   const path = `/projects/${projectId}`;
   const values = await Promise.all([request(`${path}/world`), request(`${path}/looks`), request(`${path}/assets`), request(`${path}/shots`), request(`${path}/sequences`), request(`${path}/references`)]);
   [world.value, , assets.value, shots.value, sequences.value, references.value] = values;
+  if (!sequences.value.some(item => item.id === sequenceId.value)) sequenceId.value = sequences.value[0]?.id ?? "";
   look.value = values[1].find((item: any) => item.scope === "project") ?? {};
   const response = await fetch("/api/ai/media/models", { signal: controller.signal });
   const result = await response.json();
@@ -454,6 +476,7 @@ async function selectShot(id: string) {
   await saveShot(); shotId.value = id; preview.value = null; targetId.value = "";
   if (!id) { detail.value = null; draft.value = null; return; }
   detail.value = await request(`/shots/${id}`);
+  sequenceId.value = detail.value.sequenceId;
   baseUpdatedAt = detail.value.updatedAt ?? detail.value.createdAt;
   draft.value = structuredClone(toRaw(detail.value));
   draft.value.realism ??= Object.fromEntries(realismFields.map(field => [field[0], ""]));
@@ -486,12 +509,25 @@ async function promoteOne(item: any) {
 }
 async function createShot() {
   await saveShot();
-  let sequence = sequences.value[0];
+  let sequence = sequences.value.find(item => item.id === sequenceId.value);
   if (!sequence) { sequence = await request(`/projects/${projectId}/sequences`, "POST", { name: "主序列" }); sequences.value.push(sequence); }
+  sequenceId.value = sequence.id;
   let scene = sequence.scenes?.[0];
   if (!scene) { scene = await request(`/projects/${projectId}/scenes`, "POST", { sequenceId: sequence.id, name: "场景 1" }); sequence.scenes = [scene]; }
-  const item = await request(`/projects/${projectId}/shots`, "POST", { sequenceId: sequence.id, sceneId: scene.id, title: `镜头 ${shots.value.length + 1}` });
+  const item = await request(`/projects/${projectId}/shots`, "POST", { sequenceId: sequence.id, sceneId: scene.id, title: `镜头 ${sequenceShots.value.length + 1}` });
   shots.value.push(item); await selectShot(item.id); section.value = "shot";
+}
+async function selectSequence(id: string) {
+  await saveShot();
+  sequenceId.value = id;
+  await selectShot(sequenceShots.value[0]?.id ?? "");
+}
+async function createEpisode() {
+  await saveShot();
+  const episodeNumber = Math.max(0, ...sequences.value.map(item => item.episodeNumber ?? 0)) + 1;
+  const sequence = await request(`/projects/${projectId}/sequences`, "POST", { name: `第 ${episodeNumber} 集`, kind: "serial", episodeNumber });
+  sequences.value.push(sequence);
+  await selectSequence(sequence.id);
 }
 async function uploadReference(event: Event, forAsset = false) {
   const input = event.target as HTMLInputElement;
@@ -580,7 +616,7 @@ function selectPendingVersion() {
 }
 // 按镜头顺序找下一个还没批准 Take 的镜头，连续检查时不用回到镜头条。
 const nextPendingShot = computed(() => {
-  const ordered = [...shots.value].sort((left, right) => left.ord - right.ord);
+  const ordered = sequenceShots.value;
   const index = ordered.findIndex(shot => shot.id === shotId.value);
   return [...ordered.slice(index + 1), ...ordered.slice(0, Math.max(index, 0))].find(shot => !shot.approvedTakeId && shot.id !== shotId.value);
 });
@@ -609,10 +645,12 @@ function selectVersion(item: any) {
   reviewedFields.value = []; dismissedKinds.value = []; fullPlayback.value = false;
   speechChecked.value = false; lipSyncChecked.value = false; speechNote.value = "";
   techniqueReviews.value = Object.fromEntries(qualityReviewPlan(detail.value ?? {}, item.type).techniques.map(technique => [technique.id, { verdict: "unverified", note: "" }]));
+  motionReviews.value = Object.fromEntries((qualityReviewPlan(detail.value ?? {}, item.type).motionPlan?.checkpoints ?? []).map(checkpoint => [checkpoint.id, { verdict: "unverified", note: "" }]));
   const previous = (detail.value?.qc ?? []).filter((report: any) => report.targetId === item.id).at(-1);
   if (previous?.current) {
     const evidence = previous.evidence;
     for (const check of evidence.techniqueReview ?? []) if (techniqueReviews.value[check.id]) techniqueReviews.value[check.id] = { verdict: check.verdict, note: check.note };
+    for (const check of evidence.motionReview ?? []) if (motionReviews.value[check.id]) motionReviews.value[check.id] = { verdict: check.verdict, note: check.note };
     reviewedFields.value = [...(evidence.reviewed ?? [])]; fullPlayback.value = evidence.fullPlayback === true;
     speechChecked.value = evidence.audioReview?.speech === "pass"; lipSyncChecked.value = evidence.audioReview?.lipSync === "pass";
     speechNote.value = evidence.audioReview?.note ?? ""; reviewNote.value = evidence.note ?? "";
@@ -641,6 +679,7 @@ function reviewPayload(item: any, onlyProblems = false) {
   }
   return { targetType: item.type, targetId: item.id, reviewed: onlyProblems ? [] : reviewedFields.value, note: reviewNote.value, fullPlayback: fullPlayback.value, reviewedSegments: speechChecked.value ? qualityPlan.value.speechRanges : [], dismissedKinds: dismissedKinds.value,
     ...(item.type === "take" && qualityPlan.value.techniques.length ? { techniqueReview: qualityPlan.value.techniques.map(technique => ({ id: technique.id, ...techniqueReviews.value[technique.id] })).filter(check => !onlyProblems || check.verdict === "revise") } : {}),
+    ...(item.type === "take" && qualityPlan.value.motionPlan?.checkpoints.length ? { motionReview: qualityPlan.value.motionPlan.checkpoints.map(checkpoint => ({ id: checkpoint.id, ...motionReviews.value[checkpoint.id] })).filter(check => !onlyProblems || check.verdict === "revise") } : {}),
     ...(item.type === "take" && !onlyProblems && speechReviewRequired.value ? { audioReview: { speech: speechChecked.value ? "pass" : "fail", lipSync: needsLipSync(detail.value ?? {}) ? lipSyncChecked.value ? "pass" : "fail" : "notApplicable", note: speechNote.value, ...(item.speechSync ? { inspectionKey: item.speechSync.inspectionKey, referenceMediaId: item.speechSync.referenceMediaId } : {}) } } : {}),
     ...(item.type === "take" && !onlyProblems ? { observedStateDelta } : {}), observations: observation.value ? [{ kind: observation.value, note: reviewNote.value }] : [] };
 }

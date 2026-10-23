@@ -3,6 +3,7 @@ import { all, get, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, forbidden, j, notFound, now, ulid } from "../util.ts";
 import { mediaView } from "../storage.ts";
 import { parseGrade, type Grade } from "./grade.ts";
+import { musicSource } from "./music.ts";
 
 /**
  * Editable multi-track timeline (PRD P3 "高级 NLE"). Persisted in `timelines.data`; derived `buildTimeline` (assembly.ts) stays the fallback.
@@ -50,9 +51,12 @@ const newClip = (p: Partial<EClip> & Pick<EClip, "trackId" | "type" | "start" | 
 export function conformBody(s: Scope, sequenceId: string, prev: Body | null, reset: boolean): Body {
     const shots = s.list("shots", { sequenceId }, "ord");
     const bindings = s.list("reference_bindings", { targetType: "shot" }).filter((b: any) => b.role === "AUDIO");
+    // 原曲有独立排轨；原生对白的 AUDIO 是生成参考，不能把旧样音再叠入成片。
+    const generationAudio = new Set(shots.filter(shot => shot.musicVideo?.audioMode === "sourceTrack" || shot.creativeBrief?.dialogue?.mode === "native").map(shot => shot.id));
     const base: Body = !prev || reset ? { fps: 24, tracks: defaultTracks(), clips: [], markers: [], grade: prev && !reset ? prev.grade : null, duck: null } : structuredClone(prev);
     const have = new Set(base.clips.filter((c) => c.shotId).map((c) => c.shotId));
     const live = new Set(shots.map((x) => x.id));
+    base.clips = base.clips.filter(clip => !(clip.auto && clip.refId && bindings.some(binding => `${binding.targetId}:${binding.referenceId}` === clip.refId && generationAudio.has(binding.targetId))));
     // drop clips of deleted shots; drop auto audio whose binding disappeared
     base.clips = base.clips.filter((c) => (c.type === "shot" ? live.has(c.shotId!) : !(c.auto && c.refId && !bindings.some((b: any) => `${b.targetId}:${b.referenceId}` === c.refId))));
     const manualV1 = base.clips.some((c) => c.trackId === "V1" && !c.auto);
@@ -62,18 +66,32 @@ export function conformBody(s: Scope, sequenceId: string, prev: Body | null, res
     for (const sh of shots) {
         if (!manualV1 || !have.has(sh.id)) {
             const dur = Number(sh.duration ?? 4);
-            base.clips.push(newClip({ trackId: "V1", type: "shot", shotId: sh.id, start: r3(t), duration: dur, label: sh.title ?? "", auto: true }));
+            base.clips.push(newClip({ trackId: "V1", type: "shot", shotId: sh.id, start: r3(t), duration: dur, label: sh.title ?? "", auto: true, ...(sh.musicVideo?.audioMode === "sourceTrack" ? { gainDb: -60 } : {}) }));
             t += dur;
         }
     }
     // A1 from AUDIO-role bindings, aligned to the shot clip
     for (const b of bindings) {
+        if (generationAudio.has(b.targetId)) continue;
         const key = `${b.targetId}:${b.referenceId}`;
         const sc = v1(b.targetId) ?? base.clips.find((c) => c.type === "shot" && c.shotId === b.targetId);
         const ref = s.get("refs", b.referenceId);
         if (!sc || !ref?.mediaId || base.clips.some((c) => c.refId === key)) continue;
         const m = s.get("media", ref.mediaId);
         base.clips.push(newClip({ trackId: "A1", type: "media", mediaId: ref.mediaId, refId: key, start: sc.start, duration: Math.min(sc.duration, m?.duration ?? sc.duration), label: ref.name ?? "audio", auto: true }));
+    }
+    // 原曲以同一个真实文件的连续入点排轨；手工改过的原曲片段保留，错位由定稿检查指出。
+    for (const shot of shots) {
+        const media = musicSource(s, shot);
+        if (!media) continue;
+        const clip = v1(shot.id);
+        const refId = `music:${shot.id}`;
+        if (!clip || base.clips.some(item => item.refId === refId)) continue;
+        const manualMusic = base.clips.some(item => !item.auto && item.mediaId === media.id && base.tracks.find(track => track.id === item.trackId)?.role === "music"
+            && item.start <= clip.start && end(item) >= end(clip));
+        if (manualMusic) continue;
+        base.clips.push(newClip({ trackId: "A2", type: "media", mediaId: media.id, refId, start: clip.start, duration: clip.duration,
+            in: r3(shot.musicVideo.sourceStart + clip.in), speed: clip.speed, label: "原曲", auto: true }));
     }
     return base;
 }

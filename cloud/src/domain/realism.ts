@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Scope } from "../db.ts";
 import { shotInput } from "./schema.ts";
 import { conflict, notFound, HttpError } from "../util.ts";
-import { statesOf, validateStateDelta } from "./state.ts";
+import { statesOf, validateStateDelta, continuityPredecessor } from "./state.ts";
 import { adContext } from "./adDirection.ts";
 import { needsLipSync, qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
 import { z } from "zod";
@@ -11,15 +11,27 @@ import { assertSpeechPlan } from "./speechPlanning.ts";
 export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 // 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
 export const audioReviewSchema = z.object({
-  speech: z.enum(["pass", "fail", "notApplicable"]), lipSync: z.enum(["pass", "fail", "notApplicable"]),
+  speech: z.enum(["pass", "fail", "unverified", "notApplicable"]), lipSync: z.enum(["pass", "fail", "unverified", "notApplicable"]),
   referenceMediaId: z.string().min(1).optional(), inspectionKey: z.string().length(64).optional(),
   offsetMs: z.number().finite().min(-5000).max(5000).optional(), note: z.string().trim().min(10).max(4000),
 }).strict();
 
 export const reviewedSegmentsSchema = z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).strict().refine(range => range.end > range.start)).max(80).default([]);
 export const techniqueReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(8);
+export const motionReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(144);
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
+
+export function motionCoverageIssue(s: Scope, shot: Record<string, any>, item: Record<string, any>) {
+  const checkpoints = qualityReviewPlan(shot, "take").motionPlan?.checkpoints ?? [];
+  if (!checkpoints.length) return null;
+  const media = s.get("media", item.mediaId);
+  const end = Math.max(...checkpoints.map(checkpoint => checkpoint.end));
+  if (!media?.mime.startsWith("video/") || media.projectId !== shot.projectId || !Number.isFinite(media.duration) || media.duration <= 0 || end > media.duration + 0.05) {
+    return `动作计划延续至 ${end}s，当前视频实际时长 ${media?.duration ?? "未知"}s；须包含完整动作及结果，不能用静帧、循环或完整播放勾选替代`;
+  }
+  return null;
+}
 
 export function takeCoverageIssue(s: Scope, shot: Record<string, any>, item: Record<string, any>) {
   const ranges = qualityReviewPlan(shot, "take").speechRanges;
@@ -42,13 +54,14 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
     if (!(cause instanceof HttpError) || cause.status !== 400) throw cause;
     throw conflict("镜头计划状态格式或资产引用无效，请通过 updateShot 修正 intendedStateDelta 后再检查或采用；原记录未修改", "invalid_state_delta", { shotId });
   }
-  const previous = s.list("shots", { sequenceId: shot.sequenceId }, "ord").filter(item => item.ord < shot.ord).at(-1);
+  const previous = continuityPredecessor(s, shot);
   const previousTake = previous?.approvedTakeId ? s.get("takes", previous.approvedTakeId) : null;
   const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
   const advertising = adContext(s, shot);
   const data = {
     ...(shot.techniques?.length ? { techniqueVersion } : {}),
     ...(advertising ? { advertising } : {}),
+    musicSource: type === "take" && shot.musicVideo?.sourceMediaId ? s.get("media", shot.musicVideo.sourceMediaId) : null,
     shot: { ...shotData, ...(creativeBrief ? { creativeBrief: type === "keyframe"
       ? { kind: creativeBrief.kind, intent: creativeBrief.intent, visualPayoff: creativeBrief.visualPayoff }
       : creativeBrief } : {}) },
@@ -62,6 +75,7 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
   if (type === "keyframe") {
     // 静帧编译不使用视频音轨/时间线；前镜采用只按实际继承状态影响静帧，不按 Take ID 使其失效。
     delete data.shot.musicVideo;
+    delete data.shot.interactions;
     if (data.shot.techniques) {
       const imageIds = new Set(techniquePlan(shot, "image").map(item => item.id));
       data.shot.techniques = data.shot.techniques.filter(item => imageIds.has(item.id));
@@ -73,6 +87,13 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
 }
 
 export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Record<string, any>) {
+  const continuation = type === "keyframe" ? item.meta?.continuationSource : null;
+  if (continuation) {
+    const source = s.get("takes", continuation.takeId), media = source && s.get("media", source.mediaId);
+    if (!source || source.projectId !== item.projectId || media?.id !== continuation.mediaId || media?.hash !== continuation.hash
+      || shotFingerprint(s, source.shotId) !== continuation.fingerprint
+      || continuityPredecessor(s, s.get("shots", item.shotId)!)?.id !== source.shotId) throw conflict("接戏帧的前镜视频或规格已改变，请从当前前镜重新提取并检查", "continuation_stale");
+  }
   const latest = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
   const evidence = latest?.evidence;
   const shot = s.get("shots", item.shotId);
@@ -87,9 +108,18 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     if (!audio || !(evidence.fullPlayback === true || coversSpeechRanges(plan.speechRanges, evidence.reviewedSegments ?? [])) || audio.speech !== "pass" || needsLipSync(shot ?? {}) && audio.lipSync !== "pass") {
       throw conflict("本镜有对白或画内演唱，须看听本镜全部发声区间并记录声音、逐字口型检查；抽帧或生成成功不能证明同步。先对口型或核验实际声音，不重新生成画面绕过", "speech_review_required");
     }
+    if (shot?.musicVideo?.audioMode === "sourceTrack" && audio.referenceMediaId !== shot.musicVideo.sourceMediaId) throw conflict("演唱口型须对照当前原曲，检查记录中的 referenceMediaId 必须匹配当前歌曲", "speech_review_stale");
     if (item.meta?.speechSync && (audio.inspectionKey !== item.meta.speechSync.inspectionKey || !item.meta.speechSync.audioMatches)) throw conflict("口型检查不是当前声音与视频版本，请重新检核当前素材", "speech_review_stale");
   }
   const required = plan.checks;
+  if (type === "take") {
+    const coverageIssue = motionCoverageIssue(s, shot!, item);
+    if (coverageIssue) throw conflict(coverageIssue, "motion_media_coverage_required");
+    if (plan.motionPlan?.checkpoints.length && (!evidence?.fullPlayback || !plan.motionPlan.checkpoints.every(checkpoint =>
+      evidence.motionReview?.some((review: { id: string; verdict: string; note: string }) => review.id === checkpoint.id && review.verdict === "pass" && review.note?.trim().length >= 10)))) {
+      throw conflict("须按当前 motionPlan.checkpoints 记录动作阶段、接触及空间关系的实际检查 motionReview；未看或未达标不能正式采用。由助手批量记录已授权审阅，不重复询问用户", "motion_review_required");
+    }
+  }
   if (type === "take" && plan.techniques.length && (!evidence?.fullPlayback || !plan.techniques.every(item =>
     evidence.techniqueReview?.some((review: { id: string; verdict: string }) => review.id === item.id && review.verdict === "pass")))) {
     throw conflict("选用镜头技法的视频须完整播放并逐项记录真实检查依据，检索或编译成功不能代替通过", "technique_review_required");

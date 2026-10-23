@@ -151,7 +151,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const revision = story.revisions.find(item => item.id === story.approvedId);
           const scene = revision?.scenes.find(item => item.sceneId === source.sceneId);
           if (!revision || !scene) throw new Error("来源场次必须属于当前已采用的剧本");
-          data = { ...data, source: { sceneId: scene.sceneId, revisionId: revision.id, sceneText: scene.text, speech: scene.speech, knowledge: scene.knowledge } };
+          data = { ...data, source: { sceneId: scene.sceneId, revisionId: revision.id, episodeNumber: scene.episodeNumber, sceneText: scene.text, speech: scene.speech, knowledge: scene.knowledge } };
         }
         if (operation === "readStoryImpact") {
           const story = await readStoryProject(cwd);
@@ -186,6 +186,17 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const image = await readReference(cwd, { path: input.path, mimeType: "image/png" }, "image", signal);
           signal?.throwIfAborted();
           return api.importWorkspaceKeyframe(scope, projectId, input.shotId, Buffer.from(image.data, "base64"), input.path);
+        }
+        if (operation === "continuationFrame") {
+          const { image, ...result } = await api.extractContinuationFrame(scope, projectId, data);
+          signal?.throwIfAborted();
+          const folder = "assets/continuation";
+          const output = await resolveWorkspacePath(cwd, folder, true);
+          await mkdir(output.path, { recursive: true });
+          const path = `${folder}/${result.keyframe.id}.png`;
+          const target = await resolveWorkspacePath(cwd, path, true);
+          await writeWorkspaceFile(target.path, image);
+          return { ...result, path, note: "这是前镜真实视频帧，可读图检查或作为新机位编辑参考；它不是动态镜头，也未自动采用。前镜改变后此候选失效。" };
         }
         if (operation === "importAudio") {
           const input = z.strictObject({ path: z.string().min(1).max(2048), kind: z.enum(["speech", "music", "sfx"]).default("speech") }).parse(data);

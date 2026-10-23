@@ -44,12 +44,13 @@ export function duplicateProject(s: Scope, id: string, name: string, actor: stri
             if (initial) s.update("asset_versions", initial.id, { snapshot: { ...remapAssetIds(initial.snapshot), references: data.references } });
         }
         for (const sq of s.list("sequences", { projectId: id }, "ord") as any[]) {
-            const ns = s.insert("sequences", { project_id: dst.id, name: sq.name, ord: sq.ord, script: sq.script, data: {} });
+            const ns = s.insert("sequences", { project_id: dst.id, name: sq.name, ord: sq.ord, script: sq.script, data: { kind: sq.kind, episodeNumber: sq.episodeNumber, storyRevisionId: sq.storyRevisionId } });
             const sceneMap = new Map<string, string>();
             for (const sc of s.list("scenes", { sequenceId: sq.id }, "ord") as any[]) sceneMap.set(sc.id, s.insert("scenes", { project_id: dst.id, sequence_id: ns.id, name: sc.name, ord: sc.ord, data: {} }).id);
             for (const sh of s.list("shots", { sequenceId: sq.id }, "ord") as any[]) {
                 const { sequenceId, sceneId, ord, schemaVersion, status, heroKeyframeId, approvedTakeId, ...data } = strip(sh);
                 const n = s.insert("shots", { project_id: dst.id, sequence_id: ns.id, scene_id: sceneMap.get(sh.sceneId) ?? null, ord, schema_version: schemaVersion, status: "planned", data: remapAssetIds(data) });
+                idMap.set(sh.id, n.id);
                 for (const b of s.list("reference_bindings", { targetType: "shot", targetId: sh.id }) as any[]) s.insert("reference_bindings", { project_id: dst.id, target_type: "shot", target_id: n.id, reference_id: refMap.get(b.referenceId) ?? b.referenceId, role: b.role, weight: b.weight, lock_level: b.lockLevel, crop: b.crop ?? null, notes: b.notes ?? null });
             }
             recomputeStates(s, ns.id);

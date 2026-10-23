@@ -18,7 +18,7 @@ export function inspectProductionQuality(s: Scope, projectId: string, type: "key
   const shot = item && s.get("shots", item.shotId);
   const media = item && s.get("media", item.mediaId);
   if (!item || !shot || !media || [item, shot, media].some(row => row.projectId !== projectId)) throw notFound("project output");
-  const key = sha256(JSON.stringify(["basicQuality1", media.id, media.hash]));
+  const key = sha256(JSON.stringify(["basicQuality2", media.id, media.hash]));
   const cached = item.meta?.basicQuality;
   if (cached?.key === key) return Promise.resolve({ ...cached, reused: true, plan: qualityReviewPlan(shot, type) });
   const pendingKey = `${s.workspaceId}:${type}:${id}:${key}`;
@@ -35,11 +35,19 @@ export function inspectProductionQuality(s: Scope, projectId: string, type: "key
       const probe = await probeFile(source);
       if (!probe?.hasVideo || !probe.width || !probe.height || type === "take" && (!probe.duration || probe.duration <= 0)) throw new Error("无法读取有效画面、尺寸或时长");
       const decoded = await runCmd("ffmpeg", ["-v", "info", "-xerror", "-threads", "2", "-i", source,
-        ...(type === "take" ? ["-vf", "scale=320:-2,blackdetect=d=0.5:pix_th=0.02"] : ["-frames:v", "1"]), "-an", "-f", "null", "-"], AbortSignal.timeout(120000));
+        ...(type === "take" ? ["-vf", "scale=320:-2,blackdetect=d=0.5:pix_th=0.02,freezedetect=n=-60dB:d=0.75"] : ["-frames:v", "1"]), "-an", "-f", "null", "-"], AbortSignal.timeout(120000));
       if (decoded.code !== 0) throw new Error("解码检测失败或超时，保留原片，需查看文件");
       const blackSegments = [...decoded.err.matchAll(/black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/g)]
         .map(match => ({ start: Number(match[1]), end: Number(match[2]), duration: Number(match[3]) }));
-      result = { key, mediaId: media.id, hash: media.hash, status: "checked", checkedAt: new Date().toISOString(), ...probe, blackSegments };
+      const freezeSegments: { start: number; end: number }[] = [];
+      let freezeStart: number | undefined;
+      for (const match of decoded.err.matchAll(/freeze_(start|end):\s*([\d.]+)/g)) {
+        if (match[1] === "start") freezeStart = Number(match[2]);
+        else if (freezeStart !== undefined) { freezeSegments.push({ start: freezeStart, end: Number(match[2]) }); freezeStart = undefined; }
+      }
+      if (freezeStart !== undefined) freezeSegments.push({ start: freezeStart, end: probe.duration! });
+      // ACT: 低阈值仅定位近乎相同的连续帧；静机位、呼吸或纹理噪声均可能影响检测，不据此自动判断表演或口型。
+      result = { key, mediaId: media.id, hash: media.hash, status: "checked", checkedAt: new Date().toISOString(), ...probe, blackSegments, freezeSegments };
     } catch (error) {
       result = { key, mediaId: media.id, hash: media.hash, status: "error", checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) };
     } finally { await rm(directory, { recursive: true, force: true }); }
@@ -59,10 +67,11 @@ export function productionQualityView(s: Scope, projectId: string) {
     const shot = s.get("shots", item.shotId)!;
     const basic = item.meta?.basicQuality;
     const media = s.get("media", item.mediaId);
-    const current = basic?.key === sha256(JSON.stringify(["basicQuality1", media?.id, media?.hash]));
+    const current = basic?.key === sha256(JSON.stringify(["basicQuality2", media?.id, media?.hash]));
     const warnings: string[] = [];
     if (current && basic.status === "checked") {
       if (basic.blackSegments?.length) warnings.push("检测到持续黑场，请确认是否为有意设计");
+      if (basic.freezeSegments?.length) warnings.push("检测到至少0.75秒近乎不变的连续帧，请查看是否存在冻结延长；此信号不能证明动作或口型合格");
       if (type === "take" && basic.duration + 0.15 < shot.duration) warnings.push("素材短于计划使用时长");
       const resolution = item.meta?.parameters?.request?.resolution ?? item.meta?.parameters?.resolution;
       const side = Number(/^(\d+)p$/i.exec(resolution ?? "")?.[1]);

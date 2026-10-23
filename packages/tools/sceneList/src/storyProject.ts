@@ -7,6 +7,8 @@ const id = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/);
 export const storyPath = z.string().min(1).max(1024).refine(value => !/^[\\/]/.test(value) && !/[\\:\x00-\x1f]/.test(value) && value.split("/").every(part => part && part !== "." && part !== ".."), "须为工作区内的相对文件路径");
 export const storyBriefSchema = z.strictObject({
   kind: z.enum(["story", "serial", "adfilm", "brandFilm", "musicFilm"]),
+  serialFormat: z.enum(["short", "medium"]).optional().describe("连载形态：短剧或中剧；duration 为单集目标秒数"),
+  episodeCount: z.number().int().min(1).max(100).optional(),
   idea: text(10000), audience: text(), channel: text(200), intent: text(), genre: text(200), tone: text(500), ending: text(500), duration: z.number().finite().min(1).max(3600), constraints: text(4000),
 });
 export const storySourceSchema = z.strictObject({
@@ -18,6 +20,7 @@ export const storySourceSchema = z.strictObject({
 export const storyDirectionSchema = z.strictObject({ id, title: text(100).min(1), premise: text().min(1), audienceReason: text().min(1), signatureScene: text().min(1), risk: text().min(1) });
 export const storySceneSchema = z.strictObject({
   sceneId: z.string().regex(/^s\d{2,3}$/), title: text(150).min(1), text: text(12000).min(1),
+  episodeNumber: z.number().int().min(1).max(100).optional().describe("连载场次所属集号；跨集仍保留唯一 sceneId"),
   goal: text(1000), obstacle: text(1000), change: text(1000), knowledge: text(2000),
   causes: z.array(z.string().regex(/^s\d{2,3}$/)).max(30),
   speech: text(6000).describe("仅实际朗读文字，逐句换行；不含角色名前缀、冒号标签、通道标记或表演说明。角色与通道保留在 text 中，无朗读则留空"),
@@ -116,7 +119,16 @@ export function storyImpact(previous: StoryRevision, next: StoryRevision) {
   while (more) { more = false; for (const scene of next.scenes) if (!changed.has(scene.sceneId) && !dependent.has(scene.sceneId) && scene.causes.some(id => changed.has(id) || dependent.has(id))) { dependent.add(scene.sceneId); more = true; } }
   return { changed: [...changed], dependent: [...dependent] };
 }
-export function validateStoryDraft(draft: StoryDraft) {
+export function validateStoryDraft(draft: StoryDraft, brief?: StoryProject["brief"]) {
+  const episodic = draft.scenes.some(scene => scene.episodeNumber !== undefined) || brief?.kind === "serial" && !!brief.serialFormat;
+  if (episodic) {
+    let previous = 0;
+    for (const scene of draft.scenes) {
+      const episode = scene.episodeNumber;
+      if (!episode || episode < previous || brief?.episodeCount && episode > brief.episodeCount) throw new Error("分集场次须填写有效集号，按集排列且不超过计划集数；倒叙在本集正文注明");
+      previous = episode;
+    }
+  }
   const ids = new Set(draft.scenes.map(scene => scene.sceneId));
   if (ids.size !== draft.scenes.length) throw new Error("场次 ID 不能重复");
   for (const scene of draft.scenes) if (scene.causes.some(id => !ids.has(id) || id === scene.sceneId)) throw new Error(`${scene.sceneId} 的因果引用无效`);
@@ -138,9 +150,10 @@ export function validateStoryDraft(draft: StoryDraft) {
   for (const items of [draft.canon, draft.threads]) if (new Set(items.map(item => item.id)).size !== items.length) throw new Error("事实与线索各自的 ID 不能重复");
 }
 
-export const shortDramaWritingGuide = `仅对连载短剧（brief.kind=serial）应用：沿用已定集数、单集时长和当前写作范围，不能默认扩成百集或加付费墙。先确定观众持续期待的情绪或信息，再把故事组织成可收束的单元；后续矛盾来自前一单元的后果，不靠复位关系、反复误会或突然增加反派拖长。
+export const shortDramaWritingGuide = `仅对连载短剧或中剧（brief.kind=serial）应用：serialFormat 区分 short 短剧与 medium 中剧，episodeCount 为计划集数，duration 为单集目标秒数。沿用已定集数、单集时长和当前写作范围，不能默认扩成百集或加付费墙。中剧允许完整的多场发展与人物弧线，不套用短视频快切密度。先确定观众持续期待的情绪或信息，再把故事组织成可收束的单元；后续矛盾来自前一单元的后果，不靠复位关系、反复误会或突然增加反派拖长。
 网文改编区分原文事实与改编提案：记录保留/合并/删去的事件及章集对应；把心理描写转成可见选择、动作或明确标注的内心独白，不能把独白当场内人物听见的对白。正文区分对白、内心独白和旁白；speech 只保留实际朗读内容，通道标记和说明放在正文，不送入朗读。
-每集发展人物目标、信息、关系或代价，下一集先接住前集末态。人物状态、知情、持物者和世界规则复用 canon；伏笔与兑现复用 threads。阅读当前集相关的近期状态时，仍须核对会重新出现的旧线索，不把摘要当原文。sceneId 在当前版本唯一且稳定；集次写入场次标题。单个版本最多100场，超出时明确本次范围，全集规划保存为工作区文档，不截断或伪称已入库。
+每集发展人物目标、信息、关系或代价，下一集先接住前集末态。人物状态、知情、持物者和世界规则复用 canon；伏笔与兑现复用 threads。阅读当前集相关的近期状态时，仍须核对会重新出现的旧线索，不把摘要当原文。sceneId 跨集唯一且稳定，episodeNumber 保存所属集号。单个版本最多100场，超出时明确本次范围，全集规划保存为工作区文档，不截断或伪称已入库。
+制作按集创建 sequence（kind:serial、episodeNumber、storyRevisionId），每集单独剪辑与导出。所有集复用同一项目资产 ID、已批准定妆参考、世界与 Look、固定角色音色，不为新一集重复创造角色。每集首镜明确 continuityFromShotId，引用前序集实际承接的镜头；倒叙和平行线引用对应镜头而非盲取最近集尾。伤势、服装、持物与情绪变化写入 intendedStateDelta。生成前核对参考是否实际发送；缺少参考或模型不支持时先解决，不能宣称仅靠文字保持身份。素材生成后仍逐镜看听并检查跨集接点，不把继承计划当成实际一致性通过。
 反转、钩子、物证和断章是按故事选择的方法；变化必须有依据，宁静场与直说也可以有效。不硬凑字数、场数、反转次数或对白占比，实际时长按对白、行动和停留估计。审稿给原文、依据与最小改法，事实矛盾/理解风险/审美建议分开；不把模板检查或自评分当成平台合规、真实片长或爆款证明。`;
 
 export const musicFilmWritingGuide = `仅对 MV（brief.kind 为 musicFilm）应用以下规则：

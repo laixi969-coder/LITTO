@@ -73,3 +73,11 @@
 编译顺序可用：参考用途 → 场景与光线 → 持机与表演 → 分段动作/切点 → 有条件的成像特征 → 声音 → 少量必要限制。沿用当前模型的提示词格式，不另套一套强制模板。不要复制案例里的性别、服装、亲密程度、音乐类型或固定 BPM 到其他项目。
 
 验收看实际输出：身份是否稳定，手和手机是否合理，失焦是否及时恢复，轻微瑕疵是否仍保留可读性，音画事件是否对齐。可用相同参考和参数做基础版与少量成像特征版对照；未生成或未审看时，只报告提示词设计判断，不宣称质量提升已被验证。
+
+## 接触动作与定稿证据
+
+关键产品操作、抓握、递接、救援等动作，将真实参与资产和起势/接触/完成时间存入 shot.interactions，明确 approach、contact、force、support、release、endState；拿不到开口或结构依据时改变已授权的拍法，不猜产品结构。动作修改同时复核接触事件。
+
+每个视频都须完整播放，检查 surface、imaging、world、motion、cinematic；远景也不能仅靠少量帧宣称时域稳定。agentReview 可记录实际 observedStateDelta，完整检查齐备后正式采用并将末态传递给后镜；未实际观察不得抄写 intendedStateDelta。
+
+定稿之后 inspectFinal 返回 plan.fields 与 plan.cuts；逐切点核对动作阶段、视线、运动方向、空间光色和声音。代理已获自主审阅授权并实际完整看听后，用 agentReviewFinal 保存 review.checks、cutReview、techniqueReview、note 与告警 acknowledgements。缺项保持未验证，返修注明时间码、问题和要保留的部分；用户满意另行保存，不能代替技术证据。

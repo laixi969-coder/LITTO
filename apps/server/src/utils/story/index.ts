@@ -150,7 +150,7 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
     const now = new Date().toISOString();
     const getRevision = (id: string) => project.revisions.find(item => item.id === id) ?? fail("故事版本不存在");
     const addDraft = async (value: Parameters<typeof validateStoryDraft>[0], parentId?: string) => {
-      try { validateStoryDraft(value); }
+      try { validateStoryDraft(value, project.brief); }
       catch (cause) { fail(cause instanceof Error ? cause.message : "剧本结构无效"); }
       await checkSources(directory, project.sources);
       const parent = parentId ? getRevision(parentId) : undefined;
