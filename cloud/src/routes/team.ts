@@ -3,8 +3,6 @@ import { z } from "zod";
 import { authOf, requireRole, type Role } from "../auth.ts";
 import { all, audit, get, run, tx } from "../db.ts";
 import { body, ctx } from "../http.ts";
-import { grant } from "../credits.ts";
-import { setting } from "../db.ts";
 import { bad, conflict, forbidden, notFound, now, ulid } from "../util.ts";
 
 /** P2: team workspaces + full RBAC. Roles: OWNER > ADMIN > EDITOR > VIEWER (enforced server-side by requireRole in every handler). */
@@ -18,9 +16,9 @@ team.post("/workspaces", async (c) => {
     tx(() => {
         run("INSERT INTO workspaces(id,name,owner_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", id, b.name, a.user.id, "team", now(), now());
         run("INSERT INTO workspace_members VALUES(?,?,?,?)", id, a.user.id, "OWNER", now());
+        // 新用户赠送只在注册时发到个人工作区；创建团队不再追加奖励，也不改动已有积分。
         run("INSERT INTO credit_accounts VALUES(?,0,0,?)", id, now());
         run("INSERT INTO subscriptions(id,workspace_id,plan,period,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ulid(), id, "free", "free", "active", now(), now());
-        grant(id, setting("defaultCredits", 200), "CREDIT_GRANT", "team workspace grant");
     });
     audit(a.user.id, "workspace.create", id, { name: b.name }, id);
     return c.json({ id, name: b.name, kind: "team", role: "OWNER" }, 201);
