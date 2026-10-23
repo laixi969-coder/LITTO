@@ -15,8 +15,11 @@ import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@
 import { blockingLine } from "@/utils/media/blocking";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { applyMediaQuality } from "@/utils/media/quality";
-import { videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
+import { skinFinishes, videoMotionTiming, type SkinFinish } from "@toonflow/tool-media-generation/runtime";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
+import { inspectVideoPrompt, isDirectorPrompt, positivePromptText } from "@/utils/media/videoPrompt";
+
+export type { SkinFinish } from "@toonflow/tool-media-generation/runtime";
 
 const maxMediaSize = 100 * 1024 * 1024;
 const cameraSessions = new Set<string>();
@@ -169,18 +172,17 @@ async function assetBytes(asset: MediaAsset, mediaType: "image" | "video" | "aud
  * 写实基底：用可执行的成像行为替代「8K／超写实／电影感」这类空形容词。
  * 只约束成像与材质，不改创作内容；用户明确要求动画或插画时整段跳过。
  */
-const PHOTOGRAPHIC_BASELINE = [
-  "PHOTOGRAPHICBASELINE 实拍成像基底：35mm 电影镜头，真实光学景深与自然高光滚降，高光不糊成纯白。",
-  "皮肤保留毛孔、绒毛、肤色不均与真实皮脂反光，T 区与鼻头有自然油光；妆感可辨——粉底边界、唇部纹理、眉毛根根分明，不做无瑕哑光的塑料皮肤。",
+const photographicBaseline = [
+  "PHOTOGRAPHICBASELINE 实拍成像基底：以下仅补充未指定的成像细节，已确定的媒介、布光、时段、景深与妆容优先。真实光学透视与自然高光滚降，高光保留层次。",
+  "__SKIN__",
   "布料可见纤维与自然褶皱，金属与玻璃有各自的光泽与反射，不共用同一种塑料光泽。",
-  "光源来自画面内可见或可推断的实际光源，方向明确，墙面与地面留有投影，人物与环境受同一光源支配；不用多点均匀柔光把脸拍平。",
+  "光源来自画面内可见或可推断的实际光源，人物与环境受同一光源支配；角色资产允许大型柔光与反光板，保留柔和面部体积，正式镜头服从场景光向。",
   "头发有碎发飞出与不均匀的发丝反光，发根保留蓬松与分缝。",
-  "曝光正常，画面明亮通透，中间调不压暗，暗部保留细节但不到死黑。",
-  "色彩自然准确，不刻意降低饱和度，不加青橙滤镜，不让人脸与墙面发灰。",
-  "画面干净：无明显噪点、无胶片颗粒、无脏污、无划痕、无霉斑、无做旧痕迹。",
+  "曝光与色彩服从当前光源和时段，主体可读，高光平滑，暗部保留必要细节；清爽不等于把夜景改成白天，也不抹去已指定的夕阳、暖灯或胶片风格。",
+  "默认控制噪点、锐化光边与全局色偏，不为写实额外添加颗粒、脏污、划痕或做旧痕迹。",
   "服装、道具与场景保持干净完整、维护良好；只有剧情明确要求的状态改变才例外，且只影响指定对象。",
-  "禁止 3D 渲染感、CG 塑料质感、无瑕均匀皮肤与全画面同焦。",
-].join("");
+  "避免塑料与蜡像质感；焦平面服从构图，人物资产让完整头部与服装可辨，剧情画面保留指定景深。",
+];
 
 /**
  * 判断提示词是否在写人：编译层会追加 REFERENCEUSE 等模板段落，只取 REQUEST: 到下一个大写标记之间的作者原文，
@@ -190,7 +192,9 @@ export function looksLikePersonShot(prompt: string) {
   const authored = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(prompt)?.[1] ?? prompt;
   // 明确声明空镜的请求直接放行：场景与道具的描述里常会提到人物，按关键词一刀切会把空镜全部误拦。
   if (/无人|空镜|不出现人物|不要人物|无人物|\bno people\b|\bempty scene\b/i.test(authored)) return false;
-  return /人脸|面容|面部|正脸|肖像|长相|五官|表情|眼神|口型|对白|台词|人物|角色|男主|女主|演员|男人|女人|男子|女子|男性|女性|男孩|女孩|\bface\b|\bportrait\b|\beyes\b|\bdialogue\b|\bman\b|\bwoman\b/i.test(authored);
+  // 代词也要算人物：vlog 与 POV 稿子常写「她转过头」「他抬手」，只认名词会把整段判成空镜，
+  // 服装锁与身份约束就全被跳过（实测踩过：POV vlog 六段没有任何 WARDROBELOCK）。
+  return /人脸|面容|面部|正脸|肖像|长相|五官|表情|眼神|口型|对白|台词|人物|角色|男主|女主|演员|男人|女人|男子|女子|男性|女性|男孩|女孩|她|他|她们|他们|\bface\b|\bportrait\b|\beyes\b|\bdialogue\b|\bman\b|\bwoman\b|\bhe\b|\bshe\b/i.test(authored);
 }
 
 /**
@@ -217,11 +221,22 @@ export function compileShotSpec(spec: MediaShotSpec | undefined) {
   return parts.length ? `SHOTSPEC: ${parts.join("；")}` : "";
 }
 
-export function withPhotographicBaseline(prompt: string) {
+/** 从提示词里的 SKIN 标记读肤质路径；没有标记按资产口径（干净）处理。 */
+export function readSkinFinish(prompt: string): SkinFinish {
+  const match = /SKIN\s*[:：]\s*(clean|natural)/i.exec(prompt);
+  return match?.[1].toLowerCase() === "natural" ? "natural" : "clean";
+}
+
+export function withPhotographicBaseline(prompt: string, skinFinish?: SkinFinish) {
   if (prompt.includes("PHOTOGRAPHICBASELINE")) return prompt;
-  const authored = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(prompt)?.[1] ?? prompt;
-  if (/动画|插画|漫画|卡通|二次元|像素|3D\s*渲染|CG\s*渲染|anime|cartoon|illustration|\brender\b|\bstylized\b/i.test(authored)) return prompt;
-  return `${PHOTOGRAPHIC_BASELINE}\n\n${prompt}`;
+  const finish = skinFinish ?? readSkinFinish(prompt);
+  // SKIN 行只是给编译看的指令，不该出现在发给模型的正文里。
+  const body = prompt.replace(/^[ \t]*SKIN\s*[:：]\s*(?:clean|natural)[ \t]*\r?\n?/gim, "").trim();
+  // 五板块已含完整成像设计，不再前置一套相互冲突的默认风格。
+  if (isDirectorPrompt(body)) return body;
+  if (/动画|插画|漫画|卡通|二次元|像素|3D\s*渲染|CG\s*渲染|anime|cartoon|illustration|\brender\b|\bstylized\b/i.test(positivePromptText(body))) return body;
+  const baseline = photographicBaseline.map(line => line === "__SKIN__" ? skinFinishes[finish] : line).join("");
+  return `${baseline}\n\n${body}`;
 }
 
 /** 视频未指定时长时的推荐值：取模型可用区间的上限三分之二，避免每次都落在最短档。 */
@@ -240,6 +255,11 @@ function recommendedDuration(map: unknown, requested: number | undefined) {
  * 入队前也调用一次——排在队列里执行时才失败，用户看到的是「提交成功然后红了一片」，说不清哪一步错了。
  */
 export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "image" | "video" | "audio", compiledInputs: { sent: boolean; mediaId: string | null; role: string }[] = []) {
+  if (mediaType === "video") {
+    const review = inspectVideoPrompt(request.prompt, request.duration);
+    if (review.applicable && request.duration === undefined) invalid("五板块视频请求须显式设置 duration，与时间线总时长一致");
+    if (review.errors.length) invalid(`视频导演提示词未通过：${review.errors.join("；")}`);
+  }
   // 禁止主动做旧：默认干净完整是产品底线，只有明确标注设计意图的破败场景才放行。
   const DISTRESSED = /脏|污渍|油污|污垢|破烂|腐烂|发霉|霉斑|生锈|锈蚀|破洞|破损|陈旧|做旧|衰败|荒废|废墟|残破|\bdirty\b|\brusted\b|\bdecayed\b|\bderelict\b|\bgrimy\b/i;
   // 只检查作者自己写的部分：系统注入的基底与锚点段落本身含有「污渍/破损」这类词，
@@ -252,9 +272,7 @@ export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "
     .replace(/^SHOTSPEC: .*\n\n/m, "");
   const authoredPrompt = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(stripped)?.[1] ?? stripped;
   // 再剥掉否定句：「没有污渍、破损」是在要求干净，不是在要求做旧。
-  const positiveDemand = authoredPrompt
-    .replace(/(没有|无|不带|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得)[^，。；,;.\n]*/g, "")
-    .replace(/\b(no|without|avoid|remove|clean of)\b[^,.;\n]*/gi, "");
+  const positiveDemand = positivePromptText(authoredPrompt);
   if (mediaType !== "audio" && DISTRESSED.test(positiveDemand) && !/DISTRESSED\s*[:：]/i.test(request.prompt)) {
     // 把命中的词直接回给作者：只报「不许做旧」等于让人去猜是哪几个字踩了线。
     const hits = [...new Set(positiveDemand.match(new RegExp(DISTRESSED.source, "gi")) ?? [])].slice(0, 6);
@@ -303,8 +321,9 @@ async function generateMediaUnrecorded(
   if (typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
-  const spec = request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
-  const motionTiming = mediaType === "video" && !request.prompt.includes(videoMotionTiming) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
+  const directorPrompt = isDirectorPrompt(request.prompt);
+  const spec = directorPrompt || request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
+  const motionTiming = mediaType === "video" && !directorPrompt && !request.prompt.includes(videoMotionTiming) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
   const prompt = withPhotographicBaseline([spec, request.prompt, motionTiming].filter(Boolean).join("\n\n"));
   // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
   const referenceReads = new Map<string, ReturnType<typeof readReference>>();

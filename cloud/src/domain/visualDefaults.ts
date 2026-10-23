@@ -1,4 +1,6 @@
-// ACT: 生成与审看共用简明基线；已确认的剧情、媒介和当前镜头设计优先，不按关键词改写剧情。
-export const cleanVisualDefaults = "Keep the chosen medium, era and maintenance state. Default to clean, intact subjects; do not invent dirt, damage, fatigue, grain or darkness for realism. Explicit story/state changes stay limited to their subject and time. Follow planned lighting and exposure, including motivated silhouettes; keep the intended action readable without flattening shadows, smoothing skin or sharpening every plane.";
+import { skinFinishes } from "@toonflow/tool-media-generation/runtime";
+
+// ACT: 正式镜头、独立生成与审看复用同一份清爽肤质规则；既定媒介、妆容与剧情状态优先。
+export const cleanVisualDefaults = "Keep the chosen medium, era and maintenance state. Default to clean, intact subjects; do not invent dirt, damage, fatigue, grain or darkness for realism. Explicit story/state changes stay limited to their subject and time. Follow planned lighting and exposure, including motivated silhouettes; keep the intended action readable without flattening shadows, smoothing skin or sharpening every plane. For photographic human subjects only, fill unspecified skin and grooming details with this baseline; preserve explicit makeup, surface treatment and story state: " + skinFinishes.clean;
 
 export const characterReferenceUse = "Use references only for their assigned roles: IDENTITY for face, age and skin; WARDROBE for clothes; LOOK/LIGHTING/COMPOSITION for the specified visual relations. A face crop does not set body proportions. Preserve approved physique; new unspecified adult bodies default to naturally tall, proportionate silhouettes, never stretched or shortened to fit. Current action sets expression. Do not copy unrelated people, outfits or damage from references; text alone cannot lock identity.";

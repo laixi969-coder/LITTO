@@ -9,8 +9,10 @@ export default Router().post("/", validateFields({
   directory: z.string().min(1).max(4096),
   shotSpec: z.record(z.string(), z.string()).optional(),
   clips: z.array(z.string().min(1).max(2048)).max(400).optional(),
+  prompt: z.string().max(100000).optional(),
+  duration: z.number().finite().positive().max(3600).optional(),
 }), async (req, res) => {
-  const { directory, shotSpec, clips } = req.body;
+  const { directory, shotSpec, clips, prompt, duration } = req.body;
   const cwd = await u.workspace.resolveWorkspace(req, directory);
-  res.json(success(await preflight(cwd, { shotSpec, clips })));
+  res.json(success(await preflight(cwd, { shotSpec, clips, prompt, duration })));
 });

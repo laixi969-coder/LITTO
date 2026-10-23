@@ -79,7 +79,7 @@ metadata:
 | --- | --- |
 | 曝光 | 正常、明亮通透，中间调不压暗 |
 | 色彩 | 自然准确，不刻意降饱和，不整体偏灰 |
-| 皮肤 | 干净、有毛孔与油光，但不暗沉不脏 |
+| 皮肤 | 默认沿用清爽人物方法：自然均匀肤色、符合景别的细微纹理、轻薄妆面与克制高光；保留既定肤色、年龄和明确的特殊妆效，不以粗毛孔、黑眼圈或厚粉分界证明写实 |
 | 服装 | 平整挺括、洗得干净 |
 | 环境 | 有生活物件，但墙面地面干净，没有污渍霉斑 |
 
@@ -120,7 +120,12 @@ metadata:
 | 准备提交生成、不确定该传哪些参数 | 读取[生成参数手册](references/generationParams.md)；六个参数（shotSpec／cast／styleReference／continueFrom／composeFilm／qc）决定底线质量，人物镜没有身份参考会被直接拒绝 |
 | 定影调、选导演风格、需要可执行的色值比例 | 读取[导演色卡库](../directorPalettes/SKILL.md)；198 位导演的实测主色板（HEX＋画面占比）、情绪色板与光影特征，转成 `shotSpec.lighting` 与 `styleReference`。一镜只用一个导演的色板，主色由环境承载，肤色不被环境色污染 |
 | 需要导演视觉语言、选画风、把口语需求补成规范提示词 | 读取[导演与视觉风格](../gavenDirectImagePrompts/SKILL.md)；按 Dxx 导演／Pxx 摄影／Cxx 胶片／Rxx 印片代码选风格并展开成自然语言。项目已有 Look 时以项目为准，不叠加冲突风格；画风代码只定影调与成像，不改剧情与人物 |
-| 把定稿剧本或场次转成逐镜视频提示词 | 读取[剧本转视频提示词](../gavenScriptToVideo/SKILL.md)；按动作因果与对白容量拆片段，逐镜写景别、运镜、时长、动作与表演。**片段上限以 listMediaModels 的真实 duration 为准**（如 MiniMax-H3 为 15 秒），该技能默认的 30 秒只适用于 Seedance 2.5 |
+| 只要一份精简可读的逐镜提示词，不需要资产绑定与节点配置 | 读取[剧本转视频提示词](../gavenScriptToVideo/SKILL.md)；按动作因果与对白容量拆片段，逐镜写景别、运镜、时长、动作与表演。**片段上限以 listMediaModels 的真实 duration 为准**（如 MiniMax-H3 为 15 秒），该技能默认的 30 秒只适用于 Seedance 2.5 |
+| 要成片级的完整提示词：资产绑定、摄影与光影、逐镜时间线、声音、负面约束一起交付 | 读取[视频提示词导演](../videoPromptDirector/SKILL.md)；按五板块结构写完 `final_video_prompt`，用 preflight 校验结构与总时长；按生成段创建视频节点，连接资产后读取 getConfig.references，用实际 `{{ref N}}` 标记绑定，再回读 generationPrompt。总时长在模型能力内且剧情可控时优先单节点；正式镜头仍走 productionSpec 编译，不以独立片段绕过。清爽人物同时读取其中 cleanPortrait 方法 |
+| 旅拍婚礼、双人旅行或个人旅拍，需要选镜、删镜、换装 | 读取[旅拍影像提示词导演](../travelWeddingDirector/SKILL.md)；默认每镜 2 秒、4:3 写实、无 BGM，内置按镜号检索的镜头库与带版本管理的服装表。挑完镜头仍按 videoPromptDirector 的五板块成稿，不整库复制进提示词 |
+| 小清新、自然光、清透色彩、湖边庭院海边树林 | 读取[光感小清新导演](../lightFreshDirector/SKILL.md)；按光源方向与时段组织光线，多镜头按动作与光线节奏分配而不是平均切分；镜头库按镜号检索，成稿规范沿用 videoPromptDirector |
+| 中式园林、东方含蓄表演、月洞门与游廊的人景关系 | 读取[中式园林影像导演](../chineseGardenDirector/SKILL.md)；把空间层次、檐下廊内的窄光与水面倒影写成可观察条件，人物表演走"少动作、多停顿"，续写与修复沿用同一套空间关系。园林的旧只属于建筑本身，不写做旧质感 |
+| 东方奇境单图：巨型花木、云上天宫、仙侠志怪梦境 | 读取[东方奇境图片导演](../orientalEpicDirector/SKILL.md)；先放一个能被认出来的标尺再写主体，建筑按台基/柱列/斗拱/檐口/屋脊五层写，梦境只改一条规则。画风代码仍走 gavenDirectImagePrompts，不做旧 |
 | 用户指定青绿寓言、东方超现实绘画画风 | 读取[青绿寓言画风](../gavenQingluAllegory/SKILL.md)；仅在该画风被明确要求时使用，不替代写实基底 |
 | 选角、候选人物、角色生成、系列人像或摄影参考转译 | 读取[选角与角色生成](references/methods/characterCasting.md)，按电影、MV、广告任务区分身份、造型、摄影与当场状态；全局默认干净、完整、清晰，明确例外限定对象和时段 |
 | 妆发、服装搭配、换装、卸妆或持续外观状态 | 读取[妆造设计](references/methods/characterStyling.md)，将人物处境、当前造型、变化时点与参考分工落实到现有资产和镜头；现代真人 MV 人物资产或精致人像参考在出图前应用其中的肤面、妆发与搭配标准 |

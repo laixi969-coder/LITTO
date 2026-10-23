@@ -1,0 +1,4 @@
+interface:
+  display_name: "视频提示词导演"
+  short_description: "把构想/剧本/资产编译成五板块视频提示词并配置节点"
+  default_prompt: "使用 $video-prompt-director-prompts，根据我的构想、参考素材或剧本，按五板块结构编写可直接投喂 Seedance 2.5 的中文视频提示词，确认分镜后自动创建视频节点并写入提示词。"

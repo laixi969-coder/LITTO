@@ -13,7 +13,8 @@ function mediaValue(input: MediaInput, kind: "image" | "audio") {
   if (!formats.includes(input.mimeType)) throw new Error(kind === "image" ? "Vidu 图片须为 PNG、JPEG 或 WebP" : "Vidu 参考音频须为 MP3，时长为 3–12 秒");
   const data = input.type === "binary" ? Buffer.from(input.data).toString("base64") : input.data.replace(/^data:[^,]+,/, "");
   if (!data) throw new Error(`Vidu ${label}不能为空`);
-  return `data:${input.mimeType};base64,${data}`;
+  // Vidu 的 sounds 协议要求 video/mp3，宿主仍使用标准的 audio/mpeg。
+  return `data:${kind === "audio" ? "video/mp3" : input.mimeType};base64,${data}`;
 }
 
 async function fetchJson(context: ProviderContext, path: string, signal: AbortSignal, authorization: "Token" | "Bearer", body?: string) {
@@ -24,7 +25,7 @@ async function fetchJson(context: ProviderContext, path: string, signal: AbortSi
     method: body === undefined ? "GET" : "POST", signal,
     headers: { Authorization: `${authorization} ${key}`, "Content-Type": "application/json" }, body,
   });
-  if (!response.ok) throw new Error(`Vidu 请求失败（HTTP ${response.status}）`);
+  if (!response.ok) throw Object.assign(new Error(`Vidu 请求失败（HTTP ${response.status}）`), { status: response.status });
   const result = await response.json() as Record<string, any>;
   if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("Vidu 响应格式错误");
   return result;
@@ -40,19 +41,29 @@ function wait(signal: AbortSignal) {
 }
 
 export default {
-  id: "vidu", label: "Vidu", version: "1.1.1", rules,
+  id: "vidu", label: "Vidu", version: "1.1.3", rules,
   readme: "Vidu Q4 Preview 支持图生视频和参考生视频。图生视频使用一张首帧，画幅跟随首帧；参考生视频使用 1–15 张图片，可附加 0–3 段 MP3 参考音频（每段 3–12 秒），画幅可选 16:9、9:16、1:1、4:3、3:4。两种模式均支持 3–16 秒、540P / 720P / 1080P / 2K / 4K，可选音画同出。提示词可按输入顺序使用“参考图1”“参考音频1”指定素材。只需填写 API Key，API 地址默认使用官方地址；中转须兼容 Vidu 协议。\n\n[图生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) · [参考生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video)",
   models: [
     { id: "viduq4-preview", label: "Vidu Q4 Preview", type: "video", mode: ["singleImage", ["imageReference:15", "audioReference:3"]], audio: "optional", durationResolutionMap: [{ duration: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], resolution: ["540P", "720P", "1080P", "2K", "4K"] }] },
   ] satisfies ProviderModel[],
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
     if (request.model !== "viduq4-preview") throw new Error("当前 Vidu 接入支持 viduq4-preview");
-    // Vidu 没有独立负面词字段；保留编译约束，以文本排除要求随正文发送。
-    const prompt = [request.prompt, request.negativePrompt?.trim() ? `Avoid the following: ${request.negativePrompt.trim()}` : ""].filter(Boolean).join("\n\n");
+    // 画布单图模式使用 images，接口工具也允许 firstFrame；统一成实际首帧，避免已连图仍报缺图。
+    if (request.mode === "singleImage" && request.images?.length === 1 && !request.firstFrame) request = { ...request, firstFrame: request.images[0], images: [] };
+    // Vidu 没有独立负面词字段。「Avoid the following: 中文」对中文模型约束很弱，
+    // 改成中文否定清单并前置到正文之前，模型才会把它当画面要求而不是附注。
+    const avoid = request.negativePrompt?.trim();
+    const prompt = [avoid ? `画面中不得出现：${avoid}。` : "", request.prompt].filter(Boolean).join("\n\n");
     if (prompt.length > 20000) throw new Error("Vidu 提示词（含排除要求）不能超过 20000 字");
     const referenceMode = Array.isArray(request.mode) || (request.mode === undefined && !!request.images?.length);
     if (Array.isArray(request.mode)) {
-      if (!request.mode.includes("imageReference:15") || request.mode.some(mode => !["imageReference:15", "audioReference:3"].includes(mode))) throw new Error("不支持此 Vidu 参考模式");
+      // mode 里的 imageReference:N 是模型声明的上限，不是本次实际张数；实际张数以 images 为准。
+      // 旧实现要求必须等于 imageReference:15，等于让参考生视频除传满 15 张外全部不可用。
+      const imageModes = request.mode.filter(mode => /^imageReference:/.test(mode));
+      const others = request.mode.filter(mode => !/^(imageReference|audioReference):/.test(mode));
+      if (imageModes.length !== 1 || others.length) throw new Error("不支持此 Vidu 参考模式");
+      const declared = Number(imageModes[0].split(":")[1]);
+      if (!Number.isInteger(declared) || declared < 1 || declared > 15) throw new Error("Vidu 参考图上限为 15 张");
     } else if (request.mode !== undefined && request.mode !== "singleImage") throw new Error("Vidu Q4 Preview 支持图生视频和参考生视频");
     if (request.lastFrame || request.videos?.length) throw new Error("Vidu Q4 Preview 不支持尾帧或视频参考");
     if (referenceMode) {
@@ -82,11 +93,21 @@ export default {
     if (Buffer.byteLength(body) >= 20 * 1024 * 1024) throw new Error("Vidu 请求体须小于 20 MB，请压缩首帧或使用公开图片地址");
     const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const authorization = referenceMode ? "Bearer" : "Token";
-    const task = await fetchJson(this, referenceMode ? "/reference2video" : "/img2video", signal, authorization, body);
+    await this.tool.reportTask?.({ status: "submitting" });
+    let task;
+    try {
+      task = await fetchJson(this, referenceMode ? "/reference2video" : "/img2video", signal, authorization, body);
+    } catch (error) {
+      const rejected = [400, 401, 402, 403, 404, 413, 415, 422, 429].includes(Number((error as { status?: number }).status));
+      await this.tool.reportTask?.({ status: rejected ? "rejected" : "unknown" });
+      throw error;
+    }
     const taskId = task.task_id ?? task.id;
     if (typeof taskId !== "string" || !taskId.trim()) throw new Error(this.tool.errorMessage(task) || "Vidu 未返回任务 ID");
+    await this.tool.reportTask?.({ id: taskId, status: String(task.state ?? "created") });
     while (true) {
       const result = await fetchJson(this, `/tasks/${encodeURIComponent(taskId)}/creations`, signal, authorization);
+      await this.tool.reportTask?.({ id: taskId, status: String(result.state ?? "unknown") });
       if (result.state === "success") {
         if (!Array.isArray(result.creations) || !result.creations.length) throw new Error("Vidu 未返回生成结果");
         return result.creations.map((item: any): MediaAsset => {

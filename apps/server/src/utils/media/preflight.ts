@@ -1,12 +1,12 @@
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { mkdir, readdir, stat } from "@toonflow/file";
+import { mkdir, readFileSync, readdir, stat } from "@toonflow/file";
 import conf from "@/utils/conf";
 import { getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { coverageCheck, readCoverage } from "@/utils/media/coverage";
 import { dailySpend } from "@/utils/media/spend";
 import { readBlocking } from "@/utils/media/blocking";
+import { inspectVideoPrompt } from "@/utils/media/videoPrompt";
 
 export type CheckLevel = "block" | "warn" | "info";
 
@@ -36,8 +36,13 @@ async function readJson<T>(path: string): Promise<T | null> {
  * 技能文档写得再好，不落到「不满足就拦」这一步就只是摆设；
  * 这里只查能用文件与配置验证的事实，不猜创作意图。
  */
-export async function preflight(cwd: string, options: { shotSpec?: Record<string, string | undefined>; clips?: string[] } = {}) {
+export async function preflight(cwd: string, options: { shotSpec?: Record<string, string | undefined>; clips?: string[]; prompt?: string; duration?: number } = {}) {
   const items: CheckItem[] = [];
+  if (options.prompt) {
+    const review = inspectVideoPrompt(options.prompt, options.duration);
+    if (review.applicable) items.push({ key: "videoPrompt", level: "block", passed: !review.errors.length, detail: review.errors.join("；") || "五板块完整，时间线与总时长一致；画质尚需实际生成验收", rule: "视频导演提示词结构" });
+    if (review.warnings.length) items.push({ key: "videoPromptAdvice", level: "warn", passed: false, detail: review.warnings.join("；"), rule: "视频导演提示词建议" });
+  }
   const skills = join(dirname(conf.path), "skills");
 
   // 1. 项目影调是否已定：没有 look 就每镜各写各的，全片会散。

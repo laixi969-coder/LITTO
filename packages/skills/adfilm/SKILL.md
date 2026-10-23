@@ -9,6 +9,8 @@ metadata:
 
 # 广告与原生短视频
 
+真人商业广告与品牌片默认采用[清爽人物方法](../videoPromptDirector/references/cleanPortrait.md)：肤色自然均匀、细微纹理、轻薄妆面、克制高光和清晰毛流。从人物资产到正式镜头沿用同一参考与肤面标准，写入 look、lighting、realism.surface 后 compile 回读；五板块提示词写入第二块。此默认不改变产品本色、包装、功效证据、既定光色或明确的特殊妆效；纯产品、动画与无人画面不套人物要求。
+
 ## 先选择创作入口
 
 - **原生短视频**：TikTok、Reels、Shorts、带货、UGC、软件/App/数字资产推广、纯内容涨粉、Hook 或用户指定 hiccai-pop，先读取[原生短视频创作](references/nativeShortVideo.md)。它已替换旧版固定广告节奏与 UGC 示例，按需读取其前三秒、反转、无人拍摄和样本索引。只有产品名也可构思，不因简报缺项反复提问；每条交付完整镜头与实现办法。用户只要一个 Hook 等更窄内容时遵从其范围。

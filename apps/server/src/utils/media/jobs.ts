@@ -16,6 +16,7 @@ import { blockingLine } from "@/utils/media/blocking";
 import { modelAccess } from "@/utils/modelAvailability";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { assertCurrentSpeechAudio } from "@/utils/media/voiceDecision";
+import { isDirectorPrompt } from "@/utils/media/videoPrompt";
 
 export function workspaceProject(directory: string, create = true) {
   const tenant = currentTenant();
@@ -62,7 +63,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     request = await applyMediaQuality(directory, kind, request, model);
     if (kind === "video" && model.lipSync) speechSyncInputs = await validateSpeechInputs(directory, request);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
-    const spec = compileShotSpec(request.shotSpec);
+    const spec = isDirectorPrompt(request.prompt) ? "" : compileShotSpec(request.shotSpec);
     request = { ...request, prompt: withPhotographicBaseline(spec ? `${spec}\n\n${request.prompt}` : request.prompt) };
   }
   const projectId = workspaceProject(directory)!;

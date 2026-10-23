@@ -183,8 +183,17 @@ watch([selectedModel, () => data.value.duration], ([choice]) => {
 const modelGroups = computed(() => groupNodeModels(models.value));
 const generationPrompt = computed(() =>
   [
-    data.value.prompt.trim(),
-    ...refList.value.flatMap((item, index) => (item.dataType === "STRING" && item.value?.trim() ? [`参考 ${index + 1}：\n${item.value.trim()}`] : [])),
+    data.value.prompt.trim().replace(/\{\{ref (\d+)\}\}/g, (marker, number: string) => {
+      const index = Number(number) - 1;
+      const reference = refList.value[index];
+      if (!reference) return marker;
+      const position = refList.value.slice(0, index + 1).filter(item => item.dataType === reference.dataType).length;
+      if (reference.dataType === "IMAGE" && frameMode.value) return position === 1 && !(selectedMode.value === "startFrameOptional" && mediaCounts.value.image === 1) ? "首帧图片" : "尾帧图片";
+      const labels: Record<string, string> = { IMAGE: "图片", VIDEO: "视频", AUDIO: "音频", STRING: "文字参考" };
+      const label = typeof reference.dataType === "string" ? labels[reference.dataType] : undefined;
+      return label ? `${label}${position}` : marker;
+    }),
+    ...refList.value.filter(item => item.dataType === "STRING").flatMap((item, index) => (typeof item.value === "string" && item.value.trim() ? [`文字参考${index + 1}：\n${item.value.trim()}`] : [])),
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -254,6 +263,7 @@ async function startGeneration() {
   if (!choice) throw new Error("请先选择视频模型");
   if (choice.cameraTrajectory && (!data.value.cameraTrajectory || !data.value.imageAndCameraOnly)) throw new Error("请先通过 setCameraTrajectory 配置并校准轨迹，或在镜头制作面板导入轨迹");
   if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
+  if (!data.value.production && /\{\{ref \d+\}\}/.test(generationPrompt.value)) throw new Error("提示词含未绑定的参考标记，请重新连接资产并写入提示词");
   if (!data.value.production && refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const images = refList.value.flatMap((item) => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
   if (choice.mode?.length && !matchingModes.value.some(mode => JSON.stringify(mode) === data.value.mode)) throw new Error("当前模式不适用于这些参考素材，请更换模式或调整引用");
@@ -355,6 +365,15 @@ async function resizeVideo(event: Event) {
 
 function getConfig() {
   return {
+    prompt: data.value.prompt,
+    generationPrompt: generationPrompt.value,
+    references: refList.value.map((item, index) => ({
+      marker: `{{ref ${index + 1}}}`,
+      source: item.source,
+      sourceHandle: item.sourceHandle,
+      dataType: item.dataType,
+      ready: item.value !== undefined,
+    })),
     config: {
       production: data.value.production,
       purpose: data.value.purpose,
@@ -376,7 +395,7 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "读取此视频生成节点的当前配置、可选视频模型能力、通用比例及适合当前引用的模式，不含密钥；时长与分辨率须符合 durationResolutionMap",
+  description: "读取当前提示词、实际连接的参考及其 {{ref N}} 标记、配置和模型能力，不含密钥；先连接资产再按 references 写入引用，回读核对 source 与 ready；时长与分辨率须符合 durationResolutionMap",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
@@ -447,6 +466,10 @@ nodeTools.register({
   parameters: z.strictObject({ prompt: z.string() }),
   execute({ prompt: value }) {
     if (deleting.value) throw new Error("节点正在删除，请稍后修改");
+    for (const match of value.matchAll(/\{\{ref (\d+)\}\}/g)) {
+      const reference = refList.value[Number(match[1]) - 1];
+      if (!reference || reference.value === undefined) throw new Error(`参考 ${match[1]} 未连接或暂无内容，请先连接对应资产`);
+    }
     data.value.prompt = value;
     data.value.promptModel = value.split("\n").map((text) => [{ type: "Write", text }]);
     return { prompt: value };

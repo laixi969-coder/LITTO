@@ -18,6 +18,7 @@ metadata:
 - [workflow](../workflow/SKILL.md)：剧本改编、资产制作、画布制作阶段和模型执行；先读现场模型能力；只有明确选用 Seedance 后，其专用规则才约束分段上限和提示词格式，不覆盖电影创作意图。
 - [canvas](../canvas/SKILL.md)：查询实际节点、配置、参考顺序并操作画布，不猜节点能力。
 - [continuity](../continuity/SKILL.md)：身份、服装、道具、空间、动作、光线与情绪的跨镜状态；锁定资产与版本修复。
+- [videoPromptDirector](../videoPromptDirector/SKILL.md)：独立生成段可用五板块 `final_video_prompt`，先连接资产并回读 references，再绑定实际 `{{ref N}}` 标记。正式剧情镜头仍以 ShotSpec 和 productionSpec 编译请求为准，不用独立段绕过规格。真人资产与各镜默认采用其中[清爽人物方法](../videoPromptDirector/references/cleanPortrait.md)，把肤面写入 realism.surface 并继承角色参考；既定年龄、伤势、汗水、夜景和特殊妆效优先，不改变叙事、表演与场景光向。
 - 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)，**对白怎么切镜见 [对白覆盖与正反打](references/coverage.md)**。
 - **有对白先核对 coverage 表再决定拆镜**：逐句保留原文、说话人、画内/画外及声源依据、观看对象、实际音频时长和局部窗口。多轮同框、合法画外声和持续镜头可保留；按可读性、真实容量和所选模型能力决定拆镜，不按轮次或字数硬切，不删台词、加速或跨镜挪音。
 - **后配音先按实测声音规划再生成画面**：productionSpec(planSpeech) 复用已选声音或明确映射的旧素材，返回原速整句窗口和容量下限；导演复核后保存逐句 audio 与完整可见 coverage。配音未定、超窗或覆盖缺口只允许规划预览，不提交付费视频。容量不足重新组织有意义的表演／镜头，不拉慢打斗救援来填秒数。见 [创作准备](references/creativePreparation.md)。
