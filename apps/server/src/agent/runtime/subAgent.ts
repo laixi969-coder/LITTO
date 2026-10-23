@@ -69,7 +69,7 @@ export async function runSubAgent(options: SubAgentModel & {
     const resources = await createAgentResources(cwd, activeTools, SettingsManager.inMemory({
       compaction: { enabled: true, reserveTokens: 16384, keepRecentTokens: 8000 },
       retry: { enabled: false, provider: { maxRetries: 0 } },
-    }), instructions);
+    }), instructions, task);
     signal.throwIfAborted();
     ({ session } = await createAgentSession({
       ...modelOptions, ...resources, cwd,

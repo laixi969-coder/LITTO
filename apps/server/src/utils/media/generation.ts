@@ -232,9 +232,13 @@ export function withPhotographicBaseline(prompt: string, skinFinish?: SkinFinish
   const finish = skinFinish ?? readSkinFinish(prompt);
   // SKIN 行只是给编译看的指令，不该出现在发给模型的正文里。
   const body = prompt.replace(/^[ \t]*SKIN\s*[:：]\s*(?:clean|natural)[ \t]*\r?\n?/gim, "").trim();
-  // 五板块已含完整成像设计，不再前置一套相互冲突的默认风格。
-  if (isDirectorPrompt(body)) return body;
   if (/动画|插画|漫画|卡通|二次元|像素|3D\s*渲染|CG\s*渲染|anime|cartoon|illustration|\brender\b|\bstylized\b/i.test(positivePromptText(body))) return body;
+  // ACT: 五板块只在第二块补默认肤面，不改时间线、资产、声音和既定成像设计。
+  if (isDirectorPrompt(body)) {
+    if (body.includes(skinFinishes[finish])) return body;
+    return body.replace(/(^[ \t]*【画面质感与光影】[ \t\r]*$)/m,
+      `$1\n仅对真人对象补充未指定的肤面细节；已定身份、年龄、肤色、特殊妆效、剧情状态和场景光色优先：${skinFinishes[finish]}\n`);
+  }
   const baseline = photographicBaseline.map(line => line === "__SKIN__" ? skinFinishes[finish] : line).join("");
   return `${baseline}\n\n${body}`;
 }

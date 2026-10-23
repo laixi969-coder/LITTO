@@ -42,6 +42,10 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权生成媒体"), { status: 403 });
+  const linkedProjectId = workspaceProject(directory, false);
+  if (!request.shotId && !request.purpose && linkedProjectId && api.scoped(tenant.workspaceId).list("shots", { projectId: linkedProjectId }).length) {
+    throw Object.assign(new Error("当前项目已有正式镜头，请传 shotId 并先 compile 取得 productionFingerprint，以继承已采用的人物参考与共同质感。基础资产用 purpose=asset，明确独立的画面用 purpose=standalone。此次未提交生成。"), { status: 400 });
+  }
   // 覆盖表判 block 的项目不放行视频生成：一镜塞三轮以上对白，成片里必然是「听见他的声音却一直看着另一个人」。
   if (kind === "video" && !request.shotId) {
     const blocked = await coverageGate(directory);

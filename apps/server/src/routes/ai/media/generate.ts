@@ -191,7 +191,7 @@ export default Router().post("/", validateFields({
     request = {
       ...request,
       images: [...(Array.isArray(raw.images) ? raw.images : []), ...resolved.images],
-      prompt: `${resolved.note}\n\n${raw.prompt ?? ""}`,
+      prompt: `${resolved.note}\n\n${request.prompt ?? raw.prompt ?? ""}`,
     };
   }
 

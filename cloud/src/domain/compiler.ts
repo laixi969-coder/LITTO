@@ -1,5 +1,5 @@
 import { bad, notFound } from "../util.ts";
-import { all, get, type Scope } from "../db.ts";
+import { all, get, type Row, type Scope } from "../db.ts";
 import { validateVisibleAssets } from "./shots.ts";
 import { statesOf, validateStateDelta } from "./state.ts";
 import { route, type Policy } from "../providers/router.ts";
@@ -130,7 +130,19 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         if (wardrobeId && projectAssets.get(wardrobeId)?.type === "Wardrobe") relevantIds.add(wardrobeId);
     }
     const assets = [...relevantIds].map(id => projectAssets.get(id)!) as any[];
-    const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId }).filter(binding => {
+    const assetBindings = assets.flatMap(asset => {
+        // 已审看主帧承载视频身份；不再挤占单首帧模式的输入槽。
+        if (kind === "video" && extra.startFrameMediaId || asset.attributes?.authoritativeReference) return [];
+        const role = ["Character", "Creature"].includes(asset.type) ? "IDENTITY"
+            : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
+        const inherited: Row[] = s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).filter(binding => binding.role === role)
+            .map(binding => ({ ...binding, lockLevel: ["IDENTITY", "WARDROBE"].includes(role) ? "LOCK" : binding.lockLevel }));
+        const references = (asset.references ?? []).filter((id: string) => !inherited.some(binding => binding.referenceId === id))
+            .filter((id: string) => s.get("refs", id)?.kind === "image")
+            .map((referenceId: string) => ({ referenceId, role, weight: 1, lockLevel: "LOCK", crop: null, notes: `${asset.name} 的已绑定资产参考` }));
+        return [...inherited, ...references];
+    });
+    const bindings = [...s.list("reference_bindings", { targetType: "shot", targetId: shotId }), ...assetBindings].filter(binding => {
         if (!["IDENTITY", "WARDROBE", "GEOMETRY", "ENVIRONMENT"].includes(binding.role)) return true;
         const reference = s.get("refs", binding.referenceId);
         const owners = [...projectAssets.values()].filter(asset => asset.references?.includes(binding.referenceId)
@@ -197,8 +209,10 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const sorted = [...bindings].sort((a, b) => b.weight - a.weight);
     const textFallback: string[] = [];
     for (const b of sorted) {
+        if (kind === "image" && ["AUDIO", "PERFORMANCE", "CAMERA_MOTION"].includes(b.role)) continue;
         if (kind === "video" && extra.startFrameMediaId && b.role === "START_FRAME") continue;
         const ref = s.get("refs", b.referenceId);
+        if (ref && ref.projectId !== proj) throw bad("参考不属于当前项目");
         if (!b.crop && inputs.some(input => input.mediaId === ref?.mediaId && input.role === b.role && input.sent)) continue;
         const adapterSupports = !(adapter === "openai-compatible" && kind === "video" && b.role !== "START_FRAME");
         const supported = adapterSupports && !!caps[roleCap[b.role]] && used < maxInputs && ref?.mediaId;
@@ -232,6 +246,17 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         }
     }
     if (kind === "video" && extra.startFrameMediaId && !inputs.some((i) => i.role === "START_FRAME")) inputs.unshift({ referenceId: "hero", mediaId: extra.startFrameMediaId, role: "START_FRAME", weight: 1, lockLevel: "LOCK", sent: true });
+
+    if (["story", "serial", "adfilm", "brandFilm", "musicFilm"].includes(s.get("sequences", shot.sequenceId)?.kind ?? "story")) {
+      for (const asset of assets) {
+        if (asset.approvalStatus !== "approved") warnings.push(`创作准备未完成：资产「${asset.name}」尚未采用，请先固定设定再生成正式镜头`);
+        if (kind === "video" && extra.startFrameMediaId || !["Character", "Creature", "Wardrobe", "Environment", "Product", "Vehicle"].includes(asset.type)) continue;
+        const role = ["Character", "Creature"].includes(asset.type) ? "IDENTITY" : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
+        const referenceIds = [...(asset.references ?? []), ...s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).map(binding => binding.referenceId)];
+        const mediaIds = new Set([asset.attributes?.authoritativeReference, ...referenceIds.map(id => s.get("refs", id)?.mediaId)].filter(Boolean));
+        if (!inputs.some(input => input.sent && input.role === role && mediaIds.has(input.mediaId))) warnings.push(`创作准备未完成：资产「${asset.name}」没有实际发送 ${role} 参考图，请绑定该资产参考或选择支持足够参考输入的模型`);
+      }
+    }
 
     const cam = shot.camera ?? {}, lt = shot.lighting ?? {};
     const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
