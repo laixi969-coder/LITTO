@@ -126,7 +126,7 @@
               <span>{{ projectList.length }}</span>
             </h2>
             <el-space wrap>
-              <el-button v-if="!accounts" :icon="IconFolderOpen" :disabled="creating || opening" @click="openProject()">导入项目</el-button>
+              <el-button :icon="IconFolderOpen" :disabled="creating || opening" @click="openProject()">导入项目</el-button>
               <el-button :icon="IconFolderPlus" :disabled="creating || opening" @click="createProject(false)">新建空项目</el-button>
               <el-button
                 circle
@@ -369,6 +369,15 @@ const promptAttachments = ref<AgentAttachment[]>([]);
 const workspaceStore = useWorkspaceStore();
 const { project, projectList } = storeToRefs(workspaceStore);
 const workspaceDirectory = ref(project.value?.directory ?? "");
+// 支持用链接直接打开项目：/?directory=<绝对路径>，方便把后台生成的结果直接发给别人看。
+const linkDirectory = new URLSearchParams(location.search).get("directory");
+if (linkDirectory) {
+  window.setTimeout(() => {
+    void openProject({ directory: linkDirectory, name: "", lastOpenedAt: Date.now() }).catch(() => {
+      ElMessage.error("链接指向的项目打不开：请确认目录存在，且当前账号是该项目所在工作区的成员");
+    });
+  }, 1500);
+}
 const promptPlaceholder = "描述你的故事、产品或镜头想法…";
 
 const selectedModel = ref("");

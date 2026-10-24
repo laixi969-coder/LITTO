@@ -12,6 +12,7 @@ import u from "@/utils";
 import conf from "@/utils/conf";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { looksLikePersonShot } from "@/utils/media/generation";
+import { assertAssetsReady } from "@/utils/media/flow";
 import { authEnabled } from "@/utils/tenant";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { translateMessage, validationOptions } from "@/lib/i18n";
@@ -146,6 +147,7 @@ interface CastEntry {
 async function loadCast(cwd: string, names: string[]) {
   const images: { path: string; mimeType: string }[] = [];
   const notes: string[] = [];
+  const wardrobes: string[] = [];
   for (const name of names) {
     const file = await resolveWorkspacePath(cwd, `assets/cast/${name}.json`);
     let entry: CastEntry;
@@ -160,18 +162,59 @@ async function loadCast(cwd: string, names: string[]) {
       await resolveWorkspacePath(cwd, reference);
       images.push({ path: reference, mimeType: imageMime(reference) });
     }
-    notes.push(`${entry.name ?? name}：${[entry.identity, entry.wardrobe].filter(Boolean).join("；")}`);
+    const label = entry.name ?? name;
+    notes.push(`${label}：${[entry.identity, entry.wardrobe].filter(Boolean).join("；")}`);
+    if (entry.wardrobe?.trim()) wardrobes.push(`${label} 穿${entry.wardrobe.trim()}`);
   }
-  return { images, note: notes.length ? `CAST: ${notes.join("；")}。以上参考图按顺序对应该角色的身份与定妆，脸型、年龄、服装以参考为准。` : "" };
+  return {
+    images,
+    note: notes.length ? `CAST: ${notes.join("；")}。以上参考图按顺序对应该角色的身份与定妆，脸型、年龄、服装以参考为准。` : "",
+    wardrobe: wardrobes.join("；"),
+  };
+}
+
+/**
+ * 服装锁：图生视频在蹲下、起立、走远时会把下装与鞋履「省」掉，一句「保持同一服装」模型无法执行。
+ * 有角色档案或提示词里写了 WARDROBE 就逐项列出；否则退回首帧可见服装，并禁止改短、赤脚、丢鞋。
+ */
+const lowerBodyAction = /蹲|坐|跪|起立|起身|站起|躺|爬|走|跑|跳|迈步|\bsquat\b|\bsit\b|\bkneel\b|\bwalk\b|\brun\b|\bstand up\b/i;
+
+function withWardrobeLock(prompt: string, items: string) {
+  if (/WARDROBELOCK\s*[:：]/.test(prompt)) return prompt;
+  const body = items.trim()
+    ? `WARDROBELOCK 本镜人物的完整着装固定为：${items.trim()}。上衣、下装、鞋履与配饰须逐帧保持，不得省略任何一件、不得替换、改色或改变版型；下装与鞋履进入画面时必须完整可见。`
+    : "WARDROBELOCK 本镜人物按首帧里已出现的完整着装逐帧保持：上衣、下装、鞋履与配饰一件不少；不得把长裤改短、不得赤脚、不得让鞋履消失；蹲下、坐下、起身、走远之后仍须完整穿着。";
+  return `${prompt}\n\n${body}`;
+}
+
+/**
+ * 肤质路径：资产与定妆永远是 clean（干净基准，四视图必须能当长期参考）；
+ * 其余镜头跟随项目 assets/visual.json 的 skinFinish，请求可临时覆盖。
+ */
+async function resolveSkinFinish(cwd: string, isAsset: boolean, override?: string) {
+  if (isAsset) return "clean" as const;
+  if (override === "clean" || override === "natural") return override;
+  try {
+    const file = await resolveWorkspacePath(cwd, "assets/visual.json");
+    const config = JSON.parse(await readFile(file.path, "utf8")) as { skinFinish?: string };
+    if (config.skinFinish === "natural" || config.skinFinish === "clean") return config.skinFinish;
+  } catch { /* 没有配置文件就按资产口径 */ }
+  return "clean" as const;
 }
 
 export default Router().post("/", validateFields({
   requestId: z.string().uuid().optional(), directory: z.string().min(1).max(4096), mediaType: z.enum(["image", "video", "audio"]),
 }), async (req, res) => {
-  const { directory, mediaType, requestId, continueFrom, styleReference, cast, ...raw } = req.body;
+  const { directory, mediaType, requestId, continueFrom, styleReference, cast, skinFinish, ...raw } = req.body;
   const cwd = await u.workspace.resolveWorkspace(req, directory);
   let request: Record<string, unknown> = { ...raw };
   const hasIdentityReference = (Array.isArray(raw.images) && raw.images.length > 0) || Boolean(raw.firstFrame) || typeof continueFrom === "string";
+
+  // 肤质路径：资产与定妆固定 clean，其余按项目 assets/visual.json，请求可覆盖。
+  if (mediaType !== "audio" && !String(request.prompt ?? "").includes("PHOTOGRAPHICBASELINE")) {
+    const finish = await resolveSkinFinish(cwd, raw.purpose === "asset", typeof skinFinish === "string" ? skinFinish : undefined);
+    request = { ...request, prompt: `SKIN: ${finish}\n\n${request.prompt ?? ""}` };
+  }
 
   // 年代锚点：提示词写明年代才注入，避免把现代故事拍成旧年代。
   if (mediaType !== "audio" && !String(request.prompt ?? "").includes("ERA ")) {
@@ -186,8 +229,11 @@ export default Router().post("/", validateFields({
   }
 
   // 角色档案：先按名解析，把定妆参考和身份说明并进请求。
+  let castWardrobe = "";
   if (Array.isArray(cast) && cast.length && mediaType !== "audio") {
     const resolved = await loadCast(cwd, cast.map(String));
+    castWardrobe = resolved.wardrobe;
+    // 用 request.prompt 而不是 raw.prompt：年代锚点与项目影调已经写进去了，这里重建会把它们丢掉。
     request = {
       ...request,
       images: [...(Array.isArray(raw.images) ? raw.images : []), ...resolved.images],
@@ -210,6 +256,23 @@ export default Router().post("/", validateFields({
   }
   if (mediaType === "video" && typeof continueFrom === "string" && !request.firstFrame) {
     request = { ...request, firstFrame: await lastFrameReference(cwd, continueFrom) };
+  }
+
+  // 资产门禁：拆过清单却还没建角色卡就进生成，等于让每一镜重新选角。
+  // 要动下半身的镜头额外要求四视图，因为单张定妆撑不住蹲下、走远。
+  if (mediaType === "video" && raw.purpose !== "asset" && !/ASSETGATE\s*[:：]/i.test(String(raw.prompt ?? ""))) {
+    const gate = await assertAssetsReady(cwd, { needsLowerBody: lowerBodyAction.test(String(raw.prompt ?? "")) });
+    if (!gate.ok) throw Object.assign(new Error(gate.message), { status: 400 });
+  }
+
+  // 服装锁：人物视频只要有下半身动作，就必须有服装依据，否则图生视频会把裤子和鞋省掉（实测：走远时整条裤子消失）。
+  if (mediaType === "video" && raw.purpose !== "asset" && looksLikePersonShot(String(raw.prompt ?? ""))) {
+    const declared = /WARDROBE\s*[:：]\s*([^\n]+)/.exec(String(raw.prompt ?? ""))?.[1] ?? "";
+    const wardrobe = castWardrobe || declared;
+    if (!wardrobe && lowerBodyAction.test(String(raw.prompt ?? ""))) {
+      throw Object.assign(new Error("这一镜含人物的下半身动作（蹲下、坐下、起身、走动、奔跑等），但没有服装依据：图生视频会把下装与鞋履省掉，生成后才发现只能整段重做。请二选一——①建 assets/cast/<角色>.json，写清 wardrobe（上衣、下装、鞋履、配饰）并配定妆参考图，用 cast 传入；②在提示词里写一行「WARDROBE: 米白棉麻衬衫、浅蓝直筒牛仔裤、深棕皮质凉鞋」"), { status: 400 });
+    }
+    request = { ...request, prompt: withWardrobeLock(String(request.prompt ?? ""), wardrobe) };
   }
 
   const parsed = (mediaType === "image" ? imageGenerationSchema : mediaType === "audio" ? audioGenerationSchema : videoGenerationSchema).safeParse(request, validationOptions());
