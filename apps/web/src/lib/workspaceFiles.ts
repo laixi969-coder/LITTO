@@ -7,6 +7,8 @@ type WorkspaceEntry = { name: string; path: string; type: "file" | "directory" }
 const client = axios.create({ baseURL: "/api/workspaces/files", headers: { "x-toonflow-workspace": "1" } });
 registerApiLanguage(client);
 const fileUrls = new Map<string, { directory: string; path: string; url: Promise<string>; users: number }>();
+// 实例级 Map 会让同一页面里多个 useWorkspaceFiles 实例互相把版本写过期（A 读 B 写，A 再写必 409），提升为模块级共享。
+const revisions = new Map<string, string>();
 
 function cachePath(path: string) {
   return path.replaceAll("\\", "/").split("/").filter(part => part && part !== ".").join("/").toLowerCase();
@@ -23,7 +25,6 @@ function invalidateUrls(directory: string, path: string) {
 }
 
 export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | undefined>) {
-  const revisions = new Map<string, string>();
   const workspace = directory === undefined ? useWorkspaceStore() : undefined;
   function getDirectory() {
     const path = directory === undefined ? workspace?.project?.directory : toValue(directory);

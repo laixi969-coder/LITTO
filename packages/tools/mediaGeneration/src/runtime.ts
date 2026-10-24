@@ -13,9 +13,9 @@ export type SkinFinish = "clean" | "natural";
 
 export const skinFinishes: Record<SkinFinish, string> = {
   clean:
-    "人物肤色干净均匀，保留既定肤色、年龄与身份特征，以及符合景别的细微纹理和自然血色。默认轻薄半哑光肤面，额鼻反光克制，颧骨与嘴唇高光柔和；已指定的妆容与润泽程度优先。底妆与颈部自然衔接，眉毛和睫毛根根可辨，发根清爽蓬松。不要刻意放大毛孔、绒毛、色斑或皱纹，不加粉底分界、疲态、满脸油光或蜡状磨皮。",
+    "人物肤色干净均匀，保留既定肤色、年龄与身份特征，以及符合景别的细微纹理和自然血色。默认轻薄半哑光肤面，额鼻反光克制，颧骨与嘴唇高光柔和；已指定的妆容与润泽程度优先。底妆与颈部自然衔接，眉毛和睫毛根根可辨，发根清爽蓬松。不要刻意放大毛孔、绒毛、色斑或皱纹，不加粉底分界、疲态、满脸油光或蜡状磨皮。雨水、汗水与潮湿只作用于头发和衣物；面部皮肤不随场景变湿，雨中人像面部至多零星水珠挂在局部，不做整脸水膜，不给额头、鼻梁、颧骨镜面高光。",
   natural:
-    "人物保留既定肤色、年龄特征及符合景别的细微纹理；生活或纪实镜头允许少量自然皮脂反光和局部肤色变化，强度服从当时活动状态。眉毛、睫毛和唇纹自然可辨，不刻意添加粗大毛孔、粉底分界、厚重油膜或疲态，不以磨皮改变人物身份。",
+    "人物保留既定肤色、年龄特征及符合景别的细微纹理；生活或纪实镜头允许少量自然皮脂反光和局部肤色变化，强度服从当时活动状态。眉毛、睫毛和唇纹自然可辨，不刻意添加粗大毛孔、粉底分界、厚重油膜或疲态，不以磨皮改变人物身份。雨水、汗水与潮湿只作用于头发和衣物；面部皮肤不随场景变湿，雨中人像面部至多零星水珠挂在局部，不做整脸水膜，不给额头、鼻梁、颧骨镜面高光。",
 };
 
 export const videoMotionTiming = "Motion defaults to real time. Combat and rescue use compact, continuous causal action: contact triggers response and the next movement; approach, support, transfer and withdrawal connect without idle resets. Let compatible actions overlap naturally while preserving readable contact, force, weight and consequences. Execute the full planned action chain and its visible result; do not reduce body movement, interaction or displacement to blinking, breathing or a held pose. Follow the planned framing and changes of viewing distance; keep both participants and their support/contact readable when the plan calls for it. Do not divide duration into equal action slots or stretch brief actions to fill the clip. Camera follows the action at its actual speed or stays locked; never default to slow pushes, slow pans or waiting for the camera before acting. Slow motion is allowed only for an explicitly designated beat with a clear narrative purpose or user request; resume real time afterwards, never spread it across the whole scene. Preserve explicit dialogue/music sync, planned cuts and purposeful stillness; do not add cuts, events or pauses to fill time.";
