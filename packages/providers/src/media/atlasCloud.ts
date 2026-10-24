@@ -76,7 +76,7 @@ async function generate(context: ProviderContext, mediaType: "image" | "video" |
   }
 }
 
-type InputField = { type?: string; enum?: (string | number | boolean)[]; default?: unknown; minimum?: number; maximum?: number; maxLength?: number; minItems?: number; maxItems?: number };
+type InputField = { type?: string; enum?: (string | number | boolean)[]; default?: unknown; minimum?: number; maximum?: number; step?: number; maxLength?: number; minItems?: number; maxItems?: number };
 type AtlasModel = ProviderModel & Record<string, unknown> & { schemaUrl?: string; inputSchema?: { properties: Record<string, InputField>; required?: string[] } };
 
 async function generateSynced(context: ProviderContext, request: ImageRequest | VideoRequest, mediaType: "image" | "video", model: AtlasModel) {
@@ -94,15 +94,15 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
     const input = request as ImageRequest;
     if (input.mask || (input.n !== undefined && input.n !== 1)) throw new Error("当前不支持蒙版或指定生成数量");
     const images = input.images ?? [];
-    const imageField = fields.images ?? fields.image;
+    const imageField = fields.images ?? fields.image ?? fields.reference_images;
     if (images.length && !imageField) throw new Error("文生图模型不能附带参考图");
-    if (images.length > (imageField?.maxItems ?? (fields.images ? 10 : 1))) throw new Error("参考图数量超过所选模型上限");
-    if (schema.required?.some(field => ["image", "images"].includes(field)) && images.length < (imageField?.minItems ?? 1)) {
+    if (images.length > (imageField?.maxItems ?? (fields.images || fields.reference_images ? 10 : 1))) throw new Error("参考图数量超过所选模型上限");
+    if (schema.required?.some(field => ["image", "images", "reference_images"].includes(field)) && images.length < (imageField?.minItems ?? 1)) {
       throw new Error(`「${request.model}」是编辑模型，必须带参考图：在请求里用 images 传 1–${imageField?.maxItems ?? 10} 张图；只想凭文字出图请切回文生图模型（如 openai/gpt-image-2/text-to-image）`);
     }
     const urls: string[] = [];
     for (const image of images) urls.push(await uploadImage(context, image, signal));
-    if (urls.length) body[fields.images ? "images" : "image"] = fields.images ? urls : urls[0];
+    if (urls.length) body[fields.images ? "images" : fields.image ? "image" : "reference_images"] = fields.image && !fields.images ? urls[0] : urls;
     set("size", input.size || fields.size?.default);
     // 无像素 size 的模型（nano-banana 系）把所选 1k/2k/4k 档传给 resolution。
     if (!fields.size && fields.resolution) set("resolution", input.size || fields.resolution.default);
@@ -119,6 +119,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
     set("duration", input.duration ?? fields.duration?.default);
     set("resolution", input.resolution || fields.resolution?.default);
     set("aspect_ratio", input.ratio || fields.aspect_ratio?.default);
+    set("ratio", input.ratio || fields.ratio?.default);
     set("sound", input.generateAudio ?? false);
     if (input.generateAudio && !fields.sound) throw new Error("此模型不支持生成音频");
     set("multi_shot", false);
@@ -168,7 +169,7 @@ export default {
       const result = await response.json() as Record<string, any>;
       const input = result?.components?.schemas?.Input;
       if (!input?.properties || !Array.isArray(input.required)) throw new Error(`模型 ${model.id} 参数格式错误`);
-      const allowed = model.type === "audio" ? Object.entries(input.properties as Record<string, InputField>).filter(([, field]) => ["string", "number", "integer", "boolean"].includes(field.type ?? "")).map(([name]) => name) : ["model", "prompt", "size", "quality", "output_format", "images", "image", "end_image", "duration", "resolution", "aspect_ratio", "sound", "multi_shot"];
+      const allowed = model.type === "audio" ? Object.entries(input.properties as Record<string, InputField>).filter(([, field]) => ["string", "number", "integer", "boolean"].includes(field.type ?? "")).map(([name]) => name) : ["model", "prompt", "size", "quality", "output_format", "images", "image", "reference_images", "end_image", "duration", "resolution", "aspect_ratio", "ratio", "sound", "multi_shot"];
       if (input.required.some((field: string) => !allowed.includes(field))) throw new Error(`模型 ${model.id} 包含未适配的必填参数`);
       const properties = Object.fromEntries(Object.entries(input.properties as Record<string, InputField>).filter(([field]) => allowed.includes(field)).map(([field, value]) => [field,
         Object.fromEntries(Object.entries(value).filter(([key]) => ["type", "enum", "default", "minimum", "maximum", "maxLength", "minItems", "maxItems"].includes(key))),
@@ -181,19 +182,25 @@ export default {
         const voices = (properties.voice ?? properties.voice_id)?.enum?.filter((voice): voice is string => typeof voice === "string").map(voice => ({ title: voice, voice }));
         if (voices?.length) model.voices = voices;
       } else if (model.type === "image") {
-        const editing = !!(properties.images || properties.image);
-        model.mode = editing ? ["singleImage", ...(properties.images ? ["multiReference" as const] : [])] : ["text"];
+        const editing = !!(properties.images || properties.image || properties.reference_images);
+        model.mode = editing ? ["singleImage", ...((properties.images || properties.reference_images) ? ["multiReference" as const] : [])] : ["text"];
         model.imageSizes = properties.size?.enum?.filter((size): size is string => typeof size === "string" && /^\d+[x*]\d+$/.test(size));
         if (!model.imageSizes?.length) {
           // nano-banana 等系列没有像素 size，用 resolution 的 1k/2k/4k 档；生成端把尺寸选择映射到 resolution 参数。
           model.imageSizes = properties.resolution?.enum?.filter((tier): tier is string => typeof tier === "string" && /^\d+k$/i.test(tier));
         }
-        if (!model.imageSizes?.length) throw new Error(`模型 ${model.id} 缺少已适配的尺寸参数`);
+        // mai-image 的 size 是无枚举自由字符串（走模型默认）；edit 变体尺寸跟随参考图。仅纯文生图连尺寸字段都没有时视为未适配结构。
+        if (!properties.size && !properties.resolution && !editing) throw new Error(`模型 ${model.id} 缺少已适配的尺寸参数`);
       } else {
         model.mode = model.id.endsWith("/image-to-video") ? ["singleImage", ...(properties.end_image ? ["endFrameOptional" as const] : [])] : ["text"];
         model.audio = properties.sound ? "optional" : false;
-        const duration = properties.duration?.enum?.filter((value): value is number => typeof value === "number" && value > 0);
-        if (!duration?.length) throw new Error(`模型 ${model.id} 缺少已适配的时长参数`);
+        // duration 无枚举时（seedance v1.5 系）按 minimum/maximum/step 生成档位；范围也缺失时退回常用档。
+        const durationField = properties.duration;
+        const duration = durationField?.enum?.filter((value): value is number => typeof value === "number" && value > 0)
+          ?? (durationField?.minimum != null || durationField?.maximum != null
+            ? Array.from({ length: 24 }, (_, i) => (durationField.minimum ?? 1) + i * (durationField.step ?? 1)).filter(value => durationField.maximum == null || value <= durationField.maximum)
+            : [5, 10]);
+        if (!duration.length) throw new Error(`模型 ${model.id} 缺少已适配的时长参数`);
         model.durationResolutionMap = [{ duration, resolution: properties.resolution?.enum?.filter((value): value is string => typeof value === "string") ?? [] }];
       }
       models.push(model);
