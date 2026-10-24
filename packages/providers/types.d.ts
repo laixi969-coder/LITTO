@@ -17,6 +17,7 @@ interface ProviderModel {
   id: string;
   label: string;
   type: ModelType;
+  price?: string;
   think?: boolean;
   mode?: (ImageMode | VideoMode)[];
   associationSkills?: string;

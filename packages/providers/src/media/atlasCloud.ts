@@ -104,6 +104,8 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
     for (const image of images) urls.push(await uploadImage(context, image, signal));
     if (urls.length) body[fields.images ? "images" : "image"] = fields.images ? urls : urls[0];
     set("size", input.size || fields.size?.default);
+    // 无像素 size 的模型（nano-banana 系）把所选 1k/2k/4k 档传给 resolution。
+    if (!fields.size && fields.resolution) set("resolution", input.size || fields.resolution.default);
     set("quality", input.quality);
     set("output_format", input.outputFormat);
   } else {
@@ -144,12 +146,14 @@ export default {
     if (!response.ok) throw new Error(`获取 Atlas Cloud 目录失败（HTTP ${response.status}）`);
     const result = await response.json() as { data?: Record<string, any>[] };
     if (!Array.isArray(result.data)) throw new Error("Atlas Cloud 目录格式错误");
-    // ACT: 只导入已映射请求参数的家族，复杂任务和未知新协议需单独适配。
+    // ACT: 只导入已映射请求参数的家族，复杂任务和未知新协议需单独适配；reference-to-video、video-edit、sequential 等多参考与分层任务模式暂不导入。
     const catalogue: AtlasModel[] = result.data.filter(item => item.display_console === true && typeof item.model === "string" && (
-      item.type === "Image" && (/^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2\/(text-to-image|edit|image-to-image)$/.test(item.model))
-      || item.type === "Video" && (/^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || item.model === "sync/lipsync-v3")
+      item.type === "Image" && (/^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2(?:\.\d)?(?:-[a-z]+)?\/(text-to-image|edit|image-to-image)$/.test(item.model) || /^google\/nano-banana-[\d.]+(?:-lite|-pro)?(?:-developer)?\/(text-to-image|edit)$/.test(item.model) || /^microsoft\/mai-image-[\d.]+(?:-[a-z]+)?\/(text-to-image|edit)$/.test(item.model))
+      || item.type === "Video" && (/^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || /^bytedance\/seedance-[\w.-]+\/(text|image)-to-video$/.test(item.model) || /^minimax\/h3-[a-z-]+\/(text|image)-to-video$/.test(item.model) || /^alibaba\/wan-[\d.]+(?:-prime)?\/(text|image)-to-video$/.test(item.model) || item.model === "sync/lipsync-v3")
       || item.type === "Audio" && !/asr|stt|transcri|lyrics-generation|voice-clon|voice-design/i.test(item.model)
-    )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(), schemaUrl: item.schema }));
+    )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(),
+      ...(item.price && (item.price.actual?.base_price != null || item.price.origin?.base_price != null) ? { price: JSON.stringify({ actual: item.price.actual?.base_price, origin: item.price.origin?.base_price }) } : {}),
+      schemaUrl: item.schema }));
     if (!modelIds) return catalogue;
     const models: AtlasModel[] = [];
     for (const model of catalogue.filter(item => modelIds.includes(item.id))) {
@@ -180,6 +184,10 @@ export default {
         const editing = !!(properties.images || properties.image);
         model.mode = editing ? ["singleImage", ...(properties.images ? ["multiReference" as const] : [])] : ["text"];
         model.imageSizes = properties.size?.enum?.filter((size): size is string => typeof size === "string" && /^\d+[x*]\d+$/.test(size));
+        if (!model.imageSizes?.length) {
+          // nano-banana 等系列没有像素 size，用 resolution 的 1k/2k/4k 档；生成端把尺寸选择映射到 resolution 参数。
+          model.imageSizes = properties.resolution?.enum?.filter((tier): tier is string => typeof tier === "string" && /^\d+k$/i.test(tier));
+        }
         if (!model.imageSizes?.length) throw new Error(`模型 ${model.id} 缺少已适配的尺寸参数`);
       } else {
         model.mode = model.id.endsWith("/image-to-video") ? ["singleImage", ...(properties.end_image ? ["endFrameOptional" as const] : [])] : ["text"];

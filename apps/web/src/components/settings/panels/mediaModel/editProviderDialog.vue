@@ -37,6 +37,7 @@
           </div>
           <div class="modelTags">
             <el-tag size="small">{{ modelTypes[item.type] }}</el-tag>
+            <el-tag v-if="priceOf(item)" size="small" type="warning">价格 {{ priceOf(item) }}</el-tag>
             <el-tag v-for="(tag, tagIndex) in modelTags(item)" :key="tagIndex" size="small" type="info">{{ tag }}</el-tag>
           </div>
         </el-card>
@@ -135,6 +136,7 @@ const resultColumns = computed<Column[]>(() => [
   }) },
   { key: "id", dataKey: "id", title: "模型 ID", width: 260, flexGrow: 1 },
   { key: "label", dataKey: "label", title: "显示名称", width: 220, flexGrow: 1 },
+  { key: "price", title: "价格", width: 150, cellRenderer: ({ rowData }) => h("span", priceOf(rowData) || "—") },
   { key: "type", title: "类型", width: 65, cellRenderer: ({ rowData }) => h("span", modelTypes[rowData.type as keyof typeof modelTypes]) },
 ]);
 onBeforeUnmount(() => catalogueRequest?.abort());
@@ -208,6 +210,17 @@ function modelTags(model: MediaProviderModel) {
     const reference = /^(imageReference|videoReference|audioReference):(\d+)$/.exec(mode);
     return reference ? `${modeLabels[reference[1]!]} ×${reference[2]}` : modeLabels[mode] ?? mode;
   });
+}
+
+/** 供应商目录的基准价（Atlas 为折后单价，原价不同才标注）；单位与计价口径以供应商账单为准。 */
+function priceOf(model: MediaProviderModel) {
+  if (typeof model.price !== "string") return "";
+  try {
+    const price = JSON.parse(model.price) as { actual?: string | number; origin?: string | number };
+    if (price.actual == null || price.actual === "") return "";
+    const actual = String(price.actual), origin = String(price.origin ?? "");
+    return origin && origin !== actual ? `${actual}（原价 ${origin}）` : actual;
+  } catch { return ""; }
 }
 
 function editModel(index?: number) {
