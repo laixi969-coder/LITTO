@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" :title="section === 'assets' ? '角色资产库' : '镜头制作'" size="min(1180px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
+  <el-drawer v-model="visible" :title="section === 'assets' ? '资产库' : '镜头制作'" size="min(1180px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
     <div class="productionPanel" :aria-busy="busy">
       <p v-if="error" class="errorMessage" role="alert">{{ error }}</p>
       <p v-if="message" class="statusMessage" role="status">{{ message }}</p>
@@ -16,8 +16,11 @@
           <button type="button" @click="run(saveWorld)">保存世界与影调</button>
         </template>
         <template v-else-if="section === 'assets'">
-          <h3>角色库（跨项目复用）</h3>
-          <p class="reviewHint">上传照片或生成定妆图，保存并采用资产后收藏。角色库独立保存参考图，各项目导入后可单独修改。</p>
+          <nav class="assetTypeTabs" aria-label="资产类型">
+            <button v-for="item in assetTypeTabs" :key="item[0]" type="button" :aria-pressed="assetTypeFilter === item[0]" @click="run(() => selectAssetType(item[0]))">{{ item[1] }}</button>
+          </nav>
+          <h3>跨项目资产库</h3>
+          <p class="reviewHint">上传照片或生成定妆图，保存并采用资产后收藏。资产库独立保存参考图，各项目导入后可单独修改；按上方类型分别查看人物、场景与道具。</p>
           <details class="libraryFilters"><summary>搜索与筛选</summary>
             <div class="fieldGrid">
               <label>名称或描述<input v-model="libraryFilter.q" @keyup.enter="run(searchLibraryAssets)" /></label>
@@ -25,26 +28,28 @@
               <label>类型<select v-model="libraryFilter.type"><option value="">全部</option><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
               <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="libraryFilter[axis.key]"><option value="">不限</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
             </div>
-            <button type="button" @click="run(searchLibraryAssets)">检索角色库</button>
+            <button type="button" @click="run(searchLibraryAssets)">检索资产库</button>
           </details>
           <ul class="libraryList"><li v-for="entry in libraryAssets" :key="entry.id">
             <figure v-if="entry.media"><el-image class="libraryPortrait" :src="mediaUrl(entry.media.url)" :alt="entry.name" :previewSrcList="(entry.images?.length ? entry.images : [entry.media]).map((image: any) => mediaUrl(image.url))" :previewTeleported="true" fit="contain" /></figure>
-            <div class="libraryMeta"><strong>{{ entry.name }}</strong><span>{{ assetTypeLabel(entry.type) }} · {{ entry.images?.length || 1 }} 张参考图 · 复用 {{ entry.reuseCount }} 次<template v-if="hasPersonaTags(entry.personaTags)"> · {{ personaSummary(entry.personaTags) }}</template></span><details><summary>角色详情</summary><p>{{ entry.description }}</p><p v-for="(invariant, index) in entry.invariants" :key="index">{{ invariant }}</p></details></div>
+            <div class="libraryMeta"><strong>{{ entry.name }}</strong><span>{{ assetTypeLabel(entry.type) }} · {{ entry.images?.length || 1 }} 张参考图 · 复用 {{ entry.reuseCount }} 次<template v-if="hasPersonaTags(entry.personaTags)"> · {{ personaSummary(entry.personaTags) }}</template></span><details><summary>资产详情</summary><p>{{ entry.description }}</p><p v-for="(invariant, index) in entry.invariants" :key="index">{{ invariant }}</p></details></div>
             <button type="button" :aria-pressed="entry.favorite" @click="run(() => toggleFavorite(entry))">{{ entry.favorite ? '取消收藏' : '收藏' }}</button>
             <button type="button" @click="run(() => importLibraryAsset(entry))">导入本项目</button>
+            <button type="button" @click="run(() => removeLibraryAsset(entry))">从库中删除</button>
           </li></ul>
-          <p v-if="librarySearched && !libraryAssets.length" class="reviewHint">角色库暂无匹配资产。</p>
-          <h3>本项目角色与资产</h3>
-          <ul class="projectAssetGrid"><li v-for="item in assets" :key="item.id">
+          <p v-if="librarySearched && !libraryAssets.length" class="reviewHint">资产库暂无匹配资产。</p>
+          <h3>本项目资产</h3>
+          <ul class="projectAssetGrid"><li v-for="item in filteredProjectAssets" :key="item.id">
             <button class="assetCard" type="button" :aria-label="'查看角色：' + item.name" @click="run(() => editAsset(item))">
               <img v-if="assetPortraits[item.attributes?.authoritativeReference]" :src="mediaUrl(assetPortraits[item.attributes.authoritativeReference])" :alt="item.name" loading="lazy" />
               <strong>{{ item.name }}</strong><span>v{{ item.version }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</span>
             </button>
             <button v-if="item.approvalStatus !== 'approved'" type="button" @click="run(() => approveAsset(item.id))">批准此资产</button>
-            <button v-else-if="librarySourceVersions.get(item.id) !== item.version" type="button" @click="run(() => publishAsset(item.id))">{{ librarySourceVersions.has(item.id) ? "更新角色库" : "收藏到角色库" }}</button>
+            <button v-else-if="librarySourceVersions.get(item.id) !== item.version" type="button" @click="run(() => publishAsset(item.id))">{{ librarySourceVersions.has(item.id) ? "更新资产库" : "收藏到资产库" }}</button>
+            <button type="button" @click="run(() => removeAsset(item))">删除资产</button>
           </li></ul>
           <details ref="assetEditor" class="assetEditor">
-            <summary>{{ editingAsset ? "编辑角色：" + asset.name : "上传 / 生成新角色" }}</summary>
+            <summary>{{ editingAsset ? "编辑资产：" + asset.name : "新增资产（上传 / 生成）" }}</summary>
             <div class="fieldGrid">
               <label>类型<select v-model="asset.type"><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
               <label>名称<input v-model="asset.name" /></label>
@@ -68,7 +73,7 @@
               <div class="assetImageGrid"><label v-for="image in assetImages" :key="image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><input v-model="asset.referenceMediaIds" type="checkbox" :value="image.id" :aria-label="`保留参考图 ${image.id.slice(-8)}`" />保留此参考</label></div>
             </details>
             <button type="button" :disabled="!asset.name.trim() || asset.type !== 'Character'" @click="run(generateCharacter)">生成角色设定图</button>
-            <p class="reviewHint">气质标签仅用于角色库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
+            <p class="reviewHint">气质标签仅用于资产库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
             <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
             <ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
           </details>
@@ -246,7 +251,7 @@ const section = ref("world"), busy = ref(false), error = ref(""), message = ref(
 const controller = new AbortController();
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 onScopeDispose(() => { controller.abort(); clearTimeout(pollTimer); clearInterval(watchTimer); });
-const tabs = [{ id: "world", label: "世界与影调" }, { id: "assets", label: "角色资产库" }, { id: "shot", label: "镜头规格" }, { id: "generate", label: "生成" }, { id: "review", label: "检查与采用" }, { id: "edit", label: "剪辑与衔接" }];
+const tabs = [{ id: "world", label: "世界与影调" }, { id: "assets", label: "资产库" }, { id: "shot", label: "镜头规格" }, { id: "generate", label: "生成" }, { id: "review", label: "检查与采用" }, { id: "edit", label: "剪辑与衔接" }];
 const worldFields = [["era", "年代"], ["locationLogic", "地点与空间逻辑"], ["architecture", "建筑"], ["weather", "天气"], ["time", "时间"], ["material", "环境材质"], ["physics", "物理规则"], ["realism", "影像媒介（摄影写实、动画等）"]];
 const lookFields = [["contrast", "对比"], ["saturation", "饱和度"], ["skinTone", "肤色"], ["highlightRolloff", "高光滚降"], ["shadowBehavior", "暗部表现"], ["lensCharacter", "镜头特性"], ["texture", "纹理"], ["sharpnessPhilosophy", "锐度策略"]];
 const cameraFields = [["shotSize", "景别"], ["position", "机位"], ["focus", "焦点"], ["depth", "景深"], ["motion", "摄影机运动"], ["motivation", "运镜动机"], ["axisCrossing", "越轴动机（没有则留空）"]];
@@ -267,6 +272,14 @@ const personaLabel: Record<string, string> = { poised: "沉稳", liveliness: "�
 const hasPersonaTags = (tags: any) => !!tags && Object.values(tags).some(Boolean);
 const personaSummary = (tags: any) => Object.values(tags ?? {}).filter(Boolean).map(v => personaLabel[v as string] ?? v).join(" / ");
 const assetTypeLabel = (type: string) => assetTypes.find(item => item[0] === type)?.[1] ?? type;
+const assetTypeTabs = [...assetTypes, ["", "全部"]];
+const assetTypeFilter = ref("Character");
+const filteredProjectAssets = computed(() => assets.value.filter(item => !assetTypeFilter.value || item.type === assetTypeFilter.value));
+async function selectAssetType(type: string) {
+  assetTypeFilter.value = type;
+  libraryFilter.value.type = type;
+  await searchLibraryAssets();
+}
 const libraryAssets = ref<any[]>([]), librarySearched = ref(false), librarySourceVersions = ref(new Map<string, number>());
 const libraryFilter = ref<Record<string, string>>({ type: "Character", q: "", favorite: "", bearing: "", gaze: "", focus: "", rapport: "" });
 const asBatch = ref(false), batchId = ref(""), batchAssetId = ref(""), candidateBatches = ref<any[]>([]);
@@ -435,9 +448,10 @@ async function approveAsset(id: string) {
 async function publishAsset(id: string) {
   const entry = await request(`/library/assets/${id}/publish`, "POST", {});
   await refreshAssetLibrary();
-  message.value = `已收藏到角色资产库：${entry.name}`;
+  message.value = `已收藏到资产库：${entry.name}`;
 }
 async function searchLibraryAssets() {
+  assetTypeFilter.value = libraryFilter.value.type;
   const params = new URLSearchParams(Object.entries(libraryFilter.value).filter(([, v]) => v));
   const rows = await request(`/library/assets${params.size ? "?" + params : ""}`);
   libraryAssets.value = rows; librarySearched.value = true;
@@ -715,6 +729,20 @@ async function toggleFavorite(entry: any) {
   await request(`/library/assets/${entry.id}/favorite`, "PUT", { favorite: !entry.favorite });
   await searchLibraryAssets();
 }
+async function removeAsset(item: any) {
+  const approved = item.approvalStatus === "approved";
+  await ElMessageBox.confirm(`确定删除「${item.name}」？${approved ? "该资产已批准，引用它的镜头将失去此资产。" : ""}已收藏到资产库的副本不受影响。`, "删除资产", { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" });
+  await request(`/assets/${item.id}${approved ? "?confirm=1" : ""}`, "DELETE");
+  if (editingAsset.value === item.id) clearAsset();
+  await refreshAssetLibrary();
+  message.value = `已删除资产：${item.name}`;
+}
+async function removeLibraryAsset(entry: any) {
+  await ElMessageBox.confirm(`确定从资产库删除「${entry.name}」？已导入各项目的资产不受影响。`, "从库中删除", { confirmButtonText: "删除", cancelButtonText: "取消", type: "warning" });
+  await request(`/library/assets/${entry.id}`, "DELETE");
+  await refreshAssetLibrary();
+  message.value = `已从资产库删除：${entry.name}`;
+}
 async function generateCharacter() {
   const item = editingAsset.value && JSON.stringify(asset.value) === savedAsset ? { id: editingAsset.value } : await createAsset();
   emit("generateCharacter", item.id);
@@ -732,6 +760,7 @@ defineExpose({ flushSave, openShot, openLibrary });
   color: var(--studioInk); font-size: 14px;
   .productionTabs, .shotNavigation, .versionList { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; align-items: end; }
   .productionTabs { position: sticky; top: 0; z-index: 1; background: var(--studioSurface); padding: 8px 0; }
+  .assetTypeTabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
   fieldset { border: 0; padding: 0; min-width: 0; }
   h3 { font-size: 16px; margin: 24px 0 16px; }
   label { display: flex; flex-direction: column; gap: 8px; line-height: 1.5; }

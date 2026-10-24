@@ -23,7 +23,7 @@ import { autoObserve } from "../domain/qc-vision.ts";
 import { inspectProductionQuality } from "../domain/qualityInspection.ts";
 import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema, motionReviewSchema } from "../domain/realism.ts";
 import { createBatch, listBatches, listCandidates, promoteCandidate, scoreCandidate } from "../domain/candidates.ts";
-import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference, setLibraryFavorite } from "../domain/library.ts";
+import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference, setLibraryFavorite, deleteLibraryAsset } from "../domain/library.ts";
 import { acceptLocalRepair, repairDirective, scheduleLocalRepair, localRepairSchema } from "../domain/localRepair.ts";
 
 export const production = new Hono();
@@ -405,6 +405,10 @@ production.post(`${P}/library/import/:libraryId`, async (c) => {
     const { s, a } = project(c, c.req.param("pid"), "EDITOR");
     const b = await body(c, z.object({ name: z.string().optional(), invariants: z.array(z.string()).optional() }).default({}));
     return c.json(await importFromLibrary(s, c.req.param("libraryId"), c.req.param("pid"), a.user.id, b), 201);
+});
+production.delete("/library/assets/:id", (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    return c.json(deleteLibraryAsset(s, c.req.param("id"), a.user.id));
 });
 production.put("/library/assets/:id/reference", async (c) => {
     const { s, a } = ctx(c, "EDITOR");

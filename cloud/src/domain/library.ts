@@ -117,6 +117,14 @@ export function setLibraryFavorite(s: Scope, libraryId: string, favorite: boolea
   return s.get("library_assets", libraryId)!;
 }
 
+export function deleteLibraryAsset(s: Scope, libraryId: string, actor: string) {
+  const entry = s.get("library_assets", libraryId);
+  if (!entry) throw notFound("library asset");
+  s.softDelete("library_assets", libraryId);
+  audit(actor, "library.delete", libraryId, { name: entry.name }, s.workspaceId);
+  return { ok: true };
+}
+
 export function findLibraryAsset(s: Scope, entry: Row, projectId: string) {
   const source = s.get("assets", entry.sourceAssetId);
   if (source?.projectId === projectId) return source;

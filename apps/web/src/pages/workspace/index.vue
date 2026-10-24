@@ -43,7 +43,7 @@
     </el-tooltip>
     <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" />
     <settings v-model="settingsVisible" />
-    <div class="productionActions"><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="productionPanelRef?.openLibrary()">角色资产库</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <div class="productionActions"><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="productionPanelRef?.openLibrary()">资产库</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
     <storyPanel v-if="workspaceStore.project" :key="`story${workspaceStore.project.directory}`" ref="storyPanelRef" v-model="storyVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" @produce="prepareStoryProduction" />
     <voicePanel v-if="workspaceStore.project" :key="`voice${workspaceStore.project.directory}`" ref="voicePanelRef" v-model="voiceVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" />
     <productionPanel v-if="workspaceStore.project" :key="workspaceStore.project.directory" ref="productionPanelRef" v-model="productionVisible" :projectId="workspaceStore.project.projectId" :directory="workspaceStore.project.directory" @generateCharacter="prepareCharacterGeneration" />
