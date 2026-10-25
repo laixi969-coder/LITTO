@@ -154,7 +154,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 
 export default {
   resumeMedia,
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.4", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.5", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
@@ -162,8 +162,8 @@ export default {
     { id: "sync/lipsync-v3", label: "Sync Lipsync v3 · 已有视频对口型", type: "video", lipSync: true, audio: true, mode: [["videoReference:1", "audioReference:1"]] },
     { id: "bytedance/seedream-v4.5", label: "Seedream 4.5 文生图", type: "image", mode: ["text"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "bytedance/seedream-v4.5/edit", label: "Seedream 4.5 参考图编辑", type: "image", mode: ["singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
-    { id: "kwaivgi/kling-v2.6-pro/text-to-video", label: "Kling 2.6 Pro 文生视频", type: "video", mode: ["text"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
-    { id: "kwaivgi/kling-v2.6-pro/image-to-video", label: "Kling 2.6 Pro 首帧视频", type: "video", mode: ["singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
+    { id: "kwaivgi/kling-v2.6-pro/text-to-video", label: "Kling 2.6 Pro 文生视频", type: "video", mode: ["text"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
+    { id: "kwaivgi/kling-v2.6-pro/image-to-video", label: "Kling 2.6 Pro 首帧视频", type: "video", mode: ["singleImage"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
   ] as AtlasModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const baseUrl = String(this.config.baseUrl || "https://api.atlascloud.ai").trim().replace(/\/+$/, "");
@@ -220,6 +220,7 @@ export default {
       } else {
         model.mode = model.id.endsWith("/image-to-video") ? ["singleImage", ...(properties.end_image ? ["endFrameOptional" as const] : [])] : ["text"];
         model.audio = properties.sound ? "optional" : false;
+        model.nativeDialogue = !!model.audio && /^(?:kwaivgi\/kling-v2\.6-pro|bytedance\/seedance-v1\.5-pro)\//.test(model.id);
         // duration 无枚举时（seedance v1.5 系）按 minimum/maximum/step 生成档位；范围也缺失时退回常用档。
         const durationField = properties.duration;
         const duration = durationField?.enum?.filter((value): value is number => typeof value === "number" && value > 0)

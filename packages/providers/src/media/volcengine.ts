@@ -56,13 +56,13 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 
 export default {
   resumeMedia,
-  id: "volcengine", label: "火山方舟", version: "1.2.2", rules,
+  id: "volcengine", label: "火山方舟", version: "1.2.3", rules,
   readme: "使用火山方舟 API Key。内置 Seedream 4.5 / 5 Pro 与 Seedance 1.5 Pro / 2.5，支持本地图片参考、首帧和首尾帧；Seedance 2.5 支持最多 30 张图片的身份/场景参考，尚未接入音视频参考与编辑。API 地址可改为兼容方舟协议的中转；模型 ID 可在模型配置中替换为控制台接入点 ID。\n\n[官方文档](https://docs.volcengine.com/docs/ark/seedream-4-0-5-0?lang=zh)",
   models: [
     { id: "doubao-seedream-4-5-251128", label: "Seedream 4.5", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "doubao-seedream-5-0-pro-260628", label: "Seedream 5 Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["2K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
-    { id: "doubao-seedance-1-5-pro-251215", label: "Seedance 1.5 Pro", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: "optional", durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12], resolution: ["480P", "720P", "1080P"] }] },
-    { id: "doubao-seedance-2-5-260628", label: "Seedance 2.5", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:30"]], audio: "optional", durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "doubao-seedance-1-5-pro-251215", label: "Seedance 1.5 Pro", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "doubao-seedance-2-5-260628", label: "Seedance 2.5", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:30"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], resolution: ["480P", "720P", "1080P"] }] },
   ] satisfies ProviderModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const result = await fetchJson(this, "/models", this.signal ?? AbortSignal.timeout(30000));

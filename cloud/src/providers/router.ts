@@ -16,7 +16,7 @@ const ROLE_CAP: Record<string, { cap: string; fallback: string; hard?: boolean }
     CAMERA_MOTION: { cap: "motionReference", fallback: "video motion reference unsupported; camera intention written into the prompt, without numerical control" },
     START_FRAME: { cap: "image2video", fallback: "no image-to-video: cannot honour Hero Frame", hard: true },
     END_FRAME: { cap: "startEndFrame", fallback: "end frame unsupported; only start frame is used" },
-    AUDIO: { cap: "nativeAudio", fallback: "native audio unsupported; audio must be added in assembly" },
+    AUDIO: { cap: "audioReference", fallback: "audio reference unsupported; cannot promise to preserve the selected voice", hard: true },
     DEPTH: { cap: "depthReference", fallback: "no depth conditioning: depth structure described textually" },
     PANORAMA: { cap: "panoramaReference", fallback: "no panorama input: view direction and layout described textually, panorama used as a plain environment reference" },
 };

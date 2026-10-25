@@ -1,3 +1,4 @@
+import { resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import { z } from "zod";
 import { creativeBriefSchema, type ShotInput } from "./schema.ts";
 import { techniqueIssues } from "@toonflow/tool-media-generation/filmTechniques";
@@ -44,7 +45,7 @@ export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; n
     if (line.lipSync === "visible" && !visibleIds.has(line.speakerId)) issues.push("画内说话人须在出镜资产中；画外声音使用 offscreen");
     if (line.end <= line.start || line.end > duration) issues.push("对白起止时间须在本段生成时长内，并为发声及口型留出时间");
   }
-  if (brief.dialogue.lines.length && brief.dialogue.mode === "native" && shot.musicVideo && shot.musicVideo.audioMode !== "generated") issues.push("原生对白与静音/原曲方案冲突；保留台词，修改声音方案或明确后期配音对口型路径");
+  if (resolveDialogueMode(shot) === "native" && shot.musicVideo && shot.musicVideo.audioMode !== "generated") issues.push("原生对白与静音/原曲方案冲突；保留台词，修改声音方案或明确后期配音对口型路径");
   return [...new Set(issues)];
 }
 

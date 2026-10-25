@@ -9,7 +9,7 @@ export const ADAPTERS: Record<string, ProviderAdapter> = { mock: mockAdapter, "o
 
 export const CAPABILITIES = [
     "text2image", "imageEdit", "identityReference", "multiReference", "compositionReference",
-    "text2video", "image2video", "startEndFrame", "motionReference", "cameraControl", "nativeAudio",
+    "text2video", "image2video", "startEndFrame", "motionReference", "cameraControl", "nativeAudio", "nativeDialogue", "audioReference",
 ] as const;
 
 export const providerView = (p: any) => ({

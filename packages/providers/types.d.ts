@@ -22,6 +22,8 @@ interface ProviderModel {
   mode?: (ImageMode | VideoMode)[];
   associationSkills?: string;
   audio?: "optional" | boolean;
+  /** 已核验的原生对白及同步口型能力；支持音效或音频参考不等同于此能力。 */
+  nativeDialogue?: boolean;
   imageSizes?: string[];
   imageRatios?: string[];
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];

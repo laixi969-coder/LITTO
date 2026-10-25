@@ -22,6 +22,8 @@ beats 每项保存 attackerId、defenderId、action、reaction、endState、supp
 
 ## 3. 对白与口型单独保留
 
+画内对白默认 creativeBrief.dialogue.mode=native，选择 nativeDialogue=true 的视频模型，视频同时生成原文声音、表演和对应口型，generateAudio 未传时由服务端开启；不能默认先拍无声再补对白。需要固定音色或已有采用配音时才用 post：先采用并实测完整配音，绑定 audio:{mediaId,text}，按真实声音设计时长和嘴部覆盖，再处理并检查专用口型。音频参考只表示参考能力，不保证原音逐字保留，不能冒充对口型。旁白、音乐、环境声可以后期制作。缺少能力时报告具体缺项，不自动换模型、删台词、改画外音或直接给成型视频叠对白。
+
 creativeBrief.dialogue 必填；本镜确实无对白时 lines:[]，但整场台词必须分配到其他镜头，不能因动作隔离验证而从全片消失。
 
 结构为 {mode:"native"|"post",lines:[{speakerId,text,start,end,delivery,lipSync:"visible"|"offscreen",framing,audio?:{mediaId,text},coverage?:[{start,end,description}]}]}。text 保留原文，start/end 是镜头局部秒数，不能超出实际剪入时长；生成余量不算对白屏时。delivery 写语气和气口，framing 写怎样看清说话人的嘴。用户要求可见口型时用 visible，不能静默改画外音；coverage 显式覆盖整句 start/end，记录对应人物嘴部可见的真实调度，不能只因角色在本镜出现过就视为覆盖。
@@ -32,7 +34,7 @@ post 先采用真实配音，再调用 productionSpec(planSpeech) 的 {shotId,bi
 
 重排不改变既定事件顺序与前提。旧主帧如处在另一动作阶段，保留素材并标待核对，不能为迁就它把闪避移到攻击之后、补造先前两声的证据或恢复已失去的动力。录音总长不能证明内部停顿；先本地测量实际静音及原句窗口，再只缩短不必要的句间空白，完整文件保持原速。历史接戏账本用于核对伤势与持物，不把已结束的插入、承托或接触重新当作本镜行动。可见对白窗口也约束焦点与遮挡，不能一边声明coverage完整，一边在整句中途移焦到远处景物。
 
-native 仅用于明确采用的原生有声路线，开启 generateAudio 并实际看听；不能为绕过后配音容量检查而改成 native。post 仍须专用口型任务及最终实际验收，不能把无声素材、混音或规划通过当作同步完成。独立 lipSync 能力和原生音画能力分别判断。
+native 是普通画内对白的默认路线，省略 mode 时按 native 处理，服务端开启 generateAudio，并核验返回视频确有音轨；仍须实际看听，音轨存在不能证明台词和口型正确。已采用固定声音后保持 post，不能为绕过容量检查而改成 native。post 仍须专用口型任务及最终实际验收，不能把无声素材、混音或规划通过当作同步完成。独立 lipSync 能力和原生音画能力分别判断。
 
 对白可以在交锋的判断、压迫或短暂脱离中发生，其他人物仍有合理行为；将高难接触放在对白前后，不让所有人站定等待。不用统一语速估算当作同步证据。成片需实际检查说话人、台词、发声起止、嘴部开合与音效遮挡；只看抽帧必须标未核验。
 

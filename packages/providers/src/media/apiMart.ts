@@ -15,7 +15,7 @@ const rules = [
   },
 ] as const;
 
-const version = "2.0.1";
+const version = "2.0.2";
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("APIMart 响应格式错误");
@@ -165,6 +165,7 @@ export default {
       type: "video",
       mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
       audio: "optional",
+      nativeDialogue: true,
       durationResolutionMap: [
         { duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], resolution: ["480p", "720p"] },
       ],
@@ -175,6 +176,7 @@ export default {
       type: "video",
       mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
       audio: "optional",
+      nativeDialogue: true,
       durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480p", "720p", "1080p"] }],
     },
     {
@@ -183,6 +185,7 @@ export default {
       type: "video",
       mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
       audio: "optional",
+      nativeDialogue: true,
       durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480p", "720p"] }],
     },
     {
@@ -191,6 +194,7 @@ export default {
       type: "video",
       mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
       audio: "optional",
+      nativeDialogue: true,
       durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480p", "720p"] }],
     },
     {
@@ -198,7 +202,8 @@ export default {
       label: "Wan3.0",
       type: "video",
       mode: ["text", "startFrameOptional", ["imageReference:10", "videoReference:5", "audioReference:5"]],
-      audio: true,
+      audio: "optional",
+      nativeDialogue: true,
       durationResolutionMap: [
         { duration: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], resolution: ["480P", "720P", "1080p"] },
       ],
@@ -208,7 +213,8 @@ export default {
       label: "MiniMax-H3",
       type: "video",
       mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
-      audio: "optional",
+      audio: true,
+      nativeDialogue: true,
       durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "2K"] }],
     },
     { id: "seedream-5-0-lite", label: "Doubao Seedream 5.0 Lite", type: "image", mode: ["text", "singleImage", "multiReference"] },
@@ -275,6 +281,8 @@ export default {
     const mode =
       request.mode ?? (frames.length ? "startFrameOptional" : videoUrls.length || audioUrls.length ? [] : imageUrls.length ? "singleImage" : "text");
     const isFrames = mode === "startEndRequired" || mode === "endFrameOptional" || mode === "startFrameOptional";
+    if (!Array.isArray(mode) && (videoUrls.length || audioUrls.length)) throw new Error("音视频参考须选择多参考模式，不能丢弃已传入的声音");
+    if (Array.isArray(mode) && frames.length) throw new Error("多参考模式不能混入首尾帧");
     const frameImages = frames.length ? frames : imageUrls.map((url, index) => ({ url, role: index === 0 ? "first_frame" : "last_frame" }));
 
     const body: Record<string, unknown> = {
@@ -286,6 +294,7 @@ export default {
     };
 
     if (lowerName.includes("wan")) {
+      if (typeof request.generateAudio === "boolean") body.audio = request.generateAudio;
       if (isFrames && frameImages.length >= 2) {
         body.image_with_roles = frameImages.map(({ url, role }) => ({ role, url }));
       } else if (Array.isArray(mode)) {
@@ -309,8 +318,7 @@ export default {
         body.image_with_roles = imageUrls.map((url) => ({ role: "reference_image", url }));
       }
     } else if (lowerName.includes("minimax")) {
-      // H3 的对白与环境音是可选能力：不显式开启时供应商只返回静音画面。
-      if (typeof request.generateAudio === "boolean") body.generate_audio = request.generateAudio;
+      // H3 固定返回音轨，官方未提供 generate_audio 开关；静音交付由宿主保留原片后处理。
       if (Array.isArray(mode)) {
         if (imageUrls.length) body.image_with_roles = imageUrls.map((url) => ({ role: "reference_image", url }));
         if (videoUrls.length) body.video_urls = videoUrls;

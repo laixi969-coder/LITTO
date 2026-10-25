@@ -1,3 +1,4 @@
+import { resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import { all, get, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
 import { compileShot, requireCompiledInputs } from "./compiler.ts";
@@ -104,13 +105,13 @@ export function generateTakes(s: Scope, shotId: string, actor: string, o: GenOpt
     const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId });
     const roles = ["START_FRAME", ...bindings.map((b: any) => b.role)];
     const policy = resolvePolicy(s.workspaceId, shot.projectId, { ...shot.modelOverride, ...o.policy });
-    const { chosen } = mustRoute({ kind: "video", workspaceId: s.workspaceId, projectId: shot.projectId, roles, policy });
+    const nativeDialogue = resolveDialogueMode(shot) === "native";
+    const { chosen } = mustRoute({ kind: "video", workspaceId: s.workspaceId, projectId: shot.projectId, roles, policy, need: nativeDialogue ? ["nativeDialogue", "nativeAudio"] : [] });
     const c = compileShot(s, shotId, "video", chosen!.modelId, { startFrameMediaId: kf.mediaId, repair: o.repair });
     requireCompiledInputs(c);
     if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
     const jobs = [];
     const n = o.count ?? 2;
-    const nativeDialogue = shot.creativeBrief?.dialogue.mode === "native" && shot.creativeBrief.dialogue.lines.length > 0;
     for (let i = 0; i < n; i++) jobs.push(enqueue({ workspaceId: s.workspaceId, projectId: shot.projectId, kind: "video", targetType: "shot", targetId: shotId, modelId: chosen!.modelId, compiledPrompt: c.prompt, negativePrompt: c.negativePrompt, parameters: { ...sizeOf(shot, "video"), duration: shot.generationDuration ?? shot.duration ?? 4, keyframeId: kf.id, specFingerprint: shotFingerprint(s, shotId), count: 1, ...(nativeDialogue ? { generateAudio: true } : {}), ...(o.candidateBatchId ? { candidateBatchId: o.candidateBatchId } : {}) }, inputRefs: c.inputs, createdBy: actor, fallbackAllowed: !nativeDialogue && policy.allowFallback !== false, idempotencyKey: o.idempotencyKey ? `${o.idempotencyKey}:${i}` : undefined, label: `TAKE ${i + 1} · shot ${shot.ord + 1}`, seed: o.seed !== undefined ? o.seed + i : undefined }));
     return { jobs, degradations: [...chosen!.degradations, ...c.degradations], warnings: c.warnings };
 }

@@ -107,6 +107,7 @@ export async function requestMediaQuality(directory: string, toolCallId: string,
 /** ACT: 按项目和模型记忆精度；单次明确传入的规格优先，队列保存解析后的快照。 */
 export async function applyMediaQuality(directory: string, kind: "image" | "video" | "audio", request: MediaGenerationRequest, model: MediaModel) {
   if (kind === "audio") return request;
+  if (kind === "video" && request.generateAudio === true && !model.audio) throw new Error("当前模型未声明生成声音能力，不能静默忽略 generateAudio；此次未提交生成");
   const aspect = (await readMediaAspect(directory))[kind === "image" ? "imageRatio" : "videoRatio"];
   if (aspect && request.ratio) {
     const [width, height] = aspect.split(":").map(Number);

@@ -1,3 +1,4 @@
+import { resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import { createHash } from "node:crypto";
 import { get, run, scoped, tx } from "./db.ts";
 import { createProject } from "./routes/platform.ts";
@@ -143,7 +144,7 @@ function generationSignature(request: Record<string, unknown>, prompt: string, n
 
 export function prepareWorkspaceShot(input: {
   workspaceId: string; projectId: string; shotId: string; kind: "image" | "video";
-  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean; localRepair?: unknown; previewOnly?: boolean;
+  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean; nativeDialogue?: boolean; audio?: boolean | "optional"; localRepair?: unknown; previewOnly?: boolean;
 }) {
   const { previewOnly = false, ...generationInput } = input;
   const previewWarnings: string[] = [];
@@ -161,7 +162,8 @@ export function prepareWorkspaceShot(input: {
   const images = input.kind === "image" ? imageLimit > 0 : referenceLimit > 0;
   const capabilities = { image2video: firstFrame || referenceLimit > 0, startEndFrame: ["startEndRequired", "endFrameOptional"].includes(String(mode)),
     multiReference: images, identityReference: images, compositionReference: images,
-    motionReference: videoLimit > 0, cameraControl: input.cameraTrajectory === true, nativeAudio: audioLimit > 0,
+    motionReference: videoLimit > 0, cameraControl: input.cameraTrajectory === true, audioReference: audioLimit > 0,
+    nativeAudio: !!input.audio, nativeDialogue: input.nativeDialogue === true && !!input.audio,
     maxInputs: input.kind === "image" ? imageLimit : firstFrame ? (mode === "startEndRequired" || mode === "endFrameOptional" ? 2 : 1) : referenceLimit + videoLimit + audioLimit };
   const modelId = "workspace" + createHash("sha256").update(JSON.stringify([input.workspaceId, input.kind, input.providerId, input.modelId])).digest("hex");
   upsertModel(modelId, { providerId: "workspaceMedia", externalModelId: JSON.stringify([input.providerId, input.modelId]), name: input.modelId,
@@ -214,7 +216,7 @@ export function prepareWorkspaceShot(input: {
   }).join("; ");
   compiled.sections["Objective" in compiled.sections ? "Reference binding" : "reference plan"] = referencePlan;
   compiled.prompt = renderCompiledPrompt(compiled.sections);
-  const nativeDialogue = shot.creativeBrief?.dialogue?.mode === "native" && shot.creativeBrief.dialogue.lines.length > 0;
+  const nativeDialogue = resolveDialogueMode(shot) === "native";
   const repairParameters = repair ? { localRepairOf: repair.keyframe.id, localRepairKind: repair.kind, localRepairTarget: repair.target } : undefined;
   const fingerprint = createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), generationInput, keyframe?.id, compiled])).digest("hex");
   compiled.warnings.push(...previewWarnings);

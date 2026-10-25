@@ -316,7 +316,11 @@ export async function updateBuiltinMediaProvider(fileName: string, revision: str
     const parsed = parseProvider(builtin.source);
     // ACT: 显式更新实现，保留已有模型的用户配置，并补新内置模型；不触碰密钥、默认选择和旧生成记录。
     const models = new Map(parsed.models.map(model => [model.id, model]));
-    for (const model of current.models) models.set(model.id, { ...models.get(model.id), ...model });
+    for (const model of current.models) {
+      const builtinModel = models.get(model.id);
+      // 声音能力须与新适配器协议一致，不能被旧版本的 optional/true 覆盖；其余用户字段保留。
+      models.set(model.id, { ...builtinModel, ...model, ...(builtinModel ? { audio: builtinModel.audio, nativeDialogue: builtinModel.nativeDialogue } : {}) });
+    }
     const property = parsed.modelProperty;
     if (property?.type !== "ObjectProperty") invalid("内置适配器缺少模型列表");
     const source = builtin.source.slice(0, property.value.start!) + JSON.stringify([...models.values()], null, 2) + builtin.source.slice(property.value.end!);

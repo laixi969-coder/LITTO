@@ -83,11 +83,11 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 
 export default {
   resumeMedia,
-  id: "kling", label: "可灵", version: "1.0.2", rules,
+  id: "kling", label: "可灵", version: "1.0.3", rules,
   readme: "内置可灵 Image 2.1 和 Video 2.6。新认证只需 API Key，Secret Key 留空；旧 AK/SK 认证在 API Key 中填 Access Key，再填 Secret Key。接口地址以 /v1 结尾，可改成可灵协议中转地址。图片支持文字和最多 4 张主体参考；视频支持文字或首帧，5/10 秒。\n\n[认证文档](https://kling.ai/document-api/api/get-started/authentication) · [视频文档](https://kling.ai/document-api/api/video/2-6/text-to-video/legacy)",
   models: [
     { id: "kling-v2-1", label: "Kling Image 2.1", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
-    { id: "kling-v2-6", label: "Kling Video 2.6", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: ["1080P"] }] },
+    { id: "kling-v2-6", label: "Kling Video 2.6", type: "video", mode: ["text", "singleImage"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10], resolution: ["1080P"] }] },
   ] satisfies ProviderModel[],
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
     if (!request.model.trim() || !request.prompt.trim() || request.prompt.length > 2500) throw new Error("请填写模型 ID 和 2500 字以内的提示词");

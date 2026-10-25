@@ -231,7 +231,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     if (model.durationResolutionMap?.length && !model.durationResolutionMap.some(rule => rule.duration.includes(request.duration!) && rule.resolution.includes(request.resolution!))) throw Object.assign(new Error("时长与分辨率组合不受模型支持"), { status: 400 });
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
-    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, localRepair: request.localRepair, ...(previewOnly ? { previewOnly: true } : {}) });
+    providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, nativeDialogue: model.nativeDialogue === true, audio: model.audio, localRepair: request.localRepair, ...(previewOnly ? { previewOnly: true } : {}) });
   if (kind === "video" && !request.ratio && result.keyframeId) {
     const scope = api.scoped(tenant.workspaceId);
     const frame = scope.get("keyframes", result.keyframeId);
@@ -250,8 +250,9 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (kind === "video" && request.providerId === "meta" && request.modelId === "MiniMax-H3") {
     result.compiled.prompt = compactVideoPrompt(result.compiled.prompt);
   }
-  if (kind === "video" && result.audioMode === "generated" && (!model.audio || request.generateAudio === false || (model.audio === "optional" && request.generateAudio !== true))) {
-    throw Object.assign(new Error("本镜对白或声音方案需要生成声音，请选用支持音频的模型并开启 generateAudio；不能删除台词或改成静音绕过"), { status: 400 });
+  if (kind === "video" && result.audioMode === "generated") {
+    if (!model.audio || request.generateAudio === false) throw Object.assign(new Error("本镜对白或声音方案需要生成声音，不能关闭音轨、删除台词或改成成片叠对白；此次未提交生成"), { status: 400 });
+    request = { ...request, generateAudio: true };
   }
   if (kind === "video" && result.audioMode === "silent" && (model.audio === true || request.generateAudio === true || (model.audio === "optional" && request.generateAudio !== false))) {
     throw Object.assign(new Error("MV 方案要求无声素材，请关闭 generateAudio 或更换支持无声输出的模型"), { status: 400 });

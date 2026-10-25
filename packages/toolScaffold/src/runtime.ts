@@ -98,6 +98,7 @@ export interface MediaModel {
   imageRatios?: string[];
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   audio?: boolean | "optional";
+  nativeDialogue?: boolean;
   voices?: { title: string; voice: string }[];
   audioParameterSchema?: Record<string, unknown>;
   speechInstructions?: boolean;

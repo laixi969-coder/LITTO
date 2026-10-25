@@ -58,7 +58,7 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 
 export default {
   resumeMedia,
-  id: "bailian", label: "阿里百炼", version: "1.1.2", rules,
+  id: "bailian", label: "阿里百炼", version: "1.1.3", rules,
   readme: "支持分页同步工作空间模型目录，接入已适配的图片、视频及 Qwen-Audio-TTS、CosyVoice、Qwen-TTS 非实时配音。请填写同地域 API Key 和以 /api/v1 结尾的工作空间地址。Qwen-TTS 使用单独的 DashScope 地址，请在 qwenTtsBaseUrl 配置同地域端点；不将工作空间端点与其混用。CosyVoice 3.5 需要已创建的复刻或设计音色 ID。目录存在不代表账户已开通权限。\n\n[模型目录](https://help.aliyun.com/zh/model-studio/list-models) · [语音文档](https://help.aliyun.com/zh/model-studio/non-realtime-tts-user-guide)",
   models: [
     { id: "qwen-audio-3.1-tts-flash", label: "Qwen Audio 3.1 TTS Flash · 配音", type: "audio", speechInstructions: true, voices: [{ title: "龙安欢", voice: "longanhuan_v3.1" }] },
@@ -67,8 +67,8 @@ export default {
     { id: "qwen3-tts-flash", label: "Qwen3 TTS Flash · 配音", type: "audio", voices: [{ title: "Cherry", voice: "Cherry" }, { title: "Serena", voice: "Serena" }, { title: "Ethan", voice: "Ethan" }] },
     { id: "qwen3-tts-instruct-flash", label: "Qwen3 TTS Instruct · 表演配音", type: "audio", speechInstructions: true, voices: [{ title: "Cherry", voice: "Cherry" }] },
     { id: "qwen-image-2.0-pro", label: "Qwen Image 2.0 Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"] },
-    { id: "wan2.6-t2v", label: "万相 2.6 文生视频", type: "video", mode: ["text"], audio: true, durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["720P", "1080P"] }] },
-    { id: "wan2.6-i2v-flash", label: "万相 2.6 Flash 首帧视频", type: "video", mode: ["singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["720P", "1080P"] }] },
+    { id: "wan2.6-t2v", label: "万相 2.6 文生视频", type: "video", mode: ["text"], audio: true, nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["720P", "1080P"] }] },
+    { id: "wan2.6-i2v-flash", label: "万相 2.6 Flash 首帧视频", type: "video", mode: ["singleImage"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["720P", "1080P"] }] },
   ] satisfies ProviderModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const signal = this.signal ?? AbortSignal.timeout(60000);

@@ -11,7 +11,7 @@ import type { ShotInput } from "./schema.ts";
 import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
-import { physicalInteractionPlan, videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
+import { physicalInteractionPlan, videoMotionTiming, resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import { musicSource } from "./music.ts";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
@@ -186,15 +186,14 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     warnings.push(...creativeDirectionIssues(shot as ShotInput, shot.assetIds.map((id: string) => projectAssets.get(id)!)).map(issue => `创作准备未完成：${issue}`));
     warnings.push(...adShotIssues(s, shot).map(issue => `创作准备未完成：${issue}`));
     const advertising = adContext(s, shot);
-    if (kind === "video" && shot.creativeBrief?.dialogue.mode === "native" && shot.creativeBrief.dialogue.lines.length
-        && !model.limits.workspaceExecution && !caps.nativeAudio) warnings.push("创作准备未完成：当前模型没有原生音频能力，不能静默丢弃对白；请选择支持的模型或明确后期配音对口型路径");
+    if (kind === "video" && resolveDialogueMode(shot) === "native" && (!caps.nativeDialogue || !caps.nativeAudio)) warnings.push("创作准备未完成：当前模型未声明原生对白与同步口型能力；不能用音效或音频参考能力代替，也不能静默改为后期叠对白");
     const clean = (t: string, where: string) => {
         const r = stripFluff(t);
         if (r.removed.length) warnings.push(`removed non-actionable terms from ${where}: ${r.removed.join(", ")}`);
         return r.clean;
     };
 
-    const roleCap: Record<string, string> = { IDENTITY: "identityReference", GEOMETRY: "multiReference", WARDROBE: "multiReference", ENVIRONMENT: "multiReference", COMPOSITION: "compositionReference", LIGHTING: "multiReference", LOOK: "multiReference", DEPTH: "depthReference", PANORAMA: "panoramaReference", PERFORMANCE: "motionReference", CAMERA_MOTION: "motionReference", START_FRAME: "image2video", END_FRAME: "startEndFrame", AUDIO: "nativeAudio" };
+    const roleCap: Record<string, string> = { IDENTITY: "identityReference", GEOMETRY: "multiReference", WARDROBE: "multiReference", ENVIRONMENT: "multiReference", COMPOSITION: "compositionReference", LIGHTING: "multiReference", LOOK: "multiReference", DEPTH: "depthReference", PANORAMA: "panoramaReference", PERFORMANCE: "motionReference", CAMERA_MOTION: "motionReference", START_FRAME: "image2video", END_FRAME: "startEndFrame", AUDIO: "audioReference" };
     const adapter = get("SELECT adapter FROM providers WHERE id=?", model.providerId)?.adapter;
     const maxInputs = adapter === "openai-compatible" && kind === "video" ? 1 : Number(caps.maxInputs ?? 0);
     const degradations: Compiled["degradations"] = [];
@@ -300,7 +299,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
                 return `${timing ? `${timing.start}–${timing.end}s` : "待绑定执行节拍"} ${assetName(beat.attackerId)}对${assetName(beat.defenderId)}：${beat.action} → ${beat.reaction} → ${beat.endState}；其他人物：${beat.supportingAction}`;
             })]) : "",
         dialogue: kind === "video" && brief?.dialogue.lines.length
-            ? `${brief.dialogue.mode === "native" ? "生成以下原文对白及声音，并按要求同步人物口型" : "后期配音及口型处理计划，当前素材不代表声画同步已完成"}：\n${brief.dialogue.lines.map(line => `${musicTimecode(line.start)}–${musicTimecode(line.end)} ${assetName(line.speakerId)}${!visibleIds.has(line.speakerId) ? "（仅画外声音，不出镜）" : ""}说：${JSON.stringify(line.text)}；${line.delivery}；${line.lipSync === "visible" ? "可见嘴部与此句逐字同步" : "画外音，不要求画内人物说此句"}；${line.framing}`).join("\n")}` : "",
+            ? `${resolveDialogueMode(shot) === "native" ? "生成以下原文对白及声音，并按要求同步人物口型" : "后期配音及口型处理计划，当前素材不代表声画同步已完成"}：\n${brief.dialogue.lines.map(line => `${musicTimecode(line.start)}–${musicTimecode(line.end)} ${assetName(line.speakerId)}${!visibleIds.has(line.speakerId) ? "（仅画外声音，不出镜）" : ""}说：${JSON.stringify(line.text)}；${line.delivery}；${line.lipSync === "visible" ? "可见嘴部与此句逐字同步" : "画外音，不要求画内人物说此句"}；${line.framing}`).join("\n")}` : "",
         // 整段动作的不变量可能含后续持物或落位；首帧只投影明确起点，视频保留完整约束。
         shotDesign: kind === "image" && cam.design?.start ? `Single starting frame: ${cam.design.start}` : "",
         subject: J([kind === "image" && !!cam.design?.start && "Appearance references only; initial occupancy is defined exclusively by the starting frame, not by this list",

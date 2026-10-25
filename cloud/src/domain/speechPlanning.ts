@@ -1,6 +1,6 @@
 import type { Scope } from "../db.ts";
 import { bad, notFound } from "../util.ts";
-import { coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
+import { coversSpeechRanges, resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import type { ShotInput } from "./schema.ts";
 
 type DialogueLine = NonNullable<ShotInput["creativeBrief"]>["dialogue"]["lines"][number];
@@ -22,7 +22,7 @@ export function speechPlanningIssues(s: Scope, shot: Record<string, any>) {
   for (const [index, line] of lines.entries()) {
     const label = `第${index + 1}句`;
     const media = speechMedia(s, shot.projectId, line);
-    if ((dialogue.mode === "post" || line.audio) && !media) issues.push(`${label}须绑定当前项目实测的配音 audio:{mediaId,text}，不能按字数估时或沿用改词前的声音；先 planSpeech`);
+    if (resolveDialogueMode(shot) === "post" && !media) issues.push(`${label}须绑定当前项目实测的配音 audio:{mediaId,text}，不能按字数估时或沿用改词前的声音；先 planSpeech`);
     if (media && media.duration > line.end - line.start + 0.001) issues.push(`${label}真实配音 ${media.duration.toFixed(3)} 秒超过窗口 ${(line.end - line.start).toFixed(3)} 秒；须重排镜头，不能加速、删句、截断或跨镜挪音`);
     if (line.start < previousEnd - 0.001) issues.push(`${label}与前句重叠，不能叠说来压缩未授权的对白`);
     previousEnd = line.end;

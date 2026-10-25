@@ -1,3 +1,4 @@
+import { resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import { z } from "zod";
 import { mediaAspectIssue } from "./qualityInspection.ts";
 import { all, get, run, tx, type Scope } from "../db.ts";
@@ -53,7 +54,7 @@ export function conformBody(s: Scope, sequenceId: string, prev: Body | null, res
     const shots = s.list("shots", { sequenceId }, "ord");
     const bindings = s.list("reference_bindings", { targetType: "shot" }).filter((b: any) => b.role === "AUDIO");
     // 原曲有独立排轨；原生对白的 AUDIO 是生成参考，不能把旧样音再叠入成片。
-    const generationAudio = new Set(shots.filter(shot => shot.musicVideo?.audioMode === "sourceTrack" || shot.creativeBrief?.dialogue?.mode === "native").map(shot => shot.id));
+    const generationAudio = new Set(shots.filter(shot => shot.musicVideo?.audioMode === "sourceTrack" || resolveDialogueMode(shot) === "native").map(shot => shot.id));
     const base: Body = !prev || reset ? { fps: 24, tracks: defaultTracks(), clips: [], markers: [], grade: prev && !reset ? prev.grade : null, duck: null } : structuredClone(prev);
     const have = new Set(base.clips.filter((c) => c.shotId).map((c) => c.shotId));
     const live = new Set(shots.map((x) => x.id));

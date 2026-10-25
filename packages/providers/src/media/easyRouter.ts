@@ -72,13 +72,13 @@ function videoModel(id: string): ProviderModel | undefined {
     const minor = Number(seedanceVersion[2]);
     const max = major >= 3 || (major === 2 && minor >= 5) ? 30 : major === 2 ? 15 : 10;
     const duration = [5, 10, 15, 20, 25, 30].filter(value => value <= max);
-    return { id, label: id, type: "video", mode: ["text", "singleImage"], audio: "optional",
+    return { id, label: id, type: "video", mode: ["text", "singleImage"], audio: "optional", nativeDialogue: ["1.5", "2.0", "2.5"].includes(`${major}.${minor}`),
       durationResolutionMap: [{ duration, resolution: ["480P", "720P", "1080P"] }] };
   }
   if (!/^PixVerse\/(c1|v6|v5\.6|v5\.5|v5|v4\.5|v4|v3\.5)$/.test(id)) return;
   const continuous = ["PixVerse/c1", "PixVerse/v6"].includes(id);
   const audio = continuous || ["PixVerse/v5.6", "PixVerse/v5.5"].includes(id);
-  return { id, label: id, type: "video", mode: ["text", "singleImage"], audio: audio ? "optional" : false,
+  return { id, label: id, type: "video", mode: ["text", "singleImage"], audio: audio ? "optional" : false, nativeDialogue: ["PixVerse/v5.5", "PixVerse/v5.6", "PixVerse/v6"].includes(id),
     durationResolutionMap: continuous ? [{ duration: Array.from({ length: 15 }, (_, index) => index + 1), resolution: ["720P", "1080P"] }]
       : [{ duration: audio ? [5, 8, 10] : [5, 8], resolution: ["720P"] }, { duration: [5], resolution: ["1080P"] }],
   };
@@ -110,14 +110,14 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 
 export default {
   resumeMedia,
-  id: "easyRouter", label: "EasyRouter", version: "1.2.2", rules,
+  id: "easyRouter", label: "EasyRouter", version: "1.2.3", rules,
   readme: "图片、视频和独立配音共用 API Key，可同步目录并选择已适配模型。配音支持 GPT TTS 与 Gemini TTS，使用 /audio/speech 返回音频流；Gemini 保留原生 WAV 和默认语速。支持平台音色 ID，不支持此接口未定义的克隆参考和表演指令。视频自动轮询并通过带认证的内容接口下载。\n\n[配音文档](https://docs.easyrouter.io/en/docs/api/ai-model/audio/speech)",
   models: [
     { id: "gpt-4o-mini-tts", label: "GPT-4o Mini TTS · 配音", type: "audio", voices: [{ title: "Alloy", voice: "alloy" }, { title: "Nova", voice: "nova" }] },
     { id: "gpt-image-2", label: "GPT Image 2", type: "image", mode: ["text", "singleImage"], imageSizes: ["1K"], imageRatios: ["1:1", "3:2", "2:3"] },
-    { id: "PixVerse/v6", label: "PixVerse V6", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["720P", "1080P"] }] },
-    { id: "dreamina-seedance-2-0", label: "Seedance 2.0", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["480P", "720P", "1080P"] }] },
-    { id: "dreamina-seedance-2-0-fast", label: "Seedance 2.0 Fast", type: "video", mode: ["text", "singleImage"], audio: "optional", durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "PixVerse/v6", label: "PixVerse V6", type: "video", mode: ["text", "singleImage"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["720P", "1080P"] }] },
+    { id: "dreamina-seedance-2-0", label: "Seedance 2.0", type: "video", mode: ["text", "singleImage"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "dreamina-seedance-2-0-fast", label: "Seedance 2.0 Fast", type: "video", mode: ["text", "singleImage"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10, 15], resolution: ["480P", "720P", "1080P"] }] },
   ] satisfies ProviderModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const result = await fetchJson(this, "/models", this.signal ?? AbortSignal.timeout(30000));

@@ -15,7 +15,7 @@ const rules = [
   },
 ] as const;
 
-const version = "2.0.1";
+const version = "2.0.2";
 
 function mediaUrl(input: MediaInput) {
   if (input.type === "url") return input.url;
@@ -94,7 +94,8 @@ export default {
       label: "MiniMax-H3",
       type: "video",
       mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
-      audio: "optional",
+      audio: true,
+      nativeDialogue: true,
       durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "2K"] }],
     },
   ] satisfies ProviderModel[],
@@ -113,6 +114,8 @@ export default {
     const mode =
       request.mode ?? (frames.length ? "startFrameOptional" : videos.length || audios.length ? [] : images.length ? "singleImage" : "text");
     const isFrames = mode === "startEndRequired" || mode === "endFrameOptional" || mode === "startFrameOptional";
+    if (!Array.isArray(mode) && (videos.length || audios.length)) throw new Error("音视频参考须选择多参考模式，不能丢弃已传入的声音");
+    if (Array.isArray(mode) && frames.length) throw new Error("多参考模式不能混入首尾帧");
 
     const prompt = compactVideoPrompt(request.prompt);
     const content: Record<string, unknown>[] = [{ type: "text", text: prompt }];
