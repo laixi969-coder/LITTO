@@ -14,6 +14,10 @@
 
 先保存完整camera.design：起点start、终点end、subjectPath、cameraPath、timing、cut和必要保持项。mode选择singleTake或multiShot。
 
+相机执行以 cameraPath 和唯一时间线为准；camera.motion 只作兼容摘要，必须同步更新，不能让默认 static 与推进并存。technique 会进入执行文本，必须与相机路线一致；背后跟拍与后退跟拍不是同一机位。起止状态写明确景别、画内人物和必须可见的部位，acceptance 写相应可观察结果，不用“手腿”“双人中景”等含混或不存在的目标。生成前核对 compiled.prompt；语义冲突由导演修正，不能用关键词自动替用户改成另一套拍法。
+
+生成后按 motionPlan.checkpoints 中 cameraStart、cameraPath、cameraEnd 对照实际起幅、运动和落点。人物有动作、镜头有移动不等于摄影设计完成；目标手腕被裁掉、眼睛出画或错误方向揭示均记录 revise。保留未通过候选，不自动付费重生。已采用版本优先；候选按请求提交时间比较，不把旧请求晚完成当作新设计。
+
 - 剧情、广告：camera.design.timeline为[{start,end,description,transition?}]。
 - MV：沿用musicVideo.timeline，不能再填写camera.design.timeline。
 - start/end是本生成段局部秒数，从0连续覆盖generationDuration（未设置则duration）；description写具体身体任务、接触结果、位置、观看距离与运镜。transition为continuous或cut，首节拍不得cut。

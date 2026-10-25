@@ -1,5 +1,5 @@
 import { type Scope } from "../db.ts";
-import { videoCoveragePlanning, videoMotionTiming, videoSpeechPlanning } from "@toonflow/tool-media-generation/runtime";
+import { cameraDirectionPlanning, videoCoveragePlanning, videoMotionTiming, videoSpeechPlanning } from "@toonflow/tool-media-generation/runtime";
 import { bad, notFound, sha256 } from "../util.ts";
 import { checkSequence } from "./continuity.ts";
 import { createShotsFromDrafts, validateVisibleAssets } from "./shots.ts";
@@ -41,6 +41,7 @@ async function refineWithLlm(s: Scope, projectId: string, actor: string, script:
   const system = [
     videoMotionTiming,
     videoCoveragePlanning,
+    cameraDirectionPlanning,
     videoSpeechPlanning,
     "TECHNIQUES are local design candidates, not mandatory choices or new events. Choose only useful entries, at most 8 per shot, as techniques:[{id,purpose,execution,start?,end?}]. Execution names the current subject, trigger, path and visible result; match camera/lighting fields. image/video techniques describe generation, look preserves the approved shared Look, edit/audio/story remain plans for their own real workflows, never extra visual actions. Time effects require an explicit local start/end and must not overlap speech or source-track sync. Never add slow motion, equal time slots or idle resets to combat or rescue. A continuous shot can contain several causal beats or multiple speakers when staging, capacity and the selected model permit; never split by line count alone.",
     "You are a film director. Return ONLY JSON {\"shots\":[...]}. Each shot needs sourceIndexes (zero-based draft indexes), visibleAssetIds, title, narrativeFunction, action, performance{emotion,intensity,eyeline,lookTarget,gesture,timing}, blocking{foreground,midground,background}, camera, lighting, duration, intendedStateDelta and creativeBrief. Merge adjacent beats within a scene or split one beat into consecutive shots when motivated. Cover all beats in order without repeating events; repeated sourceIndexes are only for a split beat. Preserve real asset IDs; visibleAssetIds is the subset appearing at some point, excluding voice-only characters.",

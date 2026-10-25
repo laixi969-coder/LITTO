@@ -8,7 +8,7 @@ import { ensureCropMedia, viewOf } from "./panorama.ts";
 import { ensureReferenceCrop } from "./referenceCrop.ts";
 import { lookSchema, validateActionTimeline, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
-import { creativeDirectionIssues } from "./creativeDirection.ts";
+import { cameraDirectionIssues, creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
 import { physicalInteractionPlan, videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
@@ -163,6 +163,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         })),
     ]));
     const warnings: string[] = [];
+    if (kind === "video") warnings.push(...cameraDirectionIssues(shot as ShotInput).map(issue => `创作准备未完成：${issue}`));
     if (kind === "video") warnings.push(...speechPlanningIssues(s, shot).map(issue => `配音规划未完成：${issue}`));
     const previous = continuityPredecessor(s, shot);
     // ACT: 仅显式接戏形成生成依赖；意象蒙太奇和独立镜头仍可并行，计划末态不能冒充实际末态。
@@ -320,7 +321,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             (kind === "video" || !cam.design?.start) && shot.blocking?.background && `background: ${shot.blocking.background}`,
         ]),
         view: viewText,
-        camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
+        // ACT: 完整路线优先于旧运动摘要，避免默认 static 冲突；语义一致性由导演复核，不用关键词猜轨迹。
+        camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && !cam.design?.cameraPath?.trim() && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
         lighting: J([lt.worldSource && `fixed world light source: ${lt.worldSource}`, lt.keyDirection && lt.keyDirection !== "none" && `key direction ${lt.keyDirection} in ${lt.directionSpace ?? "screen"} coordinates`, lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
         world: world ? J([world.realism && `medium: ${world.realism}`, world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
         look: J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette.length > 0 && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`]),
@@ -349,6 +351,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         }
         // ACT: 时间线是执行节拍的唯一来源；验收标准、备用方案和跨镜剪点留在规格中，不发给生成模型执行。
         sections.shotDesign = cam.design ? J([
+            cam.design.technique && `Camera technique: ${cam.design.technique}`,
             cam.design.start && `Starting state: ${cam.design.start}`,
             cam.design.end && `Ending state: ${cam.design.end}`,
             cam.design.subjectPath !== shot.action && cam.design.subjectPath && `Subject path: ${cam.design.subjectPath}`,

@@ -8,6 +8,16 @@ const stylingSchema = z.object({
   costume: z.string().trim().min(1), accessories: z.string().trim().min(1),
 });
 
+export function cameraDirectionIssues(shot: ShotInput) {
+  const design = shot.camera?.design;
+  const fields = ["purpose", "start", "end", "subjectPath", "cameraPath"] as const;
+  const missing = fields.filter(field => !design?.[field]?.trim());
+  const issues = missing.length ? [`请由导演补齐 camera.design 的 ${missing.join("、")}：明确起幅、主体与相机各自路径、结束构图和叙事作用；固定机位也须说明观看对象`] : [];
+  if (!design?.acceptance.some(item => item.trim())) issues.push("请补充 camera.design.acceptance：最终必须看清的主体或部位、构图及停止点；不能仅写运镜流畅");
+  if (!shot.camera?.design?.timeline?.length && !shot.musicVideo?.timeline?.length && !design?.timing?.trim()) issues.push("请明确相机触发、运动与停住的时间；有执行时间线时统一写入时间线，否则填写 camera.design.timing");
+  return issues;
+}
+
 // ACT: 这里只校验设计是否可执行，不用关键词、分数或服饰繁简冒充审美判断。
 export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; name: string; type: string; attributes?: Record<string, unknown> }[]) {
   const visibleIds = new Set(shot.visibleAssetIds ?? shot.assetIds);

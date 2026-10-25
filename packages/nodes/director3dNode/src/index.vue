@@ -12,7 +12,7 @@
     :plans="plans" :selectedPlanId="data.selectedPlanId ?? ''" :tasks="tasks"
     :exportingVideo="exportingVideo" :exportingImage="exportingImage" :exportProgress="exportProgress"
     @exportVideo="exportVideo" @exportImage="exportImage" @exportTrajectory="saveTrajectory" @addMannequin="addMannequin"
-    @selectPlan="data.selectedPlanId = $event" @loadModels="loadModels" @generate="generate" @editInstruction="setPrompt" @close="editing = false">
+    @selectPlan="data.selectedPlanId = $event" @loadModels="loadModels" @generate="generate()" @editInstruction="setPrompt" @close="editing = false">
     <template #input>
       <referenceItem v-if="refList.length" v-model="refList" @preview="setReferencePreview" @remove="removeReference" />
       <promptInput v-model="promptModel" v-model:text="prompt" :references="referenceMentions" />
@@ -139,13 +139,27 @@ async function loadModel() {
 
 let modelReady = loadModel();
 nodeTools.register({
-  name: "readCameraTrajectory",
-  description: "读取已选 3D 方案的数值相机轨迹。只支持不超过5秒且没有硬切的方案；OpenCV相对坐标，24fps/121帧。translationScale 必须按 GEN3C 深度尺度校准，返回值不是渲染视频。",
-  parameters: z.strictObject({ translationScale: z.number().finite().positive().max(100) }),
-  async execute({ translationScale }) {
+  name: "generatePlan",
+  description: "用当前导演台文字模型生成并保存3D预演方案。适用于遮挡揭示、绕行、穿越空间或指定机位路径；须在已有生成授权内调用。复用场景和取景锚点，不生成正式视频，不自动切换媒体模型。返回相机关键帧供核对；不能把预演成功称作视频模型已执行轨迹。",
+  parameters: z.strictObject({ instruction: z.string().trim().min(1).max(12000) }),
+  async execute({ instruction }) {
     await modelReady;
-    if (modelError.value || !selectedPlan.value) throw new Error("先加载并选定可用方案");
-    const plan = selectedPlan.value;
+    if (disposed || modelError.value) throw new Error(modelError.value || "导演台已关闭");
+    await loadModels();
+    if (tasks.value.some(task => !task.error)) throw new Error("已有预演正在生成，请等待完成");
+    const plan = await generate(instruction, true);
+    if (!plan) throw new Error("预演未完成，不能继续导出轨迹");
+    return { planId: plan.id, name: plan.name, duration: plan.duration, cameraFrames: plan.cameraFrames, modelPath: data.value.modelPath, selected: data.value.selectedPlanId === plan.id };
+  },
+});
+nodeTools.register({
+  name: "readCameraTrajectory",
+  description: "读取指定 planId（省略则为当前已选方案）的数值相机轨迹。只支持不超过5秒且没有硬切的方案；OpenCV相对坐标，24fps/121帧。translationScale 必须按 GEN3C 深度尺度校准，返回值不是渲染视频。",
+  parameters: z.strictObject({ planId: z.string().min(1).optional(), translationScale: z.number().finite().positive().max(100) }),
+  async execute({ planId, translationScale }) {
+    await modelReady;
+    const plan = planId ? plans.value.find(item => item.id === planId) : selectedPlan.value;
+    if (modelError.value || !plan) throw new Error("先加载并指定可用方案");
     return { planId: plan.id, duration: 121 / 24, cameraTrajectory: exportCameraTrajectory(plan.cameraFrames, plan.duration, translationScale) };
   },
 });
@@ -357,18 +371,24 @@ function setPrompt(value: string) {
   promptModel.value = value ? value.split("\n").map(text => [{ type: "Write", text }]) : [];
 }
 
-async function generate() {
-  if (modelLoading.value || modelError.value || addingMannequin.value) return;
+async function generate(instruction?: string, reportError = false) {
+  if (modelLoading.value || modelError.value || addingMannequin.value) {
+    if (reportError) throw new Error(modelError.value || "导演台尚未就绪");
+    return;
+  }
   const choice = selectedModel.value;
-  const requirement = prompt.value.trim();
-  if (!choice || !requirement) return;
+  const requirement = instruction ?? prompt.value.trim();
+  if (!choice || !requirement) {
+    if (reportError) throw new Error("缺少已配置的文字模型或预演要求");
+    return;
+  }
   // 首次创建基础模型期间只接收一个请求，后续动画可并行生成。
   if (!scene.value.objectList.length && tasks.value.some(task => !task.error)) return;
   const baseScene = scene.value;
   const basePlanId = data.value.selectedPlanId ?? "";
   const task = { id: crypto.randomUUID(), instruction: requirement };
   tasks.value = [...tasks.value, task];
-  setPrompt("");
+  if (instruction === undefined) setPrompt("");
   try {
     const workspaceFiles = files.getWorkspaceFiles();
     if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
@@ -424,9 +444,12 @@ async function generate() {
     });
     modelSaving = saving.catch(() => {});
     await saving;
+    if (disposed) throw new Error("导演台已关闭，请重新读取已保存方案");
     tasks.value = tasks.value.filter(item => item.id !== task.id);
+    return plan;
   } catch (error) {
     if (!disposed) tasks.value = tasks.value.map(item => item.id === task.id ? { ...item, error: error instanceof Error ? error.message : "生成失败，请重试" } : item);
+    if (reportError) throw error;
   }
 }
 </script>

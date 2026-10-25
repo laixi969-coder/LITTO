@@ -115,6 +115,8 @@ export function physicalInteractionPlan(shot: Record<string, any>) {
     instruction: instruction + (events.length ? `\nExecute these contact events in local seconds; preserve each named participant, support and visible result: ${JSON.stringify(events)}` : "") };
 }
 
+export const cameraDirectionPlanning = "每镜先设计起幅、触发、主体路径、相机路径和结束构图，明确最终必须留在画内的主体及部位；固定机位是有效设计。camera.design.cameraPath与唯一执行时间线是运镜执行依据，camera.motion及technique须同步一致，不保留默认static与推进冲突、不混用背后跟拍与后退跟拍，不用手腿等含混部位或不存在的双人构图。technique会发送给模型，写当前镜头实际方法，不堆术语。时间线存在时timing只作制作记录，运动触发与停止秒数必须写入时间线。生成前读compiled.prompt核对起幅、路径、目标部位、停止点和参考的真实控制能力，修正规格后再编译；不能用优先级声明掩盖冲突。生成后完整播放，按motionPlan的cameraStart/cameraPath/cameraEnd记录实际时间点与构图差异，目标部位出画或落点错误不能记通过。正式选片沿用明确采用版本，不以任务最后完成代替选择。";
+
 export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | "take" = "take") {
   const duration = Number(shot.generationDuration ?? shot.duration);
   const lines = shot.creativeBrief?.dialogue?.lines ?? [];
@@ -123,8 +125,14 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   const techniques = techniquePlan(shot, type === "keyframe" ? "image" : "video");
   const techniqueMotion = techniques.some(item => item.stages.includes("video") && !item.stages.includes("image"));
   const motionBeats = type === "take" ? shot.camera?.design?.timeline ?? shot.musicVideo?.timeline ?? [] : [];
+  const cameraDesign = shot.camera?.design;
   // ACT: 检查点从同一执行规格生成，不推断动作是否合格；每项仍须真实播放观察，未观察不填通过。
   const checkpoints: { id: string; start: number; end: number; criterion: string }[] = type === "take" ? [
+    ...(cameraDesign && Number.isFinite(duration) && duration > 0 ? [
+      { id: "cameraStart", start: 0, end: Math.min(0.5, duration), criterion: `起幅：${cameraDesign.start}。核对实际观看方向、景别与画内主体，不能只凭参考图判定。` },
+      { id: "cameraPath", start: 0, end: duration, criterion: `相机路线：${cameraDesign.cameraPath}；技法：${cameraDesign.technique}。对照唯一执行时间线检查触发、方向与停止点，区分主体移动与相机移动；固定镜头检查是否漂移。` },
+      { id: "cameraEnd", start: Math.max(0, duration - 0.5), end: duration, criterion: `结束构图：${cameraDesign.end}。检查目标主体及部位是否完整可见、是否到达并停在预定落点；${(cameraDesign.acceptance ?? []).join("；")}` },
+    ] : []),
     ...motionBeats.map((beat: any, index: number) => ({ id: `beat${index}`, start: beat.start, end: beat.end,
       criterion: `${beat.description}；${beat.transition === "cut" ? "检查切点前后姿态、持物、视线和运动方向" : "检查动作持续推进，无无故停顿、复位或隐藏切镜"}` })),
     ...(shot.interactions ?? []).map((event: any, index: number) => ({ id: `contact${index}`, start: event.start, end: event.end,
@@ -182,7 +190,7 @@ export const agentReviewSchema = z.strictObject({
   observedStateDelta: z.record(z.string(), z.json()).optional().describe("实际观察到的镜尾状态变化，沿用 intendedStateDelta 分组但不得照抄计划；无变化传 {}。完整视频检查通过且提供实际末态时采用为正式镜头，并传递给后镜"),
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
   techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
-  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(144).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
+  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(147).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
   creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字，写实际妆造与调度依据。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),

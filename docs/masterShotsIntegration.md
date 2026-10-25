@@ -29,6 +29,14 @@
    画布流程可将导演台 `readCameraTrajectory` 的结果交给视频生成节点 `setCameraTrajectory`，再按已授权配置生成；首帧、轨迹、声音开关和规格均通过实际节点请求传入供应商。
 6. 先 compile，检查警告和参考；generate 使用同一轨迹、画幅、时长、模型及 fingerprint。已有主关键帧须先实际检查采用。轨迹和确认标记均进入请求指纹，修改后必须重新预览。
 
+## 镜头执行与预演入口补齐
+
+正式视频编译检查镜头目的、起止构图、主体与相机路径、观看验收和执行节拍是否填写；缺项由助手补齐，不要求用户填写技术表单。已有 cameraPath 时不重复发送 camera.motion 的旧摘要，避免默认 static 与明确移动路线同时进入请求；design.technique 会进入执行文本，导演须同步核对技法、路线与唯一时间线。结构门禁不冒充语义或审美判断。
+
+视频审阅复用 motionReview，新增 cameraStart、cameraPath、cameraEnd 三个检查点；起幅、实际运动和结束构图必须经完整播放检查后才能采用。旧审阅缺少这些记录时须补检，不能自动补 pass。面板默认待处理候选按请求提交时间排序，避免旧请求晚完成抢占新设计；不改变已有选择和采用状态。
+
+3D 节点新增 generatePlan({instruction})，复用现有预演生成、验证与保存流程。助手按遮挡揭示、绕行、穿越空间或指定机位路径的需要调用，普通固定与跟拍不强制经过3D；这是助手调度规则，不是所有视频请求的后台必经步骤。预演成功不等于正式模型执行轨迹，数值控制仍遵守以下模型、首帧与尺度要求。没有真实模型与渲染端到端验证时，不宣称预演或成片质量通过。
+
 ## GEN3C 服务与约束
 
 按官方 [INSTALL](https://github.com/nv-tlabs/GEN3C/blob/db2ffe12ced12ddafcec5e0422ee46ce8520746b/INSTALL.md) 与 [GUI API 部署说明](https://github.com/nv-tlabs/GEN3C/tree/db2ffe12ced12ddafcec5e0422ee46ce8520746b/gui)部署独立 GPU 服务并下载权重。适配目标是该提交的 JSON API，拒绝旧 pickle API；本次不会安装 Python/GPU 环境或自动下载权重。所需路径为 GET `/metadata`、POST `/seed-model`、POST `/request-inference?sync=1`，不是自建的假接口。

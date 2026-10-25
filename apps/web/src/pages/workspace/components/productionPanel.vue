@@ -644,12 +644,12 @@ async function refreshResults() {
   }
   window.dispatchEvent(new Event("milimiliProductionUpdated"));
 }
-// 直接选中待处理的版本：没有主关键帧选最新关键帧，有了选最新未批准的 Take；当前选中的仍待处理就保留。
+// 按提交时间选待处理 Take，避免旧任务晚完成抢占新方案；不改变用户当前选择或采用状态。
 function selectPendingVersion() {
   const current = target.value;
   if (current && ["variant", "candidate"].includes(current.status)) return;
   const newest = (type: string, status: string) => versions.value.filter(item => item.type === type && item.status === status)
-    .sort((left, right) => String(left.createdAt).localeCompare(String(right.createdAt))).at(-1);
+    .sort((left, right) => String(left.requestedAt ?? left.createdAt).localeCompare(String(right.requestedAt ?? right.createdAt))).at(-1);
   const pending = !detail.value?.heroKeyframeId ? newest("keyframe", "variant") : !detail.value?.approvedTakeId ? newest("take", "candidate") : undefined;
   if (pending) selectVersion(pending);
   else targetId.value = "";

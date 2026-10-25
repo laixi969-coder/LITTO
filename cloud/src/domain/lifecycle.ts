@@ -157,7 +157,7 @@ export function rollbackTake(s: Scope, shotId: string, toTakeId: string, actor: 
 }
 
 export const keyframeView = (k: any) => ({ id: k.id, shotId: k.shotId, status: k.status, jobId: k.jobId, modelId: k.meta?.modelId, seed: k.meta?.seed, createdAt: k.createdAt, basicQuality: k.meta?.basicQuality, media: mediaOf(k.workspaceId, k.mediaId) });
-export const takeView = (t: any) => ({ id: t.id, shotId: t.shotId, keyframeId: t.keyframeId, status: t.status, jobId: t.jobId, modelId: t.meta?.modelId, seed: t.meta?.seed, createdAt: t.createdAt, basicQuality: t.meta?.basicQuality, speechSync: t.meta?.speechSync, media: mediaOf(t.workspaceId, t.mediaId) });
+export const takeView = (t: any) => ({ id: t.id, shotId: t.shotId, keyframeId: t.keyframeId, status: t.status, jobId: t.jobId, modelId: t.meta?.modelId, seed: t.meta?.seed, createdAt: t.createdAt, requestedAt: t.jobId ? get("SELECT created_at FROM generation_jobs WHERE id=? AND workspace_id=?", t.jobId, t.workspaceId)?.created_at ?? t.createdAt : t.createdAt, basicQuality: t.meta?.basicQuality, speechSync: t.meta?.speechSync, media: mediaOf(t.workspaceId, t.mediaId) });
 function mediaOf(ws: string, id: string | null) {
     if (!id) return null;
     const m = get("SELECT * FROM media WHERE id=? AND workspace_id=?", id, ws);
