@@ -14,6 +14,7 @@
       <fieldset :disabled="busy || !loaded">
         <h3>角色与音色</h3>
         <div v-for="role in project.roles" :key="role.id" class="roleRow">
+          <label v-if="characters.length">角色资产<select :value="role.assetId ?? ''" @change="selectRoleAsset(role, ($event.target as HTMLSelectElement).value)"><option value="">按唯一角色名称关联</option><option v-for="character in characters" :key="character.id" :value="character.id">{{ character.name }}</option></select></label>
           <label>角色名称<input v-model="role.name" maxlength="100" /></label>
           <label>配音模型<select :value="modelKey(role)" @change="selectRoleModel(role, ($event.target as HTMLSelectElement).value)"><option value="">选择模型</option><option v-for="model in speechModels" :key="modelKey(model)" :value="modelKey(model)">{{ model.providerLabel }} · {{ model.label }}</option></select></label>
           <label>固定音色<select v-if="roleModel(role)?.voices?.length" v-model="role.voice"><option value="">选择音色</option><option v-for="voice in roleModel(role)?.voices" :key="voice.voice" :value="voice.voice">{{ voice.title }}</option></select><input v-else v-model="role.voice" maxlength="256" aria-label="供应商音色 ID" /></label>
@@ -45,8 +46,8 @@
           <div class="toolbar">
             <el-button :disabled="line.kind === 'singing' || !!line.sourceAudio || !line.text.trim() || !line.roleId || line.takes.length >= 100" @click="run(() => generateSpeech(line), true)">生成此句配音</el-button>
             <label class="fileLabel">使用已有配音 / 原曲<input type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" @change="uploadAudio(line, $event)" /></label>
-            <label v-if="line.takes.length">采用配音版本<select v-model="line.takeId"><option v-for="(take, takeIndex) in line.takes" :key="take.id" :value="take.id">版本 {{ takeIndex + 1 }}</option></select></label>
-            <attachmentPreview v-if="selectedTake(line)" :attachment="{ ...selectedTake(line)!.audio, name: '试听配音' }" :directory="directory" />
+            <label v-if="line.takes.length">采用配音版本<select v-model="line.takeId"><option value="">试听后选择采用版本</option><option v-for="(take, takeIndex) in line.takes" :key="take.id" :value="take.id" :disabled="take.sourceKey !== speechSourceKey(line, lineRole(line))">版本 {{ takeIndex + 1 }}</option></select></label>
+            <attachmentPreview v-for="(take, takeIndex) in line.takes" :key="take.id" :attachment="{ ...take.audio, name: `试听配音 ${takeIndex + 1}${take.id === line.takeId ? '（已采用）' : ''}` }" :directory="directory" />
           </div>
           <div v-if="line.sourceAudio" class="fieldGrid">
             <label>音频起点（秒）<input v-model.number="line.sourceAudio.start" type="number" min="0" step="0.01" /></label>
@@ -116,6 +117,7 @@ const project = ref<VoiceProject>({ littoVoice: 1, roles: [], lines: [], lipSync
 const models = ref<NodeMediaModel[]>([]);
 const workspaceStore = useWorkspaceStore();
 const shots = ref<{ id: string; title: string; creativeBrief?: { dialogue: { lines: { text: string }[] } } }[]>([]);
+const characters = ref<{ id: string; name: string }[]>([]);
 const storyRevision = ref<StoryRevision>();
 const loaded = ref(false);
 const busy = ref(false);
@@ -143,7 +145,8 @@ let savedContent: string | null = null;
 const savedSnapshot = ref(JSON.stringify(project.value));
 const emotions = ["开心", "悲伤", "愤怒", "紧张", "惊讶", "克制", "低声耳语", "激动喊叫"];
 const dirty = computed(() => JSON.stringify(project.value) !== savedSnapshot.value);
-const speechModels = computed(() => models.value.filter(model => model.type === "audio" && (!model.audioTask || model.audioTask === "speech")));
+const speechModels = computed(() => models.value.filter(model => model.type === "audio" && (!model.audioTask || model.audioTask === "speech")
+  && (!model.audioParameterSchema || model.audioParameterSchema.voice || model.audioParameterSchema.voice_id)));
 function syncMode(model: NodeMediaModel) {
   return model.mode?.find(mode => Array.isArray(mode) && mode.some(item => /^videoReference:[1-9]\d*$/.test(item)) && mode.some(item => /^audioReference:[1-9]\d*$/.test(item))) as NodeVideoRequest["mode"] | undefined;
 }
@@ -186,6 +189,10 @@ async function importStory() {
 }
 
 function addRole() { project.value.roles.push({ id: crypto.randomUUID(), name: "", providerId: "", modelId: "", voice: "" }); }
+function selectRoleAsset(role: VoiceRole, id: string) {
+  role.assetId = id || undefined;
+  if (id) role.name = characters.value.find(character => character.id === id)?.name ?? role.name;
+}
 function addLine() { project.value.lines.push({ id: crypto.randomUUID(), roleId: "", kind: "dialogue", text: "", emotion: "", delivery: "", speed: 1, pauseAfter: 0.3, takes: [], takeId: "" }); }
 function moveLine(index: number, offset: number) { const [line] = project.value.lines.splice(index, 1); if (line) project.value.lines.splice(index + offset, 0, line); }
 function selectRoleModel(role: VoiceRole, key: string) {
@@ -199,9 +206,8 @@ function selectLipSyncModel(key: string) {
 
 async function refreshModels() {
   invalidateNodeModels("media");
-  const selected = await ai.getMediaModels(lifetime.signal);
   const available = await ai.getMediaModels(lifetime.signal, true);
-  models.value = [...selected, ...available.filter(model => model.type === "video" && syncMode(model) && model.lipSync === true && !selected.some(item => modelKey(item) === modelKey(model)))];
+  models.value = available.filter(model => model.type === "audio" && (!model.audioTask || model.audioTask === "speech") || model.type === "video" && syncMode(model) && model.lipSync === true);
 }
 async function load() {
   try {
@@ -216,7 +222,12 @@ async function load() {
   await refreshModels();
   await refreshStory();
   const projectId = workspaceStore.project?.projectId;
-  if (projectId) shots.value = (await axios.get(`/cloud/projects/${encodeURIComponent(projectId)}/shots`, { signal: lifetime.signal })).data;
+  if (projectId) {
+    const base = `/cloud/projects/${encodeURIComponent(projectId)}`;
+    const [shotList, assetList] = await Promise.all([axios.get(`${base}/shots`, { signal: lifetime.signal }), axios.get(`${base}/assets`, { signal: lifetime.signal })]);
+    shots.value = shotList.data;
+    characters.value = assetList.data.filter((asset: { type: string }) => asset.type === "Character");
+  }
 }
 
 async function save() {
@@ -249,12 +260,15 @@ async function generateSpeech(line: VoiceLine) {
   if (line.takes.length >= 100) throw new Error("每句最多保留 100 个配音版本");
   await save();
   const sourceKey = speechSourceKey(line, role);
+  if (line.takes.some(take => take.sourceKey === sourceKey)) { message.value = "已有当前音色和台词的配音，请试听并采用，不重复生成"; return; }
   const instructions = speechInstructions(line, role);
-  const [audio] = await ai.generateAudio({ directory, providerId: role.providerId, modelId: role.modelId, prompt: line.text.trim(), voice: role.voice, speed: line.speed, instructions, format: "wav", outputDirectory: "assets/speech" }, signal());
+  const speed = line.speed === 1 && model.audioParameterSchema && !model.audioParameterSchema.speed && !model.audioParameterSchema.speech_rate ? undefined : line.speed;
+  const [audio] = await ai.generateAudio({ directory, voiceLineId: line.id, providerId: role.providerId, modelId: role.modelId, prompt: line.text.trim(), voice: role.voice, speed, instructions, outputDirectory: "assets/speech" }, signal());
   if (!audio || audio.mediaType !== "audio") throw new Error("供应商没有返回配音文件");
-  const take = { id: crypto.randomUUID(), audio: { path: audio.path, mimeType: audio.mimeType }, sourceKey, syncRequests: [], videos: [] };
-  line.takes.push(take); line.takeId = take.id;
-  await save(); message.value = "配音已生成，请试听后再对口型";
+  const content = await files.readText("voiceProject.json");
+  project.value = voiceProjectSchema.parse(JSON.parse(content));
+  savedContent = content; savedSnapshot.value = JSON.stringify(project.value);
+  message.value = "配音候选已保存，请试听并采用后再对口型";
 }
 
 async function ensureSpeechDirectory() {

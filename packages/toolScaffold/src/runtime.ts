@@ -125,6 +125,7 @@ export interface MediaShotSpec {
 }
 
 export interface MediaGenerationRequest {
+  voiceLineId?: string;
   audioParameters?: Record<string, string | number | boolean>;
   purpose?: "asset" | "standalone" | "storyboard";
   shotSpec?: MediaShotSpec;

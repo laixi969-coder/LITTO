@@ -1,4 +1,3 @@
-import { resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import { createHash } from "node:crypto";
 import { get, run, scoped, tx } from "./db.ts";
 import { createProject } from "./routes/platform.ts";
@@ -10,7 +9,7 @@ import { requireReviewed, shotFingerprint } from "./domain/realism.ts";
 import { bad, conflict, notFound, now, HttpError } from "./util.ts";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 import { localRepairSchema, prepareLocalRepair } from "./domain/localRepair.ts";
-import { assertSpeechPlan } from "./domain/speechPlanning.ts";
+import { assertSpeechPlan, shotDialogueMode } from "./domain/speechPlanning.ts";
 
 /** Host-only execution bridge. Tenant identity comes from the stored job, never its parameters. */
 export function configureWorkspaceMedia(execute: (request: GenRequest) => Promise<GenResult>) {
@@ -216,7 +215,7 @@ export function prepareWorkspaceShot(input: {
   }).join("; ");
   compiled.sections["Objective" in compiled.sections ? "Reference binding" : "reference plan"] = referencePlan;
   compiled.prompt = renderCompiledPrompt(compiled.sections);
-  const nativeDialogue = resolveDialogueMode(shot) === "native";
+  const nativeDialogue = shotDialogueMode(s, shot) === "native";
   const repairParameters = repair ? { localRepairOf: repair.keyframe.id, localRepairKind: repair.kind, localRepairTarget: repair.target } : undefined;
   const fingerprint = createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), generationInput, keyframe?.id, compiled])).digest("hex");
   compiled.warnings.push(...previewWarnings);

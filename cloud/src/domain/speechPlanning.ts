@@ -5,6 +5,14 @@ import type { ShotInput } from "./schema.ts";
 
 type DialogueLine = NonNullable<ShotInput["creativeBrief"]>["dialogue"]["lines"][number];
 
+export function shotDialogueMode(s: Scope, shot: Record<string, any>) {
+  if (!shot.creativeBrief?.dialogue?.lines?.length) return "none";
+  // ACT: 按项目现有镜头扫描说话人，跨镜头的两人对白也先定音色；项目规模增长后可缓存到规格版本。
+  const shots = [...s.list("shots", { projectId: shot.projectId }).filter(item => item.id !== shot.id), shot];
+  const speakers = new Set(shots.flatMap(item => item.creativeBrief?.dialogue?.lines?.map((line: DialogueLine) => line.speakerId) ?? []));
+  return speakers.size > 1 ? "post" : resolveDialogueMode(shot);
+}
+
 function speechMedia(s: Scope, projectId: string, line: DialogueLine) {
   if (!line.audio) return null;
   const media = s.get("media", line.audio.mediaId);
@@ -19,10 +27,11 @@ export function speechPlanningIssues(s: Scope, shot: Record<string, any>) {
   const issues: string[] = [];
   let previousEnd = 0;
   const lines = (dialogue?.lines ?? []) as DialogueLine[];
+  const mode = shotDialogueMode(s, shot);
   for (const [index, line] of lines.entries()) {
     const label = `第${index + 1}句`;
     const media = speechMedia(s, shot.projectId, line);
-    if (resolveDialogueMode(shot) === "post" && !media) issues.push(`${label}须绑定当前项目实测的配音 audio:{mediaId,text}，不能按字数估时或沿用改词前的声音；先 planSpeech`);
+    if (mode === "post" && !media) issues.push(`${label}须先为每个角色绑定固定音色并采用配音，再绑定当前项目实测的 audio:{mediaId,text}；不能按字数估时或沿用改词前的声音；先 planSpeech`);
     if (media && media.duration > line.end - line.start + 0.001) issues.push(`${label}真实配音 ${media.duration.toFixed(3)} 秒超过窗口 ${(line.end - line.start).toFixed(3)} 秒；须重排镜头，不能加速、删句、截断或跨镜挪音`);
     if (line.start < previousEnd - 0.001) issues.push(`${label}与前句重叠，不能叠说来压缩未授权的对白`);
     previousEnd = line.end;

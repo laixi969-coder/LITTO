@@ -560,8 +560,22 @@ export async function generateMediaDirect(
 ): Promise<GeneratedMedia[]> {
   const started = Date.now();
   const base = { kind: mediaType, providerId: request.providerId, modelId: request.modelId, durationMs: 0, ...(execution ? { detail: { jobId: execution.jobId } } : {}) };
+  let releaseVoice: (() => void) | undefined;
   try {
     signal?.throwIfAborted();
+    const voice = mediaType === "audio" && request.voiceLineId ? await import("@/utils/media/voiceDecision") : undefined;
+    // 同一句在生成和登记期间保持排他，其他角色/台词可并行；此键仅用于进程内锁，不创建文件。
+    if (voice) releaseVoice = lockWorkspaceFiles([join(await realpath(cwd), `voiceLine${request.voiceLineId!.replaceAll("-", "")}`)]);
+    const voiceSourceKey = voice ? await voice.assertVoiceSpeechRequest(cwd, request) : undefined;
+    if (voice && voiceSourceKey !== undefined) {
+      const saved = await voice.readVoiceProject(cwd);
+      const line = saved.project.lines.find(line => line.id === request.voiceLineId);
+      const existing = line?.takes.find(take => take.id === line.takeId && take.sourceKey === voiceSourceKey) ?? line?.takes.find(take => take.sourceKey === voiceSourceKey);
+      if (existing) {
+        await readReference(cwd, existing.audio, "audio", signal);
+        return [{ ...existing.audio, mediaType: "audio" }];
+      }
+    }
     const files = execution?.task?.files?.length ? await Promise.all(execution.task.files.map(async ({ hash, ...file }) => {
       const { path } = await resolveWorkspacePath(cwd, file.path);
       if (file.mediaType !== mediaType || createHash("sha256").update(await readFile(path)).digest("hex") !== hash) throw Object.assign(new Error("已保存的原任务文件已改变，停止恢复；不会重新生成"), { retryable: false, fallbackAllowed: false });
@@ -572,9 +586,10 @@ export async function generateMediaDirect(
     // 先登记画布再计费返回：用户在 UI 里看到的节点与磁盘文件必须同时存在。
     try {
       for (const file of files) await registerOnCanvas(cwd, file, request);
+      if (voice && voiceSourceKey !== undefined) await voice.saveVoiceSpeechTake(cwd, request.voiceLineId!, voiceSourceKey, files);
     } catch (cause) {
       const savedFiles = files.map(file => file.path);
-      throw Object.assign(new Error(`画布登记失败：${cause instanceof Error ? cause.message : String(cause)}。已保存文件：${savedFiles.join("、")}。请复用文件修复画布，不要重新生成。`, { cause }), { savedFiles, retryable: false, fallbackAllowed: false });
+      throw Object.assign(new Error(`素材登记失败：${cause instanceof Error ? cause.message : String(cause)}。已保存文件：${savedFiles.join("、")}。请复用文件修复记录，不要重新生成。`, { cause }), { savedFiles, retryable: false, fallbackAllowed: false });
     }
     const seconds = (request as { duration?: number }).duration;
     recordUsage(mediaType === "video" && seconds ? { ...base, units: seconds, unit: "second", durationMs: Date.now() - started }
@@ -583,7 +598,7 @@ export async function generateMediaDirect(
   } catch (error) {
     if (!execution) recordUsage({ ...base, units: 0, unit: mediaType === "video" ? "second" : mediaType === "image" ? "image" : "call", status: signal?.aborted ? "cancelled" : "error", durationMs: Date.now() - started });
     throw error;
-  }
+  } finally { releaseVoice?.(); }
 }
 
 

@@ -1,4 +1,3 @@
-import { resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
 import { all, get, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
 import { compileShot, requireCompiledInputs } from "./compiler.ts";
@@ -9,7 +8,7 @@ import { enqueue, estimate } from "../jobs.ts";
 import { mustRoute, resolvePolicy, type Policy } from "../providers/router.ts";
 import { mediaView } from "../storage.ts";
 import { requireReviewed, shotFingerprint } from "./realism.ts";
-import { assertSpeechPlan } from "./speechPlanning.ts";
+import { assertSpeechPlan, shotDialogueMode } from "./speechPlanning.ts";
 import { registerCandidates } from "./candidates.ts";
 import { inspectProductionQuality, mediaAspectIssue } from "./qualityInspection.ts";
 import { log } from "../util.ts";
@@ -105,7 +104,7 @@ export function generateTakes(s: Scope, shotId: string, actor: string, o: GenOpt
     const bindings = s.list("reference_bindings", { targetType: "shot", targetId: shotId });
     const roles = ["START_FRAME", ...bindings.map((b: any) => b.role)];
     const policy = resolvePolicy(s.workspaceId, shot.projectId, { ...shot.modelOverride, ...o.policy });
-    const nativeDialogue = resolveDialogueMode(shot) === "native";
+    const nativeDialogue = shotDialogueMode(s, shot) === "native";
     const { chosen } = mustRoute({ kind: "video", workspaceId: s.workspaceId, projectId: shot.projectId, roles, policy, need: nativeDialogue ? ["nativeDialogue", "nativeAudio"] : [] });
     const c = compileShot(s, shotId, "video", chosen!.modelId, { startFrameMediaId: kf.mediaId, repair: o.repair });
     requireCompiledInputs(c);

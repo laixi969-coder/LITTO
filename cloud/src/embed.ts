@@ -27,7 +27,7 @@ export { prepareKeyframeApproval, approveKeyframes } from "./domain/keyframeAppr
 export { prepareProductionDecision, applyProductionDecision } from "./domain/productionDecision.ts";
 export { inspectFinalQuality, sequenceFingerprint, assertSpeechExport } from "./domain/finalQuality.ts";
 export { shotFingerprint } from "./domain/realism.ts";
-export { assertSpeechPlan, speechPlanningIssues } from "./domain/speechPlanning.ts";
+export { assertSpeechPlan, speechPlanningIssues, shotDialogueMode } from "./domain/speechPlanning.ts";
 export { editView, getEdit } from "./domain/nle.ts";
 export { cutPairSchema, soundBridgeSchema, suggestCuts, previewCut, soundBridge } from "./domain/cutEditing.ts";
 export { startRender } from "./domain/assembly.ts";

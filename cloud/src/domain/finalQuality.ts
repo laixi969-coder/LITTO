@@ -1,4 +1,4 @@
-import { resolveDialogueMode } from "@toonflow/tool-media-generation/runtime";
+import { shotDialogueMode } from "./speechPlanning.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,13 +50,13 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
     if (relevant.some((line: any) => line.start < clip.in - 0.001 || line.end > clip.in + clip.duration * clip.speed + 0.001)) throw conflict("定稿剪辑截断了对白，须保留完整发声区间", "speech_export_blocked");
     if (!relevant.length && lines.length) continue;
     if (shot.musicVideo?.audioMode === "sourceTrack" && !lines.length) continue; // 原曲覆盖已由 validateMusicEdit 核对，口型由 requireReviewed 核对。
-    if (relevant.length && resolveDialogueMode(shot) === "post" && relevant.every((line: any) => line.lipSync !== "visible")) {
+    if (relevant.length && shotDialogueMode(s, shot) === "post" && relevant.every((line: any) => line.lipSync !== "visible")) {
       const complete = relevant.every((line: any) => active.some(audio => audio.linkedClipId === clip.id && audio.dialogueLineIndex === line.lineIndex && audio.dialogueText === line.text
         && edit.tracks.find(track => track.id === audio.trackId)?.kind === "audio" && audio.gainDb + (edit.tracks.find(track => track.id === audio.trackId)?.gainDb ?? 0) > -60));
       if (complete) continue;
     }
     if (clip.audioDetached || clip.gainDb + (edit.tracks.find(track => track.id === clip.trackId)?.gainDb ?? 0) <= -60) throw conflict("对白缺少当前完整声音或声音已静音；只能导出 draft:true 预览，不能作为定稿", "speech_export_blocked");
-    if (resolveDialogueMode(shot) === "post" && relevant.some((line: any) => line.lipSync === "visible")) {
+    if (shotDialogueMode(s, shot) === "post" && relevant.some((line: any) => line.lipSync === "visible")) {
       const sync = take.meta?.speechSync;
       if (!sync?.jobId || !sync.audioMatches || sync.specFingerprint !== shotFingerprint(s, shot.id)) throw conflict("后配音口型缺少当前规格与真实处理任务的检查记录，不能把混音视频当作同步定稿", "speech_export_blocked");
       const job = s.get("generation_jobs", sync.jobId);

@@ -151,7 +151,7 @@ export const creativeBriefSchema = z.object({
         }).strict()).min(1).max(12),
     }).strict().optional(),
     dialogue: z.object({
-        mode: z.enum(["native", "post"]).default("native").describe("画内对白默认native，视频同时生成声音和口型；固定音色或已有采用配音才用post，先绑定实测声音，再专用对口型，不直接叠对白"),
+        mode: z.enum(["native", "post"]).default("native").describe("单人且无固定音色要求时默认native；项目有多个说话人时统一走post：每个角色固定音色，先采用并绑定实测声音，再专用对口型，不直接叠对白"),
         lines: z.array(z.object({
             speakerId: directionText, text: directionText,
             start: z.number().finite().nonnegative(), end: z.number().finite().positive(),

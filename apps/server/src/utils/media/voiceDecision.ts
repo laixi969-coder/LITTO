@@ -1,17 +1,20 @@
 import { readFile, stat, writeAtomic } from "@toonflow/file";
 import { z } from "zod";
 import type { QuestionContext, QuestionRequest } from "@toonflow/tools-scaffold/runtime";
-import { voiceProjectSchema, speechPlanSchema, speechSourceKey, type VoiceProject } from "@toonflow/tool-media-generation/voiceProject";
+import { voiceProjectSchema, speechPlanSchema, speechSourceKey, speechInstructions, type VoiceProject } from "@toonflow/tool-media-generation/voiceProject";
 import { createHash } from "node:crypto";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
 import { readStoryProject } from "@/utils/story";
 import { storyStale } from "@toonflow/tool-scene-list/storyProject";
-import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
+import type { GeneratedMedia, MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import { getMediaProvider } from "@/utils/media/provider";
 import { readReference } from "@/utils/media/generation";
 import { workspaceProject } from "@/utils/media/jobs";
+import { modelAccess } from "@/utils/modelAvailability";
+
+const voiceWriteQueue = new Map<string, Promise<void>>();
 
 export async function readVoiceProject(directory: string) {
   const { path } = await resolveWorkspacePath(directory, "voiceProject.json");
@@ -19,17 +22,73 @@ export async function readVoiceProject(directory: string) {
   return { path, content, project: content === null ? { littoVoice: 1, roles: [], lines: [], lipSyncProviderId: "", lipSyncModelId: "", mixes: [] } as VoiceProject : voiceProjectSchema.parse(JSON.parse(content)) };
 }
 
-function currentVoiceLine(project: VoiceProject, shot: Record<string, any>, lineIndex: number, speakerName: string) {
+function currentVoiceLine(project: VoiceProject, shot: Record<string, any>, lineIndex: number, speakerName: string, required = false) {
   const planned = shot.creativeBrief.dialogue.lines[lineIndex];
+  const roles = project.roles.filter(role => role.assetId ? role.assetId === planned.speakerId : role.name.trim() === speakerName.trim());
+  if (roles.length > 1) throw new Error("说话人对应多个音色档案，请用角色 assetId 明确绑定，不能猜测声音");
+  const role = roles[0];
+  if (required && (!role || !role.providerId.trim() || !role.modelId.trim() || !role.voice.trim())) throw new Error(`第${lineIndex + 1}句须先为角色「${speakerName}」保存固定供应商、配音模型和音色，不回退到原生随机声音`);
   const linked = project.lines.filter(line => line.shotId === shot.id && (line.dialogueLineIndex === undefined || line.dialogueLineIndex === lineIndex));
-  const matches = linked.filter(line => line.text.trim() === planned.text && project.roles.find(role => role.id === line.roleId)?.name.trim() === speakerName.trim());
+  const matches = linked.filter(line => (planned.lipSync === "offscreen" || line.kind !== "narration") && line.text.trim() === planned.text && line.roleId === role?.id);
   if (!matches.length && linked.some(line => line.text.trim() === planned.text || line.dialogueLineIndex === lineIndex)) throw new Error(`第${lineIndex + 1}句的配音原文或角色与镜头不一致，请核对对应台词，不回退到旧声音`);
   if (matches.length > 1) throw new Error(`第${lineIndex + 1}句对应多个配音记录，请设置 voiceProject.lines 的 dialogueLineIndex（从0开始），不重新生成或猜测版本`);
   const line = matches[0];
-  if (!line) return null;
+  if (line && line.dialogueLineIndex === undefined && shot.creativeBrief.dialogue.lines.filter((item: { text: string; speakerId: string }) => item.text === planned.text && item.speakerId === planned.speakerId).length > 1) throw new Error("同镜同角色重复原句须指定 dialogueLineIndex，不能猜测对应的配音版本");
+  if (!line) {
+    if (required || role) throw new Error(`第${lineIndex + 1}句尚未关联角色的配音记录，请先绑定 shotId、dialogueLineIndex 并采用声音`);
+    return null;
+  }
   const take = line.takes.find(take => take.id === line.takeId);
   if (!take || take.sourceKey !== speechSourceKey(line, project.roles.find(role => role.id === line.roleId))) throw new Error(`第${lineIndex + 1}句尚无当前有效的已选配音；保留旧声音，不自动重新生成`);
   return take.audio;
+}
+
+/** 角色配音独立于音乐默认模型；只能发送已保存的原句、音色及表演。 */
+export async function assertVoiceSpeechRequest(directory: string, request: MediaGenerationRequest) {
+  const { project } = await readVoiceProject(directory);
+  const line = project.lines.find(line => line.id === request.voiceLineId);
+  const role = project.roles.find(role => role.id === line?.roleId);
+  if (!line || !role || !role.name.trim() || !role.voice.trim() || line.kind === "singing" || line.sourceAudio) throw new Error("固定配音须使用已保存角色及其对白或旁白原句，已有录音不重新生成");
+  if (request.providerId !== role.providerId || request.modelId !== role.modelId || request.voice !== role.voice
+    || request.prompt.trim() !== line.text.trim() || (request.speed ?? 1) !== line.speed
+    || (request.instructions?.trim() ?? "") !== speechInstructions(line, role) || request.audios?.length || Object.keys(request.audioParameters ?? {}).length) throw new Error("配音请求与角色固定音色、原文或表演不一致，请先保存当前方案；不能被默认值或额外参数覆盖");
+  modelAccess("media", role.providerId, role.modelId).assert();
+  const provider = await getMediaProvider(role.providerId);
+  const model = provider.models.find(model => model.type === "audio" && model.id === role.modelId);
+  if (!model || model.audioTask && model.audioTask !== "speech") throw new Error("角色音色必须绑定可用的语音模型，不能使用音乐或音效模型");
+  if (Array.isArray(model.voices) && model.voices.length && !model.voices.some(voice => voice && typeof voice === "object" && "voice" in voice && voice.voice === role.voice)) throw new Error("角色绑定的固定音色不属于当前模型，不能静默使用默认音色");
+  if (line.storySource) {
+    const story = await readStoryProject(directory);
+    const approved = story.revisions.find(item => item.id === story.approvedId);
+    const scene = approved?.scenes.find(item => item.sceneId === line.storySource!.sceneId);
+    if (!approved || storyStale(story, approved) || scene?.text !== line.storySource.sceneText || scene.speech !== line.storySource.speech) throw new Error("剧本已变化，请先同步当前台词，不生成旧句配音");
+  }
+  const sourceKey = speechSourceKey(line, role);
+  if (line.takes.length >= 100 && !line.takes.some(take => take.sourceKey === sourceKey)) throw new Error("此句配音候选已达上限，保留现有版本，不再提交付费生成");
+  return sourceKey;
+}
+
+export async function saveVoiceSpeechTake(directory: string, lineId: string, sourceKey: string, files: GeneratedMedia[]) {
+  const { path } = await readVoiceProject(directory);
+  // 沿用画布登记的按文件串行写法；不同角色并行完成时，逐次读取最新快照，避免丢掉另一人的候选。
+  const task = (voiceWriteQueue.get(path) ?? Promise.resolve()).catch(() => {}).then(async () => {
+    const release = lockWorkspaceFiles([path]);
+    try {
+      const saved = await readVoiceProject(directory);
+      const line = saved.project.lines.find(line => line.id === lineId);
+      if (!line) throw new Error("原配音台词已移除，已生成声音保留在磁盘，不重新生成");
+      for (const file of files) {
+        if (file.mediaType !== "audio") throw new Error("配音结果不是音频，不能记录为角色配音");
+        if (line.takes.some(take => take.audio.path === file.path)) continue;
+        line.takes.push({ id: crypto.randomUUID(), audio: { path: file.path, mimeType: file.mimeType }, sourceKey, syncRequests: [], videos: [] });
+      }
+      const next = voiceProjectSchema.parse(saved.project);
+      await writeAtomic(path, JSON.stringify(next, null, 2));
+    } finally { release(); }
+  });
+  voiceWriteQueue.set(path, task);
+  try { await task; }
+  finally { if (voiceWriteQueue.get(path) === task) voiceWriteQueue.delete(path); }
 }
 
 /** 复用已选声音或明确的旧素材映射；只导入实测声音并计算方案，不改镜头或音轨。 */
@@ -50,7 +109,11 @@ export async function planWorkspaceSpeech(directory: string, data: unknown, sign
     signal?.throwIfAborted();
     const explicit = input.bindings?.find(binding => binding.lineIndex === lineIndex);
     const audio = explicit ? { path: explicit.path, mimeType: "audio/wav" }
-      : currentVoiceLine(saved.project, shot, lineIndex, scope.get("assets", line.speakerId)?.name ?? "");
+      : currentVoiceLine(saved.project, shot, lineIndex, scope.get("assets", line.speakerId)?.name ?? "", api.shotDialogueMode(scope, shot) === "post");
+    if (explicit && api.shotDialogueMode(scope, shot) === "post") {
+      const selected = currentVoiceLine(saved.project, shot, lineIndex, scope.get("assets", line.speakerId)?.name ?? "", true);
+      if (selected?.path !== explicit.path) throw new Error("多人固定音色只使用该角色当前已采用配音，不能用任意文件替代或串用另一人的声音");
+    }
     if (!audio) continue; // 已保存且仍有效的领域声音绑定由 planShotSpeech 复用。
     const reference = await readReference(directory, audio, "audio", signal);
     const media = await api.importWorkspaceAudio(scope, projectId, Buffer.from(reference.data, "base64"));
@@ -69,7 +132,7 @@ export async function assertCurrentSpeechAudio(directory: string, shot: Record<s
   const scope = api.scoped(tenant.workspaceId);
   const saved = await readVoiceProject(directory);
   for (const [index, line] of shot.creativeBrief.dialogue.lines.entries()) {
-    const audio = currentVoiceLine(saved.project, shot, index, scope.get("assets", line.speakerId)?.name ?? "");
+    const audio = currentVoiceLine(saved.project, shot, index, scope.get("assets", line.speakerId)?.name ?? "", api.shotDialogueMode(scope, shot) === "post");
     if (!audio) continue;
     const reference = await readReference(directory, audio, "audio", signal);
     const hash = createHash("sha256").update(Buffer.from(reference.data, "base64")).digest("hex");

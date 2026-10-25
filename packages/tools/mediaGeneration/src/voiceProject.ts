@@ -27,6 +27,7 @@ export function speechInspectionMessage(inspection: SpeechInspection) {
   return (issues.join("；") || `参考音轨整体匹配，估算偏移 ${inspection.offsetMs} 毫秒`) + "。音轨匹配不证明逐字口型同步；仍需检查可见发声区间。";
 }
 const roleSchema = z.strictObject({
+  assetId: z.string().trim().min(1).max(128).optional(),
   speechStyle: z.string().max(2000).optional(),
   id: z.string().uuid(), name: z.string().max(100), providerId: z.string().max(96), modelId: z.string().max(256), voice: z.string().max(256),
 });
@@ -53,6 +54,9 @@ export const voiceProjectSchema = z.strictObject({
   lipSyncProviderId: z.string().max(96), lipSyncModelId: z.string().max(256),
   mixes: z.array(z.strictObject({ id: z.string().uuid(), audio: audioSchema, sourceKey: z.string().max(100000) })).max(100),
 }).superRefine((project, context) => {
+  const assets = project.roles.flatMap(role => role.assetId ? [role.assetId] : []);
+  const names = project.roles.map(role => role.name.trim()).filter(Boolean);
+  if (new Set(assets).size !== assets.length || new Set(names).size !== names.length) context.addIssue({ code: "custom", message: "同一角色只能绑定一份音色档案，角色名称和资产不能重复" });
   const ids = [...project.roles, ...project.lines, ...project.lines.flatMap(line => line.takes), ...project.lines.flatMap(line => line.takes.flatMap(take => take.videos)), ...project.mixes].map(item => item.id);
   if (new Set(ids).size !== ids.length) context.addIssue({ code: "custom", message: "配音项目包含重复 ID" });
   for (const line of project.lines) {

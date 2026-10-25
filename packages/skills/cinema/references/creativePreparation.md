@@ -22,7 +22,7 @@ beats 每项保存 attackerId、defenderId、action、reaction、endState、supp
 
 ## 3. 对白与口型单独保留
 
-画内对白默认 creativeBrief.dialogue.mode=native，选择 nativeDialogue=true 的视频模型，视频同时生成原文声音、表演和对应口型，generateAudio 未传时由服务端开启；不能默认先拍无声再补对白。需要固定音色或已有采用配音时才用 post：先采用并实测完整配音，绑定 audio:{mediaId,text}，按真实声音设计时长和嘴部覆盖，再处理并检查专用口型。音频参考只表示参考能力，不保证原音逐字保留，不能冒充对口型。旁白、音乐、环境声可以后期制作。缺少能力时报告具体缺项，不自动换模型、删台词、改画外音或直接给成型视频叠对白。
+多人项目默认每个角色唯一绑定固定音色（roles.assetId/providerId/modelId/voice），先确定并采用逐句配音再专用对口型；跨镜头的多个说话人也适用。生成配音传 voiceLineId，与已保存角色和原句一致；listMediaModels{all:true} 查询可用语音和口型模型，不使用音乐模型或未充值/停用的 APIMart。已有有效声音复用，不逐句重复确认或付费生成。单人且无固定音色要求时画内对白默认 creativeBrief.dialogue.mode=native，选择 nativeDialogue=true 的视频模型，视频同时生成原文声音、表演和对应口型，generateAudio 未传时由服务端开启；不能默认先拍无声再补对白。需要固定音色或已有采用配音时才用 post：先采用并实测完整配音，绑定 audio:{mediaId,text}，按真实声音设计时长和嘴部覆盖，再处理并检查专用口型。音频参考只表示参考能力，不保证原音逐字保留，不能冒充对口型。旁白、音乐、环境声可以后期制作。缺少能力时报告具体缺项，不自动换模型、删台词、改画外音或直接给成型视频叠对白。
 
 creativeBrief.dialogue 必填；本镜确实无对白时 lines:[]，但整场台词必须分配到其他镜头，不能因动作隔离验证而从全片消失。
 
