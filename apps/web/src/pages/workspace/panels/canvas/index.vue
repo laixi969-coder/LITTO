@@ -463,6 +463,50 @@ let saveCancelled = false;
 let changedWhilePaused = false;
 let saveRevision = 0;
 let savedRevision = 0;
+function isStaleWrite(err: unknown) {
+  return axios.isAxiosError<{ data?: { code?: string } }>(err) && err.response?.status === 409 && err.response.data?.data?.code === "ESTALE";
+}
+
+// 与 canvasLineage 的素材识别一致：sourcePath 优先，其次首个输出 url。
+function absorbDiskNodes(diskNodes: unknown) {
+  if (!Array.isArray(diskNodes)) return;
+  const nodeKey = (node: { data?: Record<string, unknown> }) => {
+    const { sourcePath, outputs } = node.data ?? {};
+    if (typeof sourcePath === "string") return sourcePath;
+    for (const output of Object.values((outputs ?? {}) as Record<string, { value?: { url?: unknown } }>)) {
+      if (typeof output?.value?.url === "string") return output.value.url;
+    }
+  };
+  const ids = new Set(flow.nodes.value.map(node => node.id));
+  const keys = new Set(flow.nodes.value.map(node => nodeKey(node)));
+  const absorbed = diskNodes.filter((node): node is Node => {
+    if (!node || typeof node !== "object") return false;
+    return typeof (node as { id?: unknown }).id === "string"
+      && !ids.has((node as { id: string }).id) && !keys.has(nodeKey(node as { data?: Record<string, unknown> }));
+  });
+  if (absorbed.length) addNodes(absorbed);
+}
+
+// 后端生成登记（registerOnCanvas）与其他页面会并发写同一画布文件；版本过期时吸收磁盘新增节点后重试一次，当前编辑不丢。
+async function writeCanvasSnapshot(fileName: string, snapshot: ReturnType<typeof toObject>) {
+  try {
+    await canvasFiles.writeJson(fileName, { milimiliCanvas: true, nodes: snapshot.nodes, edges: snapshot.edges, viewport: snapshot.viewport });
+  } catch (err) {
+    if (!isStaleWrite(err)) throw err;
+    let disk: { milimiliCanvas?: boolean; littoCanvas?: boolean; toonflowCanvas?: boolean; nodes?: unknown };
+    try {
+      disk = await canvasFiles.readJson(fileName);
+    } catch {
+      throw err;
+    }
+    // 磁盘内容已不是画布结构时不自动覆盖，仍按冲突提示处理。
+    if (disk?.milimiliCanvas !== true && disk?.littoCanvas !== true && disk?.toonflowCanvas !== true) throw err;
+    absorbDiskNodes(disk.nodes);
+    const latest = toObject();
+    await canvasFiles.writeJson(fileName, { milimiliCanvas: true, nodes: latest.nodes, edges: latest.edges, viewport: latest.viewport });
+  }
+}
+
 const saveCanvas = debounce((directory: string, fileName: string) => {
   const flow = toObject();
   const revision = saveRevision;
@@ -470,7 +514,7 @@ const saveCanvas = debounce((directory: string, fileName: string) => {
   saving = saving.then(async () => {
     try {
       if (directory !== canvasDirectory) throw new Error("项目已切换，停止保存");
-      await canvasFiles.writeJson(fileName, { milimiliCanvas: true, nodes: flow.nodes, edges: flow.edges, viewport: flow.viewport });
+      await writeCanvasSnapshot(fileName, flow);
       saveError = undefined;
       savedRevision = revision;
     } catch (err) {
