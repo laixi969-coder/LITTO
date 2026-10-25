@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mediaAspectIssue } from "./qualityInspection.ts";
 import { all, get, run, tx, type Scope } from "../db.ts";
 import { bad, conflict, forbidden, j, notFound, now, ulid } from "../util.ts";
 import { mediaView } from "../storage.ts";
@@ -185,6 +186,11 @@ export function validateTimeline(s: Scope, t: Body) {
         if (c.start < -EPS) throw bad("clip cannot start before 0");
         const src = resolveClip(s, c);
         const media = src.mediaId ? s.get("media", src.mediaId) : null;
+        if (tk.kind === "video" && c.shotId && media) {
+            const output = s.list(media.mime.startsWith("video/") ? "takes" : "keyframes", { shotId: c.shotId, mediaId: media.id })[0];
+            const aspectIssue = output && mediaAspectIssue(s, output);
+            if (aspectIssue) throw bad(aspectIssue);
+        }
         if (src.mime?.startsWith("audio/") && (tk.role === "dialogue" || media?.source === "speechReference" || c.dialogueLineIndex !== undefined)) {
             const parent = t.clips.find(item => item.id === c.linkedClipId);
             const shot = parent?.shotId ? s.get("shots", parent.shotId) : null;
@@ -482,6 +488,8 @@ export function selectWorkingTake(s: Scope, takeId: string) {
   const shot = take && s.get("shots", take.shotId);
   const media = take && s.get("media", take.mediaId);
   if (!take || !shot || !media || take.projectId !== shot.projectId || media.projectId !== shot.projectId || !media.mime.startsWith("video/")) throw bad("视频不属于当前镜头");
+  const aspectIssue = mediaAspectIssue(s, take);
+  if (aspectIssue) throw bad(aspectIssue);
   const edit = getEdit(s, shot.sequenceId, true);
   const clip = edit.clips.find(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video");
   if (!clip) throw bad("镜头没有可替换的剪辑片段");

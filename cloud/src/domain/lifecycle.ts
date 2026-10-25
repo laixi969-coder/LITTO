@@ -10,7 +10,7 @@ import { mediaView } from "../storage.ts";
 import { requireReviewed, shotFingerprint } from "./realism.ts";
 import { assertSpeechPlan } from "./speechPlanning.ts";
 import { registerCandidates } from "./candidates.ts";
-import { inspectProductionQuality } from "./qualityInspection.ts";
+import { inspectProductionQuality, mediaAspectIssue } from "./qualityInspection.ts";
 import { log } from "../util.ts";
 import { selectWorkingTake } from "./nle.ts";
 
@@ -30,6 +30,9 @@ export function onJobSucceeded(s: Scope, job: any, mediaIds: string[]) {
     }
     const type = job.kind === "image" ? "keyframe" : "take";
     for (const item of s.list(type === "keyframe" ? "keyframes" : "takes", { jobId: job.id })) {
+        const aspectIssue = mediaAspectIssue(s, item);
+        // 收取原任务结果不等于画幅合格；保留付费原件和回执，错误版本退出可用候选。
+        if (aspectIssue && ["variant", "candidate"].includes(item.status)) s.update(type === "keyframe" ? "keyframes" : "takes", item.id, { status: "rejected", meta: { ...item.meta, aspectIssue } });
         void inspectProductionQuality(s, shot.projectId, type, item.id).catch(error => log.error("basic quality check failed", String(error)));
     }
     // 抽卡入池：本批产物自动登记为候选，等待质检与采用；否则抽卡结果无法回本。
