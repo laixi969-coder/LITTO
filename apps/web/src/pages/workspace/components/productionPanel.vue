@@ -50,18 +50,12 @@
           </li></ul>
           <details ref="assetEditor" class="assetEditor">
             <summary>{{ editingAsset ? "编辑资产：" + asset.name : "新增资产（上传 / 生成）" }}</summary>
+            <p class="reviewHint">只填名称即可建立。已有四视图或定妆图直接在下面选图，不用重填设定；其余字段按需展开。</p>
             <div class="fieldGrid">
               <label>类型<select v-model="asset.type"><option v-for="item in assetTypes" :key="item[0]" :value="item[0]">{{ item[1] }}</option></select></label>
               <label>名称<input v-model="asset.name" /></label>
-              <label>几何、肤质、材质与空间说明<textarea v-model="asset.description" /></label>
-              <label>不可改变的特征（每行一项）<textarea v-model="asset.invariants" /></label>
-              <template v-if="asset.type === 'Character'">
-                <label>说话与演唱习惯<textarea v-model="asset.speech" /></label>
-                <label>表演与行为习惯<textarea v-model="asset.behavior" /></label>
-              </template>
-              <label>定妆参考图<select v-model="asset.authoritativeReference"><option value="">未选择</option><option v-for="image in assetImages" :key="image.id" :value="image.id">{{ image.source === 'upload' ? '上传' : '生成 / 导入' }} · {{ image.id.slice(-8) }}</option></select></label>
-              <label>上传角色照片<input type="file" accept="image/png,image/jpeg,image/webp" @change="run(() => uploadReference($event, true))" /></label>
-              <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="asset.personaTags[axis.key]"><option value="">未指定</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
+              <label>定妆参考图（可选）<select v-model="asset.authoritativeReference"><option value="">未选择</option><option v-for="image in assetImages" :key="image.id" :value="image.id">{{ image.source === 'upload' ? '上传' : '生成 / 导入' }} · {{ image.id.slice(-8) }}</option></select></label>
+              <label>上传参考照片（可选）<input type="file" accept="image/png,image/jpeg,image/webp" @change="run(() => uploadReference($event, true))" /></label>
             </div>
             <img v-if="assetImage" class="assetPortrait" :src="mediaUrl(assetImage.url)" :alt="`${asset.name || '角色'}定妆参考`" />
             <details class="assetImagePicker">
@@ -69,11 +63,23 @@
               <button type="button" @click="run(refreshAssetLibrary)">刷新图片</button>
               <div class="assetImageGrid"><button v-for="image in assetImages" :key="image.id" type="button" :aria-pressed="asset.authoritativeReference === image.id" :aria-label="`选择定妆图 ${image.id.slice(-8)}`" @click="asset.authoritativeReference = image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><span>{{ image.source === 'upload' ? '上传照片' : '生成 / 导入' }} · {{ image.id.slice(-5) }}</span></button></div>
             </details>
-            <details class="assetImagePicker"><summary>角色参考组（正面、侧面、背面等）</summary>
-              <div class="assetImageGrid"><label v-for="image in assetImages" :key="image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><input v-model="asset.referenceMediaIds" type="checkbox" :value="image.id" :aria-label="`保留参考图 ${image.id.slice(-8)}`" />保留此参考</label></div>
+            <details class="assetAdvanced">
+              <summary>更多设定（可选）：生成约束、表演习惯与检索标签</summary>
+              <div class="fieldGrid">
+                <label>几何、肤质、材质与空间说明<textarea v-model="asset.description" /></label>
+                <label>不可改变的特征（每行一项）<textarea v-model="asset.invariants" /></label>
+                <template v-if="asset.type === 'Character'">
+                  <label>说话与演唱习惯<textarea v-model="asset.speech" /></label>
+                  <label>表演与行为习惯<textarea v-model="asset.behavior" /></label>
+                </template>
+                <label v-for="axis in personaAxes" :key="axis.key">{{ axis.label }}<select v-model="asset.personaTags[axis.key]"><option value="">未指定</option><option v-for="pole in axis.poles" :key="pole[0]" :value="pole[0]">{{ pole[1] }}</option></select></label>
+              </div>
+              <details class="assetImagePicker"><summary>角色参考组（正面、侧面、背面等）</summary>
+                <div class="assetImageGrid"><label v-for="image in assetImages" :key="image.id"><img :src="mediaUrl(image.url)" alt="" loading="lazy" /><input v-model="asset.referenceMediaIds" type="checkbox" :value="image.id" :aria-label="`保留参考图 ${image.id.slice(-8)}`" />保留此参考</label></div>
+              </details>
+              <p class="reviewHint">气质标签仅用于资产库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
             </details>
             <button type="button" :disabled="!asset.name.trim() || asset.type !== 'Character'" @click="run(generateCharacter)">生成角色设定图</button>
-            <p class="reviewHint">气质标签仅用于资产库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
             <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
             <ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
           </details>
@@ -776,6 +782,7 @@ defineExpose({ flushSave, openShot, openLibrary });
   .assetPortrait { display: block; width: 180px; max-height: 240px; object-fit: contain; margin: 12px 0; border-radius: var(--ui-radius); }
   .assetImagePicker { margin: 12px 0; summary { cursor: pointer; } .assetImageGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; max-height: 360px; overflow: auto; button, label { padding: 6px; display: flex; flex-direction: column; gap: 4px; &[aria-pressed="true"] { outline: 2px solid var(--el-color-primary); } img { width: 100%; height: 120px; object-fit: contain; } span { font-size: 11px; } } } }
   .libraryFilters, .assetEditor { margin: 16px 0; summary { cursor: pointer; padding: 12px 0; } }
+  .assetAdvanced { margin: 16px 0; summary { cursor: pointer; padding: 12px 0; } }
   .libraryList, .projectAssetGrid {
     padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 16px;
     li { min-width: 0; padding: 12px; border: 1px solid var(--studioBorder); border-radius: var(--ui-radius); display: flex; flex-direction: column; gap: 12px;
