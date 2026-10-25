@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import conf from "@/utils/conf";
+import { cloud } from "@/lib/cloud";
+import { currentTenant } from "@/utils/tenant";
 
 export type ModelBlock = { reason: string; until: number; kind: "text" | "media"; providerId: string };
 
@@ -13,6 +15,8 @@ export function modelAccess(kind: "text" | "media", providerId: string, modelId:
   const fingerprint = createHash("sha256").update(JSON.stringify([kind, providerId, fields.map(key => [key, config?.[key]])])).digest("hex");
   const modelKey = createHash("sha256").update(`${fingerprint}:${modelId}`).digest("hex");
   function reason() {
+    const tenant = currentTenant();
+    if (tenant && !cloud()?.modelPermissions(tenant.userId).canUse) return "尚未获得模型使用白名单授权";
     if (typeof config?.apiKey !== "string" || !config.apiKey.trim().replace(/^Bearer\s*/i, "")) return "未配置 API Key";
     const blocks = conf.get("modelAvailability", {});
     return [blocks[fingerprint], blocks[modelKey]].find(item => item && item.until > Date.now())?.reason;

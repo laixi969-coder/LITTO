@@ -79,12 +79,11 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
 
 /** Routes that install or execute third-party code, or mutate platform-wide assets, are for platform admins only. */
 const pluginPath = /^\/(nodes|tools|providers|plugins|agents|skills)(?:\/|$)/i;
-const memberProviderPath = /^\/providers\/(models|test|reenable)\/?$/i;
 export function requireAdminForPlugins(req: Request, res: Response, next: NextFunction) {
   if (!authEnabled() || req.method === "GET" || req.method === "HEAD") return next();
   const tenant = (req as Request & { tenant?: Tenant }).tenant;
-  // 与 Express 的大小写匹配规则一致；普通成员仅能调用明确允许的供应商操作。
-  const memberOperation = req.method === "POST" && memberProviderPath.test(req.path);
-  if (pluginPath.test(req.path) && !memberOperation && !tenant?.isAdmin) return res.status(403).json(error("仅平台管理员可以安装或修改插件与供应商", null, 403));
+  if (/^\/providers(?:\/|$)/i.test(req.path) && (!tenant || !embed?.modelPermissions(tenant.userId).canManage))
+    return res.status(403).json(error("仅超级管理员可以配置、测试或修改模型供应商", null, 403));
+  if (pluginPath.test(req.path) && !tenant?.isAdmin) return res.status(403).json(error("仅平台管理员可以安装或修改插件与供应商", null, 403));
   next();
 }

@@ -13,12 +13,14 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
   const data = z.strictObject({ kind: z.enum(["image", "video", "audio"]), providerId: z.string().min(1).optional(), modelId: z.string().min(1).optional() })
     .refine(value => !!value.providerId === !!value.modelId, "providerId 和 modelId 须同时提供").parse(input.data);
   const tenant = currentTenant();
-  const checkPermission = () => {
-    if (!tenant) return;
-    const member = cloud()?.dbGet("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", tenant.workspaceId, tenant.userId);
-    if (!member || member.role === "VIEWER") throw new Error("无权修改工作区模型选择");
-  };
-  checkPermission();
+  if (tenant) {
+    cloud()!.requireModelAccess(tenant!.userId);
+    const selection = selectedModel(data.kind);
+    if (!selection) throw new Error("该类平台默认模型尚未设置，请由超级管理员在管理后台 → 默认模型中配置");
+    if (!(await listMediaModels(true)).some(model => model.type === data.kind && model.providerId === selection.providerId && model.modelId === selection.modelId))
+      throw new Error("平台默认模型当前不可用，请联系超级管理员检查配置与额度");
+    return { title: "沿用平台默认模型", applied: true, selection, answer: "直接使用超级管理员设置的默认模型，无需用户选择或配置" };
+  }
   const models = (await listMediaModels(true)).filter(model => model.type === data.kind && (!data.providerId || model.providerId === data.providerId && model.modelId === data.modelId));
   if (!models.length) throw new Error("没有匹配的可用模型，请先配置供应商或恢复连接与额度");
   const previous = selectedModel(data.kind);
@@ -34,7 +36,6 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
   signal?.throwIfAborted();
   const index = request.options.indexOf(response.answer);
   if (response.skipped || index < 0 || index >= models.length) return { ...request, ...response, applied: false };
-  checkPermission();
   const chosen = models[index]!;
   if (!(await listMediaModels(true)).some(model => model.type === data.kind && model.providerId === chosen.providerId && model.modelId === chosen.modelId)) throw new Error("所选模型已不可用，本次未更改设置");
   signal?.throwIfAborted();

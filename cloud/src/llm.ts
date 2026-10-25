@@ -4,6 +4,7 @@ import { ADAPTERS, credentialFor, markCredential, secretOf } from "./providers/r
 import { mustRoute, resolvePolicy } from "./providers/router.ts";
 import { storage } from "./storage.ts";
 import { bad, now, ulid } from "./util.ts";
+import { requireModelAccess } from "./auth.ts";
 
 /**
  * LLM layer (PRD §12–§13 "Skills output structured specs"): text/vision calls go through the same
@@ -11,6 +12,7 @@ import { bad, now, ulid } from "./util.ts";
  * Returns null when no usable text model exists, so callers fall back to the deterministic skills.
  */
 export async function runText(o: { workspaceId: string; projectId: string | null; actor: string; system: string; prompt: string; json?: boolean; imageMediaIds?: string[]; frames?: { data: Buffer; mime: string }[]; label: string; mockEcho?: string }) {
+    requireModelAccess(o.actor);
     const need = o.imageMediaIds?.length || o.frames?.length ? ["vision"] : [];
     let routed;
     try { routed = mustRoute({ kind: "text", need, workspaceId: o.workspaceId, projectId: o.projectId, roles: [], policy: resolvePolicy(o.workspaceId, o.projectId) }); } catch { return null; }

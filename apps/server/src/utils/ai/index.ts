@@ -11,7 +11,6 @@ import modelContextLimits from "@/utils/ai/modelContextLimits";
 import modelFetch from "@/utils/ai/modelFetch";
 import { streamTrial } from "@/utils/ai/trialStream";
 import { cloud } from "@/lib/cloud";
-import { currentTenant } from "@/utils/tenant";
 import { modelAccess } from "@/utils/modelAvailability";
 import { assertModelSelection, isSelectedModel } from "@/utils/modelSelection";
 
@@ -49,30 +48,8 @@ export function getModelLimits(providerId: string, model: z.infer<typeof provide
   };
 }
 
-// 平台试用：账号模式下由 cloud 提供平台凭据的文本模型，按 token 扣注册赠送的积分（见 cloud/src/trial.ts）。
-function trialModels() {
-  const embed = cloud();
-  const tenant = currentTenant();
-  return embed && tenant ? embed.trialStatus(tenant.workspaceId) : { credits: 0, models: [] };
-}
-export const trialStatus = trialModels;
-
-function trialConfiguredModel(modelId: string) {
-  const embed = cloud();
-  const tenant = currentTenant();
-  if (!embed || !tenant) throw Object.assign(new Error("平台试用仅在账号模式下可用"), { status: 400 });
-  const access = embed.trialModelAccess(tenant.workspaceId, modelId);
-  const model = { id: modelId, label: access.label, contextWindow: access.contextWindow, maxOutputTokens: access.maxOutputTokens };
-  const limits = getModelLimits(embed.trialProviderId, model);
-  const baseUrl = new URL(access.baseUrl);
-  if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
-  return {
-    providerId: embed.trialProviderId,
-    provider: { apiUrl: access.baseUrl, apiKey: access.apiKey, protocol: "openai-completions" as const, models: [model] },
-    model: { ...model, contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens },
-    baseUrl: baseUrl.href.replace(/\/+$/, ""),
-  };
-}
+// 当前仅开放白名单共享模型；积分试用留待后续开放。
+export const trialStatus = () => ({ credits: 0, models: [] });
 
 // 上游 SDK 的错误是英文且不说明原因，转成用户能据此行动的说明，并附上原文便于管理员排查；无法识别的保持原文。
 // Bun 的 fetch 连不上目标时报 "Unable to connect..."，与 ECONNREFUSED 等同属连接类错误；
@@ -102,7 +79,7 @@ export function describeModelError(message: string | undefined) {
 
 export function getConfiguredModel(providerId: string, modelId: string) {
   assertModelSelection("text", providerId, modelId);
-  if (providerId === cloud()?.trialProviderId) return trialConfiguredModel(modelId);
+  if (providerId === cloud()?.trialProviderId) throw Object.assign(new Error("平台积分试用尚未开放，请选择超级管理员配置的模型"), { status: 403 });
   const providers = conf.get("settings", {}).customProviders;
   const parsed = providerSchema.safeParse(Array.isArray(providers) ? providers.find(item => item?.id === providerId) : undefined);
   if (!parsed.success) throw Object.assign(new Error("请先在设置中配置模型供应商"), { status: 400 });
@@ -112,6 +89,7 @@ export function getConfiguredModel(providerId: string, modelId: string) {
   if (!model) throw Object.assign(new Error("所选模型不存在，请重新选择"), { status: 400 });
   assertPublicUrlLiteral(provider.apiUrl); // literal private/loopback addresses never reach the model client
   const baseUrl = new URL(provider.apiUrl);
+  if (baseUrl.hostname === "api.atlascloud.ai" && /^\/(?:api\/)?v1\/?$/.test(baseUrl.pathname)) baseUrl.pathname = "/v1";
   // Anthropic SDK 自带 /v1/messages，配置中的版本前缀不能重复拼接。
   if (provider.protocol === "anthropic-messages") baseUrl.pathname = baseUrl.pathname.replace(/\/v1\/*$/, "") || "/";
   else if (baseUrl.pathname === "/") baseUrl.pathname = "/v1";
@@ -137,14 +115,8 @@ export async function assertConfiguredUpstream(configured: ReturnType<typeof get
 
 export function listAiModels(all = false) {
   const providers = conf.get("settings", {}).customProviders;
-  const trialState = trialModels();
-  const trial = (trialState.credits > 0 ? trialState.models : []).filter(model => all || isSelectedModel("text", cloud()!.trialProviderId, model.id)).map(model => {
-    const limits = getModelLimits(cloud()!.trialProviderId, model);
-    return { providerId: cloud()!.trialProviderId, providerLabel: "平台试用", protocol: "openai-completions" as const, modelId: model.id, label: model.label,
-      contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens };
-  });
-  if (!Array.isArray(providers)) return trial;
-  return [...providers.flatMap(item => {
+  if (!Array.isArray(providers)) return [];
+  return providers.flatMap(item => {
     const parsed = providerSchema.extend({ id: z.string().min(1), label: z.string() }).safeParse(item);
     if (!parsed.success) return [];
     const provider = parsed.data;
@@ -155,7 +127,7 @@ export function listAiModels(all = false) {
         contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens,
       };
     });
-  }), ...trial];
+  });
 }
 
 const aiApis = {

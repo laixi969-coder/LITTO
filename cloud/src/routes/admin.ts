@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { authOf, requireAdmin } from "../auth.ts";
+import { authOf, modelPermissions, provisionUser, requireAdmin } from "../auth.ts";
 import { all, audit, get, run, setSetting, setting, tx } from "../db.ts";
 import { body } from "../http.ts";
 import { accountOf, adminAdjust, grant } from "../credits.ts";
@@ -9,11 +9,16 @@ import { cancelJob, jobView, retryJob } from "../jobs.ts";
 import { cleanupMedia } from "../storage.ts";
 import { trialReport } from "../trial.ts";
 import { scoped } from "../db.ts";
-import { bad, notFound, now } from "../util.ts";
+import { bad, forbidden, notFound, now } from "../util.ts";
 import { snapshot } from "../metrics.ts";
 
 export const admin = new Hono();
 admin.use("*", requireAdmin);
+admin.use("*", async (c, next) => {
+    if (/^\/admin\/(providers|models)(?:\/|$)/.test(c.req.path) && !modelPermissions(authOf(c).user.id).canManage)
+      throw forbidden("仅 66445039@qq.com 超级管理员可以管理平台模型");
+    await next();
+});
 const actor = (c: any) => authOf(c).user.id;
 const priceSchema = z.object({ perImage: z.number().finite().nonnegative().optional(), perSecond: z.number().finite().nonnegative().optional(), perCall: z.number().finite().nonnegative().optional() }).catchall(z.number().finite().nonnegative());
 
@@ -35,6 +40,12 @@ admin.get("/dashboard", (c) => {
 });
 
 // Users
+admin.post("/users", async (c) => {
+    if (!modelPermissions(actor(c)).canManage) throw forbidden("仅超级管理员可以创建普通账号和设置初始密码");
+    const b = await body(c, z.object({ email: z.string().trim().toLowerCase().email().max(254), password: z.string().min(12).max(256) }).strict());
+    const user = await provisionUser(b.email, b.password, actor(c));
+    return c.json(user, user.created ? 201 : 200);
+});
 admin.get("/users", (c) => {
     const q = `%${(c.req.query("q") ?? "").toLowerCase()}%`;
     const rows = all("SELECT u.id,u.email,u.status,u.is_admin,u.created_at,w.id AS workspace_id,w.name AS workspace, a.balance, a.held, s.plan, (SELECT COUNT(*) FROM generation_jobs g WHERE g.workspace_id=w.id) AS jobs, (SELECT COALESCE(SUM(size),0) FROM media m WHERE m.workspace_id=w.id AND m.deleted_at IS NULL) AS storage_bytes FROM users u LEFT JOIN workspaces w ON w.owner_id=u.id AND w.kind='personal' LEFT JOIN credit_accounts a ON a.workspace_id=w.id LEFT JOIN subscriptions s ON s.workspace_id=w.id WHERE u.deleted_at IS NULL AND lower(u.email) LIKE ? ORDER BY u.created_at DESC LIMIT 200", q);
@@ -158,8 +169,9 @@ admin.patch("/storage/quota/:workspaceId", async (c) => {
 });
 
 // System
-const systemDefaults = { accountWhitelist: { enabled: false, emails: [] }, platformTrial: { enabled: false, creditsPer1kTokens: 1 }, registrationOpen: true, defaultCredits: 200, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: true, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true }, pricing: {} };
+const systemDefaults = { accountWhitelist: { enabled: false, emails: [] }, platformTrial: { enabled: false, creditsPer1kTokens: 1 }, registrationOpen: true, defaultCredits: 0, maxConcurrency: 4, maxUploadMb: 200, defaultImageModel: "", defaultVideoModel: "", announcement: "", maintenanceMode: false, billingEnabled: false, creditsPerUsd: 100, markup: 1.0, modelPolicy: { optimize: "balanced", allowFallback: true }, pricing: {} };
 const systemSchema = z.object({
+  modelWhitelist: z.array(z.string().trim().toLowerCase().email().max(254)).max(5000).transform(emails => [...new Set(emails)]),
   accountWhitelist: z.object({ enabled: z.boolean(), emails: z.array(z.string().trim().toLowerCase().email().max(254)).max(5000).transform(emails => [...new Set(emails)]) }).strict(),
   registrationOpen: z.boolean(), defaultCredits: z.number().finite().nonnegative().max(1e9),
   billingEnabled: z.boolean(), creditsPerUsd: z.number().finite().positive().max(1e9), markup: z.number().finite().nonnegative().max(1e6),
@@ -168,9 +180,10 @@ const systemSchema = z.object({
   defaultImageModel: z.string(), defaultVideoModel: z.string(), announcement: z.string(), maintenanceMode: z.boolean(),
   modelPolicy: z.object({ optimize: z.enum(["quality", "cost", "latency", "balanced"]), allowFallback: z.boolean() }).strict(),
 }).partial().strict();
-admin.get("/system", (c) => c.json(Object.fromEntries(Object.entries(systemDefaults).map(([k, v]) => [k, setting(k, v)]))));
+admin.get("/system", (c) => c.json({ ...Object.fromEntries(Object.entries(systemDefaults).map(([k, v]) => [k, setting(k, v)])), modelWhitelist: setting("modelWhitelist", []) }));
 admin.put("/system", async (c) => {
     const b = await body(c, systemSchema);
+    if ((b.modelWhitelist || b.accountWhitelist) && !modelPermissions(actor(c)).canManage) throw forbidden("仅 66445039@qq.com 超级管理员可以设置账户与模型使用白名单");
     tx(() => {
       for (const [key, value] of Object.entries(b)) setSetting(key, value);
       audit(actor(c), "system.update", undefined, b);

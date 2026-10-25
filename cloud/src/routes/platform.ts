@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { authOf, deleteAccount, logout, requireRole, setSessionCookie, verifyPassword } from "../auth.ts";
+import { authOf, deleteAccount, logout, modelPermissions, requireRole, setSessionCookie, verifyPassword } from "../auth.ts";
 import { all, audit, get, run, scoped } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { accountOf, grant } from "../credits.ts";
@@ -30,7 +30,7 @@ authPublic.post("/password/login", async (c) => {
 platform.get("/auth/me", (c) => {
     const a = authOf(c);
     const ws = all("SELECT w.id, w.name, w.kind, m.role FROM workspaces w JOIN workspace_members m ON m.workspace_id=w.id WHERE m.user_id=? AND w.deleted_at IS NULL", a.user.id);
-    return c.json({ user: a.user, workspaceId: a.workspaceId, role: a.role, workspaces: ws });
+    return c.json({ user: a.user, workspaceId: a.workspaceId, role: a.role, workspaces: ws, modelAccess: modelPermissions(a.user.id) });
 });
 platform.post("/auth/logout", (c) => (logout(c), c.json({ ok: true })));
 platform.delete("/auth/account", async (c) => {
@@ -60,8 +60,8 @@ platform.put("/workspaces/current/model-policy", async (c) => {
 });
 
 // ---- /providers & /models (read-only for users; admin writes live under /admin) ----
-platform.get("/providers", (c) => (ctx(c), c.json(listProviders().filter((p) => p.status === "active").map(({ baseUrl, ...p }) => p))));
-platform.get("/models", (c) => { const { a } = ctx(c); return c.json(listModels(true).filter(m => !m.limits.workspaceExecution && (!m.limits.workspaceId || m.limits.workspaceId === a.workspaceId))); });
+platform.get("/providers", (c) => { const { a } = ctx(c); return c.json(modelPermissions(a.user.id).canUse ? listProviders().filter(p => p.status === "active").map(({ baseUrl, ...p }) => p) : []); });
+platform.get("/models", (c) => { const { a } = ctx(c); return c.json(modelPermissions(a.user.id).canUse ? listModels(true).filter(m => !m.limits.workspaceExecution && (!m.limits.workspaceId || m.limits.workspaceId === a.workspaceId)) : []); });
 platform.post("/models/route-preview", async (c) => {
     const { a } = ctx(c);
     const b = await body(c, z.object({ kind: z.enum(["image", "video"]), roles: z.array(z.string()).default([]), projectId: z.string().nullable().default(null), policy: z.any().optional() }));
@@ -69,6 +69,10 @@ platform.post("/models/route-preview", async (c) => {
 });
 
 // ---- BYOK credentials (workspace / project scope). Plaintext is never returned or logged. ----
+platform.use("/credentials/*", async (c, next) => {
+    if (!modelPermissions(authOf(c).user.id).canManage) throw forbidden("仅超级管理员可以管理模型凭据");
+    await next();
+});
 platform.get("/credentials", (c) => {
     const { a } = ctx(c, "ADMIN");
     return c.json(all("SELECT * FROM api_credentials WHERE workspace_id=? AND deleted_at IS NULL ORDER BY created_at", a.workspaceId).map(credentialView));

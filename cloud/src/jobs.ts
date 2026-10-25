@@ -10,6 +10,7 @@ import { onJobSucceeded } from "./domain/lifecycle.ts";
 import { inc, observe } from "./metrics.ts";
 import { assertSpeechPlan } from "./domain/speechPlanning.ts";
 import { shotFingerprint } from "./domain/realism.ts";
+import { requireModelAccess } from "./auth.ts";
 
 export type JobSpec = {
     workspaceId: string; projectId: string | null; kind: "image" | "video"; targetType?: string; targetId?: string; modelId: string;
@@ -26,6 +27,7 @@ export function estimate(modelId: string, kind: string, params: Record<string, a
 
 /** Creating a job never waits for the provider. Credits are held up-front; failure releases the hold. */
 export function enqueue(spec: JobSpec) {
+    requireModelAccess(spec.createdBy);
     if (spec.idempotencyKey) {
         const ex = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", spec.workspaceId, spec.idempotencyKey);
         if (ex) {
@@ -198,6 +200,7 @@ async function execute(jobId: string) {
     const adapter = ADAPTERS[prov.adapter];
     const cred = credentialFor(prov.id, job.workspaceId, job.projectId);
     try {
+        if (!raw.provider_task_id && !job.parameters?.remoteTask) requireModelAccess(job.createdBy);
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
@@ -358,6 +361,7 @@ export function cancelJob(workspaceId: string, id: string, actor: string) {
 
 /** Manual retry creates a child job (history is never overwritten). */
 export function retryJob(workspaceId: string, id: string, actor: string) {
+    requireModelAccess(actor);
     const o = scoped(workspaceId).get("generation_jobs", id, true);
     if (!o) throw bad("job not found");
     if (["QUEUED", "RUNNING"].includes(o.status)) throw conflict("job still active");

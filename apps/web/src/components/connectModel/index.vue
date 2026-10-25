@@ -1,6 +1,7 @@
 <template>
-  <el-dialog v-model="connectModelVisible" title="接入你的模型" width="min(880px, 94vw)" alignCenter appendToBody destroyOnClose :closeOnClickModal="!busy" :closeOnPressEscape="!busy">
-    <p class="intro">模型用的是你自己的账号：把服务商给你的 Key 粘贴进来就行，费用直接结算给服务商。Key 只保存在你的账号里，页面上只会显示末四位。</p>
+  <el-dialog v-model="connectModelVisible" :title="isAuthDisabled() ? '接入你的模型' : '配置平台模型'" width="min(880px, 94vw)" alignCenter appendToBody destroyOnClose :closeOnClickModal="!busy" :closeOnPressEscape="!busy">
+    <p v-if="!isAuthDisabled()" class="intro">由超级管理员统一添加平台模型，模型使用白名单内的账号可以使用。密钥仅保存在服务端，页面只显示末四位，当前不扣积分。</p>
+    <p v-else class="intro">模型用的是你自己的账号：把服务商给你的 Key 粘贴进来就行，费用直接结算给服务商。Key 只保存在你的账号里，页面上只会显示末四位。</p>
     <div class="cards" :class="{ single: connectModelFocus }">
       <!-- ① text -->
       <section v-if="connectModelFocus !== 'media'" class="card" aria-label="剧本与对话模型">
@@ -106,6 +107,7 @@ import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 import { customProviders, saveSettings, settings, type CustomProvider } from "@/stores/settings";
 import { mediaPresets, nonChatModel, textPresets } from "./presets";
 import { connectModelFocus, connectModelVisible } from "./state";
+import { isAuthDisabled } from "@/lib/session";
 
 type TestResult = { ok: boolean; verified?: boolean; message: string; models?: { id: string; label: string; contextWindow?: number; maxOutputTokens?: number }[] };
 

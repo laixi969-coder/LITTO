@@ -1,6 +1,6 @@
 <template>
   <div class="modelSelection">
-    <p>分别选择当前工作区使用的平台和模型。用户、节点和 Agent 共用这些选择；未设置或调用失败时停止，不会自动切换到其他平台。</p>
+    <p>{{ isAuthDisabled() ? "分别选择当前工作区使用的平台和模型。用户、节点和 Agent 共用这些选择。" : "由超级管理员统一设置平台默认模型，白名单账号、节点和 Agent 直接使用，无需各自选择或配置。" }}未设置或调用失败时停止，不会自动切换到其他平台。</p>
     <p>带参考图的图像任务（溶图、局部编辑、多图参考）自动使用「图片编辑 / 溶图」模型，纯文字生图使用「图片」模型；编辑模型留空则跟随图片模型，无需在节点上手动切换。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-form labelPosition="top" @submit.prevent="save()">
@@ -24,6 +24,7 @@ import { onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage } from "element-plus";
 import { settings, saveSettings } from "@/stores/settings";
+import { isAuthDisabled } from "@/lib/session";
 
 type Kind = "text" | "image" | "imageEdit" | "video" | "audio";
 type Choice = { providerId: string; modelId: string; providerLabel: string; label: string; type: "text" | "image" | "video" | "audio"; mode?: unknown };

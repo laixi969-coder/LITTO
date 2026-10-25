@@ -71,7 +71,7 @@ const settingsPanels = [
   { id: "mcp", label: "MCP", icon: IconPlugConnected, component: defineAsyncComponent(() => import("./panels/mcp/index.vue")) },
   { id: "developer", label: "开发者选项", icon: IconCode, component: defineAsyncComponent(() => import("./panels/developer/index.vue")) },
   { id: "about", label: "关于", icon: IconInfoCircle, component: defineAsyncComponent(() => import("./panels/about.vue")) },
-].filter((panel) => !hiddenPanels.includes(panel.id));
+].filter((panel) => !hiddenPanels.includes(panel.id) && (!accounts || !["modelSelection", "languageModel", "mediaModel"].includes(panel.id)));
 const activePanel = shallowRef(settingsPanels[0]!);
 const visible = defineModel<boolean>({ default: false });
 </script>

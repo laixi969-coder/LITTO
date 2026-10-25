@@ -179,6 +179,7 @@ import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { writeClipboardText } from "@/lib/clipboard";
 import anonymousData from "@/lib/anonymousData";
 import { modelChoices, loadAvailableModels, refreshModelSelection } from "@/stores/settings";
+import { canManageModels } from "@/lib/session";
 import { useWorkspaceStore } from "@/stores/workspace";
 import type { AgentAttachment, AgentConversation, AgentMessage } from "./types";
 import { registerStorySources } from "@/lib/storySources";
@@ -606,9 +607,15 @@ async function sendMessage(source?: AgentMessage) {
   if (source && (source.role !== "user" || resendIndex < 0)) return;
   const resendFrom = source ? source.entryId ?? messages.value.slice(resendIndex + 1).find(item => item.role === "user" && item.entryId)?.entryId : undefined;
   if (locked.value || modelSaving.value || !instance || (!prompt && !attachments.length)) return;
+  if (!canManageModels()) {
+    modelSaving.value = true;
+    try { await refreshModelSelection(); await loadAvailableModels(); }
+    catch (cause) { return ElMessage.error(cause instanceof Error ? cause.message : "读取平台默认模型失败，请稍后重试"); }
+    finally { modelSaving.value = false; }
+  }
   const model = selectedModelChoice.value;
   if (!directory) return ElMessage.warning("请先打开项目");
-  if (!model) return ElMessage.warning("请先选择模型");
+  if (!model) return ElMessage.warning(canManageModels() ? "请先选择模型" : "平台默认模型尚未就绪，请联系超级管理员配置");
 
   const requestController = new AbortController();
   const canvasContext = createCanvasContext?.();

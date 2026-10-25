@@ -1,6 +1,6 @@
 <template>
   <div v-if="loaded" class="providerList">
-    <p>这里管理供应商接入。实际使用的平台与模型请在左侧“默认模型”中选择；安装供应商不代表默认使用它。</p>
+    <p>这里管理供应商接入。实际使用的平台与模型请在“默认模型”中选择；安装供应商不代表默认使用它。</p>
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">

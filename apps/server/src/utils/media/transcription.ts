@@ -2,6 +2,8 @@ import { z } from "zod";
 import conf from "@/utils/conf";
 import { providerSchema } from "@/utils/ai";
 import { assertPublicHttpUrl } from "@/utils/ssrf";
+import { cloud } from "@/lib/cloud";
+import { currentTenant } from "@/utils/tenant";
 
 const timeRange = { start: z.number().finite().nonnegative(), end: z.number().finite().nonnegative() };
 const transcriptSchema = z.object({
@@ -39,6 +41,8 @@ export function transcriptionStatus() {
 }
 
 export async function transcribeMusic(audio: Buffer, providerId: string, model: string, signal: AbortSignal, source = "custom") {
+  const tenant = currentTenant();
+  if (tenant) cloud()?.requireModelAccess(tenant.userId);
   // ACT: 只接受客户端重采样生成的标准 PCM WAV，限制 10 分钟；不在服务端再次解码不可信压缩媒体。
   if (audio.length < 46 || audio.length > 19200044 || audio.toString("ascii", 0, 4) !== "RIFF"
     || audio.toString("ascii", 8, 16) !== "WAVEfmt " || audio.readUInt32LE(16) !== 16

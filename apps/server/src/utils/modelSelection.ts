@@ -1,10 +1,17 @@
 import { z } from "zod";
 import conf from "@/utils/conf";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
+import { cloud } from "@/lib/cloud";
+import { currentTenant } from "@/utils/tenant";
 
 const choice = z.strictObject({ providerId: z.string().trim().min(1).max(200), modelId: z.string().trim().min(1).max(300) }).nullable().optional();
 export const modelSelectionSchema = z.strictObject({ text: choice, image: choice, imageEdit: choice, video: choice, audio: choice });
 export type ModelKind = keyof z.infer<typeof modelSelectionSchema>;
+
+export function usesPlatformDefaults() {
+  const tenant = currentTenant();
+  return !!tenant && cloud()?.modelPermissions(tenant.userId).canManage === false;
+}
 
 export function selectedModel(kind: ModelKind) {
   const parsed = modelSelectionSchema.safeParse(conf.get("settings", {}).modelSelection ?? {});
@@ -17,8 +24,15 @@ export function isSelectedModel(kind: ModelKind, providerId: string, modelId: st
 }
 
 export function assertModelSelection(kind: ModelKind, providerId: string, modelId: string) {
+  const tenant = currentTenant();
+  if (tenant) cloud()?.requireModelAccess(tenant.userId);
   const label = { text: "对话", image: "图片", imageEdit: "图片编辑", video: "视频", audio: "配音" }[kind];
   const selected = selectedModel(kind);
+  if (usesPlatformDefaults()) {
+    if (!selected) throw Object.assign(new Error(`超级管理员尚未设置${label}默认模型，请联系超级管理员配置。`), { status: 400, retryable: false });
+    if (!isSelectedModel(kind, providerId, modelId)) throw Object.assign(new Error(`平台${label}默认模型已更新为 ${selected.providerId} / ${selected.modelId}，请刷新后使用管理员设置的默认模型。`), { status: 409, retryable: false });
+    return;
+  }
   const action = kind === "text" ? "请在对话的模型选择器中选择并保存" : kind === "imageEdit" ? "请在设置 → 默认模型中选择「图片编辑 / 溶图」模型，或清空它以跟随图片生成模型" : "请通过 requestProductionDecision(selectModel) 在聊天中选择并保存，无需跳转设置页";
   if (!selected) throw Object.assign(new Error(`尚未设置${label}模型。${action}，系统不会自动选择或切换。`), { status: 400, retryable: false });
   if (!isSelectedModel(kind, providerId, modelId)) {

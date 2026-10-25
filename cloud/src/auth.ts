@@ -1,9 +1,9 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import type { Context, Next } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { all, audit, get, run, setting, tx } from "./db.ts";
+import { all, audit, get, run, setSetting, setting, tx } from "./db.ts";
 import { config } from "./config.ts";
-import { bad, forbidden, HttpError, now, sha256, ulid } from "./util.ts";
+import { bad, conflict, forbidden, HttpError, now, sha256, ulid } from "./util.ts";
 import { grant } from "./credits.ts";
 import { queueWorkspacePurge, sweepWorkspacePurges } from "./storage.ts";
 import { validMutationSource } from "./requestSecurity.ts";
@@ -13,6 +13,18 @@ export type Role = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
 const RANK: Record<Role, number> = { VIEWER: 0, EDITOR: 1, ADMIN: 2, OWNER: 3 };
 
 export type Auth = { user: { id: string; email: string; isAdmin: boolean }; workspaceId: string; role: Role };
+
+export function modelPermissions(userId: string) {
+  const user = get("SELECT email,is_admin FROM users WHERE id=? AND status='active' AND deleted_at IS NULL", userId);
+  const canManage = !!user?.is_admin && user.email === "66445039@qq.com";
+  const emails = setting<string[]>("modelWhitelist", []);
+  const accounts = setting("accountWhitelist", { enabled: false, emails: [] as string[] });
+  return { canManage, canUse: !!user && accountAllowed(user.email, !!user.is_admin) && (canManage || emails.includes(user.email) || accounts.emails.includes(user.email)) };
+}
+
+export function requireModelAccess(userId: string) {
+  if (!modelPermissions(userId).canUse) throw Object.assign(forbidden("尚未获得模型使用权限，请联系超级管理员加入模型使用白名单"), { retryable: false, fallbackAllowed: false });
+}
 
 const SESSION_TTL_MS = 30 * 24 * 3600_000;
 
@@ -35,18 +47,64 @@ function derivePassword(password: string, salt: string): Promise<Buffer> {
   });
 }
 
-/** 本机初始化或重置密码；不提供未认证的远程设置入口。 */
-export async function setUserPassword(userId: string, password: string) {
+async function hashPassword(password: string) {
   if (password.length < 12 || password.length > 256) throw bad("密码长度须为 12–256 个字符");
   const salt = randomBytes(16).toString("hex");
   const key = await derivePassword(password, salt);
+  return `scrypt:${salt}:${key.toString("hex")}`;
+}
+
+function saveUserPassword(userId: string, email: string, hash: string) {
+  run("INSERT INTO user_passwords VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash=excluded.password_hash, updated_at=excluded.updated_at", userId, hash, now());
+  run("DELETE FROM login_codes WHERE email=?", email);
+  run("DELETE FROM sessions WHERE user_id=?", userId);
+}
+
+/** 本机初始化或重置密码；不提供未认证的远程设置入口。 */
+export async function setUserPassword(userId: string, password: string) {
+  const hash = await hashPassword(password);
   tx(() => {
     const user = get("SELECT email FROM users WHERE id=? AND status='active' AND deleted_at IS NULL", userId);
     if (!user) throw bad("账号不存在或已停用");
-    run("INSERT INTO user_passwords VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET password_hash=excluded.password_hash, updated_at=excluded.updated_at", userId, `scrypt:${salt}:${key.toString("hex")}`, now());
-    run("DELETE FROM login_codes WHERE email=?", user.email);
-    run("DELETE FROM sessions WHERE user_id=?", userId);
+    saveUserPassword(userId, user.email, hash);
     audit(null, "auth.password.setLocal", userId);
+  });
+}
+
+function createUser(email: string, isAdmin: boolean) {
+  const id = ulid();
+  run("INSERT INTO users VALUES(?,?,?,?,?,?,NULL)", id, email, "active", isAdmin ? 1 : 0, now(), now());
+  const workspaceId = ulid();
+  run("INSERT INTO workspaces(id,name,owner_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", workspaceId, `${email.split("@")[0]}'s Workspace`, id, "personal", now(), now());
+  run("INSERT INTO workspace_members VALUES(?,?,?,?)", workspaceId, id, "OWNER", now());
+  run("INSERT INTO credit_accounts VALUES(?,0,0,?)", workspaceId, now());
+  run("INSERT INTO subscriptions(id,workspace_id,plan,period,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ulid(), workspaceId, "free", "free", "active", now(), now());
+  grant(workspaceId, setting("defaultCredits", 0), "CREDIT_GRANT", "signup grant");
+  return get("SELECT * FROM users WHERE id=?", id)!;
+}
+
+/** 超级管理员开户或为已有普通账号补设初始密码，整个操作原子提交。 */
+export async function provisionUser(email: string, password: string, actorId: string) {
+  email = email.trim().toLowerCase();
+  const hash = await hashPassword(password);
+  return tx(() => {
+    if (!modelPermissions(actorId).canManage) throw forbidden("仅超级管理员可以创建普通账号和设置初始密码");
+    if (config.adminEmails.includes(email) || email === "66445039@qq.com") throw forbidden("此入口仅用于普通账号");
+    assertNotSsoEnforced(email);
+    let user = get("SELECT * FROM users WHERE email=?", email);
+    if (user && (user.is_admin || user.status !== "active" || user.deleted_at)) throw bad("仅可为正常的普通账号设置初始密码");
+    if (user && get("SELECT 1 FROM user_passwords WHERE user_id=?", user.id)) throw conflict("该账号已设置密码，不能覆盖初始密码");
+    const whitelist = setting("accountWhitelist", { enabled: false, emails: [] as string[] });
+    if (!whitelist.emails.includes(email)) {
+      if (whitelist.emails.length >= 5000) throw bad("账户白名单最多允许 5000 个邮箱");
+      whitelist.emails.push(email);
+    }
+    const created = !user;
+    user ??= createUser(email, false);
+    saveUserPassword(user.id, email, hash);
+    setSetting("accountWhitelist", whitelist);
+    audit(actorId, created ? "user.create" : "auth.password.initialize", user.id, { email });
+    return { id: user.id, email, created };
   });
 }
 
@@ -92,17 +150,7 @@ export function loginUser(email: string, identity?: { provider: string; subject:
         if (u?.status === "disabled") throw forbidden("这个账号已被停用，请联系管理员");
         if (!u) {
             if (!setting("registrationOpen", true)) throw forbidden("暂未开放新用户注册");
-            const id = ulid();
-            const isAdmin = config.adminEmails.includes(email) ? 1 : 0;
-            run("INSERT INTO users VALUES(?,?,?,?,?,?,NULL)", id, email, "active", isAdmin, now(), now());
-            // Personal Workspace is created automatically (PRD §4).
-            const wid = ulid();
-            run("INSERT INTO workspaces(id,name,owner_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", wid, `${email.split("@")[0]}'s Workspace`, id, "personal", now(), now());
-            run("INSERT INTO workspace_members VALUES(?,?,?,?)", wid, id, "OWNER", now());
-            run("INSERT INTO credit_accounts VALUES(?,0,0,?)", wid, now());
-            run("INSERT INTO subscriptions(id,workspace_id,plan,period,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ulid(), wid, "free", "free", "active", now(), now());
-            grant(wid, setting("defaultCredits", 200), "CREDIT_GRANT", "signup grant");
-            u = get("SELECT * FROM users WHERE id=?", id)!;
+            u = createUser(email, config.adminEmails.includes(email));
         }
         for (const inv of all("SELECT * FROM workspace_invites WHERE email=? AND status='pending'", email)) {
             run("INSERT OR IGNORE INTO workspace_members VALUES(?,?,?,?)", inv.workspace_id, u.id, inv.role, now());

@@ -15,7 +15,7 @@
         </a>
       </nav>
       <div class="railFooter">
-        <el-button text :icon="IconPlugConnected" @click="openConnectModel()">接入模型</el-button>
+        <el-button v-if="canManageModels()" text :icon="IconPlugConnected" @click="openConnectModel()">{{ accounts ? "API 配置" : "接入模型" }}</el-button>
         <el-badge isDot :hidden="!hasDesktopUpdate"><el-button text :icon="IconSettings" @click="settingsVisible = true">设置</el-button></el-badge>
         <span>好戏，都在里头。</span>
       </div>
@@ -31,14 +31,15 @@
         </div>
       </header>
       <div class="pageContent">
-        <el-alert v-if="usingTrial" class="connectBanner" type="success" showIcon :closable="false">
+        <el-alert v-if="accounts && !me?.modelAccess.canUse" class="connectBanner" type="info" showIcon :closable="false" title="尚未获得模型使用权限，请联系超级管理员加入模型使用白名单" />
+        <el-alert v-else-if="usingTrial" class="connectBanner" type="success" showIcon :closable="false">
           <template #title>平台送你 {{ platformTrial.credits }} 积分，现在就能开始写故事</template>
           <div class="connectBannerBody">
             <span>写故事和剧本先用平台试用额度；生成图片和视频需要接入自己的模型。</span>
             <el-button size="small" @click="openConnectModel('text')">接入自己的模型</el-button>
           </div>
         </el-alert>
-        <el-alert v-else-if="needsModels && !bannerDismissed" class="connectBanner" type="warning" showIcon @close="dismissBanner">
+        <el-alert v-else-if="canManageModels() && needsModels && !bannerDismissed" class="connectBanner" type="warning" showIcon @close="dismissBanner">
           <template #title>{{ trialExhausted ? "试用额度已用完，接入模型继续创作" : "接入模型，准备开拍" }}</template>
           <div class="connectBannerBody">
             <span>
@@ -293,7 +294,7 @@ import usageSummary from "@/components/usageSummary.vue";
 import workspacePreview from "@/components/workspacePreview.vue";
 import { getCanvasShots, type CanvasShot } from "@/lib/canvasShots";
 import { isCanvasFile } from "@/pages/workspace/canvasFile";
-import { getMe, isAuthDisabled, logout } from "@/lib/session";
+import { canManageModels, getMe, isAuthDisabled, logout } from "@/lib/session";
 import { openConnectModel } from "@/components/connectModel/state";
 import { customProviders, loadPlatformTrial, platformTrial, settings as settingsStore } from "@/stores/settings";
 import workspacePicker from "./workspacePicker.vue";

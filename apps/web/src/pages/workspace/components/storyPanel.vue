@@ -4,8 +4,9 @@
       <p v-if="error" class="errorMessage" role="alert">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
       <div class="toolbar">
         <el-button :disabled="busy || childBusy" @click="run(() => refresh(false))">重新载入（放弃未保存编辑）</el-button>
-        <label>创作模型<select v-model="modelKey" :disabled="busy || childBusy"><option value="">选择已配置模型</option><option v-for="model in models" :key="JSON.stringify([model.providerId, model.modelId])" :value="JSON.stringify([model.providerId, model.modelId])">{{ model.providerLabel }} · {{ model.label }}</option></select></label>
-        <el-button :disabled="busy" @click="emit('settings')">模型设置</el-button><el-button v-if="busy" @click="controller?.abort()">停止创作</el-button>
+        <label v-if="canManageModels()">创作模型<select v-model="modelKey" :disabled="busy || childBusy"><option value="">选择已配置模型</option><option v-for="model in models" :key="JSON.stringify([model.providerId, model.modelId])" :value="JSON.stringify([model.providerId, model.modelId])">{{ model.providerLabel }} · {{ model.label }}</option></select></label>
+        <span v-else>平台默认模型：{{ selectedModel?.label ?? "等待管理员设置" }}</span>
+        <el-button v-if="canManageModels()" :disabled="busy" @click="isAuthDisabled() ? emit('settings') : router.push('/admin?tab=defaults')">模型设置</el-button><el-button v-if="busy" @click="controller?.abort()">停止创作</el-button>
       </div>
       <p class="hint">{{ progress }} 模型创作与审读按所选服务计费；正式采用由你决定。</p>
       <nav aria-label="故事创作步骤"><button v-for="tab in tabs" :key="tab.id" :aria-pressed="section === tab.id" :disabled="busy || childBusy" @click="run(() => switchSection(tab.id))">{{ tab.label }}</button></nav>
@@ -95,6 +96,8 @@ import { useNodeAi, type NodeAiModel } from "@toonflow/nodes-scaffold/nodeAi";
 import { newStoryProject, storyActionSchema, storyActionParameters, storyWritingGuide, musicFilmWritingGuide, shortDramaWritingGuide, storyStale, storyImpact, type StoryProject, type StoryAction, type StoryDraft, type StorySource } from "@toonflow/tool-scene-list/storyProject";
 import { resolveVisualBoard } from "@toonflow/tool-scene-list/visualReference";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
+import { canManageModels, isAuthDisabled } from "@/lib/session";
+import { useRouter } from "vue-router";
 import { readStoryProductionContext, readStory, updateStory } from "@/lib/storyClient";
 import { createSourceAttachments } from "@/components/agent/sourceAttachments";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
@@ -103,6 +106,7 @@ import storyFeedback from "./storyFeedback.vue";
 import visualReferenceBoard from "./visualReferenceBoard.vue";
 
 const props = defineProps<{ directory: string }>();
+const router = useRouter();
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ settings: []; produce: [revisionId: string, model: string] }>();
 const directory = props.directory, files = useWorkspaceFiles(directory), ai = useNodeAi();

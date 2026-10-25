@@ -26,10 +26,10 @@ export default router.put("/", validateFields({ settings: z.record(z.string(), z
   const settings = restoreSecrets(req.body.settings, u.conf.get("settings", {}));
   const selection = modelSelectionSchema.parse(settings.modelSelection ?? {});
   const previous = modelSelectionSchema.safeParse(u.conf.get("settings", {}).modelSelection ?? {});
-  for (const kind of ["text", "image", "video", "audio"] as const) {
+  for (const kind of ["text", "image", "imageEdit", "video", "audio"] as const) {
     const selected = selection[kind];
     if (!selected || previous.success && JSON.stringify(selected) === JSON.stringify(previous.data[kind])) continue;
-    const models = kind === "text" ? u.ai.listAiModels(true) : (await u.mediaGeneration.listMediaModels(true)).filter(model => model.type === kind);
+    const models = kind === "text" ? u.ai.listAiModels(true) : (await u.mediaGeneration.listMediaModels(true)).filter(model => model.type === (kind === "imageEdit" ? "image" : kind));
     if (!models.some(model => model.providerId === selected.providerId && model.modelId === selected.modelId))
       throw Object.assign(new Error("所选模型当前不可用，请先保存有效的供应商配置，再选择默认模型"), { status: 400 });
   }
@@ -48,7 +48,8 @@ export default router.put("/", validateFields({ settings: z.record(z.string(), z
   const revision = createHash("sha256").update(JSON.stringify(settings)).digest("hex");
   if (expected && expected !== currentRevision && revision !== currentRevision) throw Object.assign(new Error("设置或项目列表已在其他页面修改，未覆盖最新数据，请重新打开页面核对"), { status: 409 });
   u.conf.set("settings", settings);
-  res.set("x-settings-revision", revision);
+  const saved = u.conf.get("settings", {});
+  res.set("x-settings-revision", createHash("sha256").update(JSON.stringify(saved)).digest("hex"));
   await u.mcpRuntime.reloadMcpRuntime();
-  res.json(success(maskSecrets(settings), "设置已保存"));
+  res.json(success(maskSecrets(saved), "设置已保存"));
 });

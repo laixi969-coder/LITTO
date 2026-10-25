@@ -4,6 +4,7 @@ import { bad, j, notFound, now, ulid } from "../util.ts";
 import type { ProviderAdapter } from "./adapter.ts";
 import { mockAdapter } from "./mock.ts";
 import { openaiAdapter } from "./openai.ts";
+import { config } from "../config.ts";
 
 export const ADAPTERS: Record<string, ProviderAdapter> = { mock: mockAdapter, "openai-compatible": openaiAdapter };
 
@@ -108,6 +109,7 @@ export async function testProvider(providerId: string, workspaceId: string | nul
 
 // ---- seeding ----
 export function seedProviders() {
+    if (config.production) return;
     if (get("SELECT 1 FROM providers WHERE id='mock'")) return;
     upsertProvider(null, { id: "mock", name: "Mock Studio (offline)", adapter: "mock", priority: 10, concurrency: 8 });
     upsertProvider(null, { id: "openai-compatible", name: "OpenAI-compatible relay", adapter: "openai-compatible", baseUrl: "https://api.openai.com/v1", status: "disabled", priority: 50 });

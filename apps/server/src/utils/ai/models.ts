@@ -29,9 +29,10 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
     await response.body?.cancel();
     if (!response.ok) throw new Error(`OpenRouter 密钥验证失败（HTTP ${response.status}）`);
   }
-  if (url.hostname === "api.atlascloud.ai" && ["/", "/v1", "/v1/"].includes(url.pathname)) {
+  if (url.hostname === "api.atlascloud.ai" && ["/", "/v1", "/v1/", "/api/v1", "/api/v1/"].includes(url.pathname)) {
     url.pathname = "/api/v1/models";
-    const response = await fetch(url, { signal: AbortSignal.timeout(30000), redirect: "error" });
+    const key = apiKey.trim().replace(/^Bearer\s+/i, "");
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000), redirect: "error", headers: key ? { Authorization: `Bearer ${key}` } : {} });
     if (!response.ok) throw new Error(`获取 Atlas Cloud 模型目录失败（HTTP ${response.status}）`);
     const result = z.object({ data: z.array(z.object({
       model: z.string().min(1), displayName: z.string().optional(), type: z.string(), display_console: z.boolean(),

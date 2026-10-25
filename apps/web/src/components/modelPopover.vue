@@ -1,6 +1,7 @@
 <template>
   <div class="modelPopover">
     <el-popover
+      v-if="isAuthDisabled()"
       v-model:visible="visible"
       trigger="click"
       placement="top-start"
@@ -40,6 +41,7 @@
         </el-form-item>
       </el-form>
     </el-popover>
+    <span v-else class="modelButton">{{ selectedModelChoice?.label ?? "等待管理员设置默认模型" }}</span>
   </div>
 </template>
 
@@ -50,6 +52,7 @@ import { ElMessage } from "element-plus";
 import { IconChevronDown } from "@tabler/icons-vue";
 import { modelIcon } from "@toonflow/model-icons";
 import { modelChoices, loadAvailableModels, saveSettings } from "@/stores/settings";
+import { isAuthDisabled } from "@/lib/session";
 
 const selectedModel = defineModel<string>({ default: "" });
 const reasoningEffort = defineModel<string>("reasoningEffort", { default: "" });

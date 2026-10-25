@@ -7,15 +7,44 @@
     <el-alert v-if="error" :title="error" type="error" :closable="false" showIcon />
     <el-button v-if="error" class="retryButton" :loading="loading" @click="load">重新读取</el-button>
     <el-tabs v-if="system" v-model="activeTab" class="adminTabs">
-      <el-tab-pane label="账户白名单" name="whitelist">
+      <el-tab-pane v-if="getMe()?.modelAccess.canManage" label="API 配置" name="api" lazy>
+        <p class="description">在这里统一添加和管理 API，再设置平台默认模型、授权模型使用白名单。白名单账号无需单独配置。</p>
+        <el-button type="primary" @click="openConnectModel()">添加 API</el-button>
+        <el-tabs class="providerTabs">
+          <el-tab-pane label="文本 API"><languageModel :visible="activeTab === 'api'" /></el-tab-pane>
+          <el-tab-pane label="图片、视频与音频 API" lazy><mediaModel :visible="activeTab === 'api'" /></el-tab-pane>
+        </el-tabs>
+      </el-tab-pane>
+      <el-tab-pane v-if="getMe()?.modelAccess.canManage" label="默认模型" name="defaults" lazy>
+        <modelSelection />
+      </el-tab-pane>
+      <el-tab-pane v-if="getMe()?.modelAccess.canManage" label="模型使用白名单" name="modelWhitelist">
+        <el-form class="settingsForm" labelPosition="top" :disabled="loading || !!saving" @submit.prevent="saveModelWhitelist">
+          <p class="description">名单内账号直接使用超级管理员配置的 API 和默认模型，无需各自选择或配置，当前不扣积分。</p>
+          <el-form-item label="允许使用模型的邮箱（每行一个）">
+            <el-input v-model="modelWhitelistText" type="textarea" :rows="8" aria-label="允许使用模型的邮箱" />
+          </el-form-item>
+          <el-button type="primary" nativeType="submit" :loading="saving === 'modelWhitelist'">保存模型使用白名单</el-button>
+        </el-form>
+      </el-tab-pane>
+      <el-tab-pane v-if="getMe()?.modelAccess.canManage" label="账号与白名单" name="whitelist">
+        <el-form class="settingsForm" labelPosition="top" :disabled="loading || !!saving" @submit.prevent="saveAccount">
+          <h2>创建普通账号 / 设置初始密码</h2>
+          <p class="description">保存后自动加入账户白名单，可直接登录并使用管理员的默认模型，不能修改模型配置。已有普通账号仅可补设初始密码，已有密码不会被覆盖。</p>
+          <el-form-item label="账号邮箱"><el-input v-model="account.email" type="email" autocomplete="off" maxlength="254" aria-label="账号邮箱" /></el-form-item>
+          <el-form-item label="初始密码（12–256 个字符）"><el-input v-model="account.password" type="password" showPassword autocomplete="new-password" :minlength="12" :maxlength="256" aria-label="初始密码" /></el-form-item>
+          <el-button type="primary" nativeType="submit" :loading="saving === 'account'" :disabled="!account.email.trim() || account.password.length < 12">保存账号并加入白名单</el-button>
+        </el-form>
         <el-form class="settingsForm" labelPosition="top" :disabled="loading || !!saving" @submit.prevent="saveWhitelist">
+          <h2>账户白名单</h2>
           <el-form-item label="启用账户白名单"><el-switch v-model="system.accountWhitelist.enabled" aria-label="启用账户白名单" /></el-form-item>
           <p class="description">启用后，仅名单内邮箱可以注册和登录；移出名单的账号立即失去访问权限。超级管理员始终可登录。</p>
+          <p class="description">已设置密码的名单内账号可直接使用管理员的默认模型，无需另外加入模型使用白名单。</p>
           <el-form-item label="允许登录的邮箱（每行一个）">
             <el-input v-model="whitelistText" type="textarea" :rows="8" aria-label="允许登录的邮箱" />
           </el-form-item>
           <el-form-item label="允许新用户注册"><el-switch v-model="system.registrationOpen" aria-label="允许新用户注册" /></el-form-item>
-          <p class="description">关闭新用户注册后，白名单内尚未注册的邮箱也无法创建账号。</p>
+          <p class="description">关闭新用户注册后，超级管理员仍可在上方创建普通账号并设置初始密码。</p>
           <el-button type="primary" nativeType="submit" :loading="saving === 'whitelist'">保存白名单</el-button>
         </el-form>
       </el-tab-pane>
@@ -100,26 +129,36 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { defineAsyncComponent, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { cloudRequest, getMe } from "@/lib/session";
+import { openConnectModel } from "@/components/connectModel/state";
+
+const languageModel = defineAsyncComponent(() => import("@/components/settings/panels/languageModel/index.vue"));
+const mediaModel = defineAsyncComponent(() => import("@/components/settings/panels/mediaModel/index.vue"));
+const modelSelection = defineAsyncComponent(() => import("@/components/settings/panels/modelSelection.vue"));
 
 type Price = { perImage?: number; perSecond?: number; perCall?: number };
-type SystemSettings = { accountWhitelist: { enabled: boolean; emails: string[] }; registrationOpen: boolean; defaultCredits: number; billingEnabled: boolean; creditsPerUsd: number; markup: number; platformTrial: { enabled: boolean; creditsPer1kTokens: number }; pricing: Record<string, Price> };
+type SystemSettings = { modelWhitelist: string[]; accountWhitelist: { enabled: boolean; emails: string[] }; registrationOpen: boolean; defaultCredits: number; billingEnabled: boolean; creditsPerUsd: number; markup: number; platformTrial: { enabled: boolean; creditsPer1kTokens: number }; pricing: Record<string, Price> };
 type Account = { id: string; email: string; status: string; is_admin: number; workspace_id: string | null; balance: number; held: number };
 type Model = { id: string; name: string; providerId: string; price: Price; limits: { workspaceExecution?: boolean } };
 type Pack = { id: string; name: string; priceUsd: number; credits: number };
 type Plan = Pack & { period: string; storageGb: number };
 type Catalogue = { plans: Plan[]; packs: Pack[] };
 const router = useRouter();
-const activeTab = ref("whitelist");
+const route = useRoute();
+const activeTab = ref(getMe()?.modelAccess.canManage ? "api" : "whitelist");
+watch(() => route.query.tab, value => {
+  if (getMe()?.modelAccess.canManage && ["api", "defaults", "modelWhitelist"].includes(String(value))) activeTab.value = String(value);
+}, { immediate: true });
 const system = ref<SystemSettings>();
 const catalogue = ref<Catalogue>();
 const users = ref<Account[]>([]);
 const models = ref<Model[]>([]);
 const usagePrices = ref<{ providerId: string; modelId: string; price: Price }[]>([]);
 const whitelistText = ref("");
+const modelWhitelistText = ref("");
 const search = ref("");
 const loading = ref(false);
 const usersLoading = ref(false);
@@ -128,6 +167,7 @@ const error = ref("");
 const selectedUser = ref<Account>();
 const adjustmentVisible = ref(false);
 const adjustment = reactive<{ amount: number | undefined; note: string }>({ amount: 0, note: "" });
+const account = reactive({ email: "", password: "" });
 const rates = [{ key: "perImage", label: "每张图片" }, { key: "perSecond", label: "每秒视频" }, { key: "perCall", label: "每次调用" }] as const;
 
 async function load() {
@@ -144,6 +184,7 @@ async function load() {
     models.value = modelList.filter(model => !model.limits.workspaceExecution);
     catalogue.value = prices;
     whitelistText.value = settings.accountWhitelist.emails.join("\n");
+    modelWhitelistText.value = settings.modelWhitelist.join("\n");
     usagePrices.value = Object.entries(settings.pricing).map(([key, price]) => {
       const splitAt = key.indexOf("/");
       return { providerId: key.slice(0, splitAt), modelId: key.slice(splitAt + 1), price };
@@ -173,11 +214,29 @@ function saveWhitelist() {
     whitelistText.value = emails.join("\n");
   });
 }
+function saveAccount() {
+  return save("account", async () => {
+    await cloudRequest("/admin/users", "POST", { email: account.email.trim(), password: account.password });
+    account.email = "";
+    account.password = "";
+    const settings = await cloudRequest<SystemSettings>("/admin/system");
+    system.value!.accountWhitelist = settings.accountWhitelist;
+    whitelistText.value = settings.accountWhitelist.emails.join("\n");
+    await loadUsers();
+  });
+}
 function openAdjustment(user: Account) {
   selectedUser.value = user;
   adjustment.amount = 0;
   adjustment.note = "";
   adjustmentVisible.value = true;
+}
+function saveModelWhitelist() {
+  return save("modelWhitelist", async () => {
+    const emails = [...new Set(modelWhitelistText.value.split(/\r?\n/).map(email => email.trim().toLowerCase()).filter(Boolean))];
+    await cloudRequest("/admin/system", "PUT", { modelWhitelist: emails });
+    modelWhitelistText.value = emails.join("\n");
+  });
 }
 function saveAdjustment() {
   return save("credits", async () => {
@@ -231,7 +290,12 @@ onMounted(load);
   }
   .retryButton { margin-top: 12px; }
   .adminTabs {
-    .settingsForm { max-width: 580px; }
+    .providerTabs { margin-top: 24px; }
+    .settingsForm {
+      max-width: 580px;
+      margin-bottom: 28px;
+      h2 { margin: 0 0 16px; font-size: 17px; font-weight: 600; }
+    }
     .searchForm { margin-top: 16px; }
     .pricingSection {
       padding: 20px 0 28px;

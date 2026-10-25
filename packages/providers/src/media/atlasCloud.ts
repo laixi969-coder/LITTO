@@ -1,11 +1,15 @@
 const rules = [
   { type: "input", field: "apiKey" as const, title: "API Key", value: "", props: { type: "password", showPassword: true, autocomplete: "off" } },
-  { type: "input", field: "baseUrl" as const, title: "API 地址", value: "https://api.atlascloud.ai" },
+  { type: "input", field: "baseUrl" as const, title: "API 地址", value: "https://api.atlascloud.ai/api/v1" },
 ] as const;
+
+function apiBaseUrl(config: Record<string, unknown>) {
+  return String(config.baseUrl || "https://api.atlascloud.ai").trim().replace(/\/+$/, "").replace(/\/(?:api\/)?v1$/i, "");
+}
 
 async function fetchJson(context: ProviderContext, path: string, signal: AbortSignal, body?: string | FormData) {
   const key = String(context.config.apiKey ?? "").trim().replace(/^Bearer\s+/i, "");
-  const baseUrl = String(context.config.baseUrl ?? "").trim().replace(/\/+$/, "");
+  const baseUrl = apiBaseUrl(context.config);
   if (!key || !baseUrl) throw new Error("请填写 Atlas Cloud API Key 和地址");
   const response = await context.tool.fetch(`${baseUrl}${path}`, {
     method: body === undefined ? "GET" : "POST", signal, body,
@@ -154,7 +158,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 
 export default {
   resumeMedia,
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.5", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.6", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
@@ -166,9 +170,10 @@ export default {
     { id: "kwaivgi/kling-v2.6-pro/image-to-video", label: "Kling 2.6 Pro 首帧视频", type: "video", mode: ["singleImage"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 10], resolution: [] }] },
   ] as AtlasModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
-    const baseUrl = String(this.config.baseUrl || "https://api.atlascloud.ai").trim().replace(/\/+$/, "");
+    const baseUrl = apiBaseUrl(this.config);
+    const key = String(this.config.apiKey ?? "").trim().replace(/^Bearer\s+/i, "");
     const signal = this.signal ?? AbortSignal.timeout(60000);
-    const response = await this.tool.fetch(`${baseUrl}/api/v1/models`, { signal, redirect: "error" });
+    const response = await this.tool.fetch(`${baseUrl}/api/v1/models`, { signal, redirect: "error", headers: key ? { Authorization: `Bearer ${key}` } : {} });
     if (!response.ok) throw new Error(`获取 Atlas Cloud 目录失败（HTTP ${response.status}）`);
     const result = await response.json() as { data?: Record<string, any>[] };
     if (!Array.isArray(result.data)) throw new Error("Atlas Cloud 目录格式错误");

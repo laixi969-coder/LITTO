@@ -137,7 +137,8 @@
             <p>关键帧经检查选为主帧后，再生成视频。每次提交创建一个持久任务，保留全部候选。</p>
             <div class="fieldGrid">
               <label>生成类型<select v-model="kind"><option value="image">图片关键帧</option><option value="video">视频 Take</option></select></label>
-              <label>模型<select v-model="modelKey"><option value="">选择已接入的模型</option><option v-for="item in availableModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label>
+              <label v-if="canManageModels()">模型<select v-model="modelKey"><option value="">选择已接入的模型</option><option v-for="item in availableModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label>
+              <span v-else>平台默认模型：{{ selectedModel?.label ?? "等待管理员设置" }}</span>
               <label v-if="kind === 'video'">模式<select v-model="modeKey"><option value="">选择模式</option><option v-for="mode in modes" :key="JSON.stringify(mode)" :value="JSON.stringify(mode)">{{ modeLabel(mode) }}</option></select></label>
               <label v-if="kind === 'video'">分辨率<select v-model="resolution"><option value="">选择分辨率</option><option v-for="value in resolutions" :key="value">{{ value }}</option></select></label>
               <label v-if="kind === 'video'">生成时长（含剪辑余量）<select v-model.number="duration"><option v-for="value in durations" :key="value" :value="value">{{ value }} 秒</option></select></label>
@@ -179,7 +180,7 @@
               <button type="button" @click="run(basicReview)">基础检测（复用已有结果）</button>
               <p v-if="targetReports[0]?.current">当前素材与规格的检查可复用，无需重新勾选。</p>
               <p v-if="speechReviewRequired">需看听区间：{{ qualityPlan.speechRanges.map(range => range.start + "–" + range.end + " 秒").join("、") }}</p>
-              <label>检查模型<select v-model="visionModelKey"><option value="">选择支持图片输入的模型</option><option v-for="item in visualModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label><button type="button" :disabled="!visionModelKey" @click="run(autoReview)">视觉模型辅助检查</button>
+              <label v-if="canManageModels()">检查模型<select v-model="visionModelKey"><option value="">选择支持图片输入的模型</option><option v-for="item in visualModels" :key="keyOf(item)" :value="keyOf(item)">{{ item.providerLabel }} · {{ item.label }}</option></select></label><button type="button" :disabled="!visionModelKey" @click="run(autoReview)">视觉模型辅助检查</button>
               <p>辅助检查可能产生模型费用。普通镜头采样 3 帧，重点镜头采样 8 帧，物体交互最多补 6 帧；相同素材与规格复用已完成的检查。采样不能证明声音与口型同步。</p>
               <p class="reviewHint">确认前请对照画面看：{{ reviewFields.map(field => field[1]).join("、") }}{{ qualityPlan.fullPlayback ? "；复杂动作请完整播放一遍" : "；集中预览一次即可" }}。</p>
               <label v-for="field in reviewFields" :key="field[0]"><input v-model="reviewedFields" type="checkbox" :value="field[0]" />已检查 {{ field[1] }}</label>
@@ -247,6 +248,7 @@ import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 const editPanel = ref<InstanceType<typeof productionEdit>>();
 const getCanvas = inject<() => CanvasContext | undefined>("canvas");
 import { ElMessageBox } from "element-plus";
+import { canManageModels } from "@/lib/session";
 import type { MediaModel } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema, type CameraTrajectory } from "@toonflow/tools-scaffold/runtime";
 import { needsLipSync, qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
@@ -339,6 +341,8 @@ const speechReviewRequired = computed(() => needsLipSync(detail.value ?? {}) || 
 const keyOf = (model: MediaModel) => JSON.stringify([model.providerId, model.modelId]);
 const availableModels = computed(() => models.value.filter(model => model.type === kind.value));
 const selectedModel = computed(() => availableModels.value.find(model => keyOf(model) === modelKey.value));
+watch(availableModels, items => { if (!canManageModels()) modelKey.value = items[0] ? keyOf(items[0]) : ""; }, { immediate: true });
+watch(visualModels, items => { if (!canManageModels()) visionModelKey.value = items[0] ? keyOf(items[0]) : ""; });
 const modes = computed(() => Array.isArray(selectedModel.value?.mode) ? selectedModel.value!.mode as unknown[] : []);
 const resolutions = computed(() => [...new Set(selectedModel.value?.durationResolutionMap?.flatMap(rule => rule.resolution) ?? [])]);
 const durations = computed(() => [...new Set(selectedModel.value?.durationResolutionMap?.filter(rule => rule.resolution.includes(resolution.value)).flatMap(rule => rule.duration) ?? [])]);

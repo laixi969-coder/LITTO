@@ -13,7 +13,7 @@ import { sweepUploads } from "./routes/extra.ts";
 import { sweepWorkspacePurges } from "./storage.ts";
 export { configureWorkspacePurge } from "./storage.ts";
 
-export { resolveSession } from "./auth.ts";
+export { resolveSession, modelPermissions, requireModelAccess } from "./auth.ts";
 export { validMutationSource } from "./requestSecurity.ts";
 export type { Auth, Role } from "./auth.ts";
 export { scoped, get as dbGet, all as dbAll, run as dbRun, audit, setting } from "./db.ts";
