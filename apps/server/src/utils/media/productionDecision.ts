@@ -76,7 +76,7 @@ export async function requestProductionDecision(directory: string, toolCallId: s
   const member = api.dbGet("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", tenant.workspaceId, tenant.userId);
   if (!member || member.role === "VIEWER") throw new Error("制作选择的编辑权限已失效");
   if (workspaceProject(directory) !== projectId) throw new Error("工作目录关联项目已改变，请重新确认");
-  const result = await api.applyProductionDecision(scope, projectId, prepared, response, tenant.userId);
+  const result = await api.applyProductionDecision(scope, projectId, prepared, response, question.decisionSource ? `agent:${tenant.userId}` : tenant.userId);
   if ("feedback" in result) return { ...prepared.request, ...result };
   let answer = result.applied ? "决定已保存，可继续已授权的后续工作" : "本次未采用，已保留候选";
   return { ...prepared.request, ...result, answer };

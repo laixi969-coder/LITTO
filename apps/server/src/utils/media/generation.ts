@@ -19,6 +19,7 @@ import { applyMediaQuality, readMediaAspect } from "@/utils/media/quality";
 import { skinFinishes, videoMotionTiming, type SkinFinish } from "@toonflow/tool-media-generation/runtime";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { inspectVideoPrompt, isDirectorPrompt, positivePromptText } from "@/utils/media/videoPrompt";
+import { autoFilmScope } from "@/utils/autoFilm/scope";
 
 export type { SkinFinish } from "@toonflow/tool-media-generation/runtime";
 
@@ -604,6 +605,11 @@ export async function generateMediaDirect(
 
 /** Agent tools keep their awaitable contract; the actual generation is owned by the persistent worker. */
 export async function generateMedia(cwd: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]> {
+  const automatic = autoFilmScope.getStore();
+  if (automatic) {
+    if (automatic.directory !== cwd) throw new Error("自动成片任务不能跨工作目录生成素材");
+    await automatic.beforeGeneration(mediaType, request);
+  }
   const { cloud } = await import("@/lib/cloud");
   const { currentTenant } = await import("@/utils/tenant");
   const api = cloud();

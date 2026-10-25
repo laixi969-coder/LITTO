@@ -12,6 +12,7 @@ import { seedSkills } from "./domain/market-seed.ts";
 import { sweepUploads } from "./routes/extra.ts";
 import { sweepWorkspacePurges } from "./storage.ts";
 export { configureWorkspacePurge } from "./storage.ts";
+export { storage, mediaView, saveMedia, sniff } from "./storage.ts";
 
 export { resolveSession, modelPermissions, requireModelAccess } from "./auth.ts";
 export { validMutationSource } from "./requestSecurity.ts";
@@ -25,7 +26,7 @@ export { encrypt, decrypt } from "./crypto.ts";
 export { workspaceProduction, readWorkspaceAsset, importWorkspaceKeyframe, importWorkspaceAudio, importWorkspaceSpeechTake, extractContinuationFrame } from "./domain/workspaceProduction.ts";
 export { prepareKeyframeApproval, approveKeyframes } from "./domain/keyframeApproval.ts";
 export { prepareProductionDecision, applyProductionDecision } from "./domain/productionDecision.ts";
-export { inspectFinalQuality, sequenceFingerprint, assertSpeechExport } from "./domain/finalQuality.ts";
+export { inspectFinalQuality, finalQualityView, sequenceFingerprint, assertSpeechExport } from "./domain/finalQuality.ts";
 export { shotFingerprint } from "./domain/realism.ts";
 export { assertSpeechPlan, speechPlanningIssues, shotDialogueMode } from "./domain/speechPlanning.ts";
 export { editView, getEdit } from "./domain/nle.ts";

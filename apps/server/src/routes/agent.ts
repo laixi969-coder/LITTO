@@ -27,7 +27,7 @@ const inputSchema = z.object({
 });
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
-  const { directory, canvas, ...options } = req.body as z.infer<typeof inputSchema>;
+  const { directory, canvas, ...options } = inputSchema.parse(req.body);
   const cwd = await u.workspace.resolveWorkspace(req, directory);
   res.set({ "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" });
   res.flushHeaders();

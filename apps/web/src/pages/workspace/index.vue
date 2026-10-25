@@ -43,7 +43,8 @@
     </el-tooltip>
     <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" />
     <settings v-model="settingsVisible" />
-    <div class="productionActions"><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="productionPanelRef?.openLibrary()">资产库</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <div class="productionActions"><el-button @click="autoFilmVisible = true">一键自动成片</el-button><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="productionPanelRef?.openLibrary()">资产库</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <autoFilmPanel v-if="workspaceStore.project" :key="`autoFilm${workspaceStore.project.directory}`" v-model="autoFilmVisible" :directory="workspaceStore.project.directory" />
     <storyPanel v-if="workspaceStore.project" :key="`story${workspaceStore.project.directory}`" ref="storyPanelRef" v-model="storyVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" @produce="prepareStoryProduction" />
     <voicePanel v-if="workspaceStore.project" :key="`voice${workspaceStore.project.directory}`" ref="voicePanelRef" v-model="voiceVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" />
     <productionPanel v-if="workspaceStore.project" :key="workspaceStore.project.directory" ref="productionPanelRef" v-model="productionVisible" :projectId="workspaceStore.project.projectId" :directory="workspaceStore.project.directory" @generateCharacter="prepareCharacterGeneration" />
@@ -67,6 +68,8 @@ import floatingAgent from "./components/floatingAgent.vue";
 import productionPanel from "./components/productionPanel.vue";
 const voicePanel = defineAsyncComponent(() => import("./components/voicePanel.vue"));
 const storyPanel = defineAsyncComponent(() => import("./components/storyPanel.vue"));
+const autoFilmPanel = defineAsyncComponent(() => import("./components/autoFilmPanel.vue"));
+const autoFilmVisible = ref(false);
 const storyVisible = ref(false);
 const storyPanelRef = ref<InstanceType<typeof storyPanel>>();
 function prepareStoryProduction(revisionId: string, model: string) {

@@ -220,6 +220,7 @@ export type ToolCall = {
 };
 
 export interface QuestionContext {
+  decisionSource?: { kind: "agent"; taskId: string };
   ask(toolCallId: string, request: QuestionRequest, signal?: AbortSignal): Promise<QuestionAnswer>;
 }
 

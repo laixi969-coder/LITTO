@@ -30,8 +30,10 @@ import * as a2aSettings from "@/agent/a2a/settings";
 import * as personalization from "@/utils/personalization";
 import * as mentionFiles from "@/agent/mentionFiles";
 import * as story from "@/utils/story";
+import * as autoFilm from "@/utils/autoFilm";
 
 export default {
+  autoFilm,
   story,
   assets,
   desktop,
