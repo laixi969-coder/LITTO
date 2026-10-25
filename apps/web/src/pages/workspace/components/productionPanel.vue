@@ -389,9 +389,14 @@ async function load() {
   if (!projectId) throw new Error("当前工作区尚未关联项目，请重新打开工作区");
   const files = useWorkspaceFiles(props.directory);
   const { entries } = await files.list();
-  const preferences = entries.some(item => item.name === "mediaPreferences.json") ? await files.readJson<{ imageRatio?: string; videoRatio?: string }>("mediaPreferences.json") : {};
-  ratios.value.image ||= preferences.imageRatio ?? "";
-  ratios.value.video ||= preferences.videoRatio ?? "";
+  const preferences = entries.some(item => item.name === "mediaPreferences.json") ? await files.readJson<Record<string, unknown>>("mediaPreferences.json") : {};
+  if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) throw new Error("项目画幅配置无效，请核对 mediaPreferences.json");
+  for (const field of ["imageRatio", "videoRatio"]) {
+    const value = preferences[field];
+    if (value !== undefined && (typeof value !== "string" || !/^$|^[1-9]\d{0,3}:[1-9]\d{0,3}$/.test(value))) throw new Error("项目画幅配置无效，请核对 mediaPreferences.json");
+  }
+  ratios.value.image ||= typeof preferences.imageRatio === "string" ? preferences.imageRatio : "";
+  ratios.value.video ||= typeof preferences.videoRatio === "string" ? preferences.videoRatio : "";
   const path = `/projects/${projectId}`;
   const values = await Promise.all([request(`${path}/world`), request(`${path}/looks`), request(`${path}/assets`), request(`${path}/shots`), request(`${path}/sequences`), request(`${path}/references`)]);
   [world.value, , assets.value, shots.value, sequences.value, references.value] = values;

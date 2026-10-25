@@ -204,7 +204,7 @@ function loadModels() {
     if (!data.value.ratio) {
       const workspace = files.getWorkspaceFiles();
       const { entries } = await workspace.list();
-      const preferences = entries.some(item => item.name === "mediaPreferences.json") ? await workspace.readJson<{ imageRatio?: string }>("mediaPreferences.json") : {};
+      const preferences = entries.some(item => item.name === "mediaPreferences.json") ? z.object({ imageRatio: z.string().regex(/^$|^[1-9]\d{0,3}:[1-9]\d{0,3}$/).optional() }).parse(await workspace.readJson("mediaPreferences.json")) : {};
       if (disposed || deleting.value) return;
       if (!data.value.ratio) data.value.ratio = preferences.imageRatio || "16:9";
     }
