@@ -158,7 +158,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 
 export default {
   resumeMedia,
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.6", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.7", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
@@ -214,12 +214,14 @@ export default {
       } else if (model.type === "image") {
         const editing = !!(properties.images || properties.image || properties.reference_images);
         model.mode = editing ? ["singleImage", ...((properties.images || properties.reference_images) ? ["multiReference" as const] : [])] : ["text"];
-        model.imageSizes = properties.size?.enum?.filter((size): size is string => typeof size === "string" && /^\d+[x*]\d+$/.test(size));
-        model.imageRatios = (properties.aspect_ratio ?? properties.ratio)?.enum?.filter((ratio): ratio is string => typeof ratio === "string" && /^[1-9]\d*:[1-9]\d*$/.test(ratio));
-        if (!model.imageSizes?.length) {
+        let imageSizes = properties.size?.enum?.filter((size): size is string => typeof size === "string" && /^\d+[x*]\d+$/.test(size));
+        const imageRatios = (properties.aspect_ratio ?? properties.ratio)?.enum?.filter((ratio): ratio is string => typeof ratio === "string" && /^[1-9]\d*:[1-9]\d*$/.test(ratio));
+        if (!imageSizes?.length) {
           // nano-banana 等系列没有像素 size，用 resolution 的 1k/2k/4k 档；生成端把尺寸选择映射到 resolution 参数。
-          model.imageSizes = properties.resolution?.enum?.filter((tier): tier is string => typeof tier === "string" && /^\d+k$/i.test(tier));
+          imageSizes = properties.resolution?.enum?.filter((tier): tier is string => typeof tier === "string" && /^\d+k$/i.test(tier));
         }
+        if (imageSizes?.length) model.imageSizes = imageSizes;
+        if (imageRatios?.length) model.imageRatios = imageRatios;
         // mai-image 的 size 是无枚举自由字符串（走模型默认）；edit 变体尺寸跟随参考图。仅纯文生图连尺寸字段都没有时视为未适配结构。
         if (!properties.size && !properties.resolution && !editing) throw new Error(`模型 ${model.id} 缺少已适配的尺寸参数`);
       } else {
