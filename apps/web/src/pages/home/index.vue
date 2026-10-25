@@ -515,6 +515,12 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
       true,
     );
     if (storyBrief) await updateStory(directory, 0, { type: "brief", value: storyBrief });
+    if (fromPrompt && (mediaPreferencesValue.value.imageRatio || mediaPreferencesValue.value.videoRatio)) {
+      await useWorkspaceFiles(directory).writeJson("mediaPreferences.json", {
+        imageRatio: mediaPreferencesValue.value.imageRatio,
+        videoRatio: mediaPreferencesValue.value.videoRatio,
+      }, true);
+    }
     await workspaceStore.openProject(directory);
     if (fromPrompt && (message.trim() || attachments.length)) {
       workspaceStore.pendingAgentMessage = {

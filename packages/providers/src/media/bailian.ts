@@ -37,7 +37,7 @@ function wait(signal: AbortSignal) {
 }
 
 export default {
-  id: "bailian", label: "阿里百炼", version: "1.1.0", rules,
+  id: "bailian", label: "阿里百炼", version: "1.1.1", rules,
   readme: "支持分页同步工作空间模型目录，接入已适配的图片、视频及 Qwen-Audio-TTS、CosyVoice、Qwen-TTS 非实时配音。请填写同地域 API Key 和以 /api/v1 结尾的工作空间地址。Qwen-TTS 使用单独的 DashScope 地址，请在 qwenTtsBaseUrl 配置同地域端点；不将工作空间端点与其混用。CosyVoice 3.5 需要已创建的复刻或设计音色 ID。目录存在不代表账户已开通权限。\n\n[模型目录](https://help.aliyun.com/zh/model-studio/list-models) · [语音文档](https://help.aliyun.com/zh/model-studio/non-realtime-tts-user-guide)",
   models: [
     { id: "qwen-audio-3.1-tts-flash", label: "Qwen Audio 3.1 TTS Flash · 配音", type: "audio", speechInstructions: true, voices: [{ title: "龙安欢", voice: "longanhuan_v3.1" }] },
@@ -138,6 +138,7 @@ export default {
     const dimensions: Record<string, string[]> = { "16:9": ["1280*720", "1920*1080"], "9:16": ["720*1280", "1080*1920"], "1:1": ["960*960", "1440*1440"], "4:3": ["1088*832", "1632*1248"], "3:4": ["832*1088", "1248*1632"] };
     const ratio = request.ratio ?? "16:9";
     if (!dimensions[ratio]) throw new Error("不支持此视频画幅");
+    if (request.firstFrame && request.ratio) await this.tool.assertAspectRatio(request.firstFrame, request.ratio);
     if (!imageMode && request.generateAudio === false) throw new Error("万相 2.6 文生视频会自动生成音频");
     const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const task = await fetchJson(this, "/services/aigc/video-generation/video-synthesis", signal, {

@@ -41,7 +41,7 @@ function wait(signal: AbortSignal) {
 }
 
 export default {
-  id: "vidu", label: "Vidu", version: "1.1.3", rules,
+  id: "vidu", label: "Vidu", version: "1.1.4", rules,
   readme: "Vidu Q4 Preview 支持图生视频和参考生视频。图生视频使用一张首帧，画幅跟随首帧；参考生视频使用 1–15 张图片，可附加 0–3 段 MP3 参考音频（每段 3–12 秒），画幅可选 16:9、9:16、1:1、4:3、3:4。两种模式均支持 3–16 秒、540P / 720P / 1080P / 2K / 4K，可选音画同出。提示词可按输入顺序使用“参考图1”“参考音频1”指定素材。只需填写 API Key，API 地址默认使用官方地址；中转须兼容 Vidu 协议。\n\n[图生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) · [参考生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video)",
   models: [
     { id: "viduq4-preview", label: "Vidu Q4 Preview", type: "video", mode: ["singleImage", ["imageReference:15", "audioReference:3"]], audio: "optional", durationResolutionMap: [{ duration: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], resolution: ["540P", "720P", "1080P", "2K", "4K"] }] },
@@ -82,6 +82,7 @@ export default {
     if (request.seed !== undefined && (!Number.isSafeInteger(request.seed) || request.seed < 0)) throw new Error("Vidu 随机种子须为非负整数");
     const ratio = request.ratio ?? "16:9";
     if (referenceMode && !["16:9", "9:16", "1:1", "4:3", "3:4"].includes(ratio)) throw new Error("不支持此 Vidu 参考生视频画幅");
+    if (!referenceMode && request.ratio) await this.tool.assertAspectRatio(request.firstFrame!, request.ratio);
     const body = JSON.stringify({
       model: request.model, prompt,
       images: (referenceMode ? request.images! : [request.firstFrame!]).map(input => mediaValue(input, "image")),

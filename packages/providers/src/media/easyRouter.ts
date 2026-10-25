@@ -85,7 +85,7 @@ function videoModel(id: string): ProviderModel | undefined {
 }
 
 export default {
-  id: "easyRouter", label: "EasyRouter", version: "1.2.0", rules,
+  id: "easyRouter", label: "EasyRouter", version: "1.2.1", rules,
   readme: "图片、视频和独立配音共用 API Key，可同步目录并选择已适配模型。配音支持 GPT TTS 与 Gemini TTS，使用 /audio/speech 返回音频流；Gemini 保留原生 WAV 和默认语速。支持平台音色 ID，不支持此接口未定义的克隆参考和表演指令。视频自动轮询并通过带认证的内容接口下载。\n\n[配音文档](https://docs.easyrouter.io/en/docs/api/ai-model/audio/speech)",
   models: [
     { id: "gpt-4o-mini-tts", label: "GPT-4o Mini TTS · 配音", type: "audio", voices: [{ title: "Alloy", voice: "alloy" }, { title: "Nova", voice: "nova" }] },
@@ -176,6 +176,7 @@ export default {
     if (request.generateAudio && !model.audio) throw new Error("此模型不支持生成音频");
     const ratio = request.ratio || "16:9";
     if (!(seedance ? ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"] : ["16:9", "9:16", "1:1", "4:3", "3:4", "2:3", "3:2", "21:9"]).includes(ratio)) throw new Error("不支持此视频画幅");
+    if (!seedance && request.firstFrame && request.ratio) await this.tool.assertAspectRatio(request.firstFrame, request.ratio);
     const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const path = seedance ? "/video/generations" : "/videos";
     const task = await fetchJson(this, path, signal, JSON.stringify({

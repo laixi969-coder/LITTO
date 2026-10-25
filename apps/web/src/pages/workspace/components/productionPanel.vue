@@ -242,6 +242,7 @@
 <script setup lang="ts">
 import { computed, inject, onScopeDispose, ref, toRaw, watch } from "vue";
 import productionEdit from "./productionEdit.vue";
+import useWorkspaceFiles from "@/lib/workspaceFiles";
 import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 const editPanel = ref<InstanceType<typeof productionEdit>>();
 const getCanvas = inject<() => CanvasContext | undefined>("canvas");
@@ -317,7 +318,9 @@ const continuityShots = computed(() => {
   return shots.value.filter(item => item.sequenceId === sequence?.id ? item.ord < draft.value.ord
     : sequences.value.find(value => value.id === item.sequenceId)?.ord < sequence?.ord);
 });
-const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref(""), ratio = ref("16:9");
+const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref("");
+const ratios = ref<Record<string, string>>({ image: "", video: "" });
+const ratio = computed({ get: () => ratios.value[kind.value] ?? "", set: value => { ratios.value[kind.value] = value; } });
 const visualModels = ref<any[]>([]), visionModelKey = ref("");
 const models = ref<MediaModel[]>([]), preview = ref<any>(null), jobs = ref<any[]>([]);
 const compatibleBatches = computed(() => candidateBatches.value.filter(item => item.shotId === shotId.value && item.kind === kind.value && item.promptFingerprint === preview.value?.fingerprint));
@@ -357,7 +360,10 @@ const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
 const modeLabel = (mode: unknown) => Array.isArray(mode) ? `多参考 (${mode.join(" / ")})` : ({ singleImage: "首帧", startFrameOptional: "首帧可选", startEndRequired: "首尾帧", endFrameOptional: "首帧与可选尾帧", text: "纯文本" }[String(mode)] ?? String(mode));
 const generateAudio = ref(false);
 watch([kind, modelKey, modeKey, resolution, duration, size, ratio, shotId, generateAudio], () => { preview.value = null; pendingRequestId = ""; });
-watch(selectedModel, model => { modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? ""; ratio.value = model?.cameraTrajectory ? "20:11" : model?.imageRatios?.[0] ?? "16:9"; });
+watch(selectedModel, model => {
+  modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? "";
+  if (model && !ratio.value) ratio.value = model.cameraTrajectory ? "20:11" : model.imageRatios?.[0] ?? "16:9";
+});
 watch([cameraTrajectory, imageAndCameraOnly], () => { preview.value = null; pendingRequestId = ""; }, { deep: true });
 watch([shotId, modelKey], () => { cameraTrajectory.value = undefined; imageAndCameraOnly.value = false; });
 watch(durations, values => {
@@ -381,6 +387,11 @@ async function run(action: () => Promise<unknown>) {
 }
 async function load() {
   if (!projectId) throw new Error("当前工作区尚未关联项目，请重新打开工作区");
+  const files = useWorkspaceFiles(props.directory);
+  const { entries } = await files.list();
+  const preferences = entries.some(item => item.name === "mediaPreferences.json") ? await files.readJson<{ imageRatio?: string; videoRatio?: string }>("mediaPreferences.json") : {};
+  ratios.value.image ||= preferences.imageRatio ?? "";
+  ratios.value.video ||= preferences.videoRatio ?? "";
   const path = `/projects/${projectId}`;
   const values = await Promise.all([request(`${path}/world`), request(`${path}/looks`), request(`${path}/assets`), request(`${path}/shots`), request(`${path}/sequences`), request(`${path}/references`)]);
   [world.value, , assets.value, shots.value, sequences.value, references.value] = values;

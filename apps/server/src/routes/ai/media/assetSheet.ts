@@ -6,6 +6,7 @@ import u from "@/utils";
 import { copyToAssetFolder, assetPrompt, registerAsset } from "@/utils/media/assetSheet";
 import { listMediaModels } from "@/utils/media/generation";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
+import { readMediaAspect } from "@/utils/media/quality";
 
 const imageMime = (path: string) => /\.png$/i.test(path) ? "image/png" : /\.webp$/i.test(path) ? "image/webp" : "image/jpeg";
 
@@ -53,7 +54,7 @@ export default Router().post("/", validateFields(assetFields), async (req, res) 
       modelId: chosen.modelId,
       prompt,
       images: images.length ? images : undefined,
-      ratio: ratio ?? "16:9",
+      ratio: ratio ?? ((await readMediaAspect(cwd)).imageRatio || "16:9"),
       purpose: "asset",
       outputName: `${name}·${kind === "character" ? "四视图" : kind === "scene" ? "场景定场" : "道具图"}`,
       ...(regenerationId ? { regenerationId } : {}),

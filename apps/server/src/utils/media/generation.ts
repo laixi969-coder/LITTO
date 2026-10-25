@@ -5,6 +5,7 @@ import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider, type ProviderTools } from "@toonflow/providers";
+import { matchesAspect } from "@toonflow/providers/aspect";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
@@ -313,6 +314,8 @@ async function generateMediaUnrecorded(
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
   const speechInputs = mediaType === "video" && model.lipSync ? await validateSpeechInputs(directory, request, signal) : undefined;
+  const deliveryRatio = request.ratio || speechInputs?.ratio;
+  const deliveryFfmpeg = mediaType !== "audio" && deliveryRatio ? silentFfmpeg ?? await createWorkspaceFfmpeg(directory, signal, true) : undefined;
   validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
   if (mediaType === "audio" && Object.keys(request.audioParameters ?? {}).length && !model.inputSchema) invalid("此模型未提供额外音频参数定义，请清空额外参数");
@@ -344,6 +347,11 @@ async function generateMediaUnrecorded(
     mediaType === "video" && request.firstFrame ? reference(request.firstFrame, "image") : undefined,
     mediaType === "video" && request.lastFrame ? reference(request.lastFrame, "image") : undefined,
   ]);
+  if (mediaType === "video" && request.ratio) {
+    if (firstFrame) await provider.tool.assertAspectRatio(firstFrame, request.ratio);
+    if (lastFrame) await provider.tool.assertAspectRatio(lastFrame, request.ratio);
+    if (!firstFrame && request.mode === "singleImage" && images?.length === 1) await provider.tool.assertAspectRatio(images[0]!, request.ratio);
+  }
   if (speechInputs && (createHash("sha256").update(Buffer.from(videos![0]!.data, "base64")).digest("hex") !== speechInputs.videoHash
     || createHash("sha256").update(Buffer.from(audios![0]!.data, "base64")).digest("hex") !== speechInputs.audioHash)) invalid("口型参考在检查后被替换，本次未提交生成");
   signal?.throwIfAborted();
@@ -360,7 +368,7 @@ async function generateMediaUnrecorded(
       model: request.modelId, prompt, negativePrompt: request.negativePrompt, seed: request.seed,
       images,
       videos, audios, firstFrame, lastFrame,
-      ratio: request.ratio, resolution: request.resolution, duration,
+      ratio: model.lipSync ? undefined : request.ratio, resolution: request.resolution, duration,
       generateAudio: request.generateAudio, mode: request.mode,
       cameraTrajectory: request.cameraTrajectory, imageAndCameraOnly: request.imageAndCameraOnly,
     })))().catch(error => {
@@ -374,6 +382,7 @@ async function generateMediaUnrecorded(
   await reportTask?.({ status: "completed" });
   const written: string[] = [];
   const result: GeneratedMedia[] = [];
+  const deliveryIssues: string[] = [];
   try {
     for (const asset of assets) {
       signal?.throwIfAborted();
@@ -387,6 +396,7 @@ async function generateMediaUnrecorded(
         const { path } = await resolveWorkspacePath(directory, file);
         signal?.throwIfAborted();
         await writeWorkspaceFile(path, bytes, true);
+        written.push(path);
         let deliveredPath = path;
         if (silentFfmpeg) {
           const probe = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => silentFfmpeg.ffprobe(file, (error, data) => error ? reject(error) : resolve(data)));
@@ -405,7 +415,15 @@ async function generateMediaUnrecorded(
               throw new Error(`原视频已保留：${file}，静音处理失败，仅修复音轨处理，不重新生成视频。${error instanceof Error ? error.message : String(error)}`);
             } finally { signal?.removeEventListener("abort", cancel); }
           }
-        } else written.push(path);
+        }
+        if (deliveryRatio && mediaType !== "audio") {
+          try {
+            const dimensions = (await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => deliveryFfmpeg!.ffprobe(file, (error, data) => error ? reject(error) : resolve(data))))
+              .streams.find(stream => stream.codec_type === "video");
+            if (!dimensions?.width || !dimensions.height) throw new Error("无法读取实际画面宽高");
+            if (!matchesAspect(dimensions.width, dimensions.height, deliveryRatio, mediaType === "video" ? 16 : 0)) deliveryIssues.push(`${file}：请求 ${deliveryRatio}，实际 ${dimensions.width}×${dimensions.height}`);
+          } catch (error) { deliveryIssues.push(`${file}：画幅核验未完成，${error instanceof Error ? error.message : String(error)}`); }
+        }
         const fileResult: GeneratedMedia = { path: relative(directory, deliveredPath).replace(/\\/g, "/"), mimeType, mediaType };
         if (mediaType === "audio") {
           try {
@@ -430,13 +448,14 @@ async function generateMediaUnrecorded(
       } finally { release(); }
     }
     signal?.throwIfAborted();
+    if (deliveryIssues.length) throw new Error(`素材画幅不符或尚未核验，不自动裁剪、拉伸或重生成：${deliveryIssues.join("；")}`);
     return result;
   } catch (err) {
     // 已完成的供应商产物保留：取消或后续探测失败不能删除已付费文件，诱发重复生成。
     if (written.length) {
       const savedFiles = written.map(path => relative(directory, path).replaceAll("\\", "/"));
       const failure = new Error(`${err instanceof Error ? err.message : String(err)}。已保存文件：${savedFiles.join("、")}。请复用文件，仅修复后续处理，不重新生成。`, { cause: err });
-      throw Object.assign(failure, { savedFiles, retryable: false });
+      throw Object.assign(failure, { savedFiles, retryable: false, fallbackAllowed: false });
     }
     throw err;
   }

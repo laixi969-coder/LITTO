@@ -118,6 +118,10 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
     set("output_format", input.outputFormat);
   } else {
     const input = request as VideoRequest;
+    if (input.ratio && !fields.aspect_ratio && !fields.ratio) {
+      if (!input.firstFrame) throw new Error(`此模型没有可控制的画幅参数，无法保证 ${input.ratio}，未提交生成`);
+      await context.tool.assertAspectRatio(input.firstFrame, input.ratio);
+    }
     if (input.images?.length || input.videos?.length || input.audios?.length || input.watermark) throw new Error("此适配支持文字和首尾帧视频，不支持参考素材或水印");
     const imageMode = model.mode?.includes("singleImage") || model.mode?.includes("endFrameOptional");
     if (imageMode !== !!input.firstFrame || (input.lastFrame && !fields.end_image)) throw new Error("首尾帧与所选模型不匹配");
@@ -135,7 +139,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 }
 
 export default {
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.2", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.3", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
@@ -292,6 +296,7 @@ export default {
     if (![5, 10].includes(duration)) throw new Error("可灵视频时长须为 5 或 10 秒");
     const ratio = request.ratio || "16:9";
     if (!imageMode && !["1:1", "16:9", "9:16"].includes(ratio)) throw new Error("不支持此视频画幅");
+    if (imageMode && request.ratio) await this.tool.assertAspectRatio(request.firstFrame!, request.ratio);
     const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
     return generate(this, "video", {
       model: request.model, prompt: request.prompt, duration, sound: request.generateAudio ?? false,

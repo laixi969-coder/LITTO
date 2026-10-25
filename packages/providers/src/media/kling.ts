@@ -68,7 +68,7 @@ async function generateTask(context: ProviderContext, path: string, body: unknow
 }
 
 export default {
-  id: "kling", label: "可灵", version: "1.0.0", rules,
+  id: "kling", label: "可灵", version: "1.0.1", rules,
   readme: "内置可灵 Image 2.1 和 Video 2.6。新认证只需 API Key，Secret Key 留空；旧 AK/SK 认证在 API Key 中填 Access Key，再填 Secret Key。接口地址以 /v1 结尾，可改成可灵协议中转地址。图片支持文字和最多 4 张主体参考；视频支持文字或首帧，5/10 秒。\n\n[认证文档](https://kling.ai/document-api/api/get-started/authentication) · [视频文档](https://kling.ai/document-api/api/video/2-6/text-to-video/legacy)",
   models: [
     { id: "kling-v2-1", label: "Kling Image 2.1", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
@@ -102,6 +102,7 @@ export default {
     if (resolution === "720P" && request.generateAudio) throw new Error("可灵 2.6 有声视频需要 1080P 专业模式");
     const ratio = request.ratio ?? "16:9";
     if (!["16:9", "9:16", "1:1"].includes(ratio)) throw new Error("不支持此视频画幅");
+    if (request.firstFrame && request.ratio) await this.tool.assertAspectRatio(request.firstFrame, request.ratio);
     return generateTask(this, request.firstFrame ? "/videos/image2video" : "/videos/text2video", {
       model_name: request.model, prompt: request.prompt, duration: String(duration), mode: resolution === "1080P" ? "pro" : "std",
       sound: request.generateAudio ? "on" : "off", watermark_info: { enabled: request.watermark ?? false },

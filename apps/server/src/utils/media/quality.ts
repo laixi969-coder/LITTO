@@ -8,6 +8,14 @@ import { cloud } from "@/lib/cloud";
 
 const qualitySchema = z.strictObject({ kind: z.enum(["image", "video"]), providerId: z.string().min(1), modelId: z.string().min(1), value: z.string().min(1).max(64) });
 const preferencesSchema = z.array(qualitySchema).max(200);
+const ratioSchema = z.string().regex(/^[1-9]\d{0,3}:[1-9]\d{0,3}$/).or(z.literal(""));
+const aspectPreferencesSchema = z.strictObject({ imageRatio: ratioSchema.optional(), videoRatio: ratioSchema.optional() });
+
+export async function readMediaAspect(directory: string) {
+  const { path } = await resolveWorkspacePath(directory, "mediaPreferences.json", true);
+  const content = await readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
+  return content === null ? {} : aspectPreferencesSchema.parse(JSON.parse(content));
+}
 
 export function qualityOptions(model: MediaModel) {
   return [...new Set(model.type === "image" ? model.imageSizes ?? [] : model.durationResolutionMap?.flatMap(rule => rule.resolution) ?? [])];
@@ -98,7 +106,16 @@ export async function requestMediaQuality(directory: string, toolCallId: string,
 
 /** ACT: 按项目和模型记忆精度；单次明确传入的规格优先，队列保存解析后的快照。 */
 export async function applyMediaQuality(directory: string, kind: "image" | "video" | "audio", request: MediaGenerationRequest, model: MediaModel) {
-  if (kind === "audio" || model.lipSync) return request;
+  if (kind === "audio") return request;
+  const aspect = (await readMediaAspect(directory))[kind === "image" ? "imageRatio" : "videoRatio"];
+  if (aspect && request.ratio) {
+    const [width, height] = aspect.split(":").map(Number);
+    const [requestedWidth, requestedHeight] = request.ratio.split(":").map(Number);
+    if (width * requestedHeight !== height * requestedWidth) throw new Error(`项目已选 ${aspect}，本次请求却为 ${request.ratio}；请沿用项目画幅。确需改画幅时先明确更新项目 mediaPreferences.json，此次未提交生成`);
+  }
+  // 专用口型只核验原片，比例不作为重绘参数发送。
+  if (model.lipSync) return request;
+  request = { ...request, ratio: aspect || request.ratio };
   const field = kind === "image" ? "size" : "resolution";
   const saved = (await readMediaQuality(directory)).preferences.find(item => item.kind === kind && item.providerId === request.providerId && item.modelId === request.modelId);
   const value = request[field] ?? saved?.value;
@@ -108,6 +125,7 @@ export async function applyMediaQuality(directory: string, kind: "image" | "vide
   const pixels = kind === "image" && value ? /^(\d+)[x*](\d+)$/.exec(value) : null;
   const ratio = request.ratio?.split(":").map(Number);
   if (pixels && ratio?.length === 2 && Number(pixels[1]) * ratio[1]! !== Number(pixels[2]) * ratio[0]!) throw new Error(`图片尺寸 ${value} 与画幅 ${request.ratio} 不一致，请选择匹配规格，不会自动改变用户选择`);
+  if (kind === "image" && request.ratio && model.imageRatios?.length && !model.imageRatios.includes(request.ratio) && !pixels) throw new Error(`当前模型不支持图片画幅 ${request.ratio}；不会回退到默认比例，此次未提交生成`);
   if (kind === "video" && value && request.duration !== undefined && model.durationResolutionMap?.length && !model.durationResolutionMap.some(rule => rule.resolution.includes(value) && rule.duration.includes(request.duration!))) throw new Error(`视频 ${value} 不支持 ${request.duration} 秒，请保持所选精度并调整时长，或由用户改选精度`);
   return value ? { ...request, [field]: value } : request;
 }

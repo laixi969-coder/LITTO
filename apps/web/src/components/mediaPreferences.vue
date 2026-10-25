@@ -35,7 +35,7 @@ const fields = computed(() => {
     { key: "imageRatio" as const, label: "图片比例", options: [...new Set(images.flatMap(model => model.imageRatios?.length ? model.imageRatios : (model.imageSizes ?? []).map(ratioOfSize).filter(Boolean)))] },
     { key: "imageSize" as const, label: "图片精度", options: [...new Set(images.flatMap(model => model.imageSizes ?? []))].filter(size => !value.value.imageRatio || !ratioOfSize(size) || ratioOfSize(size) === value.value.imageRatio) },
     // ACT: 视频模型接口尚未提供画幅列表，沿用视频节点的选项，实际生成前由助手核对模型支持。
-    { key: "videoRatio" as const, label: "视频比例", options: videos.length ? ["16:9", "9:16", "1:1", "4:3", "3:4", "20:11"] : [] },
+    { key: "videoRatio" as const, label: "视频比例", options: videos.length ? ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "20:11"] : [] },
     { key: "videoResolution" as const, label: "视频分辨率", options: [...new Set(videos.flatMap(model => model.durationResolutionMap?.flatMap(item => item.resolution) ?? []))] },
   ];
 });

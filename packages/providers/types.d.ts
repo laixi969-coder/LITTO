@@ -89,6 +89,8 @@ interface ProviderTools {
   errorMessage(value: unknown): string;
   hash: typeof Bun.hash;
   image: typeof Bun.Image;
+  /** 核对已读入的首帧是否符合选定比例；只检查，不裁剪或拉伸。URL 须先导入工作区。 */
+  assertAspectRatio(input: MediaInput, ratio: string): Promise<void>;
   /**
    * 音频裁剪转码；仅接受 WAV 格式的内存字节并返回处理后的内存字节，不支持文件路径、URL 或其他压缩格式输入。
    */

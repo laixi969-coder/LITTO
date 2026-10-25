@@ -6,6 +6,7 @@ import { storage } from "../storage.ts";
 import { probeFile, runCmd } from "../media-tools.ts";
 import { notFound, sha256 } from "../util.ts";
 import { qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
+import { matchesAspect } from "@toonflow/providers/aspect";
 
 const pending = new Map<string, Promise<any>>();
 const slots = [Promise.resolve(), Promise.resolve()];
@@ -22,8 +23,7 @@ export function mediaAspectIssue(s: Scope, item: Record<string, any>) {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return "请求画幅记录无效，请核对原请求，不能自动采用或重生成";
   const media = s.get("media", item.mediaId);
   if (!media?.width || !media.height) return `请求画幅 ${expected}，素材实际宽高尚未核验，请读取实际尺寸后再采用；不自动重生成`;
-  // ACT: 容许 1% 的像素取整偏差（如 768×1376），不裁剪、不拉伸，也不自动重试付费生成。
-  if (Math.abs(media.width / media.height / (width / height) - 1) > 0.01) return `画幅不符：请求 ${expected}，实际 ${media.width}×${media.height}。原素材已保留，请核对画幅参数或选用已有正确版本；不自动裁剪、拉伸或重生成`;
+  if (!matchesAspect(media.width, media.height, String(expected), media.mime?.startsWith("video/") ? 16 : 0)) return `画幅不符：请求 ${expected}，实际 ${media.width}×${media.height}。原素材已保留，请核对画幅参数或选用已有正确版本；不自动裁剪、拉伸或重生成`;
   return null;
 }
 

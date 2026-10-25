@@ -36,7 +36,7 @@ function wait(signal: AbortSignal) {
 }
 
 export default {
-  id: "volcengine", label: "火山方舟", version: "1.2.0", rules,
+  id: "volcengine", label: "火山方舟", version: "1.2.1", rules,
   readme: "使用火山方舟 API Key。内置 Seedream 4.5 / 5 Pro 与 Seedance 1.5 Pro / 2.5，支持本地图片参考、首帧和首尾帧；Seedance 2.5 支持最多 30 张图片的身份/场景参考，尚未接入音视频参考与编辑。API 地址可改为兼容方舟协议的中转；模型 ID 可在模型配置中替换为控制台接入点 ID。\n\n[官方文档](https://docs.volcengine.com/docs/ark/seedream-4-0-5-0?lang=zh)",
   models: [
     { id: "doubao-seedream-4-5-251128", label: "Seedream 4.5", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
@@ -117,6 +117,7 @@ export default {
     if (!Number.isInteger(duration) || !capability.some(row => row.duration.includes(duration) && row.resolution.some(value => value.toLowerCase() === resolution))) throw new Error("当前模型不支持此时长与分辨率组合，请按 durationResolutionMap 配置");
     // Seedance 2.5 首帧模式由输入图决定画幅，官方仅接受 adaptive。
     const seedance25 = /seedance-2-5/.test(request.model) || /Seedance 2\.5/i.test(model?.label ?? "");
+    if (seedance25 && request.firstFrame && request.ratio) await this.tool.assertAspectRatio(request.firstFrame, request.ratio);
     const ratio = seedance25 && request.firstFrame ? "adaptive" : request.ratio ?? "16:9";
     if (!["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21", "adaptive"].includes(ratio)) throw new Error("不支持此视频画幅");
     const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);

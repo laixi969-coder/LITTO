@@ -10,6 +10,8 @@ import { cloud } from "@/lib/cloud";
 import { workspaceProject } from "@/utils/media/jobs";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import { readVoiceProject, assertCurrentSpeechAudio } from "@/utils/media/voiceDecision";
+import { readMediaAspect } from "@/utils/media/quality";
+import { matchesAspect } from "@toonflow/providers/aspect";
 
 // ACT: 仅保留本进程最近32份数值结果；每次先核验实际字节，不信任客户端缓存。
 const speechInspections = new Map<string, SpeechInspection>();
@@ -46,12 +48,15 @@ export async function validateSpeechInputs(directory: string, request: MediaGene
   const hashes = await Promise.all(paths.map(path => mediaHash(directory, path)));
   const ffmpeg = await createWorkspaceFfmpeg(directory, signal);
   const [video, audio] = await Promise.all(paths.map(path => probeMedia(ffmpeg, path)));
+  const frame = video!.streams.find(stream => stream.codec_type === "video");
+  const ratio = request.ratio || (await readMediaAspect(directory)).videoRatio || (frame?.width && frame.height ? `${frame.width}:${frame.height}` : undefined);
+  if (!ratio || !frame?.width || !frame.height || !matchesAspect(frame.width, frame.height, ratio, 16)) throw new Error(`口型原片画幅与所选 ${ratio ?? "画幅"} 不一致或无法核验；本次未提交处理，不自动改变画幅`);
   const videoDuration = Number(video!.streams.find(stream => stream.codec_type === "video")?.duration ?? video!.format.duration);
   const audioDuration = Number(audio!.format.duration);
   if (!video!.streams.some(stream => stream.codec_type === "video") || !audio!.streams.some(stream => stream.codec_type === "audio")
     || ![videoDuration, audioDuration].every(duration => Number.isFinite(duration) && duration > 0 && duration <= 600)
     || Math.abs(videoDuration - audioDuration) > 0.15) throw new Error("口型输入音画时长不一致；请先准备对应的同长发声片段，不能截断整镜、循环画面或变速塞入短句。本次未提交生成。");
-  const inputs = { videoHash: hashes[0], audioHash: hashes[1], videoDuration, audioDuration, lineId: line?.id, voiceSourceKey: line?.takes.find(take => take.id === line.takeId)?.sourceKey };
+  const inputs = { videoHash: hashes[0], audioHash: hashes[1], videoDuration, audioDuration, ratio, lineId: line?.id, voiceSourceKey: line?.takes.find(take => take.id === line.takeId)?.sourceKey };
   const expected = (request as MediaGenerationRequest & { speechSyncInputs?: typeof inputs }).speechSyncInputs;
   if (expected && JSON.stringify(expected) !== JSON.stringify(inputs)) throw new Error("口型任务的声音或原视频已改变，拒绝复用旧输入提交");
   return inputs;

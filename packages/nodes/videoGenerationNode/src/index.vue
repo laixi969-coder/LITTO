@@ -110,7 +110,7 @@ data.value.model ??= "";
 data.value.resolution ??= "";
 data.value.mode ??= "";
 data.value.generateAudio ??= true;
-data.value.ratio ??= "9:16";
+data.value.ratio ??= "";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
@@ -126,7 +126,7 @@ const { generating } = generationState;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
 // ACT: 供应商未声明视频比例范围，沿用界面的通用比例，具体支持范围由供应商校验。
-const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4", "20:11"];
+const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "20:11"];
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
 const selectedMode = computed(() => selectedModel.value?.mode?.find((item) => JSON.stringify(item) === data.value.mode) as NodeVideoRequest["mode"]);
 const frameMode = computed(() => ["startEndRequired", "endFrameOptional", "startFrameOptional"].includes(String(selectedMode.value)));
@@ -177,7 +177,6 @@ watch([selectedModel, () => data.value.duration], ([choice]) => {
   if (!durations.includes(data.value.duration!)) data.value.duration = durations[0];
   const resolutions = getResolutions(choice, data.value.duration);
   if (!resolutions.includes(data.value.resolution)) data.value.resolution = resolutions[0] ?? "";
-  if (!ratioOptions.includes(data.value.ratio)) data.value.ratio = "9:16";
   if (choice.audio !== "optional") data.value.generateAudio = choice.audio === true;
 }, { flush: "sync" });
 const modelGroups = computed(() => groupNodeModels(models.value));
@@ -240,8 +239,15 @@ async function replaceOutput(event: Event) {
 function loadModels() {
   if (modelsRequest) return modelsRequest;
   modelsLoading.value = true;
-  modelsRequest = ai.getMediaModels().then((items) => {
+  modelsRequest = ai.getMediaModels().then(async (items) => {
     if (deleting.value) return;
+    if (!data.value.ratio) {
+      const workspace = files.getWorkspaceFiles();
+      const { entries } = await workspace.list();
+      const preferences = entries.some(item => item.name === "mediaPreferences.json") ? await workspace.readJson<{ videoRatio?: string }>("mediaPreferences.json") : {};
+      if (disposed || deleting.value) return;
+      if (!data.value.ratio) data.value.ratio = preferences.videoRatio || "9:16";
+    }
     models.value = items.filter((item) => item.type === "video");
     // 运行列表只包含用户在设置中授权的默认模型。
     if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model)) {

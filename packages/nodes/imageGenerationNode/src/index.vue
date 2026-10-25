@@ -108,7 +108,7 @@ data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
 data.value.size ??= "";
-data.value.ratio ??= "16:9";
+data.value.ratio ??= "";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
@@ -135,17 +135,16 @@ function pixelRatio(size: string) {
 }
 const ratioOptions = computed(() => {
   const ratio = pixelRatio(data.value.size);
-  return ratio ? [ratio] : selectedModel.value?.imageRatios?.length ? selectedModel.value.imageRatios : ["16:9"];
+  return ratio ? [ratio] : selectedModel.value?.imageRatios?.length ? selectedModel.value.imageRatios : [data.value.ratio || "16:9"];
 });
 watch(
   [selectedModel, () => data.value.size],
   ([choice]) => {
     if (!choice) return;
     // ACT: 现有分辨率使用 K 单位；出现其他单位时再统一换算，未知名称排在数值选项之后。
-    if (!sizeOptions.value.includes(data.value.size)) data.value.size = sizeOptions.value.toSorted((left, right) =>
+    if (!sizeOptions.value.includes(data.value.size)) data.value.size = sizeOptions.value.filter(size => !pixelRatio(size) || pixelRatio(size) === data.value.ratio).toSorted((left, right) =>
       (Number.parseFloat(left) || Infinity) - (Number.parseFloat(right) || Infinity)
-    )[0]!;
-    if (!ratioOptions.value.includes(data.value.ratio)) data.value.ratio = ratioOptions.value.includes("16:9") ? "16:9" : ratioOptions.value[0]!;
+    )[0] ?? data.value.size;
   },
   { flush: "sync" }
 );
@@ -200,8 +199,15 @@ async function replaceOutput(event: Event) {
 function loadModels() {
   if (modelsRequest) return modelsRequest;
   modelsLoading.value = true;
-  modelsRequest = ai.getMediaModels().then((items) => {
+  modelsRequest = ai.getMediaModels().then(async (items) => {
     if (deleting.value) return;
+    if (!data.value.ratio) {
+      const workspace = files.getWorkspaceFiles();
+      const { entries } = await workspace.list();
+      const preferences = entries.some(item => item.name === "mediaPreferences.json") ? await workspace.readJson<{ imageRatio?: string }>("mediaPreferences.json") : {};
+      if (disposed || deleting.value) return;
+      if (!data.value.ratio) data.value.ratio = preferences.imageRatio || "16:9";
+    }
     models.value = items.filter((item) => item.type === "image");
     // 运行列表只包含用户在设置中授权的默认模型。
     if (!models.value.some(item => JSON.stringify([item.providerId, item.modelId]) === data.value.model)) {
@@ -221,6 +227,7 @@ async function startGeneration() {
   if (uploading.value) throw new Error("图片正在替换，请等待完成");
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择图片模型");
+  if (!sizeOptions.value.includes(data.value.size) || !ratioOptions.value.includes(data.value.ratio)) throw new Error("当前模型或尺寸不支持已选画幅，请调整模型或尺寸；不会自动改为默认比例");
   if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
   if (!data.value.production && refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const workspace = files.getWorkspaceFiles();
@@ -357,13 +364,12 @@ nodeTools.register({
     if (!choice) throw new Error("请选择 getConfig 返回的有效图片模型");
     const sizes = choice.imageSizes?.length ? choice.imageSizes : ["2K"];
     const pixel = pixelRatio(args.size ?? (sizes.includes(data.value.size) ? data.value.size : sizes[0]!));
-    const ratios = pixel ? [pixel] : choice.imageRatios?.length ? choice.imageRatios : ["16:9"];
+    const ratios = pixel ? [pixel] : choice.imageRatios?.length ? choice.imageRatios : [args.ratio ?? data.value.ratio];
     if (args.size !== undefined && !sizes.includes(args.size)) throw new Error(`当前模型不支持分辨率 ${args.size}，可选：${sizes.join("、")}`);
-    if (args.ratio !== undefined && !ratios.includes(args.ratio)) throw new Error(`当前模型不支持比例 ${args.ratio}，可选：${ratios.join("、")}`);
+    if (!ratios.includes(args.ratio ?? data.value.ratio)) throw new Error(`当前模型或尺寸不支持比例 ${args.ratio ?? data.value.ratio}，可选：${ratios.join("、")}；不会自动改写已选比例`);
     data.value.model = JSON.stringify([choice.providerId, choice.modelId]);
     if (args.size !== undefined) data.value.size = args.size;
     if (args.ratio !== undefined) data.value.ratio = args.ratio;
-    if (pixel) data.value.ratio = pixel;
     return getConfig();
   },
 });

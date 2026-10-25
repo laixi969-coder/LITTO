@@ -1,10 +1,12 @@
 import { t, translateMessage, validationOptions } from "@/lib/i18n";
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import { lstat, mkdir, readFile, readdir, unlink, writeAtomic } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
 import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/providers";
 import { mediaProviders } from "@toonflow/providers";
+import { matchesAspect } from "@toonflow/providers/aspect";
 import { parse, parseExpression } from "@babel/parser";
 import { z } from "zod";
 import conf from "@/utils/conf";
@@ -425,6 +427,16 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       hash: Bun.hash,
       errorMessage: (value: unknown) => mediaErrorMessage(value, providerConfig),
       image: Bun.Image,
+      assertAspectRatio: async (input: MediaInput, ratio: string) => {
+        if (input.type === "url") throw new Error("核验画幅前须将首帧导入工作区，不能按图片 URL 猜测宽高");
+        if (!cwd) throw new Error("核验画幅需要当前工作目录");
+        const bytes = input.type === "binary" ? input.data : Buffer.from(input.data.replace(/^data:[^,]+,/, ""), "base64");
+        const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
+        const probe = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => ffmpeg(Readable.from([bytes])).ffprobe((error, data) => error ? reject(error) : resolve(data)));
+        const { width, height } = probe.streams.find(stream => stream.codec_type === "video") ?? {};
+        if (!width || !height) throw new Error("无法读取首帧实际宽高，未提交生成");
+        if (!matchesAspect(width, height, ratio)) throw new Error(`首帧实际 ${width}×${height}，与选定画幅 ${ratio} 不一致；未提交生成，不自动裁剪或覆盖所选比例`);
+      },
       audio: { convert: (input: Uint8Array, options: AudioConvertOptions) => convertAudio(input, options, signal) },
       ffmpeg: async () => {
         if (!cwd) throw new Error("当前操作没有工作目录，无法使用 FFmpeg");

@@ -8,6 +8,7 @@
   },
   "exports": {
     ".": "./index.ts",
+    "./aspect": "./src/aspect.ts",
     "./types": "./types.d.ts",
     "./language/deepSeek": "./src/language/deepSeek.ts",
     "./language/atlasCloud": "./src/language/atlasCloud.ts",

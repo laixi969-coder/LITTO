@@ -11,6 +11,7 @@ import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaMode
 import { assertMediaModelSelection, assertModelSelection, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
+import { matchesAspect, mediaRatios } from "@toonflow/providers/aspect";
 import { coverageGate } from "@/utils/media/coverage";
 import { blockingLine } from "@/utils/media/blocking";
 import { modelAccess } from "@/utils/modelAvailability";
@@ -228,6 +229,14 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, localRepair: request.localRepair, ...(previewOnly ? { previewOnly: true } : {}) });
+  if (kind === "video" && !request.ratio && result.keyframeId) {
+    const scope = api.scoped(tenant.workspaceId);
+    const frame = scope.get("keyframes", result.keyframeId);
+    const media = frame && scope.get("media", frame.mediaId);
+    if (!frame || !media?.width || !media.height) throw new Error("主帧实际宽高尚未核验，不能猜测视频画幅");
+    const ratio = frame.meta?.parameters?.request?.ratio || mediaRatios.find(ratio => matchesAspect(media.width, media.height, ratio)) || `${media.width}:${media.height}`;
+    request = { ...request, ratio };
+  }
   if (kind === "video") {
     try { await assertCurrentSpeechAudio(directory, api.scoped(tenant.workspaceId).get("shots", shotId)!); }
     catch (cause) {
