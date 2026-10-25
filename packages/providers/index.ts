@@ -21,6 +21,7 @@ import gen3c from "./src/media/gen3c";
 export type Provider = ProviderDefinition;
 export type CameraTrajectory = CameraTrajectorySpec;
 export type ProviderTools = ProviderContext["tool"];
+export type ProviderTask = MediaTask;
 export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[1];
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 

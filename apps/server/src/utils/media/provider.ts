@@ -4,7 +4,7 @@ import { Readable } from "node:stream";
 import { lstat, mkdir, readFile, readdir, unlink, writeAtomic } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
-import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/providers";
+import type { AudioConvertOptions, ProviderTask, Provider, ProviderTools } from "@toonflow/providers";
 import { mediaProviders } from "@toonflow/providers";
 import { matchesAspect } from "@toonflow/providers/aspect";
 import { parse, parseExpression } from "@babel/parser";
@@ -415,9 +415,9 @@ export async function loadMediaProviderSource(source: string, config: Record<str
     config: providerConfig,
     signal,
     tool: {
-      reportTask: reportTask ? async (task: { id?: string; status: string }) => {
+      reportTask: reportTask ? async (task: ProviderTask) => {
         if (!task || (task.id !== undefined && (typeof task.id !== "string" || !task.id.trim() || task.id.length > 512)) || typeof task.status !== "string" || !task.status.trim() || task.status.length > 64) throw new Error("供应商任务信息无效");
-        await reportTask({ id: task.id, status: task.status });
+        await reportTask(task);
       } : undefined,
       fetch: signal ? Object.assign((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
         signal.throwIfAborted();
@@ -444,15 +444,17 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       },
     } satisfies ProviderTools,
   };
-  for (const name of ["generateImage", "generateVideo", "generateAudio"] as const) {
+  for (const name of ["generateImage", "generateVideo", "generateAudio", "resumeMedia"] as const) {
     const generate = definition[name];
     if (!generate) continue;
-    Object.assign(provider, { [name]: async (request: ImageRequest & VideoRequest & AudioRequest) => {
+    Object.assign(provider, { [name]: async (request: ImageRequest & VideoRequest & AudioRequest & ProviderTask & { id: string }) => {
       let failure: { status?: number; message: string } | undefined;
       let pendingRequests = 0;
       let overlappingRequests = false;
       let requestCount = 0;
       const tool = { ...provider.tool, fetch: Object.assign(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+        if (name === "resumeMedia" && !["GET", "HEAD"].includes(method)) throw Object.assign(new Error("恢复任务只能查询原结果，禁止重新提交生成"), { retryable: false, fallbackAllowed: false });
         if (++pendingRequests > 1) overlappingRequests = true;
         const requestId = ++requestCount;
         failure = undefined;
@@ -481,6 +483,10 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       }, { preconnect: provider.tool.fetch.preconnect }) as typeof fetch };
       try { return await generate.call({ ...provider, tool }, request); }
       catch (error) {
+        if (name === "resumeMedia" && [404, 410].includes(failure?.status ?? 0)) {
+          await provider.tool.reportTask?.({ status: "blocked" });
+          throw Object.assign(new Error("原供应商任务不存在或已过期，停止查询；不会重新生成或重复收费", { cause: error }), { retryable: false, fallbackAllowed: false });
+        }
         const info = error as { name?: unknown; message?: unknown } | null;
         if (signal?.aborted || info?.name === "AbortError") throw error;
         let message = mediaErrorMessage(error, provider.config);

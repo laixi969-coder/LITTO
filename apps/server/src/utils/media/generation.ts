@@ -4,7 +4,7 @@ import { guardedFetch } from "@/utils/ssrf";
 import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
-import { mediaProviders, type Provider, type ProviderTools } from "@toonflow/providers";
+import { mediaProviders, type Provider, type ProviderTask, type ProviderTools } from "@toonflow/providers";
 import { matchesAspect } from "@toonflow/providers/aspect";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
@@ -24,6 +24,7 @@ export type { SkinFinish } from "@toonflow/tool-media-generation/runtime";
 
 const maxMediaSize = 100 * 1024 * 1024;
 const cameraSessions = new Set<string>();
+type MediaExecution = { jobId: string; task?: ProviderTask };
 
 async function runCameraSession<T>(provider: Provider & { config: Record<string, unknown> }, action: () => Promise<T>) {
   if (provider.id !== "gen3c") return action();
@@ -299,10 +300,18 @@ async function generateMediaUnrecorded(
   request: MediaGenerationRequest,
   signal?: AbortSignal,
   reportTask?: ProviderTools["reportTask"],
+  execution?: MediaExecution,
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
+  const recovery = execution?.task;
+  let submitted = !!recovery;
+  const persistTask = reportTask;
+  reportTask = async task => {
+    await persistTask?.(task);
+    if (task.id || task.assets?.length || task.files?.length) submitted = true;
+  };
   if (!request.prompt.trim()) invalid("请输入生成提示词");
-  request = await assertMediaModelSelection(mediaType, request, cwd);
+  if (!recovery) request = await assertMediaModelSelection(mediaType, request, cwd);
   const directory = await realpath(cwd);
   // 静音是交付约束，先确认能处理，避免供应商忽略开关后已经付费却无法交付。
   const silentFfmpeg = mediaType === "video" && request.generateAudio === false ? await createWorkspaceFfmpeg(directory, signal, true) : undefined;
@@ -310,22 +319,22 @@ async function generateMediaUnrecorded(
   await resolveWorkspacePath(directory, outputDirectory, true);
   const providerInfo = await getMediaProvider(request.providerId);
   const access = modelAccess("media", request.providerId, request.modelId);
-  access.assert();
-  const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
+  if (!recovery) access.assert();
+  const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType) ?? (recovery ? { id: request.modelId, label: request.modelId, type: mediaType } as (typeof providerInfo.models)[number] : undefined);
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
-  const speechInputs = mediaType === "video" && model.lipSync ? await validateSpeechInputs(directory, request, signal) : undefined;
-  const deliveryRatio = request.ratio || speechInputs?.ratio;
+  const speechInputs = !recovery && mediaType === "video" && model.lipSync ? await validateSpeechInputs(directory, request, signal) : undefined;
+  const deliveryRatio = request.ratio || speechInputs?.ratio || (request as MediaGenerationRequest & { speechSyncInputs?: { ratio?: string } }).speechSyncInputs?.ratio;
   const deliveryFfmpeg = mediaType !== "audio" && deliveryRatio ? silentFfmpeg ?? await createWorkspaceFfmpeg(directory, signal, true) : undefined;
-  validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
+  if (!recovery) validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
   if (mediaType === "audio" && Object.keys(request.audioParameters ?? {}).length && !model.inputSchema) invalid("此模型未提供额外音频参数定义，请清空额外参数");
   // 视频未明确指定时长时按模型能力取推荐值：调用方漏传时不再落到供应商默认的最短档，也不强制每镜等长。
   const duration = mediaType === "video" ? recommendedDuration(model.durationResolutionMap, request.duration) : request.duration;
-  assertPromptPolicy(request, mediaType);
+  if (!recovery) assertPromptPolicy(request, mediaType);
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory, reportTask);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;
-  if (typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
+  if (!recovery && typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
   const rules = Array.isArray(provider.rules) ? provider.rules : [];
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
   const directorPrompt = isDirectorPrompt(request.prompt);
@@ -339,13 +348,13 @@ async function generateMediaUnrecorded(
     if (!referenceReads.has(key)) referenceReads.set(key, readReference(directory, item, type, signal));
     return referenceReads.get(key)!;
   };
-  const references = (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => reference(item, type))) : undefined;
+  const references = (items: MediaReference[] | undefined, type: string) => !recovery && items ? Promise.all(items.map(item => reference(item, type))) : undefined;
   const [images, videos, audios, firstFrame, lastFrame] = await Promise.all([
     references(request.images, "image"),
     mediaType === "video" ? references(request.videos, "video") : undefined,
     mediaType !== "image" ? references(request.audios, "audio") : undefined,
-    mediaType === "video" && request.firstFrame ? reference(request.firstFrame, "image") : undefined,
-    mediaType === "video" && request.lastFrame ? reference(request.lastFrame, "image") : undefined,
+    !recovery && mediaType === "video" && request.firstFrame ? reference(request.firstFrame, "image") : undefined,
+    !recovery && mediaType === "video" && request.lastFrame ? reference(request.lastFrame, "image") : undefined,
   ]);
   if (mediaType === "video" && request.ratio) {
     if (firstFrame) await provider.tool.assertAspectRatio(firstFrame, request.ratio);
@@ -356,8 +365,14 @@ async function generateMediaUnrecorded(
     || createHash("sha256").update(Buffer.from(audios![0]!.data, "base64")).digest("hex") !== speechInputs.audioHash)) invalid("口型参考在检查后被替换，本次未提交生成");
   signal?.throwIfAborted();
   // 兼容尚未上报远端句柄的适配器：进入调用后不能把无回执当作可安全重试。
-  await reportTask?.({ status: "submitting" });
-  const assets = await (async () => mediaType === "audio"
+  if (!recovery) await reportTask?.({ status: "submitting" });
+  const assets = await (async () => {
+    if (recovery) {
+      if (recovery.assets?.length) return recovery.assets;
+      if (!recovery.id || !provider.resumeMedia) throw Object.assign(new Error("缺少可恢复的原任务号或查询能力；未重新生成，请核查原任务"), { retryable: false, fallbackAllowed: false });
+      return provider.resumeMedia({ ...recovery, id: recovery.id, mediaType, model: request.modelId, mode: request.mode });
+    }
+    return mediaType === "audio"
     ? await provider.generateAudio!({
       model: request.modelId, text: request.prompt, audios, audioParameters: request.audioParameters,
       voice: request.voice, instructions: request.instructions, speed: request.speed, volume: request.volume, format: request.format, sampleRate: request.sampleRate,
@@ -371,37 +386,47 @@ async function generateMediaUnrecorded(
       ratio: model.lipSync ? undefined : request.ratio, resolution: request.resolution, duration,
       generateAudio: request.generateAudio, mode: request.mode,
       cameraTrajectory: request.cameraTrajectory, imageAndCameraOnly: request.imageAndCameraOnly,
-    })))().catch(error => {
-      // 只记录供应商调用错误，下载结果、写文件或参数错误不代表模型失效。
-      if (!signal?.aborted) access.failed(error);
-      if (error instanceof Error && access.reason()) Object.assign(error, { retryable: false });
-      throw error;
-    });
+    }));
+  })().catch(error => {
+    // 收到任务号后的查询错误不暂停模型；只恢复原查询，不重新提交。
+    if (!submitted && !signal?.aborted) access.failed(error);
+    if (!submitted && error instanceof Error && access.reason()) Object.assign(error, { retryable: false });
+    throw error;
+  });
   if (!Array.isArray(assets) || !assets.length) invalid("供应商未返回生成结果");
   // 下载或写入失败不能重新生成已经完成的素材。
-  await reportTask?.({ status: "completed" });
+  await reportTask?.({ status: "completed", ...(assets.every(asset => asset.type === "url") ? { assets: assets as NonNullable<ProviderTask["assets"]> } : {}) });
   const written: string[] = [];
   const result: GeneratedMedia[] = [];
   const deliveryIssues: string[] = [];
   try {
-    for (const asset of assets) {
+    for (const [index, asset] of assets.entries()) {
       signal?.throwIfAborted();
-      const { bytes, mimeType } = await assetBytes(asset, mediaType, signal);
+      const { bytes, mimeType } = await assetBytes(asset, mediaType, signal).catch(async error => {
+        // 已完成任务的签名下载地址可能过期；下次查询原任务换取新地址，不能重新生成。
+        if (recovery?.id && recovery.assets?.length && /HTTP (403|404|410)\b/.test(error instanceof Error ? error.message : String(error))) await reportTask?.({ status: "processing", assets: undefined });
+        throw error;
+      });
       signal?.throwIfAborted();
       const output = await resolveWorkspacePath(directory, outputDirectory, true);
       const release = lockWorkspaceFiles([output.path]);
       try {
         await mkdir(output.path, { recursive: true });
-        const file = join(outputDirectory, `${mediaType}${crypto.randomUUID()}.${mediaExtensions[mimeType]}`);
+        const file = join(outputDirectory, `${mediaType}${execution ? `${execution.jobId.toLowerCase()}${index}` : crypto.randomUUID()}.${mediaExtensions[mimeType]}`);
         const { path } = await resolveWorkspacePath(directory, file);
         signal?.throwIfAborted();
-        await writeWorkspaceFile(path, bytes, true);
+        await writeWorkspaceFile(path, bytes, true).catch(async (error: NodeJS.ErrnoException) => {
+          if (!execution || error.code !== "EEXIST") throw error;
+          if ((await readFile(path)).equals(Buffer.from(bytes))) return;
+          await reportTask?.({ status: "blocked" });
+          throw Object.assign(new Error("原任务文件已存在且字节不同，停止恢复；不会覆盖或重新生成"), { retryable: false, fallbackAllowed: false });
+        });
         written.push(path);
         let deliveredPath = path;
         if (silentFfmpeg) {
           const probe = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => silentFfmpeg.ffprobe(file, (error, data) => error ? reject(error) : resolve(data)));
           if (probe.streams.some(stream => stream.codec_type === "audio")) {
-            const silentFile = file.replace(/\.[^.]+$/, `Silent.${mediaExtensions[mimeType]}`);
+            const silentFile = file.replace(/\.[^.]+$/, `Silent${crypto.randomUUID().replaceAll("-", "")}.${mediaExtensions[mimeType]}`);
             const silentPath = (await resolveWorkspacePath(directory, silentFile, true)).path;
             const command = silentFfmpeg(file).noAudio().videoCodec("copy");
             const cancel = () => command.kill("SIGKILL");
@@ -448,7 +473,11 @@ async function generateMediaUnrecorded(
       } finally { release(); }
     }
     signal?.throwIfAborted();
-    if (deliveryIssues.length) throw new Error(`素材画幅不符或尚未核验，不自动裁剪、拉伸或重生成：${deliveryIssues.join("；")}`);
+    if (deliveryIssues.length) {
+      await reportTask?.({ status: "blocked" });
+      throw new Error(`素材画幅不符或尚未核验，不自动裁剪、拉伸或重生成：${deliveryIssues.join("；")}`);
+    }
+    await reportTask?.({ status: "saved", files: await Promise.all(result.map(async file => ({ ...file, hash: createHash("sha256").update(await readFile((await resolveWorkspacePath(directory, file.path)).path)).digest("hex") }))) });
     return result;
   } catch (err) {
     // 已完成的供应商产物保留：取消或后续探测失败不能删除已付费文件，诱发重复生成。
@@ -516,11 +545,18 @@ export async function generateMediaDirect(
   request: MediaGenerationRequest,
   signal?: AbortSignal,
   reportTask?: ProviderTools["reportTask"],
+  execution?: MediaExecution,
 ): Promise<GeneratedMedia[]> {
   const started = Date.now();
-  const base = { kind: mediaType, providerId: request.providerId, modelId: request.modelId, durationMs: 0 };
+  const base = { kind: mediaType, providerId: request.providerId, modelId: request.modelId, durationMs: 0, ...(execution ? { detail: { jobId: execution.jobId } } : {}) };
   try {
-    const files = await generateMediaUnrecorded(cwd, mediaType, request, signal, reportTask);
+    signal?.throwIfAborted();
+    const files = execution?.task?.files?.length ? await Promise.all(execution.task.files.map(async ({ hash, ...file }) => {
+      const { path } = await resolveWorkspacePath(cwd, file.path);
+      if (file.mediaType !== mediaType || createHash("sha256").update(await readFile(path)).digest("hex") !== hash) throw Object.assign(new Error("已保存的原任务文件已改变，停止恢复；不会重新生成"), { retryable: false, fallbackAllowed: false });
+      return file;
+    })) : await generateMediaUnrecorded(cwd, mediaType, request, signal, reportTask, execution);
+    signal?.throwIfAborted();
     // 先登记画布再计费返回：用户在 UI 里看到的节点与磁盘文件必须同时存在。
     try {
       for (const file of files) await registerOnCanvas(cwd, file, request);
@@ -533,7 +569,7 @@ export async function generateMediaDirect(
       : { ...base, units: Math.max(1, files.length), unit: mediaType === "image" ? "image" : "call", durationMs: Date.now() - started });
     return files;
   } catch (error) {
-    recordUsage({ ...base, units: 0, unit: mediaType === "video" ? "second" : mediaType === "image" ? "image" : "call", status: signal?.aborted ? "cancelled" : "error", durationMs: Date.now() - started });
+    if (!execution) recordUsage({ ...base, units: 0, unit: mediaType === "video" ? "second" : mediaType === "image" ? "image" : "call", status: signal?.aborted ? "cancelled" : "error", durationMs: Date.now() - started });
     throw error;
   }
 }

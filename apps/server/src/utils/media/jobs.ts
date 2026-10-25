@@ -2,6 +2,7 @@ import { basename, join } from "node:path";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, realpathSync } from "@toonflow/file";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
+import type { ProviderTask } from "@toonflow/providers";
 import type { GenRequest, GenResult } from "@/lib/cloud";
 import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
@@ -128,9 +129,9 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
     context.userId,
     context.workspaceId,
   );
-  if (!member || member.role === "VIEWER") throw new Error("生成权限已失效");
+  if (!member || member.role === "VIEWER") throw Object.assign(new Error("生成权限已失效"), { retryable: false, fallbackAllowed: false });
   const project = api.scoped(context.workspaceId).get("projects", context.projectId!);
-  if (!project) throw new Error("项目已失效");
+  if (!project) throw Object.assign(new Error("项目已失效"), { retryable: false, fallbackAllowed: false });
   const [providerId, modelId] = JSON.parse(input.externalModelId) as [string, string];
   return tenantStore.run(
     { userId: member.id, email: member.email, isAdmin: !!member.is_admin, role: member.role, workspaceId: context.workspaceId },
@@ -138,8 +139,9 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
       const directory = await resolveWorkspaceDirectory(String(input.params.directory));
       if (workspaceProject(directory, false) !== context.projectId) throw new Error("工作目录与项目不匹配");
       const request = { ...input.params.request as MediaGenerationRequest };
+      const recovery = input.params.remoteTask as ProviderTask | undefined;
       if (request.providerId !== providerId || request.modelId !== modelId) throw new Error("生成模型不匹配");
-      if (input.kind === "video" && input.params.fingerprint && request.shotId) {
+      if (!recovery && input.kind === "video" && input.params.fingerprint && request.shotId) {
         try {
           const shot = api.scoped(context.workspaceId).get("shots", request.shotId);
           if (!shot || shot.projectId !== context.projectId) throw new Error("生成镜头已失效");
@@ -148,7 +150,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
           await assertCurrentSpeechAudio(directory, shot, input.signal);
         } catch (cause) { throw Object.assign(cause as Error, { retryable: false, fallbackAllowed: false }); }
       }
-      if (input.params.fingerprint) {
+      if (!recovery && input.params.fingerprint) {
         request.prompt = input.prompt;
         request.images = [];
         request.videos = [];
@@ -176,10 +178,11 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
         ...(input.negativePrompt ? { negativePrompt: input.negativePrompt } : {}),
         ...(input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
       }, input.signal, async task => {
-        // ACT: 工作区适配器仍是单次执行；远端号作为恢复证据保存，不触发不支持的自动 poll 或重提。
+        // 先持久化回执与交付检查点；恢复只收取原结果，不创建子任务或重新生成。
         const previous = api.scoped(context.workspaceId).get("generation_jobs", context.jobId)?.parameters?.remoteTask;
-        api.dbRun("UPDATE generation_jobs SET parameters=json_set(parameters,'$.remoteTask',json(?)) WHERE id=? AND workspace_id=?", JSON.stringify({ ...previous, ...task, id: task.id ?? previous?.id, providerId, modelId, updatedAt: new Date().toISOString() }), context.jobId, context.workspaceId);
-      });
+        if (previous?.id && task.id && previous.id !== task.id) throw new Error("原供应商任务号不可替换，禁止重新提交");
+        api.dbRun("UPDATE generation_jobs SET parameters=json_set(parameters,'$.remoteTask',json(?)) WHERE id=? AND workspace_id=?", JSON.stringify({ ...previous, ...task, id: task.id ?? previous?.id, providerId, modelId, mediaType: input.kind, mode: request.mode, updatedAt: new Date().toISOString() }), context.jobId, context.workspaceId);
+      }, { jobId: context.jobId, task: recovery });
       const outputs = [];
       for (const file of files) {
         const { path } = await resolveWorkspacePath(directory, file.path);

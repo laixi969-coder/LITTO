@@ -62,6 +62,17 @@ type MediaInput =
 
 type MediaAsset = MediaInput & { mediaType: "image" | "video" | "audio" };
 
+interface MediaTask {
+  id?: string;
+  status: string;
+  mediaType?: "image" | "video" | "audio";
+  operation?: string;
+  model?: string;
+  mode?: VideoMode;
+  assets?: Extract<MediaAsset, { type: "url" }>[];
+  files?: { path: string; mimeType: string; mediaType: "image" | "video" | "audio"; hash: string }[];
+}
+
 interface AudioConvertOptions {
   format: "wav" | "mp3";
   /** 裁剪起点，单位秒，含边界；缺省为 0。 */
@@ -84,7 +95,7 @@ interface FfmpegRequiredError extends Error {
 interface ProviderTools {
   fetch: typeof globalThis.fetch;
   /** 收到远端任务号后立即持久化，供查询恢复；不代表授权重新提交。 */
-  reportTask?(task: { id?: string; status: string }): Promise<void>;
+  reportTask?(task: MediaTask): Promise<void>;
   /** 提取供应商错误正文中的可读原因，并隐藏配置中的密钥和 URL 查询参数。 */
   errorMessage(value: unknown): string;
   hash: typeof Bun.hash;
@@ -226,4 +237,6 @@ interface ProviderDefinition<TRules extends readonly ProviderFormRule[] = readon
   generateImage?: GenerateMedia<ImageRequest, ProviderConfig<TRules>>;
   generateVideo?: GenerateMedia<VideoRequest, ProviderConfig<TRules>>;
   generateAudio?: GenerateMedia<AudioRequest, ProviderConfig<TRules>>;
+  /** 仅查询已提交的任务；宿主禁止此方法发出 POST 等写请求。 */
+  resumeMedia?: (this: ProviderContext<ProviderConfig<TRules>>, task: MediaTask & { id: string }) => Promise<MediaAsset[]>;
 }

@@ -52,8 +52,22 @@ async function generateTask(context: ProviderContext, path: string, body: unknow
   const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(context.signal ? [context.signal] : [])]);
   const task = await fetchJson(context, path, signal, body);
   if (typeof task?.task_id !== "string" || !task.task_id) throw new Error("可灵未返回任务 ID");
+  await context.tool.reportTask?.({ id: task.task_id, status: "submitted", mediaType, operation: path });
+  return resumeMedia.call(context, { id: task.task_id, status: "submitted", mediaType, operation: path });
+}
+
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  const path = task.operation;
+  if (!path || !["/images/generations", "/images/multi-image2image", "/videos/text2video", "/videos/image2video"].includes(path)) throw new Error("缺少原可灵任务查询路径，不能重新提交");
+  const mediaType = task.mediaType === "image" ? "image" : "video";
   while (true) {
-    const result = await fetchJson(context, `${path}/${encodeURIComponent(task.task_id)}`, signal);
+    const result = await fetchJson(this, `${path}/${encodeURIComponent(task.id)}`, signal);
+    await this.tool.reportTask?.({ id: task.id, status: String(result?.task_status ?? "unknown") });
+    if (["failed", "cancelled", "canceled", "rejected"].includes(String(result?.task_status).toLowerCase())) {
+      await this.tool.reportTask?.({ id: task.id, status: "failed" });
+      throw Object.assign(new Error(this.tool.errorMessage(result?.task_status_msg) || "可灵原任务失败"), { retryable: false, fallbackAllowed: false });
+    }
     if (result?.task_status === "succeed") {
       const outputs = result.task_result?.[mediaType === "image" ? "images" : "videos"];
       if (!Array.isArray(outputs) || !outputs.length) throw new Error("可灵未返回生成结果");
@@ -62,13 +76,14 @@ async function generateTask(context: ProviderContext, path: string, body: unknow
         return { mediaType, type: "url", url: item.url };
       });
     }
-    if (!["submitted", "processing"].includes(result?.task_status)) throw new Error(context.tool.errorMessage(result?.task_status_msg) || "可灵任务失败或状态无效");
+    if (!["submitted", "processing"].includes(result?.task_status)) throw new Error(this.tool.errorMessage(result?.task_status_msg) || "可灵任务失败或状态无效");
     await wait(signal);
   }
 }
 
 export default {
-  id: "kling", label: "可灵", version: "1.0.1", rules,
+  resumeMedia,
+  id: "kling", label: "可灵", version: "1.0.2", rules,
   readme: "内置可灵 Image 2.1 和 Video 2.6。新认证只需 API Key，Secret Key 留空；旧 AK/SK 认证在 API Key 中填 Access Key，再填 Secret Key。接口地址以 /v1 结尾，可改成可灵协议中转地址。图片支持文字和最多 4 张主体参考；视频支持文字或首帧，5/10 秒。\n\n[认证文档](https://kling.ai/document-api/api/get-started/authentication) · [视频文档](https://kling.ai/document-api/api/video/2-6/text-to-video/legacy)",
   models: [
     { id: "kling-v2-1", label: "Kling Image 2.1", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },

@@ -21,11 +21,11 @@ export function onJobSucceeded(s: Scope, job: any, mediaIds: string[]) {
     if (!shot) return;
     const meta = { jobId: job.id, modelId: job.modelId, providerId: job.providerId, seed: job.seed, prompt: job.compiledPrompt, parameters: job.parameters, inputRefs: job.inputRefs };
     if (job.kind === "image") {
-        for (const m of mediaIds) s.insert("keyframes", { project_id: job.projectId, shot_id: shot.id, job_id: job.id, media_id: m, status: "variant", meta });
+        for (const m of mediaIds) if (!s.list("keyframes", { jobId: job.id, mediaId: m }).length) s.insert("keyframes", { project_id: job.projectId, shot_id: shot.id, job_id: job.id, media_id: m, status: "variant", meta });
         s.update("shots", shot.id, { status: shot.status === "planned" ? "keyframing" : shot.status });
     } else {
         const kfId = job.parameters?.keyframeId ?? shot.heroKeyframeId;
-        for (const m of mediaIds) s.insert("takes", { project_id: job.projectId, shot_id: shot.id, job_id: job.id, media_id: m, keyframe_id: kfId ?? null, status: "candidate", meta });
+        for (const m of mediaIds) if (!s.list("takes", { jobId: job.id, mediaId: m }).length) s.insert("takes", { project_id: job.projectId, shot_id: shot.id, job_id: job.id, media_id: m, keyframe_id: kfId ?? null, status: "candidate", meta });
         s.update("shots", shot.id, { status: shot.approvedTakeId ? shot.status : "taking" });
     }
     const type = job.kind === "image" ? "keyframe" : "take";

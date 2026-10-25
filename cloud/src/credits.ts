@@ -37,7 +37,10 @@ export function hold(ws: string, jobId: string, est: number) {
     });
 }
 export function charge(ws: string, jobId: string, held: number, userCharge: number, providerCost: number | null) {
-    tx(() => post(ws, "GENERATION_CHARGE", -userCharge, -held, { jobId, providerCost, platformCost: providerCost === null ? null : providerCost * 0.02 }));
+    tx(() => {
+        if (get("SELECT id FROM credit_ledger WHERE workspace_id=? AND job_id=? AND type='GENERATION_CHARGE'", ws, jobId)) return;
+        post(ws, "GENERATION_CHARGE", -userCharge, -held, { jobId, providerCost, platformCost: providerCost === null ? null : providerCost * 0.02 });
+    });
 }
 export function release(ws: string, jobId: string, held: number, why: string) {
     if (held <= 0) return;

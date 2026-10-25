@@ -46,10 +46,33 @@ function wait(signal: AbortSignal) {
   });
 }
 
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  const query = new URL("https://apihub.agnes-ai.com/agnesapi");
+  query.searchParams.set("video_id", task.id);
+  query.searchParams.set("model_name", task.model ?? "agnes-video-2.5-flash");
+  while (true) {
+    const result = await fetchJson(this, query.href, undefined, signal);
+    await this.tool.reportTask?.({ id: task.id, status: String(result.status ?? "unknown") });
+    if (["failed", "failure", "cancelled", "canceled", "rejected", "error"].includes(String(result.status).toLowerCase())) {
+      await this.tool.reportTask?.({ id: task.id, status: "failed" });
+      throw Object.assign(new Error(this.tool.errorMessage(result) || "供应商原任务失败"), { retryable: false, fallbackAllowed: false });
+    }
+    if (result.status === "completed") {
+      if (typeof result.url !== "string" || !/^https?:\/\//i.test(result.url)) throw new Error("Agnes 未返回有效的视频地址");
+      return [{ mediaType: "video", type: "url", url: result.url }];
+    }
+    if (result.status === "failed") throw new Error(this.tool.errorMessage(result) || "Agnes 视频生成失败");
+    if (result.status !== "queued" && result.status !== "in_progress") throw new Error("Agnes 返回了未知的视频任务状态");
+    await wait(signal);
+  }
+}
+
 export default {
+  resumeMedia,
   id: "agnes",
   label: "Agnes AI",
-  version: "1.0.0",
+  version: "1.0.1",
   apiUrl,
   readme: "使用同一个 Agnes API Key 生成图片和视频。Image 2.5 Flash 支持文字生成、本地参考图编辑及多图合成，尺寸为 1K–4K；Video 2.5 Flash 当前提供 720P、4–12 秒的文生视频。Agnes 视频参考需要公网素材地址，本地首尾帧及参考素材上传尚未接通。\n\n[获取 Key](https://apihub.agnes-ai.com/) · [图片文档](https://www.agnes-ai.com/zh-Hans/docs/agnes-image-25-flash) · [视频文档](https://www.agnes-ai.com/zh-Hans/docs/agnes-video-25-flash)",
   rules,
@@ -113,18 +136,7 @@ export default {
       model: request.model, prompt: request.prompt, mode: "text", seconds: String(duration), size: "720P", aspect_ratio: ratio, n: 1,
     }, signal);
     if (typeof task.video_id !== "string" || !task.video_id.trim()) throw new Error("Agnes 未返回 video_id");
-    const query = new URL("https://apihub.agnes-ai.com/agnesapi");
-    query.searchParams.set("video_id", task.video_id);
-    query.searchParams.set("model_name", request.model);
-    while (true) {
-      const result = await fetchJson(this, query.href, undefined, signal);
-      if (result.status === "completed") {
-        if (typeof result.url !== "string" || !/^https?:\/\//i.test(result.url)) throw new Error("Agnes 未返回有效的视频地址");
-        return [{ mediaType: "video", type: "url", url: result.url }];
-      }
-      if (result.status === "failed") throw new Error(this.tool.errorMessage(result) || "Agnes 视频生成失败");
-      if (result.status !== "queued" && result.status !== "in_progress") throw new Error("Agnes 返回了未知的视频任务状态");
-      await wait(signal);
-    }
+    await this.tool.reportTask?.({ id: task.video_id, status: "submitted", mediaType: "video", model: request.model });
+    return resumeMedia.call(this, { id: task.video_id, status: "submitted", mediaType: "video", model: request.model });
   },
 } satisfies ProviderDefinition<typeof rules>;

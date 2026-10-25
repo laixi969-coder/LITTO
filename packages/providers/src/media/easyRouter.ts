@@ -84,8 +84,33 @@ function videoModel(id: string): ProviderModel | undefined {
   };
 }
 
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  const id = task.id;
+  const path = task.operation;
+  if (path !== "/video/generations" && path !== "/videos") throw new Error("缺少原视频任务查询路径，不能重新提交");
+  const seedance = path === "/video/generations";
+  while (true) {
+    const response = await fetchJson(this, `${path}/${encodeURIComponent(id)}`, signal);
+    const result = seedance ? response.data : response;
+    const status = String(result?.status ?? "").toLowerCase();
+    await this.tool.reportTask?.({ id: task.id, status: String(status ?? "unknown") });
+    if (["failed", "failure", "cancelled", "canceled", "rejected", "error"].includes(String(status).toLowerCase())) {
+      await this.tool.reportTask?.({ id: task.id, status: "failed" });
+      throw Object.assign(new Error(this.tool.errorMessage(result) || "供应商原任务失败"), { retryable: false, fallbackAllowed: false });
+    }
+    if (["success", "completed"].includes(status)) {
+      const content = await fetchResponse(this, `/videos/${encodeURIComponent(id)}/content`, signal);
+      return [{ mediaType: "video", type: "binary", data: await readBytes(content, 100 * 1024 * 1024), mimeType: "video/mp4" }];
+    }
+    if (!["submitted", "queued", "in_progress"].includes(status)) throw new Error(this.tool.errorMessage(result) || "EasyRouter 任务失败或状态无效");
+    await wait(signal);
+  }
+}
+
 export default {
-  id: "easyRouter", label: "EasyRouter", version: "1.2.1", rules,
+  resumeMedia,
+  id: "easyRouter", label: "EasyRouter", version: "1.2.2", rules,
   readme: "图片、视频和独立配音共用 API Key，可同步目录并选择已适配模型。配音支持 GPT TTS 与 Gemini TTS，使用 /audio/speech 返回音频流；Gemini 保留原生 WAV 和默认语速。支持平台音色 ID，不支持此接口未定义的克隆参考和表演指令。视频自动轮询并通过带认证的内容接口下载。\n\n[配音文档](https://docs.easyrouter.io/en/docs/api/ai-model/audio/speech)",
   models: [
     { id: "gpt-4o-mini-tts", label: "GPT-4o Mini TTS · 配音", type: "audio", voices: [{ title: "Alloy", voice: "alloy" }, { title: "Nova", voice: "nova" }] },
@@ -187,16 +212,7 @@ export default {
     }));
     const id = task.task_id ?? task.id;
     if (typeof id !== "string" || !id) throw new Error("EasyRouter 未返回任务 ID");
-    while (true) {
-      const response = await fetchJson(this, `${path}/${encodeURIComponent(id)}`, signal);
-      const result = seedance ? response.data : response;
-      const status = String(result?.status ?? "").toLowerCase();
-      if (["success", "completed"].includes(status)) {
-        const content = await fetchResponse(this, `/videos/${encodeURIComponent(id)}/content`, signal);
-        return [{ mediaType: "video", type: "binary", data: await readBytes(content, 100 * 1024 * 1024), mimeType: "video/mp4" }];
-      }
-      if (!["submitted", "queued", "in_progress"].includes(status)) throw new Error(this.tool.errorMessage(result) || "EasyRouter 任务失败或状态无效");
-      await wait(signal);
-    }
+    await this.tool.reportTask?.({ id, status: "submitted", mediaType: "video", operation: path });
+    return resumeMedia.call(this, { id, status: "submitted", mediaType: "video", operation: path });
   },
 } satisfies ProviderDefinition<typeof rules>;

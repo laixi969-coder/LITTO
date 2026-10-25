@@ -15,7 +15,7 @@ const rules = [
   },
 ] as const;
 
-const version = "2.0.0";
+const version = "2.0.1";
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("APIMart 响应格式错误");
@@ -123,16 +123,33 @@ async function pollTaskResult<T>(context: ProviderContext, baseUrl: string, apiK
     const result = object(await response.json());
     const data = object(result.data ?? {});
     const status = String(result.status ?? data.status ?? "").toLowerCase();
+    await context.tool.reportTask?.({ id: taskId, status });
     if (status === "completed" || status === "success") return extract(data);
     if (status === "failed" || status === "failure") {
       const error = (data.error as { message?: unknown } | undefined)?.message;
-      throw new Error(context.tool.errorMessage?.(result) || (typeof error === "string" ? error : "生成失败"));
+      await context.tool.reportTask?.({ id: taskId, status: "failed" });
+      throw Object.assign(new Error(context.tool.errorMessage?.(result) || (typeof error === "string" ? error : "生成失败")), { retryable: false, fallbackAllowed: false });
     }
     await wait(signal, 3000);
   }
 }
 
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const mediaType = task.mediaType === "image" ? "image" : "video";
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  const url = await pollTaskResult(this, getBaseUrl(String(this.config.isOverseas ?? "1")), String(this.config.apiKey ?? ""), task.id, signal, data => {
+    const result = object(data.result ?? {});
+    const entries = result[mediaType === "image" ? "images" : "videos"];
+    const item = Array.isArray(entries) ? object(entries[0]) : undefined;
+    const url = item && Array.isArray(item.url) ? item.url[0] : undefined;
+    if (typeof url !== "string" || !url) throw new Error("未返回生成结果");
+    return url;
+  });
+  return [{ mediaType, type: "url", url }];
+}
+
 export default {
+  resumeMedia,
   id: "apiMart",
   label: "APIMart",
   version,
@@ -236,14 +253,8 @@ export default {
     const taskId = Array.isArray(data.data) ? object(data.data[0]).task_id : undefined;
     if (!taskId) throw new Error("未返回任务ID");
 
-    const url = await pollTaskResult(this, baseUrl, apiKey, String(taskId), signal, (taskData) => {
-      const result = object(taskData.result ?? {});
-      const image = Array.isArray(result.images) ? object(result.images[0]) : undefined;
-      const url = image && Array.isArray(image.url) ? image.url[0] : undefined;
-      if (typeof url !== "string" || !url) throw new Error("未返回生成结果");
-      return url;
-    });
-    return [{ mediaType: "image", type: "url", url }];
+    await this.tool.reportTask?.({ id: String(taskId), status: "submitted", mediaType: "image" });
+    return resumeMedia.call(this, { id: String(taskId), status: "submitted", mediaType: "image" });
   },
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
     const apiKey = this.config.apiKey?.trim();
@@ -322,14 +333,8 @@ export default {
     const taskId = Array.isArray(data.data) ? object(data.data[0]).task_id : undefined;
     if (!taskId) throw new Error("未返回任务ID");
 
-    const url = await pollTaskResult(this, baseUrl, apiKey, String(taskId), signal, (taskData) => {
-      const result = object(taskData.result ?? {});
-      const video = Array.isArray(result.videos) ? object(result.videos[0]) : undefined;
-      const url = video && Array.isArray(video.url) ? video.url[0] : undefined;
-      if (typeof url !== "string" || !url) throw new Error("未返回生成结果");
-      return url;
-    });
-    return [{ mediaType: "video", type: "url", url }];
+    await this.tool.reportTask?.({ id: String(taskId), status: "submitted", mediaType: "video" });
+    return resumeMedia.call(this, { id: String(taskId), status: "submitted", mediaType: "video" });
   },
   async updateVendor(): Promise<string> {
     const apiKey = this.config.apiKey?.trim();

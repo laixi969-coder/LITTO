@@ -40,8 +40,32 @@ function wait(signal: AbortSignal) {
   });
 }
 
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  const taskId = task.id;
+  const authorization = task.operation === "reference2video" || Array.isArray(task.mode) ? "Bearer" : "Token";
+  while (true) {
+    const result = await fetchJson(this, `/tasks/${encodeURIComponent(taskId)}/creations`, signal, authorization);
+    await this.tool.reportTask?.({ id: taskId, status: String(result.state ?? "unknown") });
+    if (["failed", "failure", "cancelled", "canceled", "rejected", "error"].includes(String(result.state).toLowerCase())) {
+      await this.tool.reportTask?.({ id: task.id, status: "failed" });
+      throw Object.assign(new Error(this.tool.errorMessage(result) || "供应商原任务失败"), { retryable: false, fallbackAllowed: false });
+    }
+    if (result.state === "success") {
+      if (!Array.isArray(result.creations) || !result.creations.length) throw new Error("Vidu 未返回生成结果");
+      return result.creations.map((item: any): MediaAsset => {
+        if (typeof item?.url !== "string" || !/^https?:\/\//i.test(item.url)) throw new Error("Vidu 未返回有效视频地址");
+        return { mediaType: "video", type: "url", url: item.url };
+      });
+    }
+    if (!["created", "queueing", "processing"].includes(result.state)) throw new Error(this.tool.errorMessage(result.err_code || result) || "Vidu 任务失败或状态无效");
+    await wait(signal);
+  }
+}
+
 export default {
-  id: "vidu", label: "Vidu", version: "1.1.4", rules,
+  resumeMedia,
+  id: "vidu", label: "Vidu", version: "1.1.5", rules,
   readme: "Vidu Q4 Preview 支持图生视频和参考生视频。图生视频使用一张首帧，画幅跟随首帧；参考生视频使用 1–15 张图片，可附加 0–3 段 MP3 参考音频（每段 3–12 秒），画幅可选 16:9、9:16、1:1、4:3、3:4。两种模式均支持 3–16 秒、540P / 720P / 1080P / 2K / 4K，可选音画同出。提示词可按输入顺序使用“参考图1”“参考音频1”指定素材。只需填写 API Key，API 地址默认使用官方地址；中转须兼容 Vidu 协议。\n\n[图生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/image-to-video) · [参考生视频文档](https://platform.vidu.cn/docs/api-reference/video-models/vidu-q4-preview/reference-to-video)",
   models: [
     { id: "viduq4-preview", label: "Vidu Q4 Preview", type: "video", mode: ["singleImage", ["imageReference:15", "audioReference:3"]], audio: "optional", durationResolutionMap: [{ duration: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], resolution: ["540P", "720P", "1080P", "2K", "4K"] }] },
@@ -105,19 +129,7 @@ export default {
     }
     const taskId = task.task_id ?? task.id;
     if (typeof taskId !== "string" || !taskId.trim()) throw new Error(this.tool.errorMessage(task) || "Vidu 未返回任务 ID");
-    await this.tool.reportTask?.({ id: taskId, status: String(task.state ?? "created") });
-    while (true) {
-      const result = await fetchJson(this, `/tasks/${encodeURIComponent(taskId)}/creations`, signal, authorization);
-      await this.tool.reportTask?.({ id: taskId, status: String(result.state ?? "unknown") });
-      if (result.state === "success") {
-        if (!Array.isArray(result.creations) || !result.creations.length) throw new Error("Vidu 未返回生成结果");
-        return result.creations.map((item: any): MediaAsset => {
-          if (typeof item?.url !== "string" || !/^https?:\/\//i.test(item.url)) throw new Error("Vidu 未返回有效视频地址");
-          return { mediaType: "video", type: "url", url: item.url };
-        });
-      }
-      if (!["created", "queueing", "processing"].includes(result.state)) throw new Error(this.tool.errorMessage(result.err_code || result) || "Vidu 任务失败或状态无效");
-      await wait(signal);
-    }
+    await this.tool.reportTask?.({ id: taskId, status: "submitted", mediaType: "video", operation: referenceMode ? "reference2video" : "img2video", mode: request.mode });
+    return resumeMedia.call(this, { id: taskId, status: "submitted", mediaType: "video", operation: referenceMode ? "reference2video" : "img2video", mode: request.mode });
   },
 } satisfies ProviderDefinition<typeof rules>;

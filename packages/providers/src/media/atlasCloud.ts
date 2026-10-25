@@ -57,11 +57,25 @@ async function generate(context: ProviderContext, mediaType: "image" | "video" |
     await context.tool.reportTask?.({ status: rejected ? "rejected" : "unknown" });
     throw error;
   }
-  let result = task.data ?? task;
+  const result = task.data ?? task;
   const id = result.id;
   if (typeof id !== "string" || !id) throw new Error("Atlas Cloud 未返回任务 ID");
+  await context.tool.reportTask?.({ id, status: String(result.status ?? "submitted"), mediaType });
+  return resumeMedia.call(context, { id, status: "submitted", mediaType });
+}
+
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  const response = await fetchJson(this, `/api/v1/model/prediction/${encodeURIComponent(task.id)}`, signal);
+  let result = response.data ?? response;
+  const id = task.id;
+  const mediaType = task.mediaType ?? "video";
   while (true) {
-    await context.tool.reportTask?.({ id, status: String(result.status ?? "unknown") });
+    await this.tool.reportTask?.({ id, status: String(result.status ?? "unknown") });
+    if (["failed", "failure", "cancelled", "canceled", "rejected", "error"].includes(String(result.status).toLowerCase())) {
+      await this.tool.reportTask?.({ id, status: "failed" });
+      throw Object.assign(new Error(this.tool.errorMessage(result) || "Atlas Cloud 原任务失败"), { retryable: false, fallbackAllowed: false });
+    }
     if (result.status === "completed") {
       if (!Array.isArray(result.outputs) || !result.outputs.length) throw new Error("Atlas Cloud 未返回生成结果");
       return result.outputs.map((url: unknown): MediaAsset => {
@@ -69,9 +83,9 @@ async function generate(context: ProviderContext, mediaType: "image" | "video" |
         return { mediaType, type: "url", url };
       });
     }
-    if (!["created", "queued", "pending", "processing"].includes(result.status)) throw new Error(context.tool.errorMessage(result) || "Atlas Cloud 任务失败或状态无效");
+    if (!["created", "queued", "pending", "processing"].includes(result.status)) throw new Error(this.tool.errorMessage(result) || "Atlas Cloud 任务失败或状态无效");
     await wait(signal, mediaType === "image" ? 2000 : 5000);
-    const response = await fetchJson(context, `/api/v1/model/prediction/${encodeURIComponent(id)}`, signal);
+    const response = await fetchJson(this, `/api/v1/model/prediction/${encodeURIComponent(id)}`, signal);
     result = response.data ?? response;
   }
 }
@@ -139,7 +153,8 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 }
 
 export default {
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.3", rules,
+  resumeMedia,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.4", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },

@@ -4,7 +4,7 @@ import { ADAPTERS, credentialFor, markCredential, modelView, secretOf } from "./
 import { route, resolvePolicy } from "./providers/router.ts";
 import type { GenRequest, GenResult } from "./providers/adapter.ts";
 import { saveMedia, storage } from "./storage.ts";
-import { bad, conflict, j, log, now, sleep, ulid } from "./util.ts";
+import { bad, conflict, j, log, now, sha256, sleep, ulid } from "./util.ts";
 import { config } from "./config.ts";
 import { onJobSucceeded } from "./domain/lifecycle.ts";
 import { inc, observe } from "./metrics.ts";
@@ -107,16 +107,24 @@ const inflight = new Set<string>();
 const controllers = new Map<string, AbortController>();
 
 export function startWorker() {
-    // ACT: 无上游任务句柄的脚本不能安全重发，重启后保留失败记录，交由用户决定重试。
+    // 回执或已交付文件可恢复；没有回执的提交结果仍待核查，不能当作未受理重发。
     for (const job of all("SELECT * FROM generation_jobs WHERE status='RUNNING' AND provider_id='workspaceMedia'")) {
         tx(() => {
             const parameters = JSON.parse(job.parameters ?? "{}");
+            if (workspaceResumable(parameters)) {
+                run("UPDATE generation_jobs SET status='QUEUED',run_after=?,finished_at=NULL,error=NULL WHERE id=?", now(), job.id);
+                return;
+            }
             // 没有回执不等于未受理；旧适配器重启后也必须阻止手动重发。
             if (!parameters.remoteTask) parameters.remoteTask = { status: "unknown", updatedAt: now() };
             run("UPDATE generation_jobs SET parameters=? WHERE id=?", j(parameters), job.id);
             run("UPDATE generation_jobs SET status='FAILED', finished_at=?, held=0, error=? WHERE id=?", now(), "服务重启，供应商结果待核查；未自动重发，请核查后重试", job.id);
             release(job.workspace_id, job.id, job.held, "server interrupted");
         });
+    }
+    // 兼容旧版本因重启标失败的已提交任务，沿用原 ID 与冻结额，只恢复原结果。
+    for (const job of all("SELECT * FROM generation_jobs WHERE provider_id='workspaceMedia' AND status IN ('FAILED','TIMEOUT') AND (error LIKE '服务重启，供应商结果待核查%' OR error LIKE '供应商结果待核查%')")) {
+        if (workspaceResumable(JSON.parse(job.parameters ?? "{}"))) run("UPDATE generation_jobs SET status='QUEUED',run_after=?,finished_at=NULL,error=NULL WHERE id=?", now(), job.id);
     }
     // 无句柄的已提交请求不能证明未受理，重启也不能重新付费提交。
     run("UPDATE generation_jobs SET status='FAILED', parameters=json_set(COALESCE(parameters,'{}'), '$.remoteTask.status', 'unknown'), finished_at=?, error='提交结果待核查，未自动重发' WHERE status='RUNNING' AND provider_task_id IS NULL", now());
@@ -136,6 +144,12 @@ function runningCount(providerId: string) {
     return all("SELECT id FROM generation_jobs WHERE provider_id=? AND status='RUNNING'", providerId).length;
 }
 
+function workspaceResumable(parameters: Record<string, any>) {
+    const task = parameters.remoteTask;
+    return task && !["failed", "rejected", "blocked"].includes(String(task.status).toLowerCase())
+        && (typeof task.id === "string" && !!task.id || task.assets?.length || task.files?.length);
+}
+
 async function tick() {
     if (ticking) return;
     ticking = true;
@@ -145,7 +159,8 @@ async function tick() {
             if (inflight.has(row.id)) continue;
             const prov = get("SELECT * FROM providers WHERE id=?", row.provider_id);
             if (!prov || runningCount(prov.id) >= prov.concurrency) continue; // provider rate limit
-            run("UPDATE generation_jobs SET status='RUNNING', started_at=COALESCE(started_at,?), attempts=attempts+1 WHERE id=? AND status='QUEUED'", now(), row.id);
+            const resuming = row.provider_id === "workspaceMedia" && workspaceResumable(JSON.parse(row.parameters ?? "{}"));
+            run("UPDATE generation_jobs SET status='RUNNING', started_at=COALESCE(started_at,?), attempts=attempts+? WHERE id=? AND status='QUEUED'", now(), resuming ? 0 : 1, row.id);
             inflight.add(row.id);
             void execute(row.id).finally(() => inflight.delete(row.id));
         }
@@ -195,7 +210,7 @@ async function execute(jobId: string) {
             } catch (cause) { throw Object.assign(cause as Error, { retryable: false, fallbackAllowed: false }); }
         }
         const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(prov.timeout_ms)]);
-        const req: GenRequest = { signal, context: { jobId, workspaceId: job.workspaceId, projectId: job.projectId, userId: job.createdBy }, kind: job.kind, externalModelId: model.external_model_id, prompt: job.compiledPrompt, negativePrompt: p.negativePrompt, params: { ...p, seed: job.seed }, inputs: await loadInputs(job.workspaceId, job.projectId, job.inputRefs ?? []), apiKey, baseUrl: prov.base_url, attempt: job.attempts, label: p.label };
+        const req: GenRequest = { signal, context: { jobId, workspaceId: job.workspaceId, projectId: job.projectId, userId: job.createdBy }, kind: job.kind, externalModelId: model.external_model_id, prompt: job.compiledPrompt, negativePrompt: p.negativePrompt, params: { ...p, seed: job.seed }, inputs: job.providerId === "workspaceMedia" && p.remoteTask ? [] : await loadInputs(job.workspaceId, job.projectId, job.inputRefs ?? []), apiKey, baseUrl: prov.base_url, attempt: job.attempts, label: p.label };
         let result: GenResult | null = null;
         let taskId: string | null = raw.provider_task_id; // resume after restart
         const deadline = started + prov.timeout_ms;
@@ -253,6 +268,12 @@ async function finish(job: any, result: GenResult, durationMs: number) {
     const s = scoped(job.workspaceId);
     const mediaIds: string[] = [];
     for (const [i, o] of result.outputs.entries()) {
+        const existing = get("SELECT o.media_id,m.hash FROM generation_outputs o JOIN media m ON m.id=o.media_id WHERE o.job_id=? AND o.idx=?", job.id, i);
+        if (existing) {
+            if (existing.hash !== sha256(o.data)) throw Object.assign(new Error("原任务输出已登记且字节不同，停止恢复，不重复登记或扣费"), { retryable: false, fallbackAllowed: false });
+            mediaIds.push(existing.media_id);
+            continue;
+        }
         const m = await saveMedia(job.workspaceId, job.projectId, o.data, { source: "generation", mime: o.mime, duration: o.duration, allowUnsniffed: false });
         mediaIds.push(m.id);
         s.insert("generation_outputs", { job_id: job.id, media_id: m.id, idx: i, meta: { seed: job.seed, model: job.modelId, workspacePath: o.workspacePath, mime: o.mime } });
@@ -260,23 +281,27 @@ async function finish(job: any, result: GenResult, durationMs: number) {
     const userCharge = creditsFor(result.costUsd);
     tx(() => {
         // A cancel may have raced us; the guard keeps the ledger consistent.
-        const cur = get("SELECT status FROM generation_jobs WHERE id=?", job.id)!;
-        if (cur.status === "CANCELLED") return;
+        const cur = get("SELECT status,held FROM generation_jobs WHERE id=?", job.id)!;
+        if (cur.status === "CANCELLED" || cur.status === "SUCCEEDED") return;
         run("UPDATE generation_jobs SET status='SUCCEEDED', actual_cost=?, user_charge=?, duration_ms=?, finished_at=?, held=0, error=NULL WHERE id=?", result.costUsd, userCharge, durationMs, now(), job.id);
-        charge(job.workspaceId, job.id, job.held, userCharge, result.costUsd);
-    });
-    if (get("SELECT status FROM generation_jobs WHERE id=?", job.id)?.status !== "SUCCEEDED") return;
-    try {
+        charge(job.workspaceId, job.id, cur.held, userCharge, result.costUsd);
         onJobSucceeded(s, scoped(job.workspaceId).get("generation_jobs", job.id, true)!, mediaIds);
-    } catch (e) {
-        log.error("post-success hook failed", (e as Error).message);
-    }
+    });
 }
 
 async function fail(job: any, err: Error & { retryable?: boolean; timeout?: boolean; fallbackAllowed?: boolean }, durationMs: number) {
     const cur = get("SELECT * FROM generation_jobs WHERE id=?", job.id)!;
     if (cur.status === "CANCELLED") return;
     const p = cur.parameters ? JSON.parse(cur.parameters) : {};
+    if (cur.provider_id === "workspaceMedia" && workspaceResumable(p) && err.retryable !== false) {
+        // 查询失败只退避查询同一个任务，不消耗生成重试次数，也不重新冻结/扣费。
+        run("UPDATE generation_jobs SET status='QUEUED',run_after=?,error=? WHERE id=?", new Date(Date.now() + 15000).toISOString(), `恢复原任务查询：${err.message}`.slice(0, 300), job.id);
+        return;
+    }
+    if (cur.provider_id === "workspaceMedia" && workspaceResumable(p) && err.retryable === false) {
+        p.remoteTask.status = "blocked";
+        run("UPDATE generation_jobs SET parameters=? WHERE id=?", j(p), job.id);
+    }
     const remoteUnresolved = !!cur.provider_task_id || p.remoteTask && !["failed", "rejected"].includes(p.remoteTask.status);
     const retryable = err.retryable !== false && (!remoteUnresolved || !!cur.provider_task_id);
     inc(`provider_${cur.provider_id}_errors`);
@@ -338,11 +363,16 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     if (["QUEUED", "RUNNING"].includes(o.status)) throw conflict("job still active");
     if (o.status === "SUCCEEDED") throw conflict("任务已完成，请复用已有结果", "job_already_completed");
     if (inflight.has(id)) throw conflict("原任务仍在停止或收取结果，不能同时重发", "job_still_settling");
-    if (o.providerTaskId) {
+    const task = o.parameters?.remoteTask;
+    const workspaceRecovery = o.providerId === "workspaceMedia" && task && !["failed", "rejected"].includes(String(task.status).toLowerCase())
+        && (task.id || task.assets?.length || task.files?.length);
+    if (o.providerTaskId || workspaceRecovery) {
         tx(() => {
-            const held = o.held || estimate(o.modelId, o.kind, o.parameters).credits;
+            const settled = get("SELECT id FROM credit_ledger WHERE workspace_id=? AND job_id=? AND type='GENERATION_CHARGE'", workspaceId, id);
+            const held = o.held || (settled ? 0 : estimate(o.modelId, o.kind, o.parameters).credits);
             if (!o.held) hold(workspaceId, id, held);
-            run("UPDATE generation_jobs SET status='QUEUED', attempts=0, held=?, run_after=?, finished_at=NULL WHERE id=?", held, now(), id);
+            const parameters = workspaceRecovery ? { ...o.parameters, remoteTask: { ...task, status: "recovering" } } : o.parameters;
+            run("UPDATE generation_jobs SET status='QUEUED', attempts=?, held=?, run_after=?, finished_at=NULL,error=NULL,parameters=? WHERE id=?", workspaceRecovery ? o.attempts : 0, held, now(), j(parameters), id);
         });
         kick();
         return { ...jobView(scoped(workspaceId).get("generation_jobs", id, true)), reused: true };

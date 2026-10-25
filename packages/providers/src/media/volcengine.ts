@@ -35,8 +35,28 @@ function wait(signal: AbortSignal) {
   });
 }
 
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  while (true) {
+    const result = await fetchJson(this, `/contents/generations/tasks/${encodeURIComponent(task.id)}`, signal);
+    await this.tool.reportTask?.({ id: task.id, status: String(result.status ?? "unknown") });
+    if (["failed", "failure", "cancelled", "canceled", "rejected", "error"].includes(String(result.status).toLowerCase())) {
+      await this.tool.reportTask?.({ id: task.id, status: "failed" });
+      throw Object.assign(new Error(this.tool.errorMessage(result) || "供应商原任务失败"), { retryable: false, fallbackAllowed: false });
+    }
+    if (result.status === "succeeded") {
+      const url = result.content?.video_url;
+      if (typeof url !== "string" || !/^https?:\/\//i.test(url)) throw new Error("方舟未返回有效视频地址");
+      return [{ mediaType: "video", type: "url", url }];
+    }
+    if (!["queued", "running"].includes(result.status)) throw new Error(this.tool.errorMessage(result.error) || "方舟视频任务失败或状态无效");
+    await wait(signal);
+  }
+}
+
 export default {
-  id: "volcengine", label: "火山方舟", version: "1.2.1", rules,
+  resumeMedia,
+  id: "volcengine", label: "火山方舟", version: "1.2.2", rules,
   readme: "使用火山方舟 API Key。内置 Seedream 4.5 / 5 Pro 与 Seedance 1.5 Pro / 2.5，支持本地图片参考、首帧和首尾帧；Seedance 2.5 支持最多 30 张图片的身份/场景参考，尚未接入音视频参考与编辑。API 地址可改为兼容方舟协议的中转；模型 ID 可在模型配置中替换为控制台接入点 ID。\n\n[官方文档](https://docs.volcengine.com/docs/ark/seedream-4-0-5-0?lang=zh)",
   models: [
     { id: "doubao-seedream-4-5-251128", label: "Seedream 4.5", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
@@ -130,15 +150,7 @@ export default {
       ], duration, resolution, ratio, generate_audio: request.generateAudio ?? false, watermark: request.watermark ?? false,
     });
     if (typeof task.id !== "string" || !task.id) throw new Error("方舟未返回任务 ID");
-    while (true) {
-      const result = await fetchJson(this, `/contents/generations/tasks/${encodeURIComponent(task.id)}`, signal);
-      if (result.status === "succeeded") {
-        const url = result.content?.video_url;
-        if (typeof url !== "string" || !/^https?:\/\//i.test(url)) throw new Error("方舟未返回有效视频地址");
-        return [{ mediaType: "video", type: "url", url }];
-      }
-      if (!["queued", "running"].includes(result.status)) throw new Error(this.tool.errorMessage(result.error) || "方舟视频任务失败或状态无效");
-      await wait(signal);
-    }
+    await this.tool.reportTask?.({ id: task.id, status: "submitted", mediaType: "video" });
+    return resumeMedia.call(this, { id: task.id, status: "submitted", mediaType: "video" });
   },
 } satisfies ProviderDefinition<typeof rules>;

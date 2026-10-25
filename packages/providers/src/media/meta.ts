@@ -15,7 +15,7 @@ const rules = [
   },
 ] as const;
 
-const version = "2.0.0";
+const version = "2.0.1";
 
 function mediaUrl(input: MediaInput) {
   if (input.type === "url") return input.url;
@@ -47,12 +47,15 @@ async function pollVideo(context: ProviderContext, baseUrl: string, apiKey: stri
     if (!response.ok) throw new Error(`查询任务失败：HTTP ${response.status}`);
     const data = await response.json() as { task?: { status?: string; content?: { url?: string } } };
     const status = data?.task?.status;
+    await context.tool.reportTask?.({ id: taskId, status: String(status ?? "unknown") });
     if (status === "succeeded") {
       const url = data.task?.content?.url;
       if (!url) throw new Error("视频生成成功但未返回视频地址");
       return url;
     }
-    if (status === "failed") throw new Error(context.tool.errorMessage?.(data) || "视频生成失败");
+    if (status === "failed") {
+      throw Object.assign(new Error(context.tool.errorMessage?.(data) || "视频生成失败"), { retryable: false, fallbackAllowed: false });
+    }
     await wait(signal, 5000);
   }
 }
@@ -71,7 +74,14 @@ export function compactVideoPrompt(input: string) {
   return prompt;
 }
 
+async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string }): Promise<MediaAsset[]> {
+  const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+  const url = await pollVideo(this, String(this.config.baseUrl ?? "").replace(/\/+$/, ""), String(this.config.apiKey ?? ""), task.id, signal);
+  return [{ mediaType: "video", type: "url", url }];
+}
+
 export default {
+  resumeMedia,
   id: "meta",
   label: "秘塔版MiniMax H3",
   version,
@@ -129,7 +139,7 @@ export default {
     const taskId = submitData?.task_id;
     if (!taskId) throw new Error("提交任务未返回任务 ID");
 
-    const videoUrl = await pollVideo(this, baseUrl, apiKey, taskId, signal);
-    return [{ mediaType: "video", type: "url", url: videoUrl }];
+    await this.tool.reportTask?.({ id: taskId, status: "submitted", mediaType: "video" });
+    return resumeMedia.call(this, { id: taskId, status: "submitted", mediaType: "video" });
   },
 } satisfies ProviderDefinition<typeof rules>;

@@ -20,6 +20,9 @@ function priced(e: UsageEvent): number | null {
 }
 
 export function recordUsage(e: UsageEvent) {
+    // ACT: 复用现有 detail，按工作区 O(n) 去重任务回执；规模增长时迁移为 job_id 唯一索引。
+    if (typeof e.detail?.jobId === "string" && (e.status ?? "ok") === "ok"
+        && get("SELECT id FROM usage_events WHERE workspace_id=? AND status='ok' AND json_extract(detail,'$.jobId')=?", e.workspaceId, e.detail.jobId)) return;
     run("INSERT INTO usage_events(id,workspace_id,user_id,kind,provider_id,model_id,units,unit,cost_usd,status,duration_ms,project,detail,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         ulid(), e.workspaceId, e.userId ?? null, e.kind, e.providerId ?? null, e.modelId ?? null, e.units, e.unit, priced(e), e.status ?? "ok", e.durationMs ?? null, e.project ?? null, e.detail ? JSON.stringify(e.detail) : null, now());
 }
