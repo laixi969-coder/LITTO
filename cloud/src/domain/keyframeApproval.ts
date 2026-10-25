@@ -4,6 +4,7 @@ import { bad, conflict, notFound } from "../util.ts";
 import { keyframeView, promoteHero } from "./lifecycle.ts";
 import { runQc } from "./qc.ts";
 import { realismChecks, requireReviewed, shotFingerprint } from "./realism.ts";
+import { mediaAspectIssue } from "./qualityInspection.ts";
 
 export function prepareKeyframeApproval(s: Scope, projectId: string, input: unknown) {
   const ids = z.array(z.string().min(1).max(128)).min(1).max(60).parse(input);
@@ -18,6 +19,8 @@ export function prepareKeyframeApproval(s: Scope, projectId: string, input: unkn
       || !media || media.projectId !== projectId || !media.mime.startsWith("image/")) throw bad("关键帧须为当前项目镜头的有效图片");
     if (shots.has(shot.id)) throw bad("每个镜头只能选定一张主关键帧，请先明确候选");
     shots.add(shot.id);
+    const aspectIssue = mediaAspectIssue(s, keyframe);
+    if (aspectIssue) throw conflict(`「${shot.title}」${aspectIssue}`, "aspect_mismatch");
     const report = s.list("qc_reports", { targetType: "keyframe", targetId: id }, "created_at DESC, rowid DESC")[0];
     if (report?.findings.some((finding: { severity: string; kind: string }) => finding.severity === "high" && !finding.kind.startsWith("continuity:"))) {
       throw conflict(`「${shot.title}」存在严重画面问题，请修复或复核后再采用`, "qc_blocked");

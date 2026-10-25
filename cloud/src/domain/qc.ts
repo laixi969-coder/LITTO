@@ -8,9 +8,11 @@ import { qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-gene
 import { bad } from "../util.ts";
 import { validateStateDelta } from "./state.ts";
 import { musicSource } from "./music.ts";
+import { mediaAspectIssue } from "./qualityInspection.ts";
 
 /** QC never returns just a score: every finding carries a cause and a concrete Repair Action (PRD §20). */
 const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string; penalty: number; severity: "high" | "medium" | "low" }> = {
+    deliveryAspect: { cause: "实际素材画幅与请求不符或尚未核验", action: "inspectDelivery", detail: "保留原素材，核对实际宽高与请求画幅，优先选用已有正确版本；不自动裁剪、拉伸或付费重生成", penalty: 25, severity: "high" },
     motionCoverage: { cause: "实际视频没有覆盖完整动作计划", action: "directionRevise", detail: "保留已有素材，定位未完成的动作与结果；在不删减既定动作的前提下重新安排镜头和接续，不能用循环、定格或慢放补时长，不自动付费重试", penalty: 25, severity: "high" },
     speechCoverage: { cause: "实际视频未覆盖当前对白和剪入时长", action: "dialogueRevise", detail: "保留旧素材与原句，对照真实配音重新安排可用画面；规划通过不能代替成片通过，不加速、删句、定格或跨镜挪音补时长，也不自动付费重试", penalty: 25, severity: "high" },
     narrativeFailure: { cause: "剧情因果或信息揭示不成立", action: "storyRevise", detail: "先 readStoryImpact 定位源场次和关联镜头，修改故事后只重做受影响段落", penalty: 25, severity: "high" },
@@ -66,7 +68,7 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (review.observedStateDelta) validateStateDelta(s, shot.projectId, review.observedStateDelta);
     const fingerprint = shotFingerprint(s, shotId, target.type);
     const previous = s.list("qc_reports", { targetType: target.type, targetId: target.id }, "created_at DESC, rowid DESC")[0];
-    const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind] && !["deliveryUnverified", "speechCoverage", "motionCoverage"].includes(item.kind)) : [];
+    const prior = previous?.evidence?.mediaId === obj.mediaId ? previous.findings.filter((item: any) => DIAGNOSIS[item.kind] && !["deliveryAspect", "deliveryUnverified", "speechCoverage", "motionCoverage"].includes(item.kind)) : [];
     const dismissed = review.dismissedKinds ?? [];
     if (dismissed.length && (!review.actor || !review.note?.trim() || !reviewed.length || dismissed.some(kind => !prior.some((item: any) => item.kind === kind)))) throw bad("排除旧告警须逐项选择，并记录复核依据");
     const sameVersion = previous?.evidence?.mediaId === obj.mediaId && previous.evidence.fingerprint === fingerprint;
@@ -80,6 +82,8 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     if (reviewed.length && (!review.actor || reviewed.some(key => !realismChecks.includes(key as any)))) throw bad("人工检查须记录检查项和检查者");
     const findings: any[] = [];
     const media = obj.mediaId ? s.get("media", obj.mediaId) : undefined;
+    const aspectIssue = mediaAspectIssue(s, obj);
+    if (aspectIssue) findings.push({ kind: "deliveryAspect", ...DIAGNOSIS.deliveryAspect, note: aspectIssue });
     const coverageIssue = target.type === "take" ? takeCoverageIssue(s, shot, obj) : null;
     if (coverageIssue) findings.push({ kind: "speechCoverage", ...DIAGNOSIS.speechCoverage, note: coverageIssue });
     const motionIssue = target.type === "take" ? motionCoverageIssue(s, shot, obj) : null;

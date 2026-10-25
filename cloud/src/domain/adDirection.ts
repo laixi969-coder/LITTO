@@ -3,6 +3,7 @@ import type { Scope } from "../db.ts";
 import { bad, conflict, notFound, sha256 } from "../util.ts";
 import { realismChecks, shotFingerprint } from "./realism.ts";
 import { advertisingSchema } from "./schema.ts";
+import { mediaAspectIssue } from "./qualityInspection.ts";
 
 const text = z.string().trim().min(1).max(2000);
 export const sequenceKindSchema = z.enum(["story", "serial", "adfilm", "brandFilm", "musicFilm"]);
@@ -94,7 +95,9 @@ export function adReadiness(s: Scope, sequenceId: string) {
     const qc = frame && s.list("qc_reports", { targetType: "keyframe", targetId: frame.id }, "created_at DESC, rowid DESC")[0];
     const fingerprint = shot && shotFingerprint(s, shot.id, "keyframe");
     const assessment = shot && review ? adPilotAssessment(shot, parsed.data.productAssetIds, review) : null;
+    const aspectIssue = frame && mediaAspectIssue(s, frame);
     const ready = !!(frame && frame.shotId === shot.id && review?.keyframeId === frame.id && review.mediaId === frame.mediaId
+      && !aspectIssue
       && !adShotIssues(s, shot, false).length
       && review.fingerprint === fingerprint && assessment?.verdict === "pass" && qc?.evidence?.fingerprint === fingerprint
       && qc.evidence.mediaId === frame.mediaId
@@ -104,6 +107,7 @@ export function adReadiness(s: Scope, sequenceId: string) {
     if (ready) reason = "静帧适用项已检查并采用；剪辑与动态留到视频阶段验证";
     else if (matches.length !== 1) reason = "每项样镜须对应唯一镜头";
     else if (!frame) reason = "请先采用已检查的样镜主帧";
+    else if (aspectIssue) reason = aspectIssue;
     else if (review?.keyframeId !== frame.id || review?.mediaId !== frame.mediaId) reason = "当前采用的主帧与样镜检查对象不一致，请核对已有候选与采用记录，不要重生成";
     else if (review?.fingerprint !== fingerprint) reason = "样镜规格已变化，须复核当前画面；不要为静帧补写动态结论或反复改规格";
     else if (assessment?.blockingChecks.length) reason = `静帧待处理项：${assessment.blockingChecks.join("、")}；不适用项与动态检查不阻塞`;

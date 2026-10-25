@@ -11,6 +11,22 @@ const pending = new Map<string, Promise<any>>();
 const slots = [Promise.resolve(), Promise.resolve()];
 let nextSlot = 0;
 
+export function mediaAspectIssue(s: Scope, item: Record<string, any>) {
+  const request = item.meta?.parameters?.request ?? item.meta?.parameters ?? {};
+  const pixels = typeof request.size === "string" ? /^(\d+)[x*](\d+)$/.exec(request.size) : null;
+  const source = item.keyframeId && s.get("keyframes", item.keyframeId);
+  const sourceMedia = source && s.get("media", source.mediaId);
+  const expected = request.ratio || (pixels ? `${pixels[1]}:${pixels[2]}` : sourceMedia?.width && sourceMedia.height ? `${sourceMedia.width}:${sourceMedia.height}` : null);
+  if (!expected) return null;
+  const [width, height] = String(expected).split(":").map(Number);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return "请求画幅记录无效，请核对原请求，不能自动采用或重生成";
+  const media = s.get("media", item.mediaId);
+  if (!media?.width || !media.height) return `请求画幅 ${expected}，素材实际宽高尚未核验，请读取实际尺寸后再采用；不自动重生成`;
+  // ACT: 容许 1% 的像素取整偏差（如 768×1376），不裁剪、不拉伸，也不自动重试付费生成。
+  if (Math.abs(media.width / media.height / (width / height) - 1) > 0.01) return `画幅不符：请求 ${expected}，实际 ${media.width}×${media.height}。原素材已保留，请核对画幅参数或选用已有正确版本；不自动裁剪、拉伸或重生成`;
+  return null;
+}
+
 /** ACT: 两路独立本地检测，不占供应商队列、不调用模型。结果落盘；进程退出后按同一素材恢复，不自动重试失败检测。 */
 export function inspectProductionQuality(s: Scope, projectId: string, type: "keyframe" | "take", id: string) {
   const table = type === "take" ? "takes" : "keyframes";
@@ -20,7 +36,7 @@ export function inspectProductionQuality(s: Scope, projectId: string, type: "key
   if (!item || !shot || !media || [item, shot, media].some(row => row.projectId !== projectId)) throw notFound("project output");
   const key = sha256(JSON.stringify(["basicQuality2", media.id, media.hash]));
   const cached = item.meta?.basicQuality;
-  if (cached?.key === key) return Promise.resolve({ ...cached, reused: true, plan: qualityReviewPlan(shot, type) });
+  if (cached?.key === key) return Promise.resolve({ ...cached, reused: true, aspectIssue: mediaAspectIssue(s, item), plan: qualityReviewPlan(shot, type) });
   const pendingKey = `${s.workspaceId}:${type}:${id}:${key}`;
   if (pending.has(pendingKey)) return pending.get(pendingKey)!;
   const slot = nextSlot++ % slots.length;
@@ -54,7 +70,7 @@ export function inspectProductionQuality(s: Scope, projectId: string, type: "key
     const current = s.get(table, id);
     if (!current || current.mediaId !== media.id) throw new Error("检查期间素材已变更，未写入旧结果");
     s.update(table, id, { meta: { ...current.meta, basicQuality: result } });
-    return { ...result, reused: false, plan: qualityReviewPlan(s.get("shots", item.shotId)!, type) };
+    return { ...result, reused: false, aspectIssue: mediaAspectIssue(s, current), plan: qualityReviewPlan(s.get("shots", item.shotId)!, type) };
   });
   slots[slot] = task.then(() => {}, () => {});
   pending.set(pendingKey, task);
@@ -69,6 +85,8 @@ export function productionQualityView(s: Scope, projectId: string) {
     const media = s.get("media", item.mediaId);
     const current = basic?.key === sha256(JSON.stringify(["basicQuality2", media?.id, media?.hash]));
     const warnings: string[] = [];
+    const aspectIssue = mediaAspectIssue(s, item);
+    if (aspectIssue) warnings.push(aspectIssue);
     if (current && basic.status === "checked") {
       if (basic.blackSegments?.length) warnings.push("检测到持续黑场，请确认是否为有意设计");
       if (basic.freezeSegments?.length) warnings.push("检测到至少0.75秒近乎不变的连续帧，请查看是否存在冻结延长；此信号不能证明动作或口型合格");

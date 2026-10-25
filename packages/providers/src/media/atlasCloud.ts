@@ -90,8 +90,16 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
     if (fields[field].enum && !fields[field].enum!.includes(value as string | number)) throw new Error(`模型不支持 ${field} 参数：${value}`);
     body[field] = value;
   };
+  // 图片与视频共用画幅字段，不能让图片分支落到 auto 或跟随参考图。
+  set("aspect_ratio", request.ratio || fields.aspect_ratio?.default);
+  set("ratio", request.ratio || fields.ratio?.default);
   if (mediaType === "image") {
     const input = request as ImageRequest;
+    if (input.ratio && !fields.aspect_ratio && !fields.ratio) {
+      const pixels = /^(\d+)[x*](\d+)$/.exec(input.size || String(fields.size?.default ?? ""));
+      const [width, height] = input.ratio.split(":").map(Number);
+      if (!fields.size || !pixels || Number(pixels[1]) * height !== Number(pixels[2]) * width) throw new Error(`此模型不能按当前尺寸保证 ${input.ratio} 画幅，请选择支持的画幅或匹配的像素尺寸；未提交生成`);
+    }
     if (input.mask || (input.n !== undefined && input.n !== 1)) throw new Error("当前不支持蒙版或指定生成数量");
     const images = input.images ?? [];
     const imageField = fields.images ?? fields.image ?? fields.reference_images;
@@ -118,8 +126,6 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
     if (input.lastFrame) body.end_image = await uploadImage(context, input.lastFrame, signal);
     set("duration", input.duration ?? fields.duration?.default);
     set("resolution", input.resolution || fields.resolution?.default);
-    set("aspect_ratio", input.ratio || fields.aspect_ratio?.default);
-    set("ratio", input.ratio || fields.ratio?.default);
     set("sound", input.generateAudio ?? false);
     if (input.generateAudio && !fields.sound) throw new Error("此模型不支持生成音频");
     set("multi_shot", false);
@@ -129,7 +135,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 }
 
 export default {
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.1", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.2", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
@@ -185,6 +191,7 @@ export default {
         const editing = !!(properties.images || properties.image || properties.reference_images);
         model.mode = editing ? ["singleImage", ...((properties.images || properties.reference_images) ? ["multiReference" as const] : [])] : ["text"];
         model.imageSizes = properties.size?.enum?.filter((size): size is string => typeof size === "string" && /^\d+[x*]\d+$/.test(size));
+        model.imageRatios = (properties.aspect_ratio ?? properties.ratio)?.enum?.filter((ratio): ratio is string => typeof ratio === "string" && /^[1-9]\d*:[1-9]\d*$/.test(ratio));
         if (!model.imageSizes?.length) {
           // nano-banana 等系列没有像素 size，用 resolution 的 1k/2k/4k 档；生成端把尺寸选择映射到 resolution 参数。
           model.imageSizes = properties.resolution?.enum?.filter((tier): tier is string => typeof tier === "string" && /^\d+k$/i.test(tier));

@@ -8,6 +8,7 @@ import { needsLipSync, qualityReviewPlan, coversSpeechRanges } from "@toonflow/t
 import { z } from "zod";
 import { techniqueVersion, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 import { assertSpeechPlan } from "./speechPlanning.ts";
+import { mediaAspectIssue } from "./qualityInspection.ts";
 export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 // 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
 export const audioReviewSchema = z.object({
@@ -87,6 +88,8 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
 }
 
 export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Record<string, any>) {
+  const aspectIssue = mediaAspectIssue(s, item);
+  if (aspectIssue) throw conflict(aspectIssue, "aspect_mismatch");
   const continuation = type === "keyframe" ? item.meta?.continuationSource : null;
   if (continuation) {
     const source = s.get("takes", continuation.takeId), media = source && s.get("media", source.mediaId);
