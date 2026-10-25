@@ -37,6 +37,8 @@
 
 3D 节点新增 generatePlan({instruction})，复用现有预演生成、验证与保存流程。助手按遮挡揭示、绕行、穿越空间或指定机位路径的需要调用，普通固定与跟拍不强制经过3D；这是助手调度规则，不是所有视频请求的后台必经步骤。预演成功不等于正式模型执行轨迹，数值控制仍遵守以下模型、首帧与尺度要求。没有真实模型与渲染端到端验证时，不宣称预演或成片质量通过。
 
+一键自动成片暂不接入后台3D。observeAutoFilmVideo 根据真实 mediaId 找到本任务候选，从当前规格自动取得 cameraStart、cameraPath、cameraEnd 清单，随完整视频交给观察员；focus 只补充重点。观察员逐项返回带时间点的 pass/revise/unverified，缺项、重复或错误ID均拒绝。缓存绑定媒体哈希、镜头规格、剧本和检查重点，旧记录或规格改变后重新观察。写入技术审阅时使用观察员的摄影结果，制作助手不能覆盖成 pass；unverified 转为未达标检查，沿用原有采用门禁。成片仍单独检查声画和剪辑接点，不把源片时间码误当成最终时间码。
+
 ## GEN3C 服务与约束
 
 按官方 [INSTALL](https://github.com/nv-tlabs/GEN3C/blob/db2ffe12ced12ddafcec5e0422ee46ce8520746b/INSTALL.md) 与 [GUI API 部署说明](https://github.com/nv-tlabs/GEN3C/tree/db2ffe12ced12ddafcec5e0422ee46ce8520746b/gui)部署独立 GPU 服务并下载权重。适配目标是该提交的 JSON API，拒绝旧 pickle API；本次不会安装 Python/GPU 环境或自动下载权重。所需路径为 GET `/metadata`、POST `/seed-model`、POST `/request-inference?sync=1`，不是自建的假接口。

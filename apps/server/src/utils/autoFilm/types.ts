@@ -1,5 +1,17 @@
 export type AutoFilmStatus = "running" | "completed" | "failed" | "stopped" | "interrupted";
 
+export interface AutoFilmPlayback {
+  mediaId: string;
+  hash: string;
+  note: string;
+  planKey?: string;
+  cameraReviews?: {
+    takeId: string;
+    fingerprint: string;
+    checks: { id: string; verdict: "pass" | "revise" | "unverified"; note: string }[];
+  }[];
+}
+
 export interface AutoFilmTask {
   id: string;
   directory: string;
@@ -17,7 +29,7 @@ export interface AutoFilmTask {
   generationCount: number;
   attempts: Record<string, number>;
   toolCalls: number;
-  playbacks: { mediaId: string; hash: string; note: string }[];
+  playbacks: AutoFilmPlayback[];
   progress: string;
   error?: string;
   decisions: { tool: string; title: string; answer: string; values?: Record<string, string | number | boolean | string[]>; reason: string }[];

@@ -16,7 +16,7 @@ import { readStoryProject } from "@/utils/story";
 import { getStatus } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { autoFilmScope } from "./scope";
-import { observeVideo } from "./observe";
+import { cameraObservationPlan, cameraReviewsSchema, observeVideo } from "./observe";
 import type { AutoFilmTask } from "./types";
 
 const relativePath = z.string().min(1).max(2048).refine(value => !/^[\\/]|[:\u0000-\u001f]/.test(value) && value.split(/[\\/]/).every(part => part && part !== "." && part !== ".."), "须为工作区相对路径");
@@ -38,7 +38,7 @@ const stateSchema = z.object({
   storyRevisionId: z.string().optional(),
   generationCount: z.number().int().nonnegative(), attempts: z.record(z.string(), z.number().int().nonnegative()),
   toolCalls: z.number().int().nonnegative(), progress: z.string(), error: z.string().optional(),
-  playbacks: z.array(z.object({ mediaId: z.string(), hash: z.string(), note: z.string() })),
+  playbacks: z.array(z.object({ mediaId: z.string(), hash: z.string(), note: z.string(), planKey: z.string().optional(), cameraReviews: z.array(cameraReviewsSchema.element.extend({ fingerprint: z.string() })).optional() })),
   decisions: z.array(z.object({ tool: z.string(), title: z.string(), answer: z.string(), values: choiceSchema.shape.values, reason: z.string() })),
   output: z.object({ renderId: z.string(), sequenceId: z.string(), mediaId: z.string(), url: z.string() }).optional(),
 });
@@ -56,6 +56,7 @@ const instructions = `你正在执行用户点击启动的独立「一键自动�
 确认类工具支持 automaticChoice:{answer,values?,reason}。首次调用若返回待选题目，读完真实候选后在同一工具参数补 automaticChoice 重试，服务端校验并保存选择；不要把题目转交用户。askUser 的创作问题直接自己决定。字段表单须按题目 fields 提供 values。
 关键帧必须读取实际图片。视频先用 observeAutoFilmVideo{mediaId,focus} 把完整真实视频交给支持视频与声音的模型观察，读取实际返回的时间点、表演、对白和接点证据，再使用 reviewProduction/reviewProductions 记录真实观察并采用（authorization 填用户点击启动自动成片的授权）。此模式没有人工主帧采用与用户满意度工具；不得伪造用户看过、用户满意或人类验收。selectCandidate 不能 asHero。资产、故事、声音和剪辑仍通过各自确认工具保存自动决定。
 有对白先确定真实声音和时长，再安排镜头与口型；复用已成功生成的素材和任务。参考、版本、指纹、连续性和声音门禁全部有效，不准通过修改检查代码或填假观察绕过。只有实际完整看听才填 fullPlayback:true；无法观察时说明缺项并结束，不能宣称通过。
+摄影检查清单由 observeAutoFilmVideo 自动从当前镜头规格读取，focus 只补充重点，不替代起幅、相机路径和结束构图检查。返回的 cameraReviews 是实际观察，revise 或 unverified 不能改写成 pass；保留候选，根据具体偏差修正规格或在已有重试额度内处理。当前后台没有3D预演工具，不尝试调用画布节点，不为缺少3D阻塞普通镜头，也不声称已使用数值轨迹。
 允许为失败或有明确缺陷的目标最多再试两次，总计最多120次媒体生成（含配音），重试使用新的 regenerationId，同一次重试复用该ID；先查询旧任务防止重复消耗。停止、余额不足、权限撤回或保存失败时停止，不无限重试。
 镜头完成后读取 readEdit，自动剪辑并用 render 导出正式成片，等待真实 SUCCEEDED，再 inspectFinal、observeAutoFilmVideo 完整核对成片，按真实观察 agentReviewFinal。不要调用 reviewFinal 代填用户满意度。最后调用 completeAutoFilm{renderId}；只有这个工具确认完成才算交付，不能只回复制作方案或让用户点击下一步。未完成就继续工具执行；真实阻塞时给出具体原因并保存已有成果。`;
 
@@ -170,7 +171,13 @@ function launch(task: AutoFilmTask, folder: string) {
             if (!target || !task.sequenceIds.includes(scope.get("shots", target.shotId)?.sequenceId)) throw new Error("只能审阅和采用本任务新建序列的素材");
             if (review.targetType !== "take" || !review.fullPlayback) continue;
             const take = scope.get("takes", review.targetId), media = take && scope.get("media", take.mediaId);
-            if (!media || !task.playbacks.some(item => item.mediaId === media.id && item.hash === media.hash)) throw new Error("完整看听前请先 observeAutoFilmVideo 观察该候选的真实 mediaId，不能以抽帧代替");
+            const fingerprint = api.shotFingerprint(scope, take!.shotId);
+            const observed = task.playbacks.filter(item => item.mediaId === media?.id && item.hash === media?.hash)
+              .flatMap(item => item.cameraReviews ?? []).findLast(item => item.takeId === take!.id && item.fingerprint === fingerprint);
+            if (!media || !observed) throw new Error("请先 observeAutoFilmVideo 按当前镜头规格完整观察该候选；旧规格或没有摄影清单的观察不能复用");
+            // 摄影结果来自观察员，不让制作助手将失败或未验证项改填通过；其余动作检查仍由原流程负责。
+            review.motionReview = [...(review.motionReview ?? []).filter((item: { id: string }) => !["cameraStart", "cameraPath", "cameraEnd"].includes(item.id)),
+              ...observed.checks.map(item => ({ ...item, verdict: item.verdict === "pass" ? "pass" : "revise", note: item.verdict === "unverified" ? `摄影未验证：${item.note}`.slice(0, 2000) : item.note }))];
           }
           task.progress = `正在执行：${tool.label || tool.name}`;
           await save();
@@ -187,20 +194,22 @@ function launch(task: AutoFilmTask, folder: string) {
         },
       } satisfies ToolDefinition;
     }), {
-      name: "observeAutoFilmVideo", label: "完整观察视频声画", description: "将真实项目视频整体发送给当前创作模型，核对动态画面和声音。返回带时间点的真实观察，不能读取时明确失败，不会填写质检通过。focus说明要核对的镜头规格、对白、检查项及剪辑接点。",
+      name: "observeAutoFilmVideo", label: "完整观察视频声画", description: "将真实任务视频整体发送给当前创作模型，自动附带当前镜头起幅、相机路线和结束构图的摄影检查清单。返回带时间点的cameraReviews与声画观察；revise或unverified不得改成通过。focus只补充对白、检查重点及剪辑接点，不能覆盖系统清单。",
       parameters: z.toJSONSchema(z.strictObject({ mediaId: z.string().min(1), focus: z.string().min(1).max(12000) })),
       async execute(_id, input) {
         assertActive();
         const { mediaId, focus } = z.object({ mediaId: z.string().min(1), focus: z.string().min(1).max(12000) }).parse(input);
         const { api, tenant } = identity(task.directory), media = api.scoped(tenant.workspaceId).get("media", mediaId);
-        const saved = task.playbacks.find(item => item.mediaId === mediaId && item.hash === media?.hash);
+        const cameraPlan = cameraObservationPlan(task.projectId, mediaId, task.sequenceIds);
+        const planKey = createHash("sha256").update(JSON.stringify([1, cameraPlan, task.script, focus])).digest("hex");
+        const saved = task.playbacks.find(item => item.mediaId === mediaId && item.hash === media?.hash && item.planKey === planKey);
         if (saved) return { content: [{ type: "text", text: JSON.stringify(saved) }], details: saved };
         const key = `observe${mediaId}`;
         if ((task.attempts[key] ?? 0) >= 3) throw new Error("该视频已达到完整审阅尝试上限，请核对模型的视频与声音理解能力");
         task.attempts[key] = (task.attempts[key] ?? 0) + 1;
         task.progress = "正在完整观察视频画面和声音";
         await save();
-        const result = await observeVideo(task.directory, task.id, task.projectId, mediaId, `${task.script}\n\n检查目标：${focus}`, signal);
+        const result = { ...await observeVideo(task.directory, task.id, task.projectId, mediaId, `${task.script}\n\n检查目标：${focus}`, signal, cameraPlan), planKey };
         task.playbacks.push(result);
         await save();
         return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
