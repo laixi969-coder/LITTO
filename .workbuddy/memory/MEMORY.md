@@ -6,6 +6,7 @@
 - 新路由后在 `apps/server` 执行 `bun run routes`；工具包构建后同步 `build/tools/*.tool.js` 到 `data/tools/`；providers 源码与 `data/providers` 副本须同步。
 - 新技能除 `packages/skills` 外还需同步 `data/skills`，并接 prompt 分发、workflow 选择表及相邻技能入口。
 - 前端项目列表存浏览器 localStorage，后台创建项目后仍需用户从目录打开；画布读取工作区目录的 `画布N.json`，不是 DB 的 `projects.canvas`。首页支持 `/?directory=<绝对路径>`。
+- 会话是 HttpOnly cookie（无 Bearer），写请求靠 `x-milimili-csrf: 1` + 同源 origin 通过 `validMutationSource`。**新建 `axios.create` 实例必须随即 `registerApiLanguage(client)`**（全局 axios 与 fetch 已分别由 `registerLanguage`/`registerSessionGuard` 覆盖，独立实例不继承）。2026-10-24 故事工作台 `storyClient` 漏注册导致「页面来源校验失败」403。排查日志注意 morgan 输出带 ANSI 颜色码，需先去除再统计状态码。
 - 模型以 `data/cloud/milimili.db` 的 active `models` 为准。ffmpeg 位于 `data/ffmpeg/darwin-arm64/ffmpeg`。
 
 ## 角色资产与连续性
