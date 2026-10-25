@@ -8,7 +8,7 @@ import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline } from "@/utils/media/generation";
-import { assertMediaModelSelection, assertModelSelection } from "@/utils/modelSelection";
+import { assertMediaModelSelection, assertModelSelection, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 import { coverageGate } from "@/utils/media/coverage";
@@ -57,6 +57,8 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   // ACT: 正式镜头以当前规格和指纹为准，提示词由服务端编译，避免模型逐字复制长文本。
   if (production) request = production.request;
   else {
+    // 独立素材先分流再取模型：尺寸、清晰度等参数要按真正执行的编辑模型计算。
+    if (kind === "image") request = routeImageEditModel(request);
     const model = (await listMediaModels(true)).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === kind);
     if (!model) {
       // 余额不足会把整个供应商停用，模型随之从列表消失；这时报「类型不匹配」会让人去翻配置。
@@ -71,10 +73,13 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     request = { ...request, prompt: withPhotographicBaseline(spec ? `${spec}\n\n${request.prompt}` : request.prompt) };
   }
   const projectId = workspaceProject(directory)!;
+  // 正式镜头的 request 由 compile 产物覆盖，参考图分流要在这之后执行，保证落库模型与实际调用一致。
+  // 镜头参考在 compile 的 inputs 里（执行时才落成 images），独立素材直接看 request.images。
+  if (kind === "image") request = routeImageEditModel(request, !!request.images?.length || !!production?.compiled.inputs?.some(input => input.sent && input.mediaId));
   // 负面词与种子走独立字段，不拼进提示词正文：拼接后模型只会当作要绘制的文字内容。
   const compiled = production?.compiled;
   const merged = {
-    ...(production?.request ?? request),
+    ...request,
     ...(production ? { prompt: compiled!.prompt } : {}),
     ...(compiled?.negativePrompt ? { negativePrompt: compiled!.negativePrompt } : {}),
   };

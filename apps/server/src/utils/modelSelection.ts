@@ -3,7 +3,7 @@ import conf from "@/utils/conf";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 
 const choice = z.strictObject({ providerId: z.string().trim().min(1).max(200), modelId: z.string().trim().min(1).max(300) }).nullable().optional();
-export const modelSelectionSchema = z.strictObject({ text: choice, image: choice, video: choice, audio: choice });
+export const modelSelectionSchema = z.strictObject({ text: choice, image: choice, imageEdit: choice, video: choice, audio: choice });
 export type ModelKind = keyof z.infer<typeof modelSelectionSchema>;
 
 export function selectedModel(kind: ModelKind) {
@@ -17,9 +17,9 @@ export function isSelectedModel(kind: ModelKind, providerId: string, modelId: st
 }
 
 export function assertModelSelection(kind: ModelKind, providerId: string, modelId: string) {
-  const label = { text: "对话", image: "图片", video: "视频", audio: "配音" }[kind];
+  const label = { text: "对话", image: "图片", imageEdit: "图片编辑", video: "视频", audio: "配音" }[kind];
   const selected = selectedModel(kind);
-  const action = kind === "text" ? "请在对话的模型选择器中选择并保存" : "请通过 requestProductionDecision(selectModel) 在聊天中选择并保存，无需跳转设置页";
+  const action = kind === "text" ? "请在对话的模型选择器中选择并保存" : kind === "imageEdit" ? "请在设置 → 默认模型中选择「图片编辑 / 溶图」模型，或清空它以跟随图片生成模型" : "请通过 requestProductionDecision(selectModel) 在聊天中选择并保存，无需跳转设置页";
   if (!selected) throw Object.assign(new Error(`尚未设置${label}模型。${action}，系统不会自动选择或切换。`), { status: 400, retryable: false });
   if (!isSelectedModel(kind, providerId, modelId)) {
     // 两边必须一致才能生成：这个镜头记着自己的模型，用户选定的是另一个。说清楚是哪两处不一致，比一句「禁止改用」有用。
@@ -27,11 +27,27 @@ export function assertModelSelection(kind: ModelKind, providerId: string, modelI
   }
 }
 
+/**
+ * 带参考图的图像任务（溶图、局部编辑、多图参考）走「图片编辑 / 溶图」模型。
+ * 未单独设置时返回原请求，沿用图片生成模型；用户明确另选了非默认模型时不替他改写。
+ */
+export function routeImageEditModel<T extends MediaGenerationRequest>(request: T, hasImageReferences = !!request.images?.length): T {
+  if (!hasImageReferences) return request;
+  const edit = selectedModel("imageEdit");
+  if (!edit || isSelectedModel("imageEdit", request.providerId, request.modelId)) return request;
+  const image = selectedModel("image");
+  if (image && !isSelectedModel("image", request.providerId, request.modelId)) return request;
+  return { ...request, providerId: edit.providerId, modelId: edit.modelId };
+}
+
 export async function assertMediaModelSelection(kind: "image" | "video" | "audio", request: MediaGenerationRequest, directory: string) {
   if (kind === "video") {
     const { isVoiceSyncRequest } = await import("@/utils/media/voiceDecision");
     // 口型选择属于配音方案；仅允许选定声音和原视频的配对请求，不改变正式镜头的默认模型。
-    if (await isVoiceSyncRequest(directory, request)) return;
+    if (await isVoiceSyncRequest(directory, request)) return request;
   }
-  assertModelSelection(kind, request.providerId, request.modelId);
+  if (kind === "image") request = routeImageEditModel(request);
+  const selectionKind: ModelKind = kind === "image" && request.images?.length && selectedModel("imageEdit") ? "imageEdit" : kind;
+  assertModelSelection(selectionKind, request.providerId, request.modelId);
+  return request;
 }

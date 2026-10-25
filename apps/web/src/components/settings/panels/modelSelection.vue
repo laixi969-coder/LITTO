@@ -1,10 +1,11 @@
 <template>
   <div class="modelSelection">
     <p>分别选择当前工作区使用的平台和模型。用户、节点和 Agent 共用这些选择；未设置或调用失败时停止，不会自动切换到其他平台。</p>
+    <p>带参考图的图像任务（溶图、局部编辑、多图参考）自动使用「图片编辑 / 溶图」模型，纯文字生图使用「图片」模型；编辑模型留空则跟随图片模型，无需在节点上手动切换。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-form labelPosition="top" @submit.prevent="save()">
       <el-form-item v-for="kind in kinds" :key="kind.id" :label="kind.label">
-        <el-select v-model="draft[kind.id]" :aria-label="`${kind.label}默认模型`" filterable clearable :disabled="loading || saving || !modelsReady" placeholder="未设置，请选择平台和模型" noDataText="没有可用模型，请先配置 API Key 并检查连接和余额" @change="save(kind.id)">
+        <el-select v-model="draft[kind.id]" :aria-label="`${kind.label}默认模型`" filterable clearable :disabled="loading || saving || !modelsReady" :placeholder="kind.id === 'imageEdit' ? '留空：跟随图片模型' : '未设置，请选择平台和模型'" noDataText="没有可用模型，请先配置 API Key 并检查连接和余额" @change="save(kind.id)">
           <el-option v-if="draft[kind.id] && !choices(kind.id).some(item => keyOf(item) === draft[kind.id])" :value="draft[kind.id]" :label="`${modelsReady ? '已不可用' : '待确认'}：${unavailableLabel(draft[kind.id])}`" disabled />
           <el-option v-for="model in choices(kind.id)" :key="keyOf(model)" :value="keyOf(model)" :label="`${model.providerLabel} · ${model.label}`" />
         </el-select>
@@ -24,11 +25,11 @@ import axios from "axios";
 import { ElMessage } from "element-plus";
 import { settings, saveSettings } from "@/stores/settings";
 
-type Kind = "text" | "image" | "video" | "audio";
-type Choice = { providerId: string; modelId: string; providerLabel: string; label: string; type: Kind };
-const kinds: { id: Kind; label: string }[] = [{ id: "text", label: "对话与文本" }, { id: "image", label: "图片" }, { id: "video", label: "视频" }, { id: "audio", label: "配音与音频" }];
+type Kind = "text" | "image" | "imageEdit" | "video" | "audio";
+type Choice = { providerId: string; modelId: string; providerLabel: string; label: string; type: "text" | "image" | "video" | "audio"; mode?: unknown };
+const kinds: { id: Kind; label: string }[] = [{ id: "text", label: "对话与文本" }, { id: "image", label: "图片" }, { id: "imageEdit", label: "图片编辑 / 溶图（带参考图）" }, { id: "video", label: "视频" }, { id: "audio", label: "配音与音频" }];
 const models = ref<Choice[]>([]);
-const draft = ref<Record<Kind, string>>({ text: "", image: "", video: "", audio: "" });
+const draft = ref<Record<Kind, string>>({ text: "", image: "", imageEdit: "", video: "", audio: "" });
 const loading = ref(false);
 const modelsReady = ref(false);
 const saving = ref(false);
@@ -36,7 +37,12 @@ const saveFailed = ref(false);
 const error = ref("");
 const pendingKind = ref<Kind>();
 const keyOf = (model: { providerId: string; modelId: string }) => JSON.stringify([model.providerId, model.modelId]);
-const choices = (kind: Kind) => models.value.filter(model => model.type === kind);
+function supportsImageEdit(model: Choice) {
+  // 只列真正能接收参考图的模型，避免把文生图模型选进编辑槽后每次带图都报错。
+  const modes = Array.isArray(model.mode) ? model.mode : [];
+  return modes.some(mode => mode !== "text") || /\/edit$|image-to-image/i.test(model.modelId);
+}
+const choices = (kind: Kind) => models.value.filter(model => kind === "imageEdit" ? model.type === "image" && supportsImageEdit(model) : model.type === kind);
 function unavailableLabel(value: string) { try { return JSON.parse(value).join(" / "); } catch { return "请重新选择"; } }
 function currentSelection() { return settings.value.modelSelection as Partial<Record<Kind, { providerId: string; modelId: string }>> | undefined; }
 

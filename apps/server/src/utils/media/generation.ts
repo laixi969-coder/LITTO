@@ -301,7 +301,7 @@ async function generateMediaUnrecorded(
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
   if (!request.prompt.trim()) invalid("请输入生成提示词");
-  await assertMediaModelSelection(mediaType, request, cwd);
+  request = await assertMediaModelSelection(mediaType, request, cwd);
   const directory = await realpath(cwd);
   // 静音是交付约束，先确认能处理，避免供应商忽略开关后已经付费却无法交付。
   const silentFfmpeg = mediaType === "video" && request.generateAudio === false ? await createWorkspaceFfmpeg(directory, signal, true) : undefined;
