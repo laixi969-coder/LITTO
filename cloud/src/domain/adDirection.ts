@@ -66,6 +66,19 @@ export function adContext(s: Scope, shot: Record<string, any>) {
   };
 }
 
+export function adPilotAssessment(shot: Record<string, any>, productAssetIds: string[], review: Record<string, any>) {
+  const visibleIds: string[] = shot.visibleAssetIds ?? shot.assetIds ?? [];
+  const notApplicableChecks = productAssetIds.some(id => visibleIds.includes(id)) ? [] : ["product"];
+  // ACT: 静帧只验当前画面，剪辑留到成片；旧报告逐项重算，不因历史总评要求重新付费检查。
+  const deferredChecks = ["editing"];
+  const requiredChecks = ["emotion", "product", "composition", "color"].filter(key => !notApplicableChecks.includes(key));
+  // ACT: 旧审片未分级的审美修订默认可选；产品识别仍保守拦截，明确 block 与真实感严重缺陷继续生效。
+  const advisoryChecks = requiredChecks.filter(key => review[key]?.verdict === "revise"
+    && (review[key]?.severity === "review" || review[key]?.severity === undefined && key !== "product"));
+  const blockingChecks = requiredChecks.filter(key => review[key]?.verdict !== "pass" && !advisoryChecks.includes(key));
+  return { verdict: blockingChecks.length ? "revise" : "pass", nextAction: blockingChecks.length ? "resolveBlockers" : "continueProduction", blockingChecks, advisoryChecks, deferredChecks, notApplicableChecks };
+}
+
 export function adReadiness(s: Scope, sequenceId: string) {
   const sequence = s.get("sequences", sequenceId);
   if (!sequence) throw notFound("sequence");
@@ -80,13 +93,22 @@ export function adReadiness(s: Scope, sequenceId: string) {
     const review = shot && sequence.adPilotReviews?.[shot.id];
     const qc = frame && s.list("qc_reports", { targetType: "keyframe", targetId: frame.id }, "created_at DESC, rowid DESC")[0];
     const fingerprint = shot && shotFingerprint(s, shot.id, "keyframe");
+    const assessment = shot && review ? adPilotAssessment(shot, parsed.data.productAssetIds, review) : null;
     const ready = !!(frame && frame.shotId === shot.id && review?.keyframeId === frame.id && review.mediaId === frame.mediaId
       && !adShotIssues(s, shot, false).length
-      && review.fingerprint === fingerprint && review.verdict === "pass" && qc?.evidence?.fingerprint === fingerprint
+      && review.fingerprint === fingerprint && assessment?.verdict === "pass" && qc?.evidence?.fingerprint === fingerprint
+      && qc.evidence.mediaId === frame.mediaId
       && realismChecks.filter(key => key !== "motion").every(key => qc.evidence.reviewed?.includes(key))
       && !qc.findings.some((finding: any) => finding.severity === "high"));
-    return { ...pilot, shotId: shot?.id, keyframeId: frame?.id, mediaId: frame?.mediaId, ready,
-      reason: ready ? "已检查并采用" : matches.length !== 1 ? "每项样镜须对应唯一镜头" : "须检查当前样镜并采用，通过后再量产" };
+    let reason = "须完成当前主帧的真实感检查；已有采用记录无需重复确认";
+    if (ready) reason = "静帧适用项已检查并采用；剪辑与动态留到视频阶段验证";
+    else if (matches.length !== 1) reason = "每项样镜须对应唯一镜头";
+    else if (!frame) reason = "请先采用已检查的样镜主帧";
+    else if (review?.keyframeId !== frame.id || review?.mediaId !== frame.mediaId) reason = "当前采用的主帧与样镜检查对象不一致，请核对已有候选与采用记录，不要重生成";
+    else if (review?.fingerprint !== fingerprint) reason = "样镜规格已变化，须复核当前画面；不要为静帧补写动态结论或反复改规格";
+    else if (assessment?.blockingChecks.length) reason = `静帧待处理项：${assessment.blockingChecks.join("、")}；不适用项与动态检查不阻塞`;
+    return { ...pilot, shotId: shot?.id, keyframeId: frame?.id, mediaId: frame?.mediaId, ready, assessment,
+      reason };
   });
   return { required: true, ready: pilots.every(pilot => pilot.ready), pilots };
 }
