@@ -577,6 +577,12 @@ export async function generateMediaDirect(
         return [{ ...existing.audio, mediaType: "audio" }];
       }
     }
+    // 采用声音及同原句候选的复用已在上面返回；只在真正开始新生成前占用自动任务额度。
+    const automatic = autoFilmScope.getStore();
+    if (automatic && !execution) {
+      if (automatic.directory !== cwd) throw new Error("自动成片任务不能跨工作目录生成素材");
+      await automatic.beforeGeneration(mediaType, request);
+    }
     const files = execution?.task?.files?.length ? await Promise.all(execution.task.files.map(async ({ hash, ...file }) => {
       const { path } = await resolveWorkspacePath(cwd, file.path);
       if (file.mediaType !== mediaType || createHash("sha256").update(await readFile(path)).digest("hex") !== hash) throw Object.assign(new Error("已保存的原任务文件已改变，停止恢复；不会重新生成"), { retryable: false, fallbackAllowed: false });
@@ -605,14 +611,16 @@ export async function generateMediaDirect(
 
 /** Agent tools keep their awaitable contract; the actual generation is owned by the persistent worker. */
 export async function generateMedia(cwd: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<GeneratedMedia[]> {
+  const { cloud } = await import("@/lib/cloud");
+  const { currentTenant } = await import("@/utils/tenant");
+  const requestId = request.speechSegment?.requestId ?? crypto.randomUUID();
+  const tenant = currentTenant(), api = cloud();
+  const receipt = request.speechSegment && tenant && api?.dbGet("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", tenant.workspaceId, `workspaceMedia:${requestId}`);
   const automatic = autoFilmScope.getStore();
   if (automatic) {
     if (automatic.directory !== cwd) throw new Error("自动成片任务不能跨工作目录生成素材");
-    await automatic.beforeGeneration(mediaType, request);
+    if (api && tenant && mediaType !== "audio" && !receipt) await automatic.beforeGeneration(mediaType, request);
   }
-  const { cloud } = await import("@/lib/cloud");
-  const { currentTenant } = await import("@/utils/tenant");
-  const api = cloud();
   if (request.localRepair && (!api || !currentTenant() || mediaType !== "image" || !request.shotId)) invalid("关键帧精修须使用已连接项目的图像镜头，不能退化成独立文生图");
   if (!api || !currentTenant() || mediaType === "audio") {
     if (mediaType !== "audio") {
@@ -627,7 +635,7 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
   signal?.throwIfAborted();
   onProgress?.("正在校验编译规格与参考素材，尚未提交生成");
   const { enqueueMedia } = await import("@/utils/media/jobs");
-  const job = await enqueueMedia(cwd, mediaType, request, crypto.randomUUID());
+  const job = await enqueueMedia(cwd, mediaType, request, requestId);
   const started = Date.now();
   let reported = "";
   let reportedAt = 0;

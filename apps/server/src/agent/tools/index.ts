@@ -25,6 +25,7 @@ import { requestKeyframeApproval } from "@/utils/media/keyframeApproval";
 import { requestProductionDecision } from "@/utils/media/productionDecision";
 import { readVoiceProject, planWorkspaceSpeech } from "@/utils/media/voiceDecision";
 import { prepareSpeechAudio, inspectSpeechSync, importSpeechTake } from "@/utils/media/lipSync";
+import { syncShotSpeech } from "@/utils/media/speechAssembly";
 import { speechSegmentSchema, speechSyncPathsSchema, speechTakeInputSchema } from "@toonflow/tool-media-generation/voiceProject";
 import { planMediaGeneration, readMediaQuality, saveMediaQuality } from "@/utils/media/quality";
 import { listAiModels } from "@/utils/ai";
@@ -112,6 +113,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       async production(operation, data, signal) {
         signal?.throwIfAborted();
         if (operation === "readVoice") return (await readVoiceProject(cwd)).project;
+        if (operation === "syncSpeech") return syncShotSpeech(cwd, data, mediaSignal(signal));
         if (operation === "planSpeech") return planWorkspaceSpeech(cwd, data, mediaSignal(signal));
         if (operation === "prepareSpeech") return prepareSpeechAudio(cwd, z.strictObject({ audio: speechSegmentSchema }).parse(data).audio, mediaSignal(signal));
         if (operation === "inspectSpeech") {

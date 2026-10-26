@@ -30,6 +30,7 @@ export interface AutoFilmTask {
   attempts: Record<string, number>;
   toolCalls: number;
   playbacks: AutoFilmPlayback[];
+  voicePlaybacks?: { lineId: string; takeId: string; hash: string; sourceKey: string; audioRead: boolean; verdict: "pass" | "revise" | "unverified"; transcript: string; note: string }[];
   progress: string;
   error?: string;
   decisions: { tool: string; title: string; answer: string; values?: Record<string, string | number | boolean | string[]>; reason: string }[];

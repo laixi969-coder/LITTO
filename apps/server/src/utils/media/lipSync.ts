@@ -16,18 +16,19 @@ import { matchesAspect } from "@toonflow/providers/aspect";
 // ACT: 仅保留本进程最近32份数值结果；每次先核验实际字节，不信任客户端缓存。
 const speechInspections = new Map<string, SpeechInspection>();
 
-async function mediaHash(directory: string, path: string) {
+export async function mediaHash(directory: string, path: string) {
   const resolved = await resolveWorkspacePath(directory, path);
   const info = await stat(resolved.path);
   if (!info.isFile() || !info.size || info.size > 100 * 1024 * 1024) throw new Error("同步素材须为工作区内不超过100MB的非空文件");
   return createHash("sha256").update(await readFile(resolved.path)).digest("hex");
 }
 
-function probeMedia(ffmpeg: Awaited<ReturnType<typeof createWorkspaceFfmpeg>>, path: string) {
+export function probeMedia(ffmpeg: Awaited<ReturnType<typeof createWorkspaceFfmpeg>>, path: string) {
   return new Promise<FfprobeData>((resolve, reject) => ffmpeg.ffprobe(path, (error, data) => error ? reject(error) : resolve(data)));
 }
 
 export async function validateSpeechInputs(directory: string, request: MediaGenerationRequest, signal?: AbortSignal) {
+  if (request.speechSegment) return (await import("@/utils/media/speechAssembly")).validateSpeechSegmentRequest(directory, request, signal);
   if (request.videos?.length !== 1 || request.audios?.length !== 1) throw new Error("专用口型处理须使用一个人物视频与一段已确定声音");
   if (request.generateAudio === false) throw new Error("口型任务必须保留采用的声音，不能关闭音轨；本次未提交生成");
   const { project } = await readVoiceProject(directory);
@@ -42,7 +43,7 @@ export async function validateSpeechInputs(directory: string, request: MediaGene
     if (shot?.projectId !== projectId || !planned?.length) throw new Error("请先将采用的声音和人物原片关联到当前项目的对应台词镜头，再对口型；本次未提交生成");
     api!.assertSpeechPlan(scope!, shot);
     await assertCurrentSpeechAudio(directory, shot, signal);
-    if (planned.length !== 1 || planned[0].text !== line!.text || planned[0].start !== 0) throw new Error("多句或延迟发声的整镜须先按台词窗口拆成对应发声片段；不能让从第0秒开始的一句口型替代整镜。本次未提交生成。");
+    if (planned.length !== 1 || planned[0].text !== line!.text || planned[0].start !== 0) throw new Error("多句或延迟发声请调用 productionSpec(syncSpeech,{shotId}) 自动拆片、对口型并合回完整镜头，不直接提交整镜单句口型。本次未提交生成。");
   }
   const paths = [request.videos[0]!.path, request.audios[0]!.path];
   const hashes = await Promise.all(paths.map(path => mediaHash(directory, path)));
@@ -170,8 +171,9 @@ export async function inspectSpeechSync(directory: string, audioPath: string, vi
   return { ...inspection };
 }
 
-export async function importSpeechTake(directory: string, input: { shotId: string; videoPath: string; audioPath: string; sourceVideoPath: string; inspectionKey: string; fullPlayback: true; speech: "pass"; lipSync: "pass"; note: string }) {
+export async function importSpeechTake(directory: string, input: { assemblyId?: string; shotId: string; videoPath: string; audioPath: string; sourceVideoPath: string; inspectionKey: string; fullPlayback: true; speech: "pass"; lipSync: "pass"; note: string }) {
   if (input.fullPlayback !== true || input.speech !== "pass" || input.lipSync !== "pass") throw new Error("须确认当前版本全部可见发声区间同步；局部通过或不确定不能整体采用");
+  if (input.assemblyId) return (await import("@/utils/media/speechAssembly")).importAssembledSpeechTake(directory, input);
   const tenant = currentTenant(), api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权登记口型候选"), { status: 403 });
   const projectId = workspaceProject(directory)!;
@@ -201,7 +203,7 @@ export async function importSpeechTake(directory: string, input: { shotId: strin
   if (!output) throw new Error("找不到对应声音、原视频和结果字节的成功口型任务；混入相同音轨不能冒充口型处理");
   const shot = scope.get("shots", input.shotId)!;
   const planned = shot.creativeBrief?.dialogue?.lines;
-  if (planned?.length && (planned.length !== 1 || planned[0].text !== line.text || planned[0].start !== 0)) throw new Error("当前是整镜的多句或延迟发声方案，不能把从第0秒开始的一句口型视频替代整镜；须先按台词窗口拆分对应发声片段");
+  if (planned?.length && (planned.length !== 1 || planned[0].text !== line.text || planned[0].start !== 0)) throw new Error("当前是多句或延迟发声方案，请用 syncSpeech 自动处理整镜，再携带 assemblyId 导入，不能以单句短片替代整镜");
   const existing = scope.list("takes", { shotId: input.shotId, mediaId: output.mediaId }).find(take => take.meta?.speechSync?.inspectionKey === inspection.key && take.meta.speechSync.specFingerprint === api.shotFingerprint(scope, input.shotId));
   if (existing) return existing;
   const edit = api.editView(scope, api.getEdit(scope, scope.get("shots", input.shotId)!.sequenceId, false));

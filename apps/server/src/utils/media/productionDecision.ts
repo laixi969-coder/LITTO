@@ -13,15 +13,27 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
   const data = z.strictObject({ kind: z.enum(["image", "video", "audio"]), providerId: z.string().min(1).optional(), modelId: z.string().min(1).optional() })
     .refine(value => !!value.providerId === !!value.modelId, "providerId 和 modelId 须同时提供").parse(input.data);
   const tenant = currentTenant();
+  if (tenant) cloud()!.requireModelAccess(tenant.userId);
+  const available = await listMediaModels(true);
+  const requested = available.find(model => model.type === data.kind && model.providerId === data.providerId && model.modelId === data.modelId);
+  if (requested?.lipSync) return {
+    title: "口型模型使用独立配音方案", applied: false,
+    selection: selectedModel(data.kind) ?? null,
+    nextAction: { tool: "requestProductionDecision", operation: "configureVoice", lipSyncProviderId: requested.providerId, lipSyncModelId: requested.modelId },
+    answer: "该口型模型可用，但 selectModel 不保存口型选择。先 productionSpec(readVoice)，保留已有角色、台词及候选，在 project 中设置 lipSyncProviderId/lipSyncModelId，再 requestProductionDecision(configureVoice,{project}) 保存。随后用已采用声音和人物原片调用 generateVideo，purpose=standalone，不传 shotId/productionFingerprint。无需修改默认视频模型，也无需放行 approveTake；处理后实际看听、inspectSpeech/importSpeech，再 reviewProduction 采用。",
+  };
   if (tenant) {
-    cloud()!.requireModelAccess(tenant!.userId);
     const selection = selectedModel(data.kind);
     if (!selection) throw new Error("该类平台默认模型尚未设置，请由超级管理员在管理后台 → 默认模型中配置");
-    if (!(await listMediaModels(true)).some(model => model.type === data.kind && model.providerId === selection.providerId && model.modelId === selection.modelId))
+    if (!available.some(model => model.type === data.kind && model.providerId === selection.providerId && model.modelId === selection.modelId))
       throw new Error("平台默认模型当前不可用，请联系超级管理员检查配置与额度");
+    if (data.providerId && (data.providerId !== selection.providerId || data.modelId !== selection.modelId)) return {
+      title: "未更改平台默认模型", applied: false, selection,
+      answer: "指定模型未被选用，平台默认模型保持不变。角色配音与专用口型通过 configureVoice 独立绑定，先 listMediaModels{all:true} 核对能力与可用性；不能把默认模型不可切换当成口型不可用。",
+    };
     return { title: "沿用平台默认模型", applied: true, selection, answer: "直接使用超级管理员设置的默认模型，无需用户选择或配置" };
   }
-  const models = (await listMediaModels(true)).filter(model => model.type === data.kind && (!data.providerId || model.providerId === data.providerId && model.modelId === data.modelId));
+  const models = available.filter(model => model.type === data.kind && !model.lipSync && (!data.providerId || model.providerId === data.providerId && model.modelId === data.modelId));
   if (!models.length) throw new Error("没有匹配的可用模型，请先配置供应商或恢复连接与额度");
   const previous = selectedModel(data.kind);
   if (!input.reconsider && previous && models.some(model => model.providerId === previous.providerId && model.modelId === previous.modelId))

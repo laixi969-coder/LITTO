@@ -125,6 +125,8 @@ export interface MediaShotSpec {
 }
 
 export interface MediaGenerationRequest {
+  /** 仅由服务端整镜口型流程创建；恢复任务时按私有制作记录核验。 */
+  speechSegment?: { assemblyId: string; lineIndex: number; requestId: string };
   voiceLineId?: string;
   audioParameters?: Record<string, string | number | boolean>;
   purpose?: "asset" | "standalone" | "storyboard";

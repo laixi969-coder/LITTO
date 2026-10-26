@@ -8,9 +8,11 @@ export const speechPlanSchema = z.strictObject({ shotId: z.string().min(1).max(1
 export const speechSegmentSchema = audioSchema.extend({ start: z.number().finite().nonnegative(), duration: z.number().finite().positive().max(600) });
 export const speechSyncPathsSchema = z.strictObject({ audioPath: pathSchema, videoPath: pathSchema, sourceVideoPath: pathSchema.optional() });
 export const speechTakeInputSchema = speechSyncPathsSchema.extend({
+  assemblyId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   shotId: z.string().min(1).max(128), sourceVideoPath: pathSchema, inspectionKey: z.string().length(64),
   fullPlayback: z.literal(true), speech: z.literal("pass"), lipSync: z.literal("pass"), note: z.string().trim().min(10).max(2000),
 });
+export const syncShotSpeechSchema = z.strictObject({ shotId: z.string().min(1).max(128) });
 export const speechInspectionSchema = z.strictObject({
   key: z.string().length(64), audioMatches: z.boolean(), offsetMs: z.number().finite(), correlation: z.number().finite(),
   audioDuration: z.number().finite().positive(), videoDuration: z.number().finite().positive(), sourceVideoDuration: z.number().finite().positive().optional(), note: z.string(),

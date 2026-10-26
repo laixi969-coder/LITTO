@@ -58,6 +58,31 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
     if (clip.audioDetached || clip.gainDb + (edit.tracks.find(track => track.id === clip.trackId)?.gainDb ?? 0) <= -60) throw conflict("对白缺少当前完整声音或声音已静音；只能导出 draft:true 预览，不能作为定稿", "speech_export_blocked");
     if (shotDialogueMode(s, shot) === "post" && relevant.some((line: any) => line.lipSync === "visible")) {
       const sync = take.meta?.speechSync;
+      if (sync?.assemblyId) {
+        const sourceMedia = s.get("media", sync.sourceMediaId), composed = s.get("media", take.mediaId);
+        if (!sync.audioMatches || sync.specFingerprint !== shotFingerprint(s, shot.id) || !sourceMedia || !composed || sourceMedia.projectId !== shot.projectId
+          || sourceMedia.hash !== sync.sourceVideoHash || composed?.hash !== sync.composedHash || composed.source !== `speechAssembly:${sync.assemblyId}`
+          || s.get("media", sync.referenceMediaId)?.hash !== sync.audioHash || !Array.isArray(sync.segments) || sync.segments.length !== lines.length
+          || new Set(sync.segments.map((part: any) => part.lineIndex)).size !== lines.length)
+          throw conflict("整镜口型来源、声音或规格已失效，不能用旧合成记录定稿", "speech_export_blocked");
+        for (const [lineIndex, line] of lines.entries()) {
+          const part = sync.segments.find((part: any) => part.lineIndex === lineIndex), audio = line.audio && s.get("media", line.audio.mediaId);
+          if (!part || part.text !== line.text || part.start !== line.start || part.visible !== (line.lipSync === "visible")
+            || part.audioMediaId !== audio?.id || audio?.projectId !== shot.projectId || audio.hash !== part.audioHash
+            || !Number.isFinite(part.duration) || part.duration <= 0 || Math.abs(audio.duration - part.duration) > 0.001 || part.start + part.duration > line.end + 0.001)
+            throw conflict("逐句口型记录与当前原句、时间窗口或采用声音不一致", "speech_export_blocked");
+          if (!part.visible) continue;
+          const job = s.get("generation_jobs", part.jobId), request = job?.parameters?.request, inputs = request?.speechSyncInputs;
+          if (job?.status !== "SUCCEEDED" || job.projectId !== shot.projectId || job.kind !== "video"
+            || request?.speechSegment?.assemblyId !== sync.assemblyId || request.speechSegment.lineIndex !== lineIndex
+            || inputs?.assemblyId !== sync.assemblyId || inputs.lineIndex !== lineIndex || inputs.start !== part.start
+            || inputs.specFingerprint !== sync.specFingerprint || inputs.sourceVideoHash !== sync.sourceVideoHash
+            || inputs.audioHash !== part.audioHash || inputs.videoHash !== part.segmentHash || inputs.lineId !== part.lineId || inputs.voiceSourceKey !== part.sourceKey
+            || s.get("media", part.mediaId)?.hash !== part.hash || !s.list("generation_outputs", { jobId: job.id }).some(output => output.mediaId === part.mediaId))
+            throw conflict("逐句口型任务或输入输出关联已失效，不能将未处理的片段混入定稿", "speech_export_blocked");
+        }
+        continue;
+      }
       if (!sync?.jobId || !sync.audioMatches || sync.specFingerprint !== shotFingerprint(s, shot.id)) throw conflict("后配音口型缺少当前规格与真实处理任务的检查记录，不能把混音视频当作同步定稿", "speech_export_blocked");
       const job = s.get("generation_jobs", sync.jobId);
       const inputs = job?.parameters?.request?.speechSyncInputs;

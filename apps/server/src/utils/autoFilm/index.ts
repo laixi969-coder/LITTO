@@ -16,7 +16,10 @@ import { readStoryProject } from "@/utils/story";
 import { getStatus } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { autoFilmScope } from "./scope";
-import { assertVideoObservation, cameraObservationPlan, cameraReviewsSchema, observeVideo, videoObservationModel } from "./observe";
+import { assertVideoObservation, cameraObservationPlan, cameraReviewsSchema, observeVideo, observeVoice, videoObservationModel } from "./observe";
+import { readVoiceProject } from "@/utils/media/voiceDecision";
+import { mediaHash } from "@/utils/media/lipSync";
+import { speechSourceKey } from "@toonflow/tool-media-generation/voiceProject";
 import type { AutoFilmTask } from "./types";
 
 const relativePath = z.string().min(1).max(2048).refine(value => !/^[\\/]|[:\u0000-\u001f]/.test(value) && value.split(/[\\/]/).every(part => part && part !== "." && part !== ".."), "须为工作区相对路径");
@@ -39,6 +42,7 @@ const stateSchema = z.object({
   generationCount: z.number().int().nonnegative(), attempts: z.record(z.string(), z.number().int().nonnegative()),
   toolCalls: z.number().int().nonnegative(), progress: z.string(), error: z.string().optional(),
   playbacks: z.array(z.object({ mediaId: z.string(), hash: z.string(), note: z.string(), planKey: z.string().optional(), cameraReviews: z.array(cameraReviewsSchema.element.extend({ fingerprint: z.string() })).optional() })),
+  voicePlaybacks: z.array(z.object({ lineId: z.string(), takeId: z.string(), hash: z.string(), sourceKey: z.string(), audioRead: z.boolean(), verdict: z.enum(["pass", "revise", "unverified"]), transcript: z.string(), note: z.string() })).default([]),
   decisions: z.array(z.object({ tool: z.string(), title: z.string(), answer: z.string(), values: choiceSchema.shape.values, reason: z.string() })),
   output: z.object({ renderId: z.string(), sequenceId: z.string(), mediaId: z.string(), url: z.string() }).optional(),
 });
@@ -56,7 +60,9 @@ const instructions = `你正在执行用户点击启动的独立「一键自动�
 确认类工具支持 automaticChoice:{answer,values?,reason}。首次调用若返回待选题目，读完真实候选后在同一工具参数补 automaticChoice 重试，服务端校验并保存选择；不要把题目转交用户。askUser 的创作问题直接自己决定。字段表单须按题目 fields 提供 values。
 关键帧必须读取实际图片。视频先用 observeAutoFilmVideo{mediaId,focus} 把完整真实视频交给已配置的视频审阅模型观察，创作模型无需自己支持视频输入。读取实际返回的时间点、表演、对白和接点证据，再使用 reviewProduction/reviewProductions 记录真实观察并采用（authorization 填用户点击启动自动成片的授权）。此模式没有人工主帧采用与用户满意度工具；不得伪造用户看过、用户满意或人类验收。selectCandidate 不能 asHero。资产、故事、声音和剪辑仍通过各自确认工具保存自动决定。
 有对白先确定真实声音和时长，再安排镜头与口型；复用已成功生成的素材和任务。参考、版本、指纹、连续性和声音门禁全部有效，不准通过修改检查代码或填假观察绕过。只有实际完整看听才填 fullPlayback:true；无法观察时说明缺项并结束，不能宣称通过。
-固定配音的专用口型模型独立于默认视频生成模型。先 listMediaModels{all:true} 核对 lipSync:true，再 configureVoice 保存 lipSyncProviderId/lipSyncModelId；台词绑定当前采用的声音和人物原片。口型 generateVideo 只传这一对 videos/audios，不传 shotId 或 productionFingerprint，不调用 selectModel 把默认视频模型换成口型模型。延迟发声、多句整镜须先按真实发声窗口规划支持的片段；缺少能力时在生成前报告，不能靠改画外音或将独立对白直接叠到旧视频绕过。
+配音候选先 observeAutoFilmVoice{lineId,takeId} 完整试听，依据返回的原句核对、实际转写与表演结论 selectVoice；不要用普通 read 读取音频冒充试听，也不把试听推回用户。revise或unverified不能采用为通过，已有有效采用声音复用。
+固定配音的专用口型模型独立于默认视频生成模型。先 listMediaModels{all:true} 核对 lipSync:true，再 productionSpec(readVoice) 读取并保留已有方案，通过 requestProductionDecision{operation:configureVoice,data:{project}} 保存 lipSyncProviderId/lipSyncModelId；台词绑定当前采用的声音和人物原片。这项选择已在自动制作授权内，由你填写 automaticChoice，不向用户申请更换默认模型。口型 generateVideo 使用该专用 providerId/modelId、purpose:standalone 和这一对 videos/audios，不传 shotId 或 productionFingerprint，不调用 selectModel 把默认视频模型换成口型模型。结果成功后先 observeAutoFilmVideo 完整看听、productionSpec(inspectSpeech) 核对声音，再 importSpeech 登记新候选并 reviewProduction 采用；不使用 approveTake 代替代理审阅。后配对白优先 productionSpec(syncSpeech,{shotId})，由服务端自动裁出每句真实发声窗口、处理口型并按原时间合回完整镜头；支持多句和延迟发声，不要求用户手动拆片。返回结果先完整观察，再 importSpeech 携带 assemblyId 和返回的路径、inspectionKey；不能直接叠对白冒充口型。原片须先通过视觉检查选入工作版；无声音时不填声音通过，也不提前采用为正式镜头。selectModel 返回默认模型、approveTake 被禁止都不是口型通道不可用的证据；续跑须按当前规则核对独立通道，不沿用历史对话中的无解结论。
+importSpeech 只登记新候选；登记前观察用于核对口型结果，登记后须再次 observeAutoFilmVideo，按新候选与当前规格的摄影清单完整观察，再 reviewProduction。不得把登记前的空清单观察当成新候选的完整检查，也不重复生成口型结果。
 摄影检查清单由 observeAutoFilmVideo 自动从当前镜头规格读取，focus 只补充重点，不替代起幅、相机路径和结束构图检查。返回的 cameraReviews 是实际观察，revise 或 unverified 不能改写成 pass；保留候选，根据具体偏差修正规格或在已有重试额度内处理。当前后台没有3D预演工具，不尝试调用画布节点，不为缺少3D阻塞普通镜头，也不声称已使用数值轨迹。
 允许为失败或有明确缺陷的目标最多再试两次，总计最多120次媒体生成（含配音），重试使用新的 regenerationId，同一次重试复用该ID；先查询旧任务防止重复消耗。停止、余额不足、权限撤回或保存失败时停止，不无限重试。
 镜头完成后读取 readEdit，自动剪辑并用 render 导出正式成片，等待真实 SUCCEEDED，再 inspectFinal、observeAutoFilmVideo 完整核对成片，按真实观察 agentReviewFinal。不要调用 reviewFinal 代填用户满意度。最后调用 completeAutoFilm{renderId}；只有这个工具确认完成才算交付，不能只回复制作方案或让用户点击下一步。未完成就继续工具执行；真实阻塞时给出具体原因并保存已有成果。`;
@@ -167,9 +173,29 @@ function launch(task: AutoFilmTask, folder: string) {
           if (tool.name === "productionSpec" && ["publishAsset", "favoriteAsset"].includes(input.operation)) throw new Error("本任务只制作当前项目，不修改跨项目角色库");
           const { api, tenant } = identity(task.directory), scope = api.scoped(tenant.workspaceId);
           const operationData = input.data ?? {};
+          if (tool.name === "requestProductionDecision" && input.operation === "selectVoice" && automaticChoice) {
+            const index = /^采用配音 (\d+)$/.exec(automaticChoice.answer)?.[1];
+            if (index) {
+              const { project } = await readVoiceProject(task.directory);
+              const line = project.lines.find(line => line.id === operationData.lineId);
+              const takeId = operationData.takeIds?.[Number(index) - 1], take = line?.takes.find(take => take.id === takeId);
+              if (!line || !take || !line.shotId || !task.sequenceIds.includes(scope.get("shots", line.shotId)?.sequenceId)) throw new Error("只能采用本任务镜头的配音候选");
+              if (line.takeId !== takeId) {
+                const hash = await mediaHash(task.directory, take.audio.path), sourceKey = speechSourceKey(line, project.roles.find(role => role.id === line.roleId));
+                if (!task.voicePlaybacks?.some(item => item.lineId === line.id && item.takeId === takeId && item.hash === hash && item.sourceKey === sourceKey && item.verdict === "pass"))
+                  throw new Error("须先 observeAutoFilmVoice 完整试听当前候选并通过，不把试听或选择交给用户");
+              }
+            }
+          }
           if (["productionSpec", "requestProductionDecision"].includes(tool.name)) {
             const sequenceId = operationData.sequenceId ?? (operationData.shotId ? scope.get("shots", operationData.shotId)?.sequenceId : undefined);
             if (sequenceId && !task.sequenceIds.includes(sequenceId)) throw new Error("自动成片只修改和导出本任务新建的序列，不能修改手动制作序列");
+          }
+          if (tool.name === "productionSpec" && input.operation === "importSpeech") {
+            const { path } = await resolveWorkspacePath(task.directory, z.string().min(1).parse(operationData.videoPath));
+            const hash = createHash("sha256").update(await readFile(path)).digest("hex");
+            if (!task.playbacks.some(item => item.hash === hash && scope.get("media", item.mediaId)?.hash === hash))
+              throw new Error("口型结果须先 observeAutoFilmVideo 完整看听成功生成的 mediaId，再 importSpeech 登记候选；登记后按镜头清单观察并 reviewProduction 采用");
           }
           const reviews = tool.name === "reviewProductions" ? input.reviews : tool.name === "reviewProduction" ? [input] : tool.name === "productionSpec" && input.operation === "agentReview" ? [input.data] : [];
           for (const review of reviews) {
@@ -200,13 +226,26 @@ function launch(task: AutoFilmTask, folder: string) {
         },
       } satisfies ToolDefinition;
     }), {
-      name: "observeAutoFilmVideo", label: "完整观察视频声画", description: "将真实任务视频整体发送给已配置的视频审阅模型，创作模型不需要支持视频输入。自动附带当前镜头起幅、相机路线和结束构图的摄影检查清单。返回带时间点的cameraReviews与声画观察；revise或unverified不得改成通过。focus只补充对白、检查重点及剪辑接点，不能覆盖系统清单。",
+      name: "observeAutoFilmVoice", label: "完整试听配音", description: "完整听取本任务当前角色原句的配音候选，返回实际转写和检查结论，再selectVoice。不能采用revise或unverified为通过。",
+      parameters: z.toJSONSchema(z.strictObject({ lineId: z.uuid(), takeId: z.uuid() })),
+      async execute(_id, input) {
+        countToolCall();
+        const { lineId, takeId } = z.strictObject({ lineId: z.uuid(), takeId: z.uuid() }).parse(input);
+        task.progress = "正在完整试听配音";
+        await save();
+        const result = await observeVoice(task.directory, lineId, takeId, task.sequenceIds, signal);
+        (task.voicePlaybacks ??= []).push(result);
+        await save();
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      },
+    }, {
+      name: "observeAutoFilmVideo", label: "完整观察视频声画", description: "将真实任务视频整体发送给已配置的视频审阅模型，创作模型不需要支持视频输入。支持本任务候选、成片，以及当前配音绑定的成功口型结果（尚未importSpeech时用productionSpec read查询对应媒体ID）。口型结果先完整看听再importSpeech；登记候选后再次调用，按新候选的摄影清单检查，再reviewProduction采用。自动附带当前镜头起幅、相机路线和结束构图的摄影检查清单。返回带时间点的cameraReviews与声画观察；revise或unverified不得改成通过。focus只补充对白、检查重点及剪辑接点，不能覆盖系统清单。",
       parameters: z.toJSONSchema(z.strictObject({ mediaId: z.string().min(1), focus: z.string().min(1).max(12000) })),
       async execute(_id, input) {
         countToolCall();
         const { mediaId, focus } = z.object({ mediaId: z.string().min(1), focus: z.string().min(1).max(12000) }).parse(input);
         const { api, tenant } = identity(task.directory), media = api.scoped(tenant.workspaceId).get("media", mediaId);
-        const cameraPlan = cameraObservationPlan(task.projectId, mediaId, task.sequenceIds);
+        const cameraPlan = await cameraObservationPlan(task.directory, task.projectId, mediaId, task.sequenceIds);
         const planKey = createHash("sha256").update(JSON.stringify([1, cameraPlan, task.script, focus])).digest("hex");
         const saved = task.playbacks.find(item => item.mediaId === mediaId && item.hash === media?.hash && item.planKey === planKey);
         if (saved) return { content: [{ type: "text", text: JSON.stringify(saved) }], details: saved };
@@ -272,13 +311,14 @@ function launch(task: AutoFilmTask, folder: string) {
       task.progress = "正在检查视频审阅模型的画面与声音读取能力";
       await save();
       await assertVideoObservation(signal);
-      for (let turn = 0; turn < 8 && !task.output; turn++) {
+      // 持续推进直到交付；已有时限和工具预算兜底，不因模型提前结束一轮而要求用户反复续跑。
+      for (let turn = 0; !task.output; turn++) {
         assertActive();
         const before = task.toolCalls;
         await run({ cwd: task.directory, ...model, thinkingLevel: "medium", sessionFile: task.sessionFile, signal, question, instructions, prepareTools,
           prompt: turn === 0 && !task.sessionFile
             ? `用户点击启动一键自动成片。任务 ${task.id}。请把以下剧本与角色参考完整制作成片，由你决定全部制作选项。已有任务序列：${JSON.stringify(task.sequenceIds)}；已有采用版本：${task.storyRevisionId ?? "无"}。有已有成果时先读取并复用，不重复创建。\n剧本：\n${task.script}\n参考图片（实际读取后使用）：\n${JSON.stringify(task.references)}\n执行规则：\n${instructions}`
-            : `继续自动成片任务 ${task.id}，用户已授权全部制作选择。先核对当前任务、已成功媒体和原任务状态，保留已有成果，不重复生成。任务序列：${JSON.stringify(task.sequenceIds)}。剩余生成次数：${120 - task.generationCount}。完成正式导出及代理验收后调用 completeAutoFilm；真实阻塞请明确说明。`,
+            : `继续自动成片任务 ${task.id}，用户已授权全部制作选择。先核对当前任务、已成功媒体和原任务状态，保留已有成果，不重复生成。任务序列：${JSON.stringify(task.sequenceIds)}。剩余生成次数：${120 - task.generationCount}。完成正式导出及代理验收后调用 completeAutoFilm；真实阻塞请明确说明。以本次执行规则重新核对历史阻塞，不能直接重复旧结论。\n当前执行规则：\n${instructions}`,
         }, event => {
           if (event.type === "session") { task.sessionFile = event.file; void save().catch(() => controller.abort()); }
           if (event.type === "error") task.error = event.message;

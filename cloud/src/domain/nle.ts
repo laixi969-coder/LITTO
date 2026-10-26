@@ -136,6 +136,7 @@ const num = z.number().finite();
 const tr = z.object({ type: z.enum(["cut", "dissolve", "fade_black"]), duration: num.min(0).max(10) });
 const clipIn = z.object({ trackId: z.string(), type: z.enum(["shot", "media"]), shotId: z.string().optional(), mediaId: z.string().optional(), linkedClipId: z.string().optional(), dialogueLineIndex: z.number().int().nonnegative().optional(), dialogueText: z.string().min(1).optional(), start: num.min(0), duration: num.optional(), in: num.min(0).default(0), speed: num.min(0.25).max(4).default(1), transition: tr.optional(), gainDb: num.min(-60).max(24).default(0), fadeIn: num.min(0).default(0), fadeOut: num.min(0).default(0), label: z.string().default("") });
 export const opSchema = z.discriminatedUnion("type", [
+    z.object({ type: z.literal("replace_source"), id: z.string(), mediaId: z.string() }),
     z.object({ type: z.literal("set_cut"), leftId: z.string(), rightId: z.string(), sourceOut: num.nonnegative(), sourceIn: num.nonnegative(), leftMediaId: z.string().optional(), rightMediaId: z.string().optional() }),
     z.object({ type: z.literal("bridge_audio"), leftId: z.string(), rightId: z.string(), mode: z.enum(["jCut", "lCut", "crossfade", "none"]), duration: num.min(0).max(3) }),
     z.object({ type: z.literal("map_segments"), mediaId: z.string(), segments: z.array(z.object({ shotId: z.string(), in: num.nonnegative(), out: num.positive() })).min(1).max(100) }),
@@ -359,6 +360,15 @@ function apply(s: Scope, t: Body, op: Op) {
             if (op.ripple) shiftLater(t, c, -c.duration, end(c) - EPS);
             return;
         }
+        case "replace_source": {
+            const c = findClip(t, op.id);
+            unlocked(t, c.trackId);
+            const media = s.get("media", op.mediaId);
+            if (findTrack(t, c.trackId).kind !== "video" || !media?.mime.startsWith("video/")) throw bad("替换源须为视频轨的真实视频");
+            c.mediaId = media.id;
+            c.auto = false;
+            return;
+        }
         case "set_transition": {
             const c = findClip(t, op.id);
             unlocked(t, c.trackId);
@@ -495,6 +505,21 @@ export function selectWorkingTake(s: Scope, takeId: string) {
   const clip = edit.clips.find(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video");
   if (!clip) throw bad("镜头没有可替换的剪辑片段");
   if (clip.mediaId === media.id) return edit;
+  const sync = take.meta?.speechSync;
+  if (sync?.assemblyId && sync.audioMatches && sync.sourceMediaId === resolveClip(s, clip).mediaId
+    && sync.composedHash === media.hash && media.source === `speechAssembly:${sync.assemblyId}` && !clip.audioDetached) {
+    const duplicates = edit.clips.filter(audio => audio.linkedClipId === clip.id && audio.dialogueLineIndex !== undefined);
+    if (duplicates.some(audio => !sync.segments?.some((part: any) => part.lineIndex === audio.dialogueLineIndex && part.text === audio.dialogueText
+      && part.audioMediaId === resolveClip(s, audio).mediaId && part.audioHash === s.get("media", part.audioMediaId)?.hash
+      && audio.in === 0 && audio.speed === 1 && Math.abs(audio.duration - part.duration) < EPS
+      && Math.abs(audio.start - (clip.start + (part.start - clip.in) / clip.speed)) < EPS)))
+      throw bad("已有独立对白与合成声音不同，保留原剪辑；请按真实声音差异调整，不能自动删除");
+    // 只移除已完整合入的新视频对白；保留视频片段ID、其他声音接点及撤销历史。
+    return applyOps(s, shot.sequenceId, [
+      ...duplicates.map(audio => ({ type: "delete_clip" as const, id: audio.id, ripple: false })),
+      { type: "replace_source", id: clip.id, mediaId: media.id },
+    ], edit.version);
+  }
   if (clip.audioDetached || edit.clips.some(audio => audio.linkedClipId === clip.id)) throw bad("该镜头已有独立声音剪辑，请通过剪辑操作替换素材，保留声音接点");
   return applyOps(s, shot.sequenceId, [
     { type: "delete_clip", id: clip.id, ripple: false },

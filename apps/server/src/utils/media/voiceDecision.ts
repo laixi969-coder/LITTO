@@ -145,6 +145,10 @@ export async function assertCurrentSpeechAudio(directory: string, shot: Record<s
 export async function isVoiceSyncRequest(directory: string, request: MediaGenerationRequest) {
   const provider = await getMediaProvider(request.providerId);
   if (!provider.models.some(model => model.id === request.modelId && model.type === "video" && model.lipSync === true)) return false;
+  if (request.speechSegment) {
+    await (await import("@/utils/media/speechAssembly")).validateSpeechSegmentRequest(directory, request);
+    return true;
+  }
   if (request.shotId || request.productionFingerprint || request.videos?.length !== 1 || request.audios?.length !== 1)
     throw new Error("专用口型处理不切换默认视频模型：请使用已保存配音方案中的一对人物 videos 和已选 audios，不传 shotId 或 productionFingerprint");
   const { project } = await readVoiceProject(directory);

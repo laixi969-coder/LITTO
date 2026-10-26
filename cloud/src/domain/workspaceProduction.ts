@@ -9,7 +9,7 @@ import { createAsset, assetVersions } from "./assets.ts";
 import { bindReference, createShot, updateShot, shotPartial } from "./shots.ts";
 import { bad, conflict, notFound, sha256 } from "../util.ts";
 import { mediaView, saveMedia, sniff, storage } from "../storage.ts";
-import { compactProductionRead, qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
+import { compactProductionRead, qualityReviewPlan, needsLipSync } from "@toonflow/tool-media-generation/runtime";
 import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
 import { approveTake, promoteHero } from "./lifecycle.ts";
@@ -238,6 +238,10 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       throw bad("视频工作版须记录至少两个递增且位于素材时长内的实际抽帧时间");
     }
     const plan = qualityReviewPlan(shot, input.targetType);
+    // 后配音原片可先保留完整视觉检查与实际末态，声音未核验时只选工作版，供后续口型处理。
+    const canApprove = input.fullPlayback && input.observedStateDelta
+      && (!(needsLipSync(shot) || shot.creativeBrief?.dialogue?.lines?.length)
+        || input.audioReview?.speech === "pass" && (!needsLipSync(shot) || input.audioReview.lipSync === "pass"));
     return tx(() => {
       const previous = s.list("qc_reports", { targetType: input.targetType, targetId: item.id }, "created_at DESC, rowid DESC")[0];
       // ACT: 同一素材和规格的有效代理检查只做一次；有新缺陷或要求修改时仍记录新结论。
@@ -258,7 +262,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
         }
         if (input.targetType === "keyframe" && shot.heroKeyframeId !== item.id) promoteHero(s, item.id, `agent:${actor}`);
         if (input.targetType === "take") {
-          if (input.fullPlayback && input.observedStateDelta) approveTake(s, item.id, `agent:${actor}`);
+          if (canApprove) approveTake(s, item.id, `agent:${actor}`);
           else selectWorkingTake(s, item.id);
         }
         return { selected: true, reused: true, status: s.get("shots", shot.id)?.approvedTakeId === item.id ? "approved" : "workingVersion", finalReviewRequired: true, review };
@@ -273,7 +277,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       });
       if (review.report.findings.some(finding => finding.severity === "high")) return { selected: false, review, reason: "存在严重问题，已保留检查记录，未采用" };
       if (input.targetType === "keyframe") promoteHero(s, item.id, `agent:${actor}`);
-      else if (input.fullPlayback && input.observedStateDelta) approveTake(s, item.id, `agent:${actor}`);
+      else if (canApprove) approveTake(s, item.id, `agent:${actor}`);
       else selectWorkingTake(s, item.id);
 
       return { selected: true, status: s.get("shots", shot.id)?.approvedTakeId === item.id ? "approved" : "workingVersion", finalReviewRequired: true, review, answer: "代理检查已记录；完整检查和实际末态齐备时已采用正式镜头，否则保留工作版。成片仍需最终看听验收" };
