@@ -1,10 +1,24 @@
 export type AutoFilmStatus = "running" | "completed" | "failed" | "stopped" | "interrupted";
 
+export interface AutoFilmCheck {
+  verdict: "pass" | "revise" | "unverified";
+  note: string;
+}
+
+export interface AutoFilmNarrativeReview {
+  key: string;
+  source: AutoFilmCheck;
+  scenes: ({ sceneId: string } & Record<"fidelity" | "causality" | "staging" | "timing" | "continuity", AutoFilmCheck>)[];
+}
+
 export interface AutoFilmPlayback {
   mediaId: string;
   hash: string;
   note: string;
   planKey?: string;
+  storyKey?: string;
+  storyChecks?: Record<"narrative" | "performance" | "continuity" | "dialogueCoverage" | "lipSync" | "editing" | "sound", AutoFilmCheck>;
+  dialogueReviews?: { id: string; speakerId: string; transcript: string; start: number | null; end: number | null; verdict: "pass" | "revise" | "unverified"; note: string }[];
   cameraReviews?: {
     takeId: string;
     fingerprint: string;
@@ -26,6 +40,7 @@ export interface AutoFilmTask {
   sessionFile?: string;
   sequenceIds: string[];
   storyRevisionId?: string;
+  narrativeReviews?: AutoFilmNarrativeReview[];
   generationCount: number;
   attempts: Record<string, number>;
   toolCalls: number;

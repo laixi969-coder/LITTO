@@ -16,11 +16,12 @@ import { readStoryProject } from "@/utils/story";
 import { getStatus } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { autoFilmScope } from "./scope";
-import { assertVideoObservation, cameraObservationPlan, cameraReviewsSchema, observeVideo, observeVoice, videoObservationModel } from "./observe";
+import { assertVideoObservation, assertStoryObservation, cameraObservationPlan, cameraReviewsSchema, dialogueReviewsSchema, observeVideo, observeVoice, storyChecksSchema, videoObservationModel } from "./observe";
 import { readVoiceProject } from "@/utils/media/voiceDecision";
 import { mediaHash } from "@/utils/media/lipSync";
 import { speechSourceKey } from "@toonflow/tool-media-generation/voiceProject";
 import type { AutoFilmTask } from "./types";
+import { assertNarrativeReady, autoFilmProgress, narrativeFailures, narrativePlan, narrativeReviewSchema, reviewNarrative } from "./narrative";
 
 const relativePath = z.string().min(1).max(2048).refine(value => !/^[\\/]|[:\u0000-\u001f]/.test(value) && value.split(/[\\/]/).every(part => part && part !== "." && part !== ".."), "须为工作区相对路径");
 export const inputSchema = z.strictObject({
@@ -39,9 +40,10 @@ const stateSchema = z.object({
   references: z.array(z.object({ name: z.string(), path: relativePath, mimeType: z.string(), mediaId: z.string() })),
   sessionFile: z.string().regex(/^[\w-]+\.jsonl$/).optional(), sequenceIds: z.array(z.string()),
   storyRevisionId: z.string().optional(),
+  narrativeReviews: z.array(narrativeReviewSchema).default([]),
   generationCount: z.number().int().nonnegative(), attempts: z.record(z.string(), z.number().int().nonnegative()),
   toolCalls: z.number().int().nonnegative(), progress: z.string(), error: z.string().optional(),
-  playbacks: z.array(z.object({ mediaId: z.string(), hash: z.string(), note: z.string(), planKey: z.string().optional(), cameraReviews: z.array(cameraReviewsSchema.element.extend({ fingerprint: z.string() })).optional() })),
+  playbacks: z.array(z.object({ mediaId: z.string(), hash: z.string(), note: z.string(), planKey: z.string().optional(), storyKey: z.string().optional(), storyChecks: storyChecksSchema.optional(), dialogueReviews: dialogueReviewsSchema.optional(), cameraReviews: z.array(cameraReviewsSchema.element.extend({ fingerprint: z.string() })).optional() })),
   voicePlaybacks: z.array(z.object({ lineId: z.string(), takeId: z.string(), hash: z.string(), sourceKey: z.string(), audioRead: z.boolean(), verdict: z.enum(["pass", "revise", "unverified"]), transcript: z.string(), note: z.string() })).default([]),
   decisions: z.array(z.object({ tool: z.string(), title: z.string(), answer: z.string(), values: choiceSchema.shape.values, reason: z.string() })),
   output: z.object({ renderId: z.string(), sequenceId: z.string(), mediaId: z.string(), url: z.string() }).optional(),
@@ -57,6 +59,8 @@ const allowedTools = new Set([
 const instructions = `你正在执行用户点击启动的独立「一键自动成片」任务。用户已授权本任务内的创作、素材生成、自动选片、剪辑、配音和代理审阅，全部制作选择由你完成，无需用户回答。
 遵循 workflow 的制作方法，但其中的人工选择在本次任务中由你自主完成。已有完整剧本保留剧情、原句和角色；只有梗概时补写。角色图的身份优先，按图名与剧本匹配；不明确时自行做合理分配并记录。缺失资产自行设计。无需另询画幅、风格、时长、音色、模型、分辨率或候选；沿用可用默认模型与项目规格，未设置或不可用的服务明确报告，不假装成功。
 先在故事工作台保存、审阅并自动采用本任务剧本，记录稳定sceneId。创建本任务专属的新序列，sequence的storyRevisionId引用这版剧本，镜头source.sceneId关联对应场次。所有新镜头和导出归入该序列；复用适用资产，不修改其他序列与旧成片。完整交付所有输入场次，不擅自删减成长片预告。配乐与音效按内容需要安排，不能用字幕、静帧拼接或旁白替代要求的动态表演和对白。输入角色图已经登记mediaId，直接用reference和asset登记身份参考；仅需要补齐设定时生成补充图，不把用户图丢掉或随意重绘。
+生成前先完成全剧分镜，调用 reviewAutoFilmStory 核对原稿→采用剧本→全部镜头。遗漏场次、原句、行动主体或因果须先修规格，不用付费生成试错。镜数与片长由完整事件、真实对白和反应决定，不固定十镜，不把每场压成一句摘要。沿用 action/performance/camera.design/creativeBrief/intendedStateDelta 共同设计：承接何结果、谁为何对谁做什么、对白在动作前中后何时发生、对手怎样反应、镜尾改变什么、如何引出下一镜。逐句保留说话人和画内/画外通道；不能为口型方便改旁白。多人同框时明确目标说话人在整个发声期的可辨认位置和嘴部覆盖；模型无法选目标脸时用符合剧情的说话者覆盖镜头，不让口型模型猜人。
+分镜核对通过后配置并采用真实声音，planSpeech 实测，再统一调整对白窗口、动作反应与切点，重新 reviewAutoFilmStory；之后才生成镜头画面。规格检查不等于真实声画合格，observeAutoFilmVideo 的 storyChecks 同样有效，revise/unverified 不能改填通过。无需人工审核表示由系统自动核对完整性，不表示跳过叙事和声画校验。只修具体缺陷，复用未受影响的素材和任务；剪辑按表演落点保留完整对白，不直接把每条生成素材原长串起来，不用长时间无行动的等待填时长。
 确认类工具支持 automaticChoice:{answer,values?,reason}。首次调用若返回待选题目，读完真实候选后在同一工具参数补 automaticChoice 重试，服务端校验并保存选择；不要把题目转交用户。askUser 的创作问题直接自己决定。字段表单须按题目 fields 提供 values。
 关键帧必须读取实际图片。视频先用 observeAutoFilmVideo{mediaId,focus} 把完整真实视频交给已配置的视频审阅模型观察，创作模型无需自己支持视频输入。读取实际返回的时间点、表演、对白和接点证据，再使用 reviewProduction/reviewProductions 记录真实观察并采用（authorization 填用户点击启动自动成片的授权）。此模式没有人工主帧采用与用户满意度工具；不得伪造用户看过、用户满意或人类验收。selectCandidate 不能 asHero。资产、故事、声音和剪辑仍通过各自确认工具保存自动决定。
 有对白先确定真实声音和时长，再安排镜头与口型；复用已成功生成的素材和任务。参考、版本、指纹、连续性和声音门禁全部有效，不准通过修改检查代码或填假观察绕过。只有实际完整看听才填 fullPlayback:true；无法观察时说明缺项并结束，不能宣称通过。
@@ -173,6 +177,12 @@ function launch(task: AutoFilmTask, folder: string) {
           if (tool.name === "productionSpec" && ["publishAsset", "favoriteAsset"].includes(input.operation)) throw new Error("本任务只制作当前项目，不修改跨项目角色库");
           const { api, tenant } = identity(task.directory), scope = api.scoped(tenant.workspaceId);
           const operationData = input.data ?? {};
+          if (tool.name === "productionSpec" && ["render", "agentReviewFinal"].includes(input.operation)) await assertNarrativeReady(task);
+          if (tool.name === "productionSpec" && input.operation === "agentReviewFinal") {
+            const render = scope.get("renders", operationData.renderId), media = render && scope.get("media", render.mediaId);
+            const snapshot = await narrativePlan(task);
+            assertStoryObservation(task.playbacks.findLast(item => item.mediaId === media?.id && item.hash === media?.hash && item.storyKey === snapshot.key), "final");
+          }
           if (tool.name === "requestProductionDecision" && input.operation === "selectVoice" && automaticChoice) {
             const index = /^采用配音 (\d+)$/.exec(automaticChoice.answer)?.[1];
             if (index) {
@@ -194,8 +204,8 @@ function launch(task: AutoFilmTask, folder: string) {
           if (tool.name === "productionSpec" && input.operation === "importSpeech") {
             const { path } = await resolveWorkspacePath(task.directory, z.string().min(1).parse(operationData.videoPath));
             const hash = createHash("sha256").update(await readFile(path)).digest("hex");
-            if (!task.playbacks.some(item => item.hash === hash && scope.get("media", item.mediaId)?.hash === hash))
-              throw new Error("口型结果须先 observeAutoFilmVideo 完整看听成功生成的 mediaId，再 importSpeech 登记候选；登记后按镜头清单观察并 reviewProduction 采用");
+            const snapshot = await narrativePlan(task);
+            assertStoryObservation(task.playbacks.findLast(item => item.hash === hash && item.storyKey === snapshot.key && scope.get("media", item.mediaId)?.hash === hash), "speech");
           }
           const reviews = tool.name === "reviewProductions" ? input.reviews : tool.name === "reviewProduction" ? [input] : tool.name === "productionSpec" && input.operation === "agentReview" ? [input.data] : [];
           for (const review of reviews) {
@@ -207,6 +217,11 @@ function launch(task: AutoFilmTask, folder: string) {
             const observed = task.playbacks.filter(item => item.mediaId === media?.id && item.hash === media?.hash)
               .flatMap(item => item.cameraReviews ?? []).findLast(item => item.takeId === take!.id && item.fingerprint === fingerprint);
             if (!media || !observed) throw new Error("请先 observeAutoFilmVideo 按当前镜头规格完整观察该候选；旧规格或没有摄影清单的观察不能复用");
+            const snapshot = await narrativePlan(task);
+            const playback = task.playbacks.findLast(item => item.mediaId === media.id && item.hash === media.hash && item.storyKey === snapshot.key);
+            // 后配音原片允许先进入视觉工作版，但不能将缺失的声音或口型记为通过。
+            assertStoryObservation(playback, "visual");
+            if (review.audioReview && Object.values(review.audioReview).includes("pass")) assertStoryObservation(playback, "speech");
             // 摄影结果来自观察员，不让制作助手将失败或未验证项改填通过；其余动作检查仍由原流程负责。
             review.motionReview = [...(review.motionReview ?? []).filter((item: { id: string }) => !["cameraStart", "cameraPath", "cameraEnd"].includes(item.id)),
               ...observed.checks.map(item => ({ ...item, verdict: item.verdict === "pass" ? "pass" : "revise", note: item.verdict === "unverified" ? `摄影未验证：${item.note}`.slice(0, 2000) : item.note }))];
@@ -226,6 +241,33 @@ function launch(task: AutoFilmTask, folder: string) {
         },
       } satisfies ToolDefinition;
     }), {
+      name: "readAutoFilmProgress", label: "读取真实制作进度", description: "从当前剧本、分镜、声音、镜头与导出记录计算缺项和下一步，不以对话总结判断完成。可随时读取，优先复用已有成果。",
+      parameters: z.toJSONSchema(z.strictObject({})),
+      async execute() {
+        countToolCall();
+        const result = await autoFilmProgress(task);
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      },
+    }, {
+      name: "reviewAutoFilmStory", label: "核对完整叙事分镜", description: "生成前逐场核对原稿、采用剧本与全部分镜的对白、人物行动、因果、屏时和接戏。无参数，从真实记录读取；返回具体缺项或独立检查。修改规格后重新调用，未变的检查复用，不生成媒体。",
+      parameters: z.toJSONSchema(z.strictObject({})),
+      async execute() {
+        countToolCall();
+        task.progress = "正在核对原稿、叙事分镜与对白调度";
+        await save();
+        const snapshot = await narrativePlan(task);
+        if (snapshot.issues.length) return { content: [{ type: "text", text: JSON.stringify({ ready: false, issues: snapshot.issues }) }], details: { ready: false, issues: snapshot.issues } };
+        let review = task.narrativeReviews?.find(item => item.key === snapshot.key);
+        if (!review) {
+          review = await reviewNarrative(snapshot, signal);
+          if ((await narrativePlan(task)).key !== snapshot.key) throw new Error("检查期间剧本或分镜已变化，请重新核对当前版本");
+          task.narrativeReviews = [...(task.narrativeReviews ?? []).slice(-19), review];
+          await save();
+        }
+        const issues = narrativeFailures(review), result = { ready: !issues.length, issues, review };
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      },
+    }, {
       name: "observeAutoFilmVoice", label: "完整试听配音", description: "完整听取本任务当前角色原句的配音候选，返回实际转写和检查结论，再selectVoice。不能采用revise或unverified为通过。",
       parameters: z.toJSONSchema(z.strictObject({ lineId: z.uuid(), takeId: z.uuid() })),
       async execute(_id, input) {
@@ -246,15 +288,17 @@ function launch(task: AutoFilmTask, folder: string) {
         const { mediaId, focus } = z.object({ mediaId: z.string().min(1), focus: z.string().min(1).max(12000) }).parse(input);
         const { api, tenant } = identity(task.directory), media = api.scoped(tenant.workspaceId).get("media", mediaId);
         const cameraPlan = await cameraObservationPlan(task.directory, task.projectId, mediaId, task.sequenceIds);
-        const planKey = createHash("sha256").update(JSON.stringify([1, cameraPlan, task.script, focus])).digest("hex");
+        const snapshot = await narrativePlan(task);
+        const planKey = createHash("sha256").update(JSON.stringify([2, cameraPlan, snapshot.key, focus])).digest("hex");
         const saved = task.playbacks.find(item => item.mediaId === mediaId && item.hash === media?.hash && item.planKey === planKey);
         if (saved) return { content: [{ type: "text", text: JSON.stringify(saved) }], details: saved };
-        const key = `observe${createHash("sha256").update(JSON.stringify([mediaId, media?.hash, cameraPlan, videoObservationModel().key])).digest("hex")}`;
+        const key = `observe${createHash("sha256").update(JSON.stringify([mediaId, media?.hash, cameraPlan, snapshot.key, videoObservationModel().key])).digest("hex")}`;
         if ((task.attempts[key] ?? 0) >= 3) throw new Error("该视频已达到完整审阅尝试上限，请核对模型的视频与声音理解能力");
         task.attempts[key] = (task.attempts[key] ?? 0) + 1;
         task.progress = "正在完整观察视频画面和声音";
         await save();
-        const result = { ...await observeVideo(task.directory, task.id, task.projectId, mediaId, `${task.script}\n\n检查目标：${focus}`, signal, cameraPlan), planKey };
+        const result = { ...await observeVideo(task.directory, task.id, task.projectId, mediaId, `原稿与全剧分镜（仅核对当前视频覆盖范围；成片核对全部）：${JSON.stringify(snapshot.plan)}\n\n检查目标：${focus}`, signal, cameraPlan), planKey, storyKey: snapshot.key };
+        if ((await narrativePlan(task)).key !== snapshot.key) throw new Error("观察期间叙事分镜已变化，请按当前计划重新观察");
         task.playbacks.push(result);
         await save();
         return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
@@ -266,6 +310,7 @@ function launch(task: AutoFilmTask, folder: string) {
         countToolCall();
         const { renderId } = z.object({ renderId: z.string().min(1) }).parse(input);
         const { api, tenant } = identity(task.directory), scope = api.scoped(tenant.workspaceId);
+        const snapshot = await assertNarrativeReady(task);
         const render = scope.get("renders", renderId);
         if (!render || render.projectId !== task.projectId || !task.sequenceIds.includes(render.sequenceId)) throw new Error("只能交付本任务序列的真实成片");
         if (render.status !== "SUCCEEDED" || render.manifest?.options?.draft || !render.mediaId || api.finalQualityView(scope, render).status !== "pass") throw new Error("成片尚未完成正式导出与有效代理验收，请继续制作；不能把草稿标为完成");
@@ -276,7 +321,7 @@ function launch(task: AutoFilmTask, folder: string) {
           || revision.scenes.some(scene => !shots.some(shot => shot.source?.sceneId === scene.sceneId && shot.source?.revisionId === revision.id
             && edit.clips.some(clip => clip.shotId === shot.id && edit.tracks.some(track => track.id === clip.trackId && track.kind === "video") && clip.mediaId && scope.get("media", clip.mediaId)?.mime.startsWith("video/"))))) throw new Error("本任务采用剧本的场次尚未全部进入本次成片，不能省略场次交付");
         const renderedMedia = scope.get("media", render.mediaId);
-        if (!task.playbacks.some(item => item.mediaId === renderedMedia?.id && item.hash === renderedMedia?.hash)) throw new Error("须先完整观察当前成片的真实画面与声音");
+        assertStoryObservation(task.playbacks.findLast(item => item.mediaId === renderedMedia?.id && item.hash === renderedMedia?.hash && item.storyKey === snapshot.key), "final");
         const view = api.workspaceProduction(scope, task.projectId, "read", {}, tenant.userId) as { renders: { id: string; media?: { url: string } }[] };
         const media = view.renders.find(item => item.id === renderId)?.media;
         if (!media) throw new Error("成片媒体不存在");
@@ -292,9 +337,12 @@ function launch(task: AutoFilmTask, folder: string) {
     directory: task.directory,
     async beforeGeneration(kind, request) {
       assertActive();
+      await assertNarrativeReady(task);
       if (request.shotId) {
         const { api, tenant } = identity(task.directory);
-        if (!task.sequenceIds.includes(api.scoped(tenant.workspaceId).get("shots", request.shotId)?.sequenceId)) throw new Error("自动成片不能生成或重做手动制作序列的镜头");
+        const scope = api.scoped(tenant.workspaceId), shot = scope.get("shots", request.shotId);
+        if (!shot || !task.sequenceIds.includes(shot.sequenceId)) throw new Error("自动成片不能生成或重做手动制作序列的镜头");
+        if (kind !== "audio") api.assertSpeechPlan(scope, shot);
       }
       const key = createHash("sha256").update(JSON.stringify([kind, request.shotId ?? request.voiceLineId ?? request.outputName ?? request.prompt])).digest("hex");
       if (task.generationCount >= 120) { controller.abort(new Error("自动成片已达到120次生成上限，已有素材和进度已保留")); signal.throwIfAborted(); }
@@ -312,20 +360,25 @@ function launch(task: AutoFilmTask, folder: string) {
       await save();
       await assertVideoObservation(signal);
       // 持续推进直到交付；已有时限和工具预算兜底，不因模型提前结束一轮而要求用户反复续跑。
+      let idleTurns = 0;
       for (let turn = 0; !task.output; turn++) {
         assertActive();
         const before = task.toolCalls;
+        const progress = await autoFilmProgress(task);
+        task.progress = `${progress.stage}：${progress.nextAction}`;
+        await save();
         await run({ cwd: task.directory, ...model, thinkingLevel: "medium", sessionFile: task.sessionFile, signal, question, instructions, prepareTools,
           prompt: turn === 0 && !task.sessionFile
             ? `用户点击启动一键自动成片。任务 ${task.id}。请把以下剧本与角色参考完整制作成片，由你决定全部制作选项。已有任务序列：${JSON.stringify(task.sequenceIds)}；已有采用版本：${task.storyRevisionId ?? "无"}。有已有成果时先读取并复用，不重复创建。\n剧本：\n${task.script}\n参考图片（实际读取后使用）：\n${JSON.stringify(task.references)}\n执行规则：\n${instructions}`
-            : `继续自动成片任务 ${task.id}，用户已授权全部制作选择。先核对当前任务、已成功媒体和原任务状态，保留已有成果，不重复生成。任务序列：${JSON.stringify(task.sequenceIds)}。剩余生成次数：${120 - task.generationCount}。完成正式导出及代理验收后调用 completeAutoFilm；真实阻塞请明确说明。以本次执行规则重新核对历史阻塞，不能直接重复旧结论。\n当前执行规则：\n${instructions}`,
+            : `继续自动成片任务 ${task.id}，用户已授权全部制作选择。系统从真实数据计算的当前阶段与缺项：${JSON.stringify(progress)}。先核对已有媒体和原任务状态，不重复生成。任务序列：${JSON.stringify(task.sequenceIds)}。剩余生成次数：${120 - task.generationCount}。完成正式导出及代理验收后调用 completeAutoFilm；不得用文本总结结束未完成任务。以本次执行规则重新核对历史阻塞，不能直接重复旧结论。\n当前执行规则：\n${instructions}`,
         }, event => {
           if (event.type === "session") { task.sessionFile = event.file; void save().catch(() => controller.abort()); }
           if (event.type === "error") task.error = event.message;
           if (event.type === "text" && event.done && event.content) task.progress = event.content.slice(-3000);
         });
         await save();
-        if (!task.output && task.toolCalls === before) break;
+        idleTurns = task.toolCalls === before ? idleTurns + 1 : 0;
+        if (!task.output && idleTurns >= 3) throw new Error(`连续三轮没有执行制作操作，进度已保留。当前缺项：${JSON.stringify(await autoFilmProgress(task))}`);
       }
       signal.throwIfAborted();
       if (!task.output) throw new Error(task.error || `制作尚未完成，进度已保留。${task.progress}`);
