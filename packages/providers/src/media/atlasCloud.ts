@@ -260,7 +260,7 @@ export default {
     set(fields.format ? "format" : fields.codec ? "codec" : "output_format", request.format);
     set("sample_rate", request.sampleRate);
     set("instructions", request.instructions || undefined);
-    if (request.speed !== undefined) set(fields.speed ? "speed" : "speech_rate", fields.speed ? request.speed : Math.round((request.speed - 1) * 100));
+    if (request.speed !== undefined && (request.speed !== 1 || fields.speed || fields.speech_rate)) set(fields.speed ? "speed" : "speech_rate", fields.speed ? request.speed : Math.round((request.speed - 1) * 100));
     for (const [field, value] of Object.entries(request.audioParameters ?? {})) {
       if (["model", "text", "prompt", "voice", "voice_id", "speed", "speech_rate", "format", "output_format", "codec", "sample_rate", "instructions"].includes(field)) throw new Error(`请通过专用字段填写 ${field}，不能从额外参数覆盖`);
       set(field, value);
