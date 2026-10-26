@@ -73,8 +73,9 @@ export function describeModelError(message: string | undefined) {
     : /timed? ?out|ETIMEDOUT/i.test(message) ? "模型服务响应超时，请稍后重试"
       : /\b401\b|invalid api key|incorrect api key|unauthorized/i.test(message) ? "模型 Key 无效或已过期，请检查后重新填写"
         : /\b402\b|insufficient[ _](user[ _])?(balance|quota)|pre-consume quota|余额不足/i.test(message) ? "模型服务账户余额不足，请充值后重试"
-          : /\b429\b|rate limit/i.test(message) ? "模型服务请求过于频繁，请稍后重试"
-            : undefined;
+          : /\b403\b|access_denied|api.?key restrictions|forbidden/i.test(message) ? "模型服务拒绝访问，请检查 API Key 的模型权限、业务空间授权和 IP 限制"
+            : /\b429\b|rate limit/i.test(message) ? "模型服务请求过于频繁，请稍后重试"
+              : undefined;
   return hint ? `${hint}（${message.slice(0, 200)}）` : message;
 }
 
@@ -99,9 +100,15 @@ export function getConfiguredModel(providerId: string, modelId: string, selectio
 }
 
 export function prepareModelPayload(configured: Pick<ReturnType<typeof getConfiguredModel>, "baseUrl" | "model">, payload: unknown, thinkingLevel = "off") {
-  if (!["https://open.bigmodel.cn", "https://api.z.ai"].includes(new URL(configured.baseUrl).origin)
-    || !/^glm-5\.3(?:-flashx?)?$/i.test(configured.model.id) || !payload || typeof payload !== "object") return payload;
+  if (!payload || typeof payload !== "object") return payload;
   const body = payload as Record<string, unknown>;
+  const url = new URL(configured.baseUrl);
+  // Omni 默认开启思考；工作区专属域名也须显式传递应用选择的关闭状态。
+  if (thinkingLevel === "off" && configured.model.id === "qwen3.8-omni-flash"
+    && (/(?:^|\.)maas\.(?:aliyuncs|qwencloudapi)\.com$/.test(url.hostname) || ["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com"].includes(url.hostname)))
+    return { ...body, reasoning_effort: "none" };
+  if (!["https://open.bigmodel.cn", "https://api.z.ai"].includes(url.origin)
+    || !/^glm-5\.3(?:-flashx?)?$/i.test(configured.model.id)) return payload;
   // GLM 5.3 不能关闭思考，缺省强度为 max；普通创作用最低支持档，显式高档选择继续保留。
   // https://docs.z.ai/api-reference/llm/chat-completion
   const effort = body.reasoning_effort ?? thinkingLevel;

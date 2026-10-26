@@ -4,7 +4,7 @@ import { readFile, writeAtomic } from "@toonflow/file";
 import { z } from "zod";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
-import { assertConfiguredUpstream, getConfiguredModel, streamAi } from "@/utils/ai";
+import { assertConfiguredUpstream, describeModelError, getConfiguredModel, streamAi } from "@/utils/ai";
 import { selectedModel } from "@/utils/modelSelection";
 import { createWorkspaceFfmpeg, getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
@@ -34,7 +34,11 @@ async function readVideo(configured: ReturnType<typeof getConfiguredModel>, byte
   for await (const _event of stream) { /* 完整视频由协议适配器发送。 */ }
   const result = await stream.result();
   recordTextUsage({ ...result, provider: configured.providerId });
-  if (result.stopReason !== "stop") throw new Error(result.errorMessage || "完整声画审阅未完成");
+  if (result.stopReason !== "stop") {
+    const message = result.errorMessage || "完整声画审阅未完成";
+    const status = Number(/^\s*(?:HTTP\s*)?([45]\d{2})\b/i.exec(message)?.[1]) || (/access_denied|api.?key restrictions|forbidden/i.test(message) ? 403 : 502);
+    throw Object.assign(new Error(describeModelError(message)), { status });
+  }
   const text = result.content.filter(part => part.type === "text").map(part => part.text).join("");
   return JSON.parse(text.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, ""));
 }
@@ -58,9 +62,18 @@ export async function assertVideoObservation(signal: AbortSignal) {
     command.once("error", reject);
     command.once("close", code => code === 0 ? resolve(Buffer.concat(chunks)) : reject(new Error(`生成声画能力检查短片失败：${error}`)));
   });
+  let result: unknown;
   try {
-    const review = z.strictObject({ videoRead: z.boolean(), audioRead: z.boolean(), colors: z.array(z.enum(["red", "blue"])).max(2), tones: z.array(z.enum(["low", "high"])).max(2), note: z.string().trim().min(1) }).parse(await readVideo(configured, bytes, "video/mp4",
-      "完整读取附带短片的动态画面和实际声音。仅返回JSON：{videoRead:boolean,audioRead:boolean,colors:[red|blue,red|blue],tones:[low|high,low|high],note:string}。colors按先后顺序记录两个纯色画面；tones按先后顺序记录低音和高音，画面和声音的先后顺序相互独立；note描述实际听到的声音。无法读取视频或音频须如实填false，不猜测。", "检查附带短片的画面变化和声音。", signal));
+    result = await readVideo(configured, bytes, "video/mp4",
+      "完整读取附带短片的动态画面和实际声音。仅返回JSON：{videoRead:boolean,audioRead:boolean,colors:[red|blue,red|blue],tones:[low|high,low|high],note:string}。colors按先后顺序记录两个纯色画面；tones按先后顺序记录低音和高音，画面和声音的先后顺序相互独立；note描述实际听到的声音。无法读取视频或音频须如实填false，不猜测。", "检查附带短片的画面变化和声音。", signal);
+  } catch (error) {
+    signal.throwIfAborted();
+    const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : 502;
+    const failure = status === 403 ? "调用权限被拒绝（403），声画能力尚未验证" : "请求或响应处理失败，尚未完成声画能力验证";
+    throw Object.assign(new Error(`视频审阅模型 ${configured.model.id} ${failure}。已有成果保留，本轮尚未开始制作。原因：${error instanceof Error ? error.message : String(error)}`), { status, cause: error });
+  }
+  try {
+    const review = z.strictObject({ videoRead: z.boolean(), audioRead: z.boolean(), colors: z.array(z.enum(["red", "blue"])).max(2), tones: z.array(z.enum(["low", "high"])).max(2), note: z.string().trim().min(1) }).parse(result);
     if (!review.videoRead) throw new Error(`模型未能读取动态画面：${review.note}`);
     if (!review.audioRead) throw new Error(`模型未能读取视频声音：${review.note}`);
     if (JSON.stringify(review.colors) !== JSON.stringify(colors) || JSON.stringify(review.tones) !== JSON.stringify(tones)) throw new Error(`未能核对动态画面与声音：${review.note}；画面 ${JSON.stringify(review.colors)} / 预期 ${JSON.stringify(colors)}，声音 ${JSON.stringify(review.tones)} / 预期 ${JSON.stringify(tones)}`);
