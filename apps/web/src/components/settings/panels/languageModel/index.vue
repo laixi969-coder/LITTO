@@ -1,6 +1,6 @@
 <template>
   <div class="providerList">
-    <p>这里管理供应商接入。实际使用的平台与模型请在“默认模型”中选择；安装供应商不代表默认使用它。</p>
+    <p>{{ purpose === 'videoReview' ? '单独配置视频审阅的 API 地址、Key 和模型，也可在“默认模型 → 视频审阅”中复用现有文本 API。模型需要实际支持视频与声音输入；添加连接后不会自动更换默认模型。' : '这里管理供应商接入。实际使用的平台与模型请在“默认模型”中选择；安装供应商不代表默认使用它。' }}</p>
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.id" class="providerItem" shadow="never">
         <div class="providerHeader">
@@ -28,10 +28,10 @@
       </el-card>
     </div>
     <div class="providerActions">
-      <el-button class="addButton" type="primary" :icon="IconPlus" @click="openCustomProvider()">添加供应商</el-button>
-      <el-button @click="openConnectModel('text')">选择已知供应商</el-button>
+      <el-button class="addButton" type="primary" :icon="IconPlus" @click="openCustomProvider()">{{ purpose === 'videoReview' ? '添加视频审阅 API' : '添加供应商' }}</el-button>
+      <el-button v-if="purpose !== 'videoReview'" @click="openConnectModel('text')">选择已知供应商</el-button>
     </div>
-    <component :is="addCustomProviderDialog" v-model="customProviderDialogVisible" :provider="editingProvider" :syncOnOpen="syncOnOpen" />
+    <component :is="addCustomProviderDialog" v-model="customProviderDialogVisible" :provider="editingProvider" :syncOnOpen="syncOnOpen" :purpose="purpose" />
   </div>
 </template>
 
@@ -39,17 +39,19 @@
 import { openConnectModel } from "@/components/connectModel/state";
 import { computed, defineAsyncComponent, ref, shallowRef, type Component } from "vue";
 import { ElMessage } from "element-plus";
-import { customProviders, saveSettings, reenableProvider, type CustomProvider } from "@/stores/settings";
+import { customProviders, settings, saveSettings, reenableProvider, type CustomProvider } from "@/stores/settings";
 import { IconPlus, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
 
-const { visible = true } = defineProps<{ visible?: boolean }>();
+const { visible = true, purpose = "text" } = defineProps<{ visible?: boolean; purpose?: "text" | "videoReview" }>();
 const addCustomProviderDialog = shallowRef<Component>();
 const customProviderDialogVisible = ref(false);
 const editingProvider = ref<CustomProvider>();
 const deletingId = ref("");
 const syncOnOpen = ref(false);
-const sortedProviders = computed(() => customProviders.value);
+const sortedProviders = computed(() => customProviders.value.filter(provider => purpose === "videoReview"
+  ? provider.purpose === "videoReview" || provider.id === (settings.value.modelSelection as { videoReview?: { providerId: string } } | undefined)?.videoReview?.providerId
+  : provider.purpose !== "videoReview"));
 
 function getProviderVersion(provider: CustomProvider) {
   const version = languageProviders.find(item => item.id.toLowerCase() === provider.id.toLowerCase())?.version ?? provider.version;

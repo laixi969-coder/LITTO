@@ -29,13 +29,7 @@
             <el-button v-else-if="modelError" size="small" text :icon="IconRefresh" @click="modelRefresh++">重试</el-button>
           </div>
           <el-alert v-if="modelError" :title="modelError" type="error" :closable="false" showIcon />
-          <div v-else-if="models.length" class="modelList" :style="{ height: `${Math.min(280, models.length * 38 + 36)}px` }" aria-label="模型列表">
-            <el-auto-resizer>
-              <template #default="{ height, width }">
-                <el-table-v2 :columns="modelColumns" :data="models" :width="width" :height="height" :rowHeight="38" :headerHeight="36" rowKey="id" fixed />
-              </template>
-            </el-auto-resizer>
-          </div>
+          <modelPicker v-else-if="models.length" :key="selectedProvider" class="modelList" v-model="selectedIds" :models="models" :disabled="saving" />
           <el-text v-else-if="!fetching" type="info" size="small">{{ formValues.apiKey ? '未获取到模型' : '填写 API Key 后自动获取模型列表' }}</el-text>
           <el-alert v-if="formError" :title="formError" type="error" :closable="false" showIcon />
         </section>
@@ -56,8 +50,8 @@ import formCreate, { formCreateForm, type Api, type Options } from "../../formCr
 import { languageProviders } from "@toonflow/providers";
 import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";
-import type { Column } from "element-plus";
 import { saveSettings, type CustomProviderModel } from "@/stores/settings";
+import modelPicker from "../modelPicker.vue";
 
 const visible = defineModel<boolean>({ default: false });
 const selectedProvider = ref<string>(languageProviders[0]?.id ?? "");
@@ -67,10 +61,8 @@ const models = shallowRef<CustomProviderModel[]>([]);
 const fetching = ref(false);
 const modelError = ref("");
 const modelRefresh = ref(0);
-const modelColumns: Column[] = [
-  { key: "id", dataKey: "id", title: "模型 ID", width: 220, flexGrow: 1 },
-  { key: "label", dataKey: "label", title: "显示名称", width: 180, flexGrow: 1 },
-];
+const selectedIds = ref(new Set<string>());
+watch(models, value => { selectedIds.value = new Set(value.map(model => model.id)); }, { flush: "sync" });
 const saving = ref(false);
 const formError = ref("");
 watch(selectedProvider, () => {
@@ -152,7 +144,7 @@ async function addProvider() {
       apiKey,
       apiUrl: "apiUrl" in provider ? provider.apiUrl : "",
       protocol: "protocol" in provider ? provider.protocol : "",
-      models: models.value.map(model => ({ ...model })),
+      models: models.value.filter(model => selectedIds.value.has(model.id)).map(model => ({ ...model })),
     };
     await saveSettings(settings => {
       const existing = settings.customProviders;

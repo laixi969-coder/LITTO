@@ -56,24 +56,17 @@
       :models="models"
       @confirmed="confirmModel" />
   </el-dialog>
-  <el-dialog v-model="resultsVisible" title="选择要启用的媒体模型" width="min(760px, 94vw)" alignCenter appendToBody destroyOnClose :closeOnClickModal="false" :showClose="!fetching">
-    <el-space class="catalogueFilters">
-      <el-input v-model="modelSearch" clearable :prefixIcon="IconSearch" placeholder="搜索模型 ID 或显示名称" aria-label="搜索媒体模型" />
-      <el-select v-model="modelType" placeholder="全部类型" aria-label="筛选模型类型" style="width: 120px">
+  <el-dialog v-model="resultsVisible" title="选择要启用的媒体模型" width="min(760px, 94vw)" alignCenter appendToBody destroyOnClose :closeOnClickModal="false" :closeOnPressEscape="!fetching" :showClose="!fetching">
+    <div class="catalogueFilters">
+      <el-select v-model="modelType" placeholder="全部类型" aria-label="筛选模型类型" :disabled="fetching" style="width: 120px">
         <el-option label="全部类型" value="" />
         <el-option label="图片" value="image" />
         <el-option label="视频" value="video" />
         <el-option label="音频" value="audio" />
       </el-select>
-    </el-space>
-    <div class="modelResults">
-      <el-auto-resizer>
-        <template #default="{ height, width }">
-          <el-table-v2 :columns="resultColumns" :data="filteredModels" :width="width" :height="height" :rowHeight="42" :headerHeight="36" rowKey="id" fixed />
-        </template>
-      </el-auto-resizer>
     </div>
-    <el-text type="info">仅列出已适配的远程模型与已有配置。{{ filteredModels.length }} 个结果，已勾选 {{ selectedIds.size }} 个；应用后点击保存生效。</el-text>
+    <modelPicker v-if="resultsVisible" v-model="selectedIds" :models="filteredModels" :columns="resultColumns" :disabled="fetching" />
+    <el-text type="info">仅列出已适配的远程模型与已有配置，应用后点击保存生效。</el-text>
     <el-alert v-if="catalogueError" :title="catalogueError" type="error" :closable="false" showIcon />
     <template #footer>
       <el-button :disabled="fetching" @click="resultsVisible = false">取消</el-button>
@@ -86,9 +79,9 @@
 import { translate } from "@toonflow/i18n/vue";
 
 import axios from "axios";
-import { ElCheckbox, type Column } from "element-plus";
+import type { Column } from "element-plus";
 import { computed, defineAsyncComponent, h, onBeforeUnmount, ref, shallowRef, watch, type Component } from "vue";
-import { IconPlus, IconTrash, IconDeviceFloppy, IconEdit, IconDownload, IconSearch } from "@tabler/icons-vue";
+import { IconPlus, IconTrash, IconDeviceFloppy, IconEdit, IconDownload } from "@tabler/icons-vue";
 import { mediaProviders } from "@toonflow/providers";
 import formCreate, { formCreateForm, type Options } from "../../formCreate";
 import { modelIcon } from "@toonflow/model-icons";
@@ -96,6 +89,7 @@ import messageMarkdown from "@/components/messageMarkdown.vue";
 import type { MediaProvider, MediaProviderModel } from "./types";
 import { settings, saveSettings } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
+import modelPicker from "../modelPicker.vue";
 
 const { provider, syncOnOpen = false } = defineProps<{ provider?: MediaProvider; syncOnOpen?: boolean }>();
 const modelEditorDialog = shallowRef<Component>();
@@ -123,19 +117,11 @@ const resultsVisible = ref(false);
 const fetchedModels = ref<MediaProviderModel[]>([]);
 const remoteIds = ref(new Set<string>());
 const selectedIds = ref(new Set<string>());
-const modelSearch = ref("");
 const modelType = ref("");
 const catalogueError = ref("");
 let catalogueRequest: AbortController | undefined;
-const filteredModels = computed(() => fetchedModels.value.filter(item => (!modelType.value || item.type === modelType.value)
-  && `${item.id} ${item.label}`.toLowerCase().includes(modelSearch.value.trim().toLowerCase())));
+const filteredModels = computed(() => fetchedModels.value.filter(item => !modelType.value || item.type === modelType.value));
 const resultColumns = computed<Column[]>(() => [
-  { key: "selection", width: 42, cellRenderer: ({ rowData }) => h(ElCheckbox, {
-    modelValue: selectedIds.value.has(rowData.id), disabled: fetching.value, ariaLabel: `选择 ${rowData.id}`,
-    onChange: (value: boolean | string | number) => { if (value) selectedIds.value.add(rowData.id); else selectedIds.value.delete(rowData.id); },
-  }) },
-  { key: "id", dataKey: "id", title: "模型 ID", width: 260, flexGrow: 1 },
-  { key: "label", dataKey: "label", title: "显示名称", width: 220, flexGrow: 1 },
   { key: "price", title: "价格", width: 150, cellRenderer: ({ rowData }) => h("span", priceOf(rowData) || "—") },
   { key: "type", title: "类型", width: 65, cellRenderer: ({ rowData }) => h("span", modelTypes[rowData.type as keyof typeof modelTypes]) },
 ]);
@@ -161,7 +147,6 @@ async function fetchModels() {
     remoteIds.value = new Set(remote.map(item => item.id));
     fetchedModels.value = [...remote, ...models.value.filter(item => !remoteIds.value.has(item.id))];
     selectedIds.value = new Set(models.value.map(item => item.id));
-    modelSearch.value = "";
     modelType.value = "";
     catalogueError.value = "";
     resultsVisible.value = true;
@@ -173,11 +158,11 @@ async function fetchModels() {
 async function applySelection() {
   if (fetching.value) return;
   const ids = [...selectedIds.value].filter(id => remoteIds.value.has(id));
-  if (ids.length > 100) { catalogueError.value = "每次最多选择 100 个远程模型"; return; }
   fetching.value = true;
   catalogueError.value = "";
   try {
-    const resolved = ids.length ? await requestCatalogue(ids) : [];
+    const resolved: MediaProviderModel[] = [];
+    for (let offset = 0; offset < ids.length; offset += 100) resolved.push(...await requestCatalogue(ids.slice(offset, offset + 100)));
     if (ids.some(id => !resolved.some(item => item.id === id))) throw new Error("部分模型已从远程目录移除，请重新同步后选择");
     const selections = fetchedModels.value.filter(item => selectedIds.value.has(item.id));
     models.value = selections.map(item => ({ ...models.value.find(model => model.id === item.id), ...(resolved.find(model => model.id === item.id) ?? item) }));
@@ -291,7 +276,6 @@ async function saveModels() {
 
 <style lang="scss" scoped>
 .catalogueFilters { margin-bottom: 12px; }
-.modelResults { height: 420px; margin-bottom: 12px; }
 .providerEditor {
   max-height: 65dvh;
   padding: 8px 4px;

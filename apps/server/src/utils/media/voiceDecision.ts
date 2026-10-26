@@ -143,22 +143,24 @@ export async function assertCurrentSpeechAudio(directory: string, shot: Record<s
 }
 
 export async function isVoiceSyncRequest(directory: string, request: MediaGenerationRequest) {
-  if (request.shotId || request.productionFingerprint || request.videos?.length !== 1 || request.audios?.length !== 1) return false;
+  const provider = await getMediaProvider(request.providerId);
+  if (!provider.models.some(model => model.id === request.modelId && model.type === "video" && model.lipSync === true)) return false;
+  if (request.shotId || request.productionFingerprint || request.videos?.length !== 1 || request.audios?.length !== 1)
+    throw new Error("专用口型处理不切换默认视频模型：请使用已保存配音方案中的一对人物 videos 和已选 audios，不传 shotId 或 productionFingerprint");
   const { project } = await readVoiceProject(directory);
-  if (project.lipSyncProviderId !== request.providerId || project.lipSyncModelId !== request.modelId) return false;
+  if (project.lipSyncProviderId !== request.providerId || project.lipSyncModelId !== request.modelId)
+    throw new Error("请先通过 configureVoice 保存 lipSyncProviderId 和 lipSyncModelId；口型模型独立于默认视频模型，无需改选默认视频模型");
   const line = project.lines.find(line => {
     const take = line.takes.find(take => take.id === line.takeId);
     return line.kind !== "narration" && line.video?.path === request.videos![0]!.path && take?.audio.path === request.audios![0]!.path
       && take.sourceKey === speechSourceKey(line, project.roles.find(role => role.id === line.roleId));
   });
-  if (!line) return false;
-  const provider = await getMediaProvider(request.providerId);
-  if (!provider.models.some(model => model.id === request.modelId && model.type === "video" && model.lipSync === true)) throw new Error("当前模型未声明专用对口型能力；支持音频参考不代表保留原音轨。请选择专用对口型模型，已有结果与未知请求继续保留。");
+  if (!line) throw new Error("口型请求未匹配当前已采用的原句、声音与人物视频，请先在配音方案中绑定对应台词，不改选默认视频模型");
   if (line.storySource) {
     const story = await readStoryProject(directory);
     const approved = story.revisions.find(item => item.id === story.approvedId);
     const scene = approved?.scenes.find(item => item.sceneId === line.storySource!.sceneId);
-    if (!approved || storyStale(story, approved) || scene?.text !== line.storySource.sceneText || scene.speech !== line.storySource.speech) return false;
+    if (!approved || storyStale(story, approved) || scene?.text !== line.storySource.sceneText || scene.speech !== line.storySource.speech) throw new Error("台词来源已变化，请先同步当前采用剧本的配音方案，保留已有素材");
   }
   return true;
 }

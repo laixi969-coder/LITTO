@@ -17,6 +17,7 @@ import { assertModelSelection, isSelectedModel } from "@/utils/modelSelection";
 export { fetchProviderModels } from "@/utils/ai/models";
 
 export const providerSchema = z.object({
+  purpose: z.enum(["text", "videoReview"]).optional(),
   apiUrl: z.url({ protocol: /^https?$/ }),
   apiKey: z.string(),
   protocol: z.enum(["openai-completions", "openai-responses", "anthropic-messages"]),
@@ -77,8 +78,8 @@ export function describeModelError(message: string | undefined) {
   return hint ? `${hint}（${message.slice(0, 200)}）` : message;
 }
 
-export function getConfiguredModel(providerId: string, modelId: string) {
-  assertModelSelection("text", providerId, modelId);
+export function getConfiguredModel(providerId: string, modelId: string, selectionKind: "text" | "videoReview" = "text") {
+  assertModelSelection(selectionKind, providerId, modelId);
   if (providerId === cloud()?.trialProviderId) throw Object.assign(new Error("平台积分试用尚未开放，请选择超级管理员配置的模型"), { status: 403 });
   const providers = conf.get("settings", {}).customProviders;
   const parsed = providerSchema.safeParse(Array.isArray(providers) ? providers.find(item => item?.id === providerId) : undefined);
@@ -123,7 +124,7 @@ export function listAiModels(all = false) {
     return provider.models.filter(model => model.id.trim() && !modelAccess("text", provider.id, model.id).reason() && (all || isSelectedModel("text", provider.id, model.id))).map(model => {
       const limits = getModelLimits(provider.id, model);
       return {
-        providerId: provider.id, providerLabel: provider.label, protocol: provider.protocol, modelId: model.id, label: model.label,
+        providerId: provider.id, providerLabel: provider.label, protocol: provider.protocol, purpose: provider.purpose, modelId: model.id, label: model.label,
         contextWindow: limits.contextWindow, maxOutputTokens: limits.maxTokens,
       };
     });
@@ -182,9 +183,10 @@ export function streamAi(
   context: Context,
   signal: AbortSignal,
   references: Awaited<ReturnType<typeof readAiReferences>> = [],
+  selectionKind: "text" | "videoReview" = "text",
 ) {
   const { provider, model: configuredModel, baseUrl } = configured;
-  assertModelSelection("text", configured.providerId, configuredModel.id);
+  assertModelSelection(selectionKind, configured.providerId, configuredModel.id);
   const model: Model<typeof provider.protocol> = {
     id: configuredModel.id, name: configuredModel.label, provider: configured.providerId === cloud()?.trialProviderId ? configured.providerId : "toonflow", api: provider.protocol, baseUrl,
     reasoning: false, input: ["text", "image"],

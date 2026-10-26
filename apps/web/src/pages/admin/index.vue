@@ -12,6 +12,7 @@
         <el-button type="primary" @click="openConnectModel()">添加 API</el-button>
         <el-tabs class="providerTabs">
           <el-tab-pane label="文本 API"><languageModel :visible="activeTab === 'api'" /></el-tab-pane>
+          <el-tab-pane label="视频审阅 API" lazy><languageModel :visible="activeTab === 'api'" purpose="videoReview" /></el-tab-pane>
           <el-tab-pane label="图片、视频与音频 API" lazy><mediaModel :visible="activeTab === 'api'" /></el-tab-pane>
         </el-tabs>
       </el-tab-pane>

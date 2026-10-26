@@ -19,7 +19,7 @@
             <keep-alive include="personalization">
               <component
                 :is="activePanel.component"
-                v-bind="['pluginMarket', 'languageModel', 'mediaModel', 'personalization'].includes(activePanel.id) ? { visible } : {}" />
+                v-bind="activePanel.id === 'videoReviewModel' ? { visible, purpose: 'videoReview' } : ['pluginMarket', 'languageModel', 'mediaModel', 'personalization'].includes(activePanel.id) ? { visible } : {}" />
             </keep-alive>
           </transition>
         </div>
@@ -59,6 +59,7 @@ const settingsPanels = [
     component: defineAsyncComponent(() => import("./panels/languageModel/index.vue")),
   },
   { id: "mediaModel", label: "媒体模型", icon: IconPhotoVideo, component: defineAsyncComponent(() => import("./panels/mediaModel/index.vue")) },
+  { id: "videoReviewModel", label: "视频审阅 API", icon: IconPhotoVideo, component: defineAsyncComponent(() => import("./panels/languageModel/index.vue")) },
   {
     id: "pluginMarket",
     label: "插件市场",
@@ -71,7 +72,7 @@ const settingsPanels = [
   { id: "mcp", label: "MCP", icon: IconPlugConnected, component: defineAsyncComponent(() => import("./panels/mcp/index.vue")) },
   { id: "developer", label: "开发者选项", icon: IconCode, component: defineAsyncComponent(() => import("./panels/developer/index.vue")) },
   { id: "about", label: "关于", icon: IconInfoCircle, component: defineAsyncComponent(() => import("./panels/about.vue")) },
-].filter((panel) => !hiddenPanels.includes(panel.id) && (!accounts || !["modelSelection", "languageModel", "mediaModel"].includes(panel.id)));
+].filter((panel) => !hiddenPanels.includes(panel.id) && (!accounts || !["modelSelection", "languageModel", "mediaModel", "videoReviewModel"].includes(panel.id)));
 const activePanel = shallowRef(settingsPanels[0]!);
 const visible = defineModel<boolean>({ default: false });
 </script>

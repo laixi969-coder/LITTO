@@ -3,12 +3,15 @@ import { t } from "@/lib/i18n";
 import { z } from "zod";
 import modelFetch from "@/utils/ai/modelFetch";
 
+const modelTimeSchema = z.union([z.number(), z.string().max(128)]).nullish().catch(undefined);
 const modelSchema = z.object({
   id: z.string().optional(), name: z.string().optional(),
   display_name: z.string().optional(), displayName: z.string().optional(),
   inputTokenLimit: z.number().int().positive().optional(),
   outputTokenLimit: z.number().int().positive().optional(),
   output_modalities: z.array(z.string()).optional(),
+  created: modelTimeSchema, created_at: modelTimeSchema, createdAt: modelTimeSchema,
+  release_date: modelTimeSchema, releaseDate: modelTimeSchema,
 });
 
 const openRouterModelSchema = modelSchema.extend({
@@ -38,10 +41,13 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
       model: z.string().min(1), displayName: z.string().optional(), type: z.string(), display_console: z.boolean(),
       contextLength: z.number().int().positive().optional(), maxCompletionTokens: z.number().int().positive().optional(),
       supported_protocols: z.array(z.string()).optional(),
+      created: modelTimeSchema, created_at: modelTimeSchema, createdAt: modelTimeSchema,
+      release_date: modelTimeSchema, releaseDate: modelTimeSchema,
     })) }).parse(await response.json());
     return result.data.filter(item => item.display_console && item.type === "Text"
       && (!item.supported_protocols || item.supported_protocols.includes("openai.chat.completions")))
-      .map(item => ({ id: item.model, label: item.displayName || item.model, contextWindow: item.contextLength, maxOutputTokens: item.maxCompletionTokens }));
+      .map(item => ({ id: item.model, label: item.displayName || item.model, contextWindow: item.contextLength, maxOutputTokens: item.maxCompletionTokens,
+        createdAt: item.releaseDate ?? item.release_date ?? item.createdAt ?? item.created_at ?? item.created ?? undefined }));
   }
   if (url.pathname === "/") url.pathname = "/v1";
   url.pathname = `${url.pathname.replace(/\/+$/, "")}/models`;
@@ -52,7 +58,7 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
     url.searchParams.set("limit", "1000");
   } else if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  const models = new Map<string, { id: string; label: string; contextWindow?: number; maxOutputTokens?: number }>();
+  const models = new Map<string, { id: string; label: string; contextWindow?: number; maxOutputTokens?: number; createdAt?: string | number }>();
   const cursors = new Set<string>();
   const signal = AbortSignal.timeout(openRouter ? 20000 : 30000);
   while (true) {
@@ -72,6 +78,7 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
       if (url.hostname === "api.atlascloud.ai" && item.output_modalities && !item.output_modalities.includes("text")) continue;
       if (["api.atlascloud.ai", "easyrouter.io"].includes(url.hostname) && /embed|whisper|tts|dall-e|image|moderation|audio|realtime|transcribe|rerank|speech|video|sora|seedance|seedream|pixverse|veo|kling|wan\d|wan-|minimax-h3|happyhorse|nano.?banana/i.test(id)) continue;
       models.set(id, { id, label: item.display_name || item.displayName || (openRouter ? item.name : undefined) || id,
+        createdAt: item.releaseDate ?? item.release_date ?? item.createdAt ?? item.created_at ?? item.created ?? undefined,
         contextWindow: openRouter ? routerModel?.context_length ?? undefined : item.inputTokenLimit,
         maxOutputTokens: openRouter ? routerModel?.top_provider?.max_completion_tokens ?? undefined : item.outputTokenLimit });
     }

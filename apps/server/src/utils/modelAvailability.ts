@@ -30,6 +30,8 @@ export function modelAccess(kind: "text" | "media", providerId: string, modelId:
     failed(error: unknown) {
       const text = error instanceof Error ? error.message : String(error ?? "");
       if (/MODEL_UNAVAILABLE|已从可用列表移除/.test(text)) return;
+      // 输入类型不支持不等于模型失效；视频探测失败不能停用仍能正常对话的模型。
+      if (/\b422\b/.test(text)) return;
       const balance = /\b402\b|insufficient[ _](user[ _])?(balance|quota|credit)|余额不足|额度不足|quota.{0,20}(exhausted|exceeded)|credit.{0,20}(exhausted|insufficient)|remaining.{0,10}-\d|剩余.{0,10}-\d/i.test(text);
       const auth = /\b401\b|invalid.{0,10}(api.?key|token)|incorrect api key|unauthorized|密钥.{0,8}(无效|失效)|未配置.*API Key/i.test(text);
       const model = /model.{0,80}(not found|not exist|not available|not supported|unavailable|permission|access)|模型.{0,20}(不存在|不可用|无权限)|\b403\b/i.test(text);

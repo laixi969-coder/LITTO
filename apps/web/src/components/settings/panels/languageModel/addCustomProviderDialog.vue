@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="provider ? '编辑供应商' : '添加供应商'"
+    :title="purpose === 'videoReview' ? (provider ? '编辑视频审阅 API' : '添加视频审阅 API') : provider ? '编辑供应商' : '添加供应商'"
     width="min(760px, 94vw)"
     alignCenter
     appendToBody
@@ -88,23 +88,7 @@
     </template>
   </el-dialog>
   <el-dialog v-model="resultsVisible" title="选择要启用的模型" width="min(680px, 92vw)" alignCenter appendToBody destroyOnClose>
-    <el-input v-model="modelSearch" clearable :prefixIcon="IconSearch" placeholder="搜索模型 ID 或显示名称" aria-label="搜索模型" />
-    <div class="modelResults">
-      <el-auto-resizer>
-        <template #default="{ height, width }">
-          <el-table-v2
-            :columns="resultColumns"
-            :data="filteredModels"
-            :width="width"
-            :height="height"
-            :rowHeight="38"
-            :headerHeight="36"
-            rowKey="id"
-            fixed />
-        </template>
-      </el-auto-resizer>
-    </div>
-    <el-text type="info">{{ filteredModels.length }} 个结果，已勾选 {{ selectedIds.size }} 个</el-text>
+    <modelPicker v-if="resultsVisible" v-model="selectedIds" :models="fetchedModels" />
     <template #footer>
       <el-button @click="resultsVisible = false">取消</el-button>
       <el-button type="primary" @click="addSelectedModels">应用选择（{{ selectedIds.size }}）</el-button>
@@ -113,21 +97,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from "vue";
 import axios from "axios";
-import { ElCheckbox, type FormInstance, type FormRules, type Column } from "element-plus";
+import type { FormInstance, FormRules } from "element-plus";
 import {
   IconPlus,
   IconDownload,
   IconTrash,
   IconChevronDown,
   IconChevronUp,
-  IconSearch,
 } from "@tabler/icons-vue";
 import { saveSettings, type CustomProvider, type CustomProviderModel } from "@/stores/settings";
 import { languageProviders } from "@toonflow/providers";
+import modelPicker from "../modelPicker.vue";
 
-const props = defineProps<{ provider?: CustomProvider; syncOnOpen?: boolean }>();
+const props = withDefaults(defineProps<{ provider?: CustomProvider; syncOnOpen?: boolean; purpose?: "text" | "videoReview" }>(), { purpose: "text" });
 const visible = defineModel<boolean>({ default: false });
 const providerForm = ref<FormInstance>();
 const form = reactive({ id: "", label: "", apiUrl: "", protocol: "openai-completions", apiKey: "" });
@@ -135,7 +119,6 @@ const models = ref<(CustomProviderModel & { key: string })[]>([]);
 const expandedModels = ref(new Set<string>());
 const fetchedModels = shallowRef<CustomProviderModel[]>([]);
 const selectedIds = ref(new Set<string>());
-const modelSearch = ref("");
 const saving = ref(false);
 const optionsOpen = ref<string[]>([]);
 const protocols = [
@@ -144,27 +127,6 @@ const protocols = [
   { value: "anthropic-messages", label: "Anthropic Claude" },
 ];
 const addedIds = computed(() => new Set(models.value.map((item) => item.id.trim())));
-const filteredModels = computed(() => {
-  const query = modelSearch.value.trim().toLowerCase();
-  return query ? fetchedModels.value.filter((item) => `${item.id} ${item.label}`.toLowerCase().includes(query)) : fetchedModels.value;
-});
-const resultColumns = computed<Column[]>(() => [
-  {
-    key: "selection",
-    width: 42,
-    cellRenderer: ({ rowData }) =>
-      h(ElCheckbox, {
-        modelValue: selectedIds.value.has(rowData.id),
-        ariaLabel: `选择 ${rowData.id}`,
-        onChange: (value: boolean | string | number) => {
-          if (value) selectedIds.value.add(rowData.id);
-          else selectedIds.value.delete(rowData.id);
-        },
-      }),
-  },
-  { key: "id", dataKey: "id", title: "模型 ID", width: 240, flexGrow: 1 },
-  { key: "label", dataKey: "label", title: "显示名称", width: 200, flexGrow: 1 },
-]);
 const resultsVisible = ref(false);
 const fetching = ref(false);
 const formError = ref("");
@@ -216,7 +178,6 @@ function resetForm() {
   expandedModels.value = new Set();
   fetchedModels.value = [];
   selectedIds.value = new Set();
-  modelSearch.value = "";
   formError.value = "";
 }
 
@@ -243,7 +204,6 @@ async function fetchModels(autoApply = false) {
     const remoteIds = new Set(data.data.map((item: CustomProviderModel) => item.id));
     fetchedModels.value = [...data.data, ...models.value.filter(item => !remoteIds.has(item.id))];
     selectedIds.value = new Set(addedIds.value);
-    modelSearch.value = "";
     resultsVisible.value = true;
   } catch (error) {
     if (!controller.signal.aborted) {
@@ -302,6 +262,7 @@ async function addProvider() {
     const updatedProvider = {
       ...props.provider,
       ...form,
+      purpose: props.provider ? props.provider.purpose ?? "text" : props.purpose,
       label: form.label.trim(),
       apiUrl: form.apiUrl.trim(),
       apiKey: form.apiKey.trim(),
@@ -392,9 +353,5 @@ async function addProvider() {
       grid-template-columns: 1fr;
     }
   }
-}
-.modelResults {
-  height: min(420px, 55dvh);
-  margin: 12px 0;
 }
 </style>

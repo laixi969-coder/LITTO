@@ -16,7 +16,7 @@ import { readStoryProject } from "@/utils/story";
 import { getStatus } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { autoFilmScope } from "./scope";
-import { cameraObservationPlan, cameraReviewsSchema, observeVideo } from "./observe";
+import { assertVideoObservation, cameraObservationPlan, cameraReviewsSchema, observeVideo, videoObservationModel } from "./observe";
 import type { AutoFilmTask } from "./types";
 
 const relativePath = z.string().min(1).max(2048).refine(value => !/^[\\/]|[:\u0000-\u001f]/.test(value) && value.split(/[\\/]/).every(part => part && part !== "." && part !== ".."), "须为工作区相对路径");
@@ -54,8 +54,9 @@ const instructions = `你正在执行用户点击启动的独立「一键自动�
 遵循 workflow 的制作方法，但其中的人工选择在本次任务中由你自主完成。已有完整剧本保留剧情、原句和角色；只有梗概时补写。角色图的身份优先，按图名与剧本匹配；不明确时自行做合理分配并记录。缺失资产自行设计。无需另询画幅、风格、时长、音色、模型、分辨率或候选；沿用可用默认模型与项目规格，未设置或不可用的服务明确报告，不假装成功。
 先在故事工作台保存、审阅并自动采用本任务剧本，记录稳定sceneId。创建本任务专属的新序列，sequence的storyRevisionId引用这版剧本，镜头source.sceneId关联对应场次。所有新镜头和导出归入该序列；复用适用资产，不修改其他序列与旧成片。完整交付所有输入场次，不擅自删减成长片预告。配乐与音效按内容需要安排，不能用字幕、静帧拼接或旁白替代要求的动态表演和对白。输入角色图已经登记mediaId，直接用reference和asset登记身份参考；仅需要补齐设定时生成补充图，不把用户图丢掉或随意重绘。
 确认类工具支持 automaticChoice:{answer,values?,reason}。首次调用若返回待选题目，读完真实候选后在同一工具参数补 automaticChoice 重试，服务端校验并保存选择；不要把题目转交用户。askUser 的创作问题直接自己决定。字段表单须按题目 fields 提供 values。
-关键帧必须读取实际图片。视频先用 observeAutoFilmVideo{mediaId,focus} 把完整真实视频交给支持视频与声音的模型观察，读取实际返回的时间点、表演、对白和接点证据，再使用 reviewProduction/reviewProductions 记录真实观察并采用（authorization 填用户点击启动自动成片的授权）。此模式没有人工主帧采用与用户满意度工具；不得伪造用户看过、用户满意或人类验收。selectCandidate 不能 asHero。资产、故事、声音和剪辑仍通过各自确认工具保存自动决定。
+关键帧必须读取实际图片。视频先用 observeAutoFilmVideo{mediaId,focus} 把完整真实视频交给已配置的视频审阅模型观察，创作模型无需自己支持视频输入。读取实际返回的时间点、表演、对白和接点证据，再使用 reviewProduction/reviewProductions 记录真实观察并采用（authorization 填用户点击启动自动成片的授权）。此模式没有人工主帧采用与用户满意度工具；不得伪造用户看过、用户满意或人类验收。selectCandidate 不能 asHero。资产、故事、声音和剪辑仍通过各自确认工具保存自动决定。
 有对白先确定真实声音和时长，再安排镜头与口型；复用已成功生成的素材和任务。参考、版本、指纹、连续性和声音门禁全部有效，不准通过修改检查代码或填假观察绕过。只有实际完整看听才填 fullPlayback:true；无法观察时说明缺项并结束，不能宣称通过。
+固定配音的专用口型模型独立于默认视频生成模型。先 listMediaModels{all:true} 核对 lipSync:true，再 configureVoice 保存 lipSyncProviderId/lipSyncModelId；台词绑定当前采用的声音和人物原片。口型 generateVideo 只传这一对 videos/audios，不传 shotId 或 productionFingerprint，不调用 selectModel 把默认视频模型换成口型模型。延迟发声、多句整镜须先按真实发声窗口规划支持的片段；缺少能力时在生成前报告，不能靠改画外音或将独立对白直接叠到旧视频绕过。
 摄影检查清单由 observeAutoFilmVideo 自动从当前镜头规格读取，focus 只补充重点，不替代起幅、相机路径和结束构图检查。返回的 cameraReviews 是实际观察，revise 或 unverified 不能改写成 pass；保留候选，根据具体偏差修正规格或在已有重试额度内处理。当前后台没有3D预演工具，不尝试调用画布节点，不为缺少3D阻塞普通镜头，也不声称已使用数值轨迹。
 允许为失败或有明确缺陷的目标最多再试两次，总计最多120次媒体生成（含配音），重试使用新的 regenerationId，同一次重试复用该ID；先查询旧任务防止重复消耗。停止、余额不足、权限撤回或保存失败时停止，不无限重试。
 镜头完成后读取 readEdit，自动剪辑并用 render 导出正式成片，等待真实 SUCCEEDED，再 inspectFinal、observeAutoFilmVideo 完整核对成片，按真实观察 agentReviewFinal。不要调用 reviewFinal 代填用户满意度。最后调用 completeAutoFilm{renderId}；只有这个工具确认完成才算交付，不能只回复制作方案或让用户点击下一步。未完成就继续工具执行；真实阻塞时给出具体原因并保存已有成果。`;
@@ -110,6 +111,7 @@ function validateChoice(request: Parameters<QuestionContext["ask"]>[1], choice: 
 
 function launch(task: AutoFilmTask, folder: string) {
   const controller = new AbortController();
+  let toolCalls = 0;
   const taskPath = join(folder, `task${task.id.replaceAll("-", "")}.json`);
   let writes = Promise.resolve();
   const save = () => {
@@ -125,6 +127,11 @@ function launch(task: AutoFilmTask, folder: string) {
     const context = identity(task.directory);
     if (!context.editable || context.projectId !== task.projectId) throw new Error("自动成片的编辑权限或项目关联已失效");
     if (task.output) throw new Error("成片已交付，本任务不再执行修改");
+  };
+  const countToolCall = () => {
+    assertActive();
+    task.toolCalls++;
+    if (++toolCalls > 2000) { controller.abort(new Error("本次运行已达到2000次工具调用上限，进度已保留")); signal.throwIfAborted(); }
   };
   const question: QuestionContext = {
     decisionSource: { kind: "agent", taskId: task.id },
@@ -152,8 +159,7 @@ function launch(task: AutoFilmTask, folder: string) {
           description: `${tool.description}\n自动成片中由AI决定：若有待选题目，补充 automaticChoice:{answer,values?,reason}，不向用户发问。`,
         } : {}),
         async execute(id, args, toolSignal, onUpdate, context) {
-          assertActive();
-          if (++task.toolCalls > 2000) { controller.abort(new Error("自动成片已达到2000次工具调用上限，进度已保留")); signal.throwIfAborted(); }
+          countToolCall();
           const { automaticChoice, ...input } = args as Record<string, any>;
           if (tool.name === "requestProductionDecision" && (["reviewFinal", "reviewOutput", "approveTake", "publishAsset", "libraryReference"].includes(input.operation) || input.operation === "selectCandidate" && input.data?.asHero))
             throw new Error("自动模式不代填用户满意度或修改跨项目角色库；关键帧和视频请用 reviewProduction，成片用 productionSpec(agentReviewFinal)");
@@ -194,17 +200,17 @@ function launch(task: AutoFilmTask, folder: string) {
         },
       } satisfies ToolDefinition;
     }), {
-      name: "observeAutoFilmVideo", label: "完整观察视频声画", description: "将真实任务视频整体发送给当前创作模型，自动附带当前镜头起幅、相机路线和结束构图的摄影检查清单。返回带时间点的cameraReviews与声画观察；revise或unverified不得改成通过。focus只补充对白、检查重点及剪辑接点，不能覆盖系统清单。",
+      name: "observeAutoFilmVideo", label: "完整观察视频声画", description: "将真实任务视频整体发送给已配置的视频审阅模型，创作模型不需要支持视频输入。自动附带当前镜头起幅、相机路线和结束构图的摄影检查清单。返回带时间点的cameraReviews与声画观察；revise或unverified不得改成通过。focus只补充对白、检查重点及剪辑接点，不能覆盖系统清单。",
       parameters: z.toJSONSchema(z.strictObject({ mediaId: z.string().min(1), focus: z.string().min(1).max(12000) })),
       async execute(_id, input) {
-        assertActive();
+        countToolCall();
         const { mediaId, focus } = z.object({ mediaId: z.string().min(1), focus: z.string().min(1).max(12000) }).parse(input);
         const { api, tenant } = identity(task.directory), media = api.scoped(tenant.workspaceId).get("media", mediaId);
         const cameraPlan = cameraObservationPlan(task.projectId, mediaId, task.sequenceIds);
         const planKey = createHash("sha256").update(JSON.stringify([1, cameraPlan, task.script, focus])).digest("hex");
         const saved = task.playbacks.find(item => item.mediaId === mediaId && item.hash === media?.hash && item.planKey === planKey);
         if (saved) return { content: [{ type: "text", text: JSON.stringify(saved) }], details: saved };
-        const key = `observe${mediaId}`;
+        const key = `observe${createHash("sha256").update(JSON.stringify([mediaId, media?.hash, cameraPlan, videoObservationModel().key])).digest("hex")}`;
         if ((task.attempts[key] ?? 0) >= 3) throw new Error("该视频已达到完整审阅尝试上限，请核对模型的视频与声音理解能力");
         task.attempts[key] = (task.attempts[key] ?? 0) + 1;
         task.progress = "正在完整观察视频画面和声音";
@@ -218,7 +224,7 @@ function launch(task: AutoFilmTask, folder: string) {
       name: "completeAutoFilm", label: "交付自动成片", description: "实际正式导出且代理验收通过后调用，校验真实成片，不接受草稿或其他任务的成片。",
       parameters: z.toJSONSchema(z.strictObject({ renderId: z.string().min(1) })),
       async execute(_id, input) {
-        assertActive();
+        countToolCall();
         const { renderId } = z.object({ renderId: z.string().min(1) }).parse(input);
         const { api, tenant } = identity(task.directory), scope = api.scoped(tenant.workspaceId);
         const render = scope.get("renders", renderId);
@@ -262,6 +268,10 @@ function launch(task: AutoFilmTask, folder: string) {
     try {
       const model = selectedModel("text");
       if (!model) throw new Error("尚未配置可用的默认创作模型");
+      getConfiguredModel(model.providerId, model.modelId);
+      task.progress = "正在检查视频审阅模型的画面与声音读取能力";
+      await save();
+      await assertVideoObservation(signal);
       for (let turn = 0; turn < 8 && !task.output; turn++) {
         assertActive();
         const before = task.toolCalls;
