@@ -2,7 +2,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "@toonflow/file
 import { z } from "zod";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scoped, type Scope } from "../db.ts";
+import { run, scoped, type Scope } from "../db.ts";
+import { setTimeout } from "node:timers/promises";
 import { probeFile, runCmd } from "../media-tools.ts";
 import { saveMedia, storage } from "../storage.ts";
 import { bad, conflict, now } from "../util.ts";
@@ -27,19 +28,39 @@ export const renderOptionsSchema = z.object({
 }).refine(options => (options.width === undefined) === (options.height === undefined), "导出宽高须同时指定");
 export type RenderOpts = z.input<typeof renderOptionsSchema>;
 
-export async function startNleRender(workspaceId: string, projectId: string, sequenceId: string, renderId: string, opts: RenderOpts) {
-    const s = scoped(workspaceId);
-    const dir = mkdtempSync(join(tmpdir(), "milimili-nle-"));
-    try {
-        const media = await renderTimeline(s, sequenceId, dir, opts);
-        const saved = await saveMedia(workspaceId, projectId, readFileSync(media.file), { source: "render", duration: media.duration });
-        s.update("renders", renderId, { status: "SUCCEEDED", media_id: saved.id });
-    } catch (e) {
-        s.update("renders", renderId, { status: "FAILED", error: (e as Error).message.slice(0, 600) });
-    } finally { rmSync(dir, { recursive: true, force: true }); }
+/** 单进程启动时只标记中断，不自动重做导出或重新生成素材。 */
+export function recoverInterruptedRenders() {
+    run("UPDATE renders SET status='FAILED', error=?, updated_at=? WHERE status='RUNNING'", "服务重启中断了导出，请使用原时间线重新 render；已有素材保留，无需重新生成", now());
 }
 
-export async function renderTimeline(s: Scope, sequenceId: string, dir: string, opts: RenderOpts, previewWindow?: { start: number; end: number }) {
+export async function waitNleRender(s: Scope, renderId: string, signal?: AbortSignal) {
+    const waiting = signal ? AbortSignal.any([signal, AbortSignal.timeout(31 * 60_000)]) : AbortSignal.timeout(31 * 60_000);
+    while (true) {
+        waiting.throwIfAborted();
+        const render = s.get("renders", renderId);
+        if (!render) throw bad("导出任务不存在");
+        if (render.status !== "RUNNING") return render;
+        await setTimeout(1000, undefined, { signal: waiting });
+    }
+}
+
+export async function startNleRender(workspaceId: string, projectId: string, sequenceId: string, renderId: string, opts: RenderOpts) {
+    const s = scoped(workspaceId);
+    const signal = AbortSignal.timeout(30 * 60_000);
+    let dir: string | undefined;
+    try {
+        dir = mkdtempSync(join(tmpdir(), "milimili-nle-"));
+        const media = await renderTimeline(s, sequenceId, dir, opts, undefined, signal);
+        signal.throwIfAborted();
+        const saved = await saveMedia(workspaceId, projectId, readFileSync(media.file), { source: "render", duration: media.duration, signal });
+        s.update("renders", renderId, { status: "SUCCEEDED", media_id: saved.id });
+    } catch (e) {
+        s.update("renders", renderId, { status: "FAILED", error: signal.aborted ? "导出超过30分钟，已停止执行；已有素材保留，请检查时间线和服务器资源后重试" : (e as Error).message.slice(0, 600) });
+    } finally { if (dir) rmSync(dir, { recursive: true, force: true }); }
+}
+
+export async function renderTimeline(s: Scope, sequenceId: string, dir: string, opts: RenderOpts, previewWindow?: { start: number; end: number }, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     opts = renderOptionsSchema.parse(opts);
     const e = getEdit(s, sequenceId, false);
     validateTimeline(s, e);
@@ -47,7 +68,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     // 导出跨越多个 await；固定每段的素材版本，不能在中途采用新 Take 后混用两版音画。
     for (const clip of e.clips) clip.mediaId = resolveClip(s, clip).mediaId ?? undefined;
     let width = opts.width ?? 0, height = opts.height ?? 0;
-    const ff = await runCmd("ffmpeg", ["-version"]);
+    const ff = await runCmd("ffmpeg", ["-version"], signal);
     if (ff.code !== 0) throw new Error("ffmpeg is not installed on the server; use the export package instead");
     const tracks = new Map(e.tracks.map((t) => [t.id, t]));
     const video = e.clips.filter((c) => tracks.get(c.trackId)?.kind === "video" && !tracks.get(c.trackId)!.muted);
@@ -75,7 +96,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         if (!prepared) {
             const file = join(dir, `in${inputs.length}.${ext(m.mime)}`);
             writeFileSync(file, await storage.get(m.storageKey));
-            const probe = await probeFile(file);
+            const probe = await probeFile(file, signal);
             if (!probe) throw new Error(`media ${m.id} could not be read by ffprobe (${m.mime})`);
             prepared = { file, probe };
             preparedMedia.set(key, prepared);
@@ -153,7 +174,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     const subs = main.map((c) => ({ c, sh: c.shotId ? s.get("shots", c.shotId) : null })).filter((x) => x.sh?.subtitle);
     const srt = subs.map((x, i) => { const t = (n: number) => new Date(Math.round(n * 1000)).toISOString().slice(11, 23).replace(".", ","); return `${i + 1}\n${t(x.c.start)} --> ${t(end(x.c))}\n${x.sh!.subtitle}\n`; }).join("\n");
     if (opts.burnSubtitles && srt) {
-        const filters = await runCmd("ffmpeg", ["-hide_banner", "-filters"]);
+        const filters = await runCmd("ffmpeg", ["-hide_banner", "-filters"], signal);
         if (!/\bsubtitles\b/.test(filters.out)) throw new Error("burn-in subtitles need an ffmpeg build with libass; use soft subtitles instead");
         const sf = join(dir, "burn.srt"); writeFileSync(sf, srt);
         post.push(`subtitles='${esc(sf)}'`);
@@ -207,7 +228,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     if (hasAudio) args.push("-map", "[aout]");
     if (srt && !opts.burnSubtitles && !previewWindow) args.push("-map", `${inputs.length}:0`, "-c:s", "mov_text");
     args.push("-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-pix_fmt", "yuv420p", ...(hasAudio ? ["-c:a", "aac", "-b:a", "192k"] : []), ...(previewWindow ? ["-ss", String(previewWindow.start)] : []), "-t", String(previewWindow ? previewWindow.end - previewWindow.start : total), "-movflags", "+faststart", join(dir, "out.mp4"));
-    const r = await runCmd("ffmpeg", args);
+    const r = await runCmd("ffmpeg", args, signal);
     if (r.code !== 0) throw new Error(`ffmpeg failed: ${r.err.trim().split("\n").slice(-3).join(" | ").slice(-500)}`);
     return { file: join(dir, "out.mp4"), duration: previewWindow ? previewWindow.end - previewWindow.start : total };
 }

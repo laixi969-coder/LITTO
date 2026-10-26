@@ -11,6 +11,7 @@ import { seedProviders } from "./providers/registry.ts";
 import { seedSkills } from "./domain/market-seed.ts";
 import { sweepUploads } from "./routes/extra.ts";
 import { sweepWorkspacePurges } from "./storage.ts";
+import { recoverInterruptedRenders } from "./domain/nle-render.ts";
 export { configureWorkspacePurge } from "./storage.ts";
 export { storage, mediaView, saveMedia, sniff } from "./storage.ts";
 
@@ -32,7 +33,7 @@ export { assertSpeechPlan, speechPlanningIssues, shotDialogueMode } from "./doma
 export { editView, getEdit } from "./domain/nle.ts";
 export { cutPairSchema, soundBridgeSchema, suggestCuts, previewCut, soundBridge } from "./domain/cutEditing.ts";
 export { startRender } from "./domain/assembly.ts";
-export { renderOptionsSchema } from "./domain/nle-render.ts";
+export { renderOptionsSchema, waitNleRender } from "./domain/nle-render.ts";
 export { configureWorkspaceVision } from "./domain/qc-vision.ts";
 export { inspectAd } from "./domain/adReview.ts";
 export { accountOf, adminAdjust, creditsFor, hold, charge, release } from "./credits.ts";
@@ -43,6 +44,7 @@ let started = false;
 export function initCloud() {
     if (started) return;
     started = true;
+    recoverInterruptedRenders();
     seedProviders();
     seedSkills();
     startWorker();

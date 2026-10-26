@@ -148,7 +148,11 @@ export function startRender(workspaceId: string, projectId: string, sequenceId: 
     const tl = buildTimeline(s, sequenceId);
     opts = renderOptionsSchema.parse(opts);
     if (!opts.draft) assertSpeechExport(s, sequenceId);
-    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts, sourceFingerprint: sequenceFingerprint(s, sequenceId) }, created_by: actor, updated_at: now() });
+    const sourceFingerprint = sequenceFingerprint(s, sequenceId);
+    const existing = s.list("renders", { sequenceId }, "created_at DESC").find(render => ["RUNNING", "SUCCEEDED"].includes(render.status)
+        && render.manifest?.sourceFingerprint === sourceFingerprint && JSON.stringify(render.manifest?.options) === JSON.stringify(opts));
+    if (existing) return existing;
+    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts, sourceFingerprint }, created_by: actor, updated_at: now() });
     void startNleRender(workspaceId, projectId, sequenceId, r.id, opts);
     return r;
 }

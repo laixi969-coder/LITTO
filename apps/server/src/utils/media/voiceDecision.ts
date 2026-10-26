@@ -49,9 +49,12 @@ export async function assertVoiceSpeechRequest(directory: string, request: Media
   const line = project.lines.find(line => line.id === request.voiceLineId);
   const role = project.roles.find(role => role.id === line?.roleId);
   if (!line || !role || !role.name.trim() || !role.voice.trim() || line.kind === "singing" || line.sourceAudio) throw new Error("固定配音须使用已保存角色及其对白或旁白原句，已有录音不重新生成");
-  if (request.providerId !== role.providerId || request.modelId !== role.modelId || request.voice !== role.voice
-    || request.prompt.trim() !== line.text.trim() || (request.speed ?? 1) !== line.speed
-    || (request.instructions?.trim() ?? "") !== speechInstructions(line, role) || request.audios?.length || Object.keys(request.audioParameters ?? {}).length) throw new Error("配音请求与角色固定音色、原文或表演不一致，请先保存当前方案；不能被默认值或额外参数覆盖");
+  const expected = { providerId: role.providerId, modelId: role.modelId, prompt: line.text.trim(), voice: role.voice, speed: line.speed, instructions: speechInstructions(line, role) };
+  // 可选字段省略时沿用已保存方案，不让调用方重新拼接角色习惯、情绪和表演。
+  request = { ...request, voice: request.voice ?? expected.voice, speed: request.speed ?? expected.speed, instructions: request.instructions?.trim() ?? expected.instructions };
+  const mismatches = (Object.keys(expected) as (keyof typeof expected)[]).filter(key => (key === "prompt" ? request.prompt.trim() : request[key]) !== expected[key]);
+  if (mismatches.length) throw new Error(`配音请求字段 ${mismatches.join("、")} 与已保存方案不一致；请使用 ${JSON.stringify(expected)}。voice、speed、instructions 可省略，由服务端读取，修改方案须先保存。`);
+  if (request.audios?.length || Object.keys(request.audioParameters ?? {}).length) throw new Error("固定角色配音不能用额外音频或参数覆盖已保存方案");
   modelAccess("media", role.providerId, role.modelId).assert();
   const provider = await getMediaProvider(role.providerId);
   const model = provider.models.find(model => model.type === "audio" && model.id === role.modelId);
@@ -65,7 +68,7 @@ export async function assertVoiceSpeechRequest(directory: string, request: Media
   }
   const sourceKey = speechSourceKey(line, role);
   if (line.takes.length >= 100 && !line.takes.some(take => take.sourceKey === sourceKey)) throw new Error("此句配音候选已达上限，保留现有版本，不再提交付费生成");
-  return sourceKey;
+  return { sourceKey, request };
 }
 
 export async function saveVoiceSpeechTake(directory: string, lineId: string, sourceKey: string, files: GeneratedMedia[]) {

@@ -57,8 +57,7 @@ export function routeImageEditModel<T extends MediaGenerationRequest>(request: T
 export async function assertMediaModelSelection(kind: "image" | "video" | "audio", request: MediaGenerationRequest, directory: string) {
   if (kind === "audio" && request.voiceLineId) {
     const { assertVoiceSpeechRequest } = await import("@/utils/media/voiceDecision");
-    await assertVoiceSpeechRequest(directory, request);
-    return request;
+    return (await assertVoiceSpeechRequest(directory, request)).request;
   }
   if (kind === "video") {
     const { isVoiceSyncRequest } = await import("@/utils/media/voiceDecision");

@@ -80,7 +80,8 @@ export function usage(workspaceId: string) {
     return get("SELECT COALESCE(SUM(size),0) AS bytes, COUNT(*) AS files FROM media WHERE workspace_id=? AND deleted_at IS NULL", workspaceId)!;
 }
 
-export async function saveMedia(workspaceId: string, projectId: string | null, data: Buffer, opts: { source: string; mime?: string; duration?: number; allowUnsniffed?: boolean }) {
+export async function saveMedia(workspaceId: string, projectId: string | null, data: Buffer, opts: { source: string; mime?: string; duration?: number; allowUnsniffed?: boolean; signal?: AbortSignal }) {
+    opts.signal?.throwIfAborted();
     if (data.length > uploadMaxBytes) throw bad("file too large");
     const s = sniff(data);
     if (!s && !opts.allowUnsniffed) throw bad("unsupported or unrecognised file type");
@@ -89,12 +90,14 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     if (usage(workspaceId).bytes + data.length > ws.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
     // Real video/audio: record true duration and size (needed for trim limits in the editor). Best effort, needs ffprobe.
     let probed: { duration: number | null; width: number | null; height: number | null } | null = null;
-    if (/^(video|audio)\//.test(mime) && !process.env.MILIMILI_NO_PROBE) probed = await probeBuffer(data);
+    if (/^(video|audio)\//.test(mime) && !process.env.MILIMILI_NO_PROBE) probed = await probeBuffer(data, opts.signal);
+    opts.signal?.throwIfAborted();
     const id = ulid();
     const key = `${workspaceId}/${projectId ?? "_"}/${id}`;
     await storage.put(key, data);
     let row;
     try {
+        opts.signal?.throwIfAborted();
         // 文件写入期间其他请求也可能完成入库；同步复核配额与记录写入之间不能再 await。
         const current = get("SELECT quota_bytes FROM workspaces WHERE id=? AND deleted_at IS NULL", workspaceId);
         if (!current || usage(workspaceId).bytes + data.length > current.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");

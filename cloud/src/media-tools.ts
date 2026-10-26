@@ -37,7 +37,7 @@ export async function makeDerivatives(media: { id: string; workspaceId: string; 
 
 export type Probe = { duration: number | null; width: number | null; height: number | null; hasVideo: boolean; hasAudio: boolean };
 const run2 = (cmd: string, args: string[], signal?: AbortSignal) => new Promise<{ code: number; out: string; err: string }>((resolve) => {
-  const process = spawn(cmd, args, { signal });
+  const process = spawn(cmd, args, { signal, killSignal: "SIGKILL", stdio: ["ignore", "pipe", "pipe"] });
   let out = "", err = "", failed = false;
   process.stdout.on("data", data => (out += data));
   process.stderr.on("data", data => (err += data));
@@ -47,8 +47,8 @@ const run2 = (cmd: string, args: string[], signal?: AbortSignal) => new Promise<
 });
 
 /** ffprobe a file on disk; null when ffprobe is unavailable or the file is unreadable. */
-export async function probeFile(path: string): Promise<Probe | null> {
-    const r = await run2("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path]);
+export async function probeFile(path: string, signal?: AbortSignal): Promise<Probe | null> {
+    const r = await run2("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path], signal);
     if (r.code !== 0) return null;
     try {
         const j = JSON.parse(r.out);
@@ -57,8 +57,8 @@ export async function probeFile(path: string): Promise<Probe | null> {
         return { duration: Number.isFinite(d) ? d : null, width: v?.width ?? null, height: v?.height ?? null, hasVideo: !!v, hasAudio: (j.streams ?? []).some((s: any) => s.codec_type === "audio") };
     } catch { return null; }
 }
-export async function probeBuffer(data: Buffer): Promise<Probe | null> {
+export async function probeBuffer(data: Buffer, signal?: AbortSignal): Promise<Probe | null> {
     const dir = mkdtempSync(join(tmpdir(), "milimili-probe-"));
-    try { writeFileSync(join(dir, "m"), data); return await probeFile(join(dir, "m")); } finally { rmSync(dir, { recursive: true, force: true }); }
+    try { writeFileSync(join(dir, "m"), data); return await probeFile(join(dir, "m"), signal); } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 export { run2 as runCmd };

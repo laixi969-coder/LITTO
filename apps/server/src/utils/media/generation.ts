@@ -567,7 +567,9 @@ export async function generateMediaDirect(
     const voice = mediaType === "audio" && request.voiceLineId ? await import("@/utils/media/voiceDecision") : undefined;
     // 同一句在生成和登记期间保持排他，其他角色/台词可并行；此键仅用于进程内锁，不创建文件。
     if (voice) releaseVoice = lockWorkspaceFiles([join(await realpath(cwd), `voiceLine${request.voiceLineId!.replaceAll("-", "")}`)]);
-    const voiceSourceKey = voice ? await voice.assertVoiceSpeechRequest(cwd, request) : undefined;
+    const speech = voice ? await voice.assertVoiceSpeechRequest(cwd, request) : undefined;
+    if (speech) request = speech.request;
+    const voiceSourceKey = speech?.sourceKey;
     if (voice && voiceSourceKey !== undefined) {
       const saved = await voice.readVoiceProject(cwd);
       const line = saved.project.lines.find(line => line.id === request.voiceLineId);

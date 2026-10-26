@@ -228,11 +228,9 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           if (typeof data.sequenceId !== "string" || scope.get("sequences", data.sequenceId)?.projectId !== projectId) throw new Error("序列不属于当前项目");
           if (operation === "readEdit") return api.editView(scope, api.getEdit(scope, data.sequenceId, true));
           const options = api.renderOptionsSchema.parse(data.options ?? {});
-          api.getEdit(scope, data.sequenceId, true);
-          if (!options.draft) api.assertSpeechExport(scope, data.sequenceId);
-          const fingerprint = api.sequenceFingerprint(scope, data.sequenceId);
-          const existing = scope.list("renders", { sequenceId: data.sequenceId }, "created_at DESC").find(render => ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.sourceFingerprint === fingerprint && JSON.stringify(render.manifest?.options) === JSON.stringify(options));
-          return existing ?? api.startRender(tenant.workspaceId, projectId, data.sequenceId, tenant.userId, options);
+          const render = api.startRender(tenant.workspaceId, projectId, data.sequenceId, tenant.userId, options);
+          const completed = await api.waitNleRender(scope, render.id, mediaSignal(signal));
+          return { ...completed, media: completed.mediaId ? api.mediaView(scope.get("media", completed.mediaId)) : null };
         }
         if (operation === "compile") {
           if (data.kind !== "image" && data.kind !== "video" || typeof data.shotId !== "string") throw new Error("须提供 kind 和 shotId");

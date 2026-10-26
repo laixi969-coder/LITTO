@@ -7,7 +7,9 @@ import { log } from "./util.ts";
 import { sweepUploads } from "./routes/extra.ts";
 import { seedSkills } from "./domain/market-seed.ts";
 import { sweepWorkspacePurges } from "./storage.ts";
+import { recoverInterruptedRenders } from "./domain/nle-render.ts";
 
+recoverInterruptedRenders();
 seedProviders();
 seedSkills();
 startWorker();
