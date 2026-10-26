@@ -10,6 +10,7 @@ import { createWorkspaceFfmpeg, getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { recordTextUsage } from "@/utils/usage";
 import { qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
+import reviewSpeech from "./reviewSpeech.json";
 
 export const cameraReviewsSchema = z.array(z.strictObject({
   takeId: z.string().min(1),
@@ -43,29 +44,37 @@ async function readVideo(configured: ReturnType<typeof getConfiguredModel>, byte
   return JSON.parse(text.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, ""));
 }
 
-/** 在任何制作调用前验证真实视频输入；探测片在内存中生成，不登记为项目成果。 */
+/** 在任何制作调用前核对随机画面与语音；探测片在内存中生成，不登记为项目成果。 */
 export async function assertVideoObservation(signal: AbortSignal) {
   const { configured } = videoObservationModel();
   const { tools } = await getStatus();
   if (!tools.ffmpeg.path || tools.ffmpeg.error || !tools.ffprobe.path || tools.ffprobe.error) throw new Error("自动成片需要可用的 FFmpeg 和 FFprobe，请先在设置中配置");
   const colors = randomInt(2) ? ["red", "blue"] : ["blue", "red"];
-  const tones = randomInt(2) ? ["low", "high"] : ["high", "low"];
+  const remainingClips = [...reviewSpeech.clips];
+  const spokenClips = Array.from({ length: 3 }, () => remainingClips.splice(randomInt(remainingClips.length), 1)[0]!);
+  const spokenNumbers = spokenClips.map(clip => clip.number);
+  // ACT: 预置单词 PCM，不要求运行环境安装语音合成器；随机内容只进入音轨，不写入提示词或画面。
+  const pause = Buffer.alloc(Math.round(reviewSpeech.sampleRate * 0.3), 128);
+  const audio = Buffer.concat([pause, ...spokenClips.flatMap(clip => [Buffer.from(clip.samples, "base64"), pause])]);
+  const duration = Math.max(6, Math.ceil(audio.length / reviewSpeech.sampleRate));
   const bytes = await new Promise<Buffer>((resolve, reject) => {
-    const command = spawn(tools.ffmpeg.path!, ["-v", "error", "-filter_complex",
-      `color=c=${colors[0]}:s=64x64:r=4:d=1[first];color=c=${colors[1]}:s=64x64:r=4:d=1[last];[first][last]concat=n=2:v=1:a=0[v];sine=frequency=${tones[0] === "low" ? 220 : 880}:sample_rate=16000:duration=1[low];sine=frequency=${tones[1] === "low" ? 220 : 880}:sample_rate=16000:duration=1[high];[low][high]concat=n=2:v=0:a=1[a]`,
-      "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-bf", "0", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1"],
-    { stdio: ["ignore", "pipe", "pipe"], signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]) });
+    const command = spawn(tools.ffmpeg.path!, ["-v", "error", "-f", "u8", "-ar", String(reviewSpeech.sampleRate), "-ac", "1", "-i", "pipe:0", "-filter_complex",
+      `color=c=${colors[0]}:s=64x64:r=4:d=${duration / 2}[first];color=c=${colors[1]}:s=64x64:r=4:d=${duration / 2}[last];[first][last]concat=n=2:v=1:a=0[v]`,
+      "-map", "[v]", "-map", "0:a", "-c:v", "libx264", "-bf", "0", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "16000", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1"],
+    { stdio: ["pipe", "pipe", "pipe"], signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]) });
     const chunks: Buffer[] = [];
     let error = "";
     command.stdout.on("data", chunk => chunks.push(Buffer.from(chunk)));
     command.stderr.on("data", chunk => { error = `${error}${chunk}`.slice(-2000); });
     command.once("error", reject);
     command.once("close", code => code === 0 ? resolve(Buffer.concat(chunks)) : reject(new Error(`生成声画能力检查短片失败：${error}`)));
+    command.stdin.on("error", reject);
+    command.stdin.end(Buffer.concat([audio, Buffer.alloc(duration * reviewSpeech.sampleRate - audio.length, 128)]));
   });
   let result: unknown;
   try {
     result = await readVideo(configured, bytes, "video/mp4",
-      "完整读取附带短片的动态画面和实际声音。仅返回JSON：{videoRead:boolean,audioRead:boolean,colors:[red|blue,red|blue],tones:[low|high,low|high],note:string}。colors按先后顺序记录两个纯色画面；tones按先后顺序记录低音和高音，画面和声音的先后顺序相互独立；note描述实际听到的声音。无法读取视频或音频须如实填false，不猜测。", "检查附带短片的画面变化和声音。", signal);
+      "完整读取附带视频的动态画面和实际声音。仅返回JSON：{videoRead:boolean,audioRead:boolean,colors:[red|blue,red|blue],spokenNumbers:number[],note:string}。colors按先后顺序记录两个纯色画面；spokenNumbers记录实际听到的三个英语数字，按听到的先后顺序输出阿拉伯数字。数字与画面先后无关，画面中没有数字。无法读取视频或声音须如实返回false，听不清的数字不猜测。note描述实际声画。", "检查附带短片的画面与语音。", signal);
   } catch (error) {
     signal.throwIfAborted();
     const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : 502;
@@ -73,13 +82,13 @@ export async function assertVideoObservation(signal: AbortSignal) {
     throw Object.assign(new Error(`视频审阅模型 ${configured.model.id} ${failure}。已有成果保留，本轮尚未开始制作。原因：${error instanceof Error ? error.message : String(error)}`), { status, cause: error });
   }
   try {
-    const review = z.strictObject({ videoRead: z.boolean(), audioRead: z.boolean(), colors: z.array(z.enum(["red", "blue"])).max(2), tones: z.array(z.enum(["low", "high"])).max(2), note: z.string().trim().min(1) }).parse(result);
+    const review = z.strictObject({ videoRead: z.boolean(), audioRead: z.boolean(), colors: z.array(z.enum(["red", "blue"])).max(2), spokenNumbers: z.array(z.number().int().min(1).max(9)).max(3), note: z.string().trim().min(1).max(2000) }).parse(result);
     if (!review.videoRead) throw new Error(`模型未能读取动态画面：${review.note}`);
     if (!review.audioRead) throw new Error(`模型未能读取视频声音：${review.note}`);
-    if (JSON.stringify(review.colors) !== JSON.stringify(colors) || JSON.stringify(review.tones) !== JSON.stringify(tones)) throw new Error(`未能核对动态画面与声音：${review.note}；画面 ${JSON.stringify(review.colors)} / 预期 ${JSON.stringify(colors)}，声音 ${JSON.stringify(review.tones)} / 预期 ${JSON.stringify(tones)}`);
+    if (JSON.stringify(review.colors) !== JSON.stringify(colors) || JSON.stringify(review.spokenNumbers) !== JSON.stringify(spokenNumbers)) throw new Error(`未能核对动态画面与语音：${review.note}；画面 ${JSON.stringify(review.colors)} / 预期 ${JSON.stringify(colors)}，语音数字 ${JSON.stringify(review.spokenNumbers)} / 预期 ${JSON.stringify(spokenNumbers)}`);
   } catch (error) {
     signal.throwIfAborted();
-    throw Object.assign(new Error(`视频审阅模型 ${configured.model.id} 未通过声画读取检查。请由模型管理员配置支持视频与声音理解的「视频审阅」模型后继续；已有成果保留，本轮尚未开始制作。原因：${error instanceof Error ? error.message : String(error)}`), { status: 422 });
+    throw Object.assign(new Error(`视频审阅模型 ${configured.model.id} 未通过声画核验，请核对审阅连接与返回内容后重试。已有成果保留，本轮尚未开始制作。原因：${error instanceof Error ? error.message : String(error)}`), { status: 422 });
   }
 }
 
