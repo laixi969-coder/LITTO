@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { realpath } from "@toonflow/file";
 import u from "@/utils";
+import { authEnabled } from "@/utils/tenant";
 import { error, success } from "@/lib/responseFormat";
 
 const router = Router();
@@ -11,7 +12,7 @@ const runFile = promisify(execFile);
 export default router.post("/", async (req, res) => {
   const localAddress = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress ?? "") && req.get("x-toonflow-local-client") !== "0";
   const localHost = ["localhost", "127.0.0.1", "[::1]"].includes(req.hostname);
-  const native = process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform) && localAddress && localHost;
+  const native = !authEnabled() && process.env.NODE_ENV === "dev" && ["win32", "darwin"].includes(process.platform) && localAddress && localHost;
   res.set("Cache-Control", "no-store");
   if (!native) return res.json(success({ native: false, directory: null }));
 

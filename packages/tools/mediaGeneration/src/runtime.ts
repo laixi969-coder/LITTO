@@ -206,6 +206,7 @@ export const imageGenerationSchema = z.strictObject({
   }).optional().describe("精修已有镜头关键帧：须同时传 shotId，target 写实际对象和部位。原图作为唯一输入，只生成新候选；先 compile，generate 复用同一请求与指纹。不是蒙版编辑。"),
   purpose: z.enum(["asset", "standalone", "storyboard"]).optional().describe("storyboard 仅用于用户明确要求的多格分镜总览；须继承已有镜头规格和资产参考，拆格后用 importKeyframe 登记各镜候选，不能将整张宫格当作单镜主帧。"),
   size: z.string().trim().min(1).max(64).optional(),
+  quality: z.string().trim().min(1).max(64).optional().describe("图片画质档位（如 high），仅按供应商支持的值传入；与 size 输出尺寸不同。"),
 });
 export const videoGenerationSchema = z.strictObject({
   cameraTrajectory: cameraTrajectorySchema.optional(),

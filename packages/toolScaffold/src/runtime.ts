@@ -153,6 +153,8 @@ export interface MediaGenerationRequest {
   lastFrame?: MediaReference;
   ratio?: string;
   size?: string;
+  /** 图片画质档位，由供应商映射；与输出尺寸分别传递。 */
+  quality?: string;
   resolution?: string;
   duration?: number;
   generateAudio?: boolean;

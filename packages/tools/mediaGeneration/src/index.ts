@@ -113,7 +113,7 @@ const plugin: ToolPlugin = {
       },
     });
     if (media.generateShots && (permissions.allowImage || permissions.allowVideo)) {
-      const schema = z.strictObject({ kind: z.enum(["image", "video"]), requests: z.array(videoGenerationSchema.extend({ shotId: z.string().min(1), size: imageGenerationSchema.shape.size }).omit({ productionFingerprint: true, regenerationId: true })).min(1).max(60) })
+      const schema = z.strictObject({ kind: z.enum(["image", "video"]), requests: z.array(videoGenerationSchema.extend({ shotId: z.string().min(1), size: imageGenerationSchema.shape.size, quality: imageGenerationSchema.shape.quality }).omit({ productionFingerprint: true, regenerationId: true })).min(1).max(60) })
         .refine(input => new Set(input.requests.map(request => request.shotId)).size === input.requests.length, "同批每镜只能提交一次");
       productionTools.push({
         name: "generateShots", label: "批量推进镜头", executionMode: "sequential",
