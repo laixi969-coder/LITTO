@@ -10,7 +10,20 @@ export async function loadProductionSkillContext(cwd: string, tools: Pick<ToolDe
   const music = /\bmv\b|musicFilm|音乐视频|音乐短片|歌曲|演唱|唱跳/i.test(task);
   const advertising = /adfilm|brandFilm|商业广告|广告|品牌片|产品片|带货|\bugc\b|探店|餐厅推广/i.test(task);
   const story = /剧情|剧本|故事|短剧|中剧|电影|story/i.test(task);
-  if (!music && !advertising && !story && !/视频|短片|分镜|人物|角色|场景|道具|生成|制作|继续|接着|这部作品|表演|布光|灯光|光线|妆造|服装|运镜|剪辑|调色|色板|材质|质感|配音|口型|声音|音效|混音|修复|穿帮|漂移|资产|三视图|四视图|打斗|交锋|群战|武打|旅拍|婚礼|旅行|vlog|videoPromptDirector/i.test(task)) return "";
+  const topics = [
+    { match: /人物|角色|表演|对白|对话|演唱|唱跳|反应|演技/, name: "cinema", paths: ["references/performanceDirection.md"] },
+    { match: /资产|角色卡|三视图|四视图|妆造|服装|道具|场景设计/, name: "workflow", paths: ["references/assets.md", "references/methods/visualDesign.md"] },
+    { match: /妆造|服装|换装|妆发|衣装/, name: "workflow", paths: ["references/methods/characterStyling.md"] },
+    { match: /布光|灯光|光线|调色|色板|材质|质感/, name: "workflow", paths: ["references/methods/colorAndLight.md"] },
+    { match: /创意|大纲|编剧|写.*剧本|故事开发/, name: "story", paths: ["references/core-methodology.md"] },
+    { match: /运镜|摄影|构图|机位|俯视|剖面|全景|白模/, name: "cinema", paths: ["references/shotLanguage.md"] },
+    { match: /剖面|全景|白模|空间设计|群像设计/, name: "workflow", paths: ["references/methods/visualDesign.md"] },
+    { match: /打斗|交锋|群战|武打/, name: "cinema", paths: ["references/combatDesign.md"] },
+    { match: /声音|音效|混音|配音|口型|剪辑/, name: "cinema", paths: ["references/coverage.md"] },
+    { match: /分段|接戏|续接|长镜头/, name: "videoPromptDirector", paths: ["references/segmentPlanning.md", "references/wardrobeContinuity.md"] },
+    { match: /修复|穿帮|失败|漂移/, name: "videoPromptDirector", paths: ["references/failureRepair.md"] },
+  ].filter(topic => topic.match.test(task));
+  if (!music && !advertising && !story && !topics.length && !/视频|短片|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|videoPromptDirector/i.test(task)) return "";
 
   const operator = tools.find(tool => tool.name === "skillOperator");
   const actions = (operator?.parameters as { properties?: { action?: { enum?: unknown[] } } } | undefined)?.properties?.action?.enum;
@@ -33,6 +46,8 @@ export async function loadProductionSkillContext(cwd: string, tools: Pick<ToolDe
   if (/旅拍|婚礼|旅行|vlog/i.test(task)) names.push("travelWeddingDirector");
   if (/小清新|自然光|清透色彩/.test(task)) names.push("lightFreshDirector");
   if (/中式园林|月洞门|游廊/.test(task)) names.push("chineseGardenDirector");
+  if (/东方奇境|巨物花木|云上天宫|东方梦境/.test(task)) names.push("orientalEpicDirector");
+  for (const topic of topics) if (!names.includes(topic.name)) names.push(topic.name);
   const available = loadAgentSkills(cwd).skills;
   const context = createSkillContext(cwd);
   const documents: string[] = [];
@@ -47,14 +62,11 @@ export async function loadProductionSkillContext(cwd: string, tools: Pick<ToolDe
     musicfilm: ["references/musicVideoDirection.md"],
     continuity: ["references/shotChecklist.md"],
     travelWeddingDirector: ["references/cameraActionMethods.md"],
+    lightFreshDirector: ["references/lightAndColor.md"],
+    chineseGardenDirector: ["references/spaceAndLight.md"],
+    orientalEpicDirector: ["references/scaleAndStructure.md", "references/dreamSpace.md"],
   };
-  if (/人物|角色|表演|对白|对话|演唱|唱跳|反应|演技/.test(task)) referencePaths.cinema.push("references/performanceDirection.md");
-  if (/资产|角色卡|三视图|四视图|妆造|服装|道具|场景设计/.test(task)) referencePaths.workflow.push("references/assets.md");
-  if (/布光|灯光|光线|调色|色板|材质|质感/.test(task)) referencePaths.workflow.push("references/methods/colorAndLight.md");
-  if (/创意|大纲|编剧|写.*剧本|故事开发/.test(task)) referencePaths.story.push("references/core-methodology.md");
-  if (/打斗|交锋|群战|武打/.test(task)) referencePaths.cinema.push("references/combatDesign.md");
-  if (/声音|音效|混音|配音|口型|剪辑/.test(task)) referencePaths.cinema.push("references/coverage.md");
-  if (/修复|穿帮|失败|漂移/.test(task)) referencePaths.videoPromptDirector.push("references/failureRepair.md");
+  for (const topic of topics) referencePaths[topic.name].push(...topic.paths);
   for (const name of names) {
     const skill = available.find(item => item.name === name);
     if (!skill) { warnings.push(`缺少技能 ${name}`); continue; }
@@ -62,7 +74,7 @@ export async function loadProductionSkillContext(cwd: string, tools: Pick<ToolDe
       warnings.push(`${name} 已关闭自动调用，未加载`);
       continue;
     }
-    for (const path of [undefined, ...(referencePaths[name] ?? [])]) {
+    for (const path of [undefined, ...new Set(referencePaths[name] ?? [])]) {
       try {
         const document = await context.read({ name, path });
         documents.push(`### ${document.name} / ${document.scope} / ${document.path}\n${document.content}`);
