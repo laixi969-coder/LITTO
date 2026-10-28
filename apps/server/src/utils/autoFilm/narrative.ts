@@ -56,11 +56,13 @@ export async function narrativePlan(task: AutoFilmTask) {
   if (revision) issues.push(...narrativeIssues(revision.scenes, shots, revision.id));
   const plan = {
     script: task.script, revision,
+    worlds: scope.list("worlds", { projectId: task.projectId }),
+    looks: scope.list("looks", { projectId: task.projectId }),
     sequences: sequences.map(sequence => ({ id: sequence.id, name: sequence.name, kind: sequence.kind, episodeNumber: sequence.episodeNumber, storyRevisionId: sequence.storyRevisionId })),
     assets: scope.list("assets", { projectId: task.projectId }).map(asset => ({ id: asset.id, name: asset.name, type: asset.type, description: asset.description, attributes: asset.attributes })),
     shots: shots.map(shot => ({
       id: shot.id, sequenceId: shot.sequenceId, ord: shot.ord, title: shot.title, source: shot.source,
-      action: shot.action, performance: shot.performance, blocking: shot.blocking, camera: shot.camera,
+      action: shot.action, performance: shot.performance, blocking: shot.blocking, camera: shot.camera, realism: shot.realism, lighting: shot.lighting, grade: shot.grade,
       creativeBrief: shot.creativeBrief, assetIds: shot.assetIds, visibleAssetIds: shot.visibleAssetIds,
       duration: shot.duration, generationDuration: shot.generationDuration, interactions: shot.interactions,
       continuityFromShotId: shot.continuityFromShotId, intendedStateDelta: shot.intendedStateDelta, musicVideo: shot.musicVideo,
@@ -110,8 +112,9 @@ export async function autoFilmProgress(task: AutoFilmTask) {
         .flatMap(review => review.checks.filter(check => check.verdict !== "pass").map(check => ({ ...check, takeId: review.takeId }))) ?? [];
       const lipSync = playback.lipSyncReviews?.filter(review => review.verdict !== "pass" || !review.faceVisible) ?? [];
       const lipSyncSummary = playback.storyChecks?.lipSync;
-      return camera.length || lipSync.length || lipSyncSummary && lipSyncSummary.verdict !== "pass"
-        ? [{ shotId: shot.id, mediaId: playback.mediaId, camera, lipSync, lipSyncSummary }] : [];
+      const visual = Object.entries(playback.visualChecks ?? {}).filter(([, check]) => check.verdict !== "pass").map(([id, check]) => ({ id, ...check }));
+      return camera.length || lipSync.length || visual.length || lipSyncSummary && lipSyncSummary.verdict !== "pass"
+        ? [{ shotId: shot.id, mediaId: playback.mediaId, camera, lipSync, lipSyncSummary, visual }] : [];
     });
     return { stage: "镜头制作", nextAction: "读取已有任务与素材；repairs 指明失败镜头、口型窗口和运镜检查点，只修对应缺陷并重新观察，复用成功素材，不以改填通过代替修复", repairs,
       issues: unfinished.map(shot => `${shot.id} ${shot.title}：${shot.heroKeyframeId ? "缺少已采用声画视频" : "缺少已采用主帧及声画视频"}`) };
