@@ -17,6 +17,8 @@ export interface AutoFilmPlayback {
   note: string;
   planKey?: string;
   storyKey?: string;
+  observerKey?: string;
+  lipSyncReviews?: ({ id: string; faceVisible: boolean; start: number; end: number } & AutoFilmCheck)[];
   storyChecks?: Record<"narrative" | "performance" | "continuity" | "dialogueCoverage" | "lipSync" | "editing" | "sound", AutoFilmCheck>;
   dialogueReviews?: { id: string; speakerId: string; transcript: string; start: number | null; end: number | null; verdict: "pass" | "revise" | "unverified"; note: string }[];
   cameraReviews?: {

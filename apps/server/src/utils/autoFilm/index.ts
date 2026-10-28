@@ -16,7 +16,7 @@ import { readStoryProject } from "@/utils/story";
 import { getStatus } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { autoFilmScope } from "./scope";
-import { assertVideoObservation, assertStoryObservation, cameraObservationPlan, cameraReviewsSchema, dialogueReviewsSchema, observeVideo, observeVoice, storyChecksSchema, videoObservationModel } from "./observe";
+import { assertVideoObservation, assertStoryObservation, cameraObservationPlan, cameraReviewsSchema, dialogueReviewsSchema, lipSyncReviewsSchema, observeVideo, observeVoice, storyChecksSchema, videoObservationModel } from "./observe";
 import { readVoiceProject } from "@/utils/media/voiceDecision";
 import { mediaHash } from "@/utils/media/lipSync";
 import { speechSourceKey } from "@toonflow/tool-media-generation/voiceProject";
@@ -43,7 +43,7 @@ const stateSchema = z.object({
   narrativeReviews: z.array(narrativeReviewSchema).default([]),
   generationCount: z.number().int().nonnegative(), attempts: z.record(z.string(), z.number().int().nonnegative()),
   toolCalls: z.number().int().nonnegative(), progress: z.string(), error: z.string().optional(),
-  playbacks: z.array(z.object({ mediaId: z.string(), hash: z.string(), note: z.string(), planKey: z.string().optional(), storyKey: z.string().optional(), storyChecks: storyChecksSchema.optional(), dialogueReviews: dialogueReviewsSchema.optional(), cameraReviews: z.array(cameraReviewsSchema.element.extend({ fingerprint: z.string() })).optional() })),
+  playbacks: z.array(z.object({ mediaId: z.string(), hash: z.string(), note: z.string(), planKey: z.string().optional(), storyKey: z.string().optional(), observerKey: z.string().optional(), lipSyncReviews: lipSyncReviewsSchema.optional(), storyChecks: storyChecksSchema.optional(), dialogueReviews: dialogueReviewsSchema.optional(), cameraReviews: z.array(cameraReviewsSchema.element.extend({ fingerprint: z.string() })).optional() })),
   voicePlaybacks: z.array(z.object({ lineId: z.string(), takeId: z.string(), hash: z.string(), sourceKey: z.string(), audioRead: z.boolean(), verdict: z.enum(["pass", "revise", "unverified"]), transcript: z.string(), note: z.string() })).default([]),
   decisions: z.array(z.object({ tool: z.string(), title: z.string(), answer: z.string(), values: choiceSchema.shape.values, reason: z.string() })),
   output: z.object({ renderId: z.string(), sequenceId: z.string(), mediaId: z.string(), url: z.string() }).optional(),
@@ -290,15 +290,17 @@ function launch(task: AutoFilmTask, folder: string) {
         const { api, tenant } = identity(task.directory), media = api.scoped(tenant.workspaceId).get("media", mediaId);
         const cameraPlan = await cameraObservationPlan(task.directory, task.projectId, mediaId, task.sequenceIds);
         const snapshot = await narrativePlan(task);
-        const planKey = createHash("sha256").update(JSON.stringify([2, cameraPlan, snapshot.key, focus])).digest("hex");
+        const observerKey = videoObservationModel().key;
+        const planKey = createHash("sha256").update(JSON.stringify([3, cameraPlan, snapshot.key, focus, observerKey])).digest("hex");
         const saved = task.playbacks.find(item => item.mediaId === mediaId && item.hash === media?.hash && item.planKey === planKey);
         if (saved) return { content: [{ type: "text", text: JSON.stringify(saved) }], details: saved };
-        const key = `observe${createHash("sha256").update(JSON.stringify([mediaId, media?.hash, cameraPlan, snapshot.key, videoObservationModel().key])).digest("hex")}`;
+        const key = `observe${createHash("sha256").update(JSON.stringify([3, mediaId, media?.hash, cameraPlan, snapshot.key, observerKey])).digest("hex")}`;
         if ((task.attempts[key] ?? 0) >= 3) throw new Error("该视频已达到完整审阅尝试上限，请核对模型的视频与声音理解能力");
         task.attempts[key] = (task.attempts[key] ?? 0) + 1;
         task.progress = "正在完整观察视频画面和声音";
         await save();
-        const result = { ...await observeVideo(task.directory, task.id, task.projectId, mediaId, `原稿与全剧分镜（仅核对当前视频覆盖范围；成片核对全部）：${JSON.stringify(snapshot.plan)}\n\n检查目标：${focus}`, signal, cameraPlan), planKey, storyKey: snapshot.key };
+        const result = { ...await observeVideo(task.directory, task.id, task.projectId, mediaId, `原稿与全剧分镜（仅核对当前视频覆盖范围；成片核对全部）：${JSON.stringify(snapshot.plan)}\n\n检查目标：${focus}`, signal, cameraPlan), planKey, storyKey: snapshot.key, observerKey };
+        if (videoObservationModel().key !== observerKey) throw new Error("观察期间审阅模型已更换，请重新观察");
         if ((await narrativePlan(task)).key !== snapshot.key) throw new Error("观察期间叙事分镜已变化，请按当前计划重新观察");
         task.playbacks.push(result);
         await save();

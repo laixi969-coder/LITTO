@@ -98,7 +98,24 @@ export async function autoFilmProgress(task: AutoFilmTask) {
   const speech = shots.flatMap(shot => api.speechPlanningIssues(scope, shot).map(issue => `${shot.id}：${issue}`));
   if (speech.length) return { stage: "对白调度", nextAction: "readVoice 复用候选；采用有效声音、planSpeech 实测，更新动作和对白窗口，再核对分镜", issues: speech };
   const unfinished = shots.filter(shot => !shot.approvedTakeId);
-  if (unfinished.length) return { stage: "镜头制作", nextAction: "读取已有任务与素材，按缺项补关键帧、视频、口型及真实观察，不重新生成成功素材", issues: unfinished.map(shot => `${shot.id} ${shot.title}：${shot.heroKeyframeId ? "缺少已采用声画视频" : "缺少已采用主帧及声画视频"}`) };
+  if (unfinished.length) {
+    const repairs = unfinished.flatMap(shot => {
+      const fingerprint = api.shotFingerprint(scope, shot.id);
+      const takes = scope.list("takes", { shotId: shot.id });
+      const playback = task.playbacks.findLast(item => item.storyKey === snapshot.key
+        && takes.some(take => take.mediaId === item.mediaId && scope.get("media", take.mediaId)?.hash === item.hash
+          && item.cameraReviews?.some(review => review.takeId === take.id && review.fingerprint === fingerprint)));
+      if (!playback) return [];
+      const camera = playback.cameraReviews?.filter(review => takes.some(take => take.id === review.takeId) && review.fingerprint === fingerprint)
+        .flatMap(review => review.checks.filter(check => check.verdict !== "pass").map(check => ({ ...check, takeId: review.takeId }))) ?? [];
+      const lipSync = playback.lipSyncReviews?.filter(review => review.verdict !== "pass" || !review.faceVisible) ?? [];
+      const lipSyncSummary = playback.storyChecks?.lipSync;
+      return camera.length || lipSync.length || lipSyncSummary && lipSyncSummary.verdict !== "pass"
+        ? [{ shotId: shot.id, mediaId: playback.mediaId, camera, lipSync, lipSyncSummary }] : [];
+    });
+    return { stage: "镜头制作", nextAction: "读取已有任务与素材；repairs 指明失败镜头、口型窗口和运镜检查点，只修对应缺陷并重新观察，复用成功素材，不以改填通过代替修复", repairs,
+      issues: unfinished.map(shot => `${shot.id} ${shot.title}：${shot.heroKeyframeId ? "缺少已采用声画视频" : "缺少已采用主帧及声画视频"}`) };
+  }
   const renders = scope.list("renders", { projectId: task.projectId }).filter(render => task.sequenceIds.includes(render.sequenceId));
   return { stage: "剪辑交付", nextAction: "readEdit 核对完整叙事与切点；复用或完成正式 render，inspectFinal、observeAutoFilmVideo、agentReviewFinal、completeAutoFilm", issues: [],
     renders: renders.slice(-10).map(render => ({ id: render.id, sequenceId: render.sequenceId, status: render.status, draft: !!render.manifest?.options?.draft, mediaId: render.mediaId })) };
