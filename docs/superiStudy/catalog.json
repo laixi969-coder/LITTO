@@ -1,0 +1,3658 @@
+{
+  "source": "https://www.super-i.cn/tool.html",
+  "date": "2026-10-26",
+  "totalPages": 24,
+  "scannedPages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "complete": true,
+  "coverageNote": "已遍历学习专区全部分类、搜索为空、默认排序的24页；不声称覆盖商业模式或博主专区的独立目录",
+  "items": [
+    {
+      "id": 3113,
+      "title": "【AI打斗】从零制作打斗 Skill：用一段群战视频完成设计、测试与迭代",
+      "url": "https://www.super-i.cn/info-3113.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3113.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文与ZIP/HTML全部文本、54条讨论已读；三段视频53张样本已看；未完整看听"
+    },
+    {
+      "id": 3109,
+      "title": "【AI角色】上传一个故事，用这个 Skill 做出一整套角色设计",
+      "url": "https://www.super-i.cn/info-3109.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3109.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文和全部文本附件、一张五人群像已读；未生成或验证视频"
+    },
+    {
+      "id": 3101,
+      "title": "【提示词创作第八十七节】拆解《Anerneq》：AI电影真实感的提示词写法",
+      "url": "https://www.super-i.cn/info-3101.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson3101.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "一个15秒片段17张样本已观察；其余影片及声音未完整验收"
+    },
+    {
+      "id": 2909,
+      "title": "【提示词创作第六十七节】AI资产怎么做，画面才稳定？",
+      "url": "https://www.super-i.cn/info-2909.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson2909.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文全文与两张人物板已读；其余插图和视频效果未验收"
+    },
+    {
+      "id": 3112,
+      "title": "【Vibe coding】弹窗还能这样开？质感直接拉满！",
+      "url": "https://www.super-i.cn/info-3112.html",
+      "catalogPage": 1,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "纯网页弹窗动效"
+    },
+    {
+      "id": 3111,
+      "title": "【动画广告】《谁动了我的面霜》AI动画广告制作教程",
+      "url": "https://www.super-i.cn/info-3111.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3111.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "八节正文全读；四图、76.7秒视频29帧；附件与2955一致已核对；未完整看听"
+    },
+    {
+      "id": 3110,
+      "title": "【提示词创作第八十八节】别只给AI一张图：让视频场景更稳定",
+      "url": "https://www.super-i.cn/info-3110.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson3110.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "观察住宅剖面和实际输入截图；未完整播放"
+    },
+    {
+      "id": 3108,
+      "title": "【AI工具】还在为PS付订阅费？免费版直接带走！",
+      "url": "https://www.super-i.cn/info-3108.html",
+      "catalogPage": 1,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3107,
+      "title": "【AI视频】从一张客厅图开始，做出四种 AI 视频氛围",
+      "url": "https://www.super-i.cn/info-3107.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson3107.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文完整与基础/四版光影共5图已读；视频/声音待完整核对"
+    },
+    {
+      "id": 3106,
+      "title": "【AI工具】vibe知识大赏，一句话复刻！",
+      "url": "https://www.super-i.cn/info-3106.html",
+      "catalogPage": 1,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3105,
+      "title": "【AI产品】用 Codex 做运镜，再用 Seedance 2.5 生成产品广告",
+      "url": "https://www.super-i.cn/info-3105.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3105.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "全文、三图、白模15帧/成片23帧；未完整看听，未取得3D工程"
+    },
+    {
+      "id": 3104,
+      "title": "【AI动画】从一个想法到一部 AI 动画短片：《雷公的喷嚏》制作教程",
+      "url": "https://www.super-i.cn/info-3104.html",
+      "catalogPage": 1,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3103,
+      "title": "【AI工具】还在充钱用 AI？这个插件让你用上免费模型",
+      "url": "https://www.super-i.cn/info-3103.html",
+      "catalogPage": 1,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "免费模型渠道与签到插件"
+    },
+    {
+      "id": 3102,
+      "title": "【AI影视】用导演台固定多人站位：从剧本到 AI 短片的完整流程",
+      "url": "https://www.super-i.cn/info-3102.html",
+      "catalogPage": 1,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson3102.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文、三段DOCX及Skill全部文本已读；视频与插图待核对"
+    },
+    {
+      "id": 3100,
+      "title": "【Vibe coding】2 个被抄爆的网页动效，源码直接拿走",
+      "url": "https://www.super-i.cn/info-3100.html",
+      "catalogPage": 1,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "纯前端动效"
+    },
+    {
+      "id": 3099,
+      "title": "【AI广告】运动鞋广告视频制作教程",
+      "url": "https://www.super-i.cn/info-3099.html",
+      "catalogPage": 1,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3098,
+      "title": "【提示词创作第八十六节】从人物拼搭到动作参考，做出有辨识度的AI角色视频",
+      "url": "https://www.super-i.cn/info-3098.html",
+      "catalogPage": 2,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3098.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "7内容图；3独立视频36帧；原舞蹈未逐帧对照；未试听"
+    },
+    {
+      "id": 3097,
+      "title": "【AI影视】没有镜头思路？借电影构图，用自己的角色生成电影感画面",
+      "url": "https://www.super-i.cn/info-3097.html",
+      "catalogPage": 2,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3097.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "14内容图；静态图教程无视频；令牌工作流未访问"
+    },
+    {
+      "id": 3096,
+      "title": "【Vibe coding】8个拉满App质感的动效，让AI复刻同款",
+      "url": "https://www.super-i.cn/info-3096.html",
+      "catalogPage": 2,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "App 界面动效"
+    },
+    {
+      "id": 3092,
+      "title": "【图片生成】新手图片生成入门：模型怎么选、图片怎么做、在哪里用？",
+      "url": "https://www.super-i.cn/info-3092.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3090,
+      "title": "【AI影视】用AI制作冲击帧：让打斗更有力量感",
+      "url": "https://www.super-i.cn/info-3090.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3089,
+      "title": "【提示词创作第八十五节】把普通素材变成有电影感的AI短片",
+      "url": "https://www.super-i.cn/info-3089.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3087,
+      "title": "【飞书自动化】外贸询盘还在手动筛？搭好自动分析，再也不漏单！",
+      "url": "https://www.super-i.cn/info-3087.html",
+      "catalogPage": 2,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "外贸询盘处理"
+    },
+    {
+      "id": 3086,
+      "title": "【动漫CG】从一张2D插画到角色展示PV：我的AI制作流程",
+      "url": "https://www.super-i.cn/info-3086.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3085,
+      "title": "【飞书自动化】用扣子搭 AI 写作线，选题自动成稿",
+      "url": "https://www.super-i.cn/info-3085.html",
+      "catalogPage": 2,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "办公写作自动化"
+    },
+    {
+      "id": 3084,
+      "title": "《和刺猬面对面》提示词怎么写？怎么使用Agent优化提示词？",
+      "url": "https://www.super-i.cn/info-3084.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3082,
+      "title": "【AI影视】从电影色板到 AI 视频：一支医院短片的色彩实验",
+      "url": "https://www.super-i.cn/info-3082.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3081,
+      "title": "【AI产品】客户咨询自动应答，多平台可用",
+      "url": "https://www.super-i.cn/info-3081.html",
+      "catalogPage": 2,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "客服自动应答"
+    },
+    {
+      "id": 3080,
+      "title": "【AI艺术】从静止油画到一镜到底：用Seedance 制作名画动态视频",
+      "url": "https://www.super-i.cn/info-3080.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3079,
+      "title": "【飞书自动化】给飞书一双手，用自然语言操控飞书",
+      "url": "https://www.super-i.cn/info-3079.html",
+      "catalogPage": 2,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "飞书操作自动化"
+    },
+    {
+      "id": 3077,
+      "title": "【CG】用AI制作十二生肖玄幻短片：从Midjourney出图到Seedance 2.5图生视频",
+      "url": "https://www.super-i.cn/info-3077.html",
+      "catalogPage": 2,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3076,
+      "title": "【飞书自动化】发票录入别再手动抄！飞书机器人一键提取票据信息",
+      "url": "https://www.super-i.cn/info-3076.html",
+      "catalogPage": 2,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "票据录入"
+    },
+    {
+      "id": 3048,
+      "title": "【AI影视】巨物感不是把怪兽放大！用山海经穷奇做一条电影级AI巨兽短片",
+      "url": "https://www.super-i.cn/info-3048.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3047,
+      "title": "【AI 工具】零基础把 Claude Code 接上国产大模型",
+      "url": "https://www.super-i.cn/info-3047.html",
+      "catalogPage": 3,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "通用编程助手模型接入"
+    },
+    {
+      "id": 3046,
+      "title": "【提示词创作第八十四节】从《英雄》学色彩：Seedance 2.5文生视频",
+      "url": "https://www.super-i.cn/info-3046.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3045,
+      "title": "【AI运镜】不会复杂运镜？先让GPT 6 Astra在Blender里拍一遍",
+      "url": "https://www.super-i.cn/info-3045.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3042,
+      "title": "【提示词创作第八十三节】 AI人物为什么总是演得太用力？",
+      "url": "https://www.super-i.cn/info-3042.html",
+      "catalogPage": 3,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3042.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "视频未观察"
+    },
+    {
+      "id": 3043,
+      "title": "【小白AI入门课程】第一单元｜AI 图片生成入门",
+      "url": "https://www.super-i.cn/info-3043.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3041,
+      "title": "【AI古风】从图片到视频：制作中式“种田文”古装群像",
+      "url": "https://www.super-i.cn/info-3041.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3044,
+      "title": "【小白AI入门课程】第一单元｜AI 视频生成入门",
+      "url": "https://www.super-i.cn/info-3044.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3075,
+      "title": "【小白AI入门课程】第二单元：图片提示词入门",
+      "url": "https://www.super-i.cn/info-3075.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3078,
+      "title": "【小白AI入门课程】第二单元：视频提示词入门",
+      "url": "https://www.super-i.cn/info-3078.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3038,
+      "title": "【提示词创作第八十二节】AI提示词正在换一种写法：生图、生视频到底该写什么？",
+      "url": "https://www.super-i.cn/info-3038.html",
+      "catalogPage": 3,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3038.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文完整阅读；插图与模型对照视频未核对"
+    },
+    {
+      "id": 3037,
+      "title": "【品牌广告】我用AI制作了一支原创饮料TVC：从产品设定到最终成片",
+      "url": "https://www.super-i.cn/info-3037.html",
+      "catalogPage": 3,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3037.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文、剧本RAR、106轮259条历史全文；20图引用17独立图、4独立视频102帧；音轨未试听，未全程动态验收"
+    },
+    {
+      "id": 3036,
+      "title": "【飞书自动化】法务扛不住全团队合同？飞书机器人，人人签前自查",
+      "url": "https://www.super-i.cn/info-3036.html",
+      "catalogPage": 3,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "合同自查"
+    },
+    {
+      "id": 3088,
+      "title": "【图片生成】Midjourney入门教程 从第一次出图到建立自己的审美档案",
+      "url": "https://www.super-i.cn/info-3088.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3033,
+      "title": "【提示词创作第八十一节】AI长视频真正难的不是提示词，而是这套一致性工作流",
+      "url": "https://www.super-i.cn/info-3033.html",
+      "catalogPage": 3,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3033.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "观察3张插图；3条视频与声音未核对"
+    },
+    {
+      "id": 3035,
+      "title": "【AI设计小白基础课01】：模型、提示词、多模态，到底都是什么？",
+      "url": "https://www.super-i.cn/info-3035.html",
+      "catalogPage": 3,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3032,
+      "title": "【豆包AI影视】先做分镜，再生成视频：一套更稳的 Seedance 2.5 制作流程",
+      "url": "https://www.super-i.cn/info-3032.html",
+      "catalogPage": 4,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3039,
+      "title": "【AI小白设计基础课 02】真正开始用AI做设计，还要懂这些",
+      "url": "https://www.super-i.cn/info-3039.html",
+      "catalogPage": 4,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3031,
+      "title": "【AI 工具】不用复杂配置！WorkBuddy 国产 AI 助手零基础上手",
+      "url": "https://www.super-i.cn/info-3031.html",
+      "catalogPage": 4,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "通用助手安装使用"
+    },
+    {
+      "id": 3049,
+      "title": "【小白入门】Skill到底怎么做？用一个真实案例，讲清楚两种制作方法",
+      "url": "https://www.super-i.cn/info-3049.html",
+      "catalogPage": 4,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3030,
+      "title": "【AI人物】用AI制作动漫角色PV：从人物设计到视频成片",
+      "url": "https://www.super-i.cn/info-3030.html",
+      "catalogPage": 4,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3029,
+      "title": "【飞书自动化】用飞书搭邮件分拣线，来信自动分类归位",
+      "url": "https://www.super-i.cn/info-3029.html",
+      "catalogPage": 4,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "邮件分拣"
+    },
+    {
+      "id": 3028,
+      "title": "【超真实】只用一张人脸图，做出自然的AI微表情特写视频",
+      "url": "https://www.super-i.cn/info-3028.html",
+      "catalogPage": 4,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3028.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "10.1秒视频19张抽样已观察；非完整看听",
+      "evidence": [
+        "正文全文",
+        "视频抽样19张"
+      ]
+    },
+    {
+      "id": 3027,
+      "title": "【提示词创作第八十节】别再手搓提示词了，让AI先学会再帮你写",
+      "url": "https://www.super-i.cn/info-3027.html",
+      "catalogPage": 4,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3026,
+      "title": "【超真实】用图片做一条餐厅推广视频",
+      "url": "https://www.super-i.cn/info-3026.html",
+      "catalogPage": 4,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3026.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "5内容图；1独立37.6秒成片27帧；提示截图部分打码；未试听"
+    },
+    {
+      "id": 3025,
+      "title": "【AI 工具】小白速通 Codex/ChatGPT 安装，接入国产大模型",
+      "url": "https://www.super-i.cn/info-3025.html",
+      "catalogPage": 4,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "通用助手安装与接入"
+    },
+    {
+      "id": 3024,
+      "title": "【超真实】用AI做一支真实感旅行Vlog：从素材准备到Seedance 2.5生成",
+      "url": "https://www.super-i.cn/info-3024.html",
+      "catalogPage": 4,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3024.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "14内容图；1独立成片40帧；未试听；令牌工作流未访问"
+    },
+    {
+      "id": 3013,
+      "title": "【品牌短片】如何用AI制作微软风格宣传片",
+      "url": "https://www.super-i.cn/info-3013.html",
+      "catalogPage": 4,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3012,
+      "title": "【飞书自动化】采购团队新同事：一张图，快速交出供应商报告",
+      "url": "https://www.super-i.cn/info-3012.html",
+      "catalogPage": 4,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "供应商报告"
+    },
+    {
+      "id": 3011,
+      "title": "【AI影视】30秒AI超真实人物对话短片",
+      "url": "https://www.super-i.cn/info-3011.html",
+      "catalogPage": 4,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3011.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "17内容图；1独立成片23取样帧；未试听；工作流令牌未访问"
+    },
+    {
+      "id": 3009,
+      "title": "【提示词创作第七十九节】为什么AI人物总有“假人感”？从人物、场景到行为入手",
+      "url": "https://www.super-i.cn/info-3009.html",
+      "catalogPage": 4,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3009.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "未观察"
+    },
+    {
+      "id": 3008,
+      "title": "【风格化视频】从一张风格板开始：用 AI 完成一条 VOX 科普视频",
+      "url": "https://www.super-i.cn/info-3008.html",
+      "catalogPage": 4,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3007,
+      "title": "【AI影视】Seedance 2.5实战：把30秒一镜到底与参考视频运镜合在一起",
+      "url": "https://www.super-i.cn/info-3007.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3006,
+      "title": "【产品广告】不会写提示词，也能用 MiniMax H3 做产品宣传片",
+      "url": "https://www.super-i.cn/info-3006.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3005,
+      "title": "【提示词创作第七十八节】让AI自动完成一条视频的声音设计",
+      "url": "https://www.super-i.cn/info-3005.html",
+      "catalogPage": 5,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson3005.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "未试听"
+    },
+    {
+      "id": 3004,
+      "title": "【提示词创作第七十七节】Seedance 2.5对比2.0，这次到底升级了什么？",
+      "url": "https://www.super-i.cn/info-3004.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3003,
+      "title": "【AI影视】让AI同时记住11个人的位置",
+      "url": "https://www.super-i.cn/info-3003.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3002,
+      "title": "【品牌美学】用9宫格和深度图做一支AI汽车TVC",
+      "url": "https://www.super-i.cn/info-3002.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3001,
+      "title": "【音频模型】SeedAudio 1.0完整教程：从参考音色到有声剧",
+      "url": "https://www.super-i.cn/info-3001.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3000,
+      "title": "【餐饮品牌】用MiniMax H3做出VOX餐饮短片",
+      "url": "https://www.super-i.cn/info-3000.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2999,
+      "title": "【创意海报】把普通照片变成创意海报：两款图形 Skill",
+      "url": "https://www.super-i.cn/info-2999.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2998,
+      "title": "【提示词创作第七十六节】3种AI创意开场，让普通素材从第一秒变得不同",
+      "url": "https://www.super-i.cn/info-2998.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2997,
+      "title": "【提示词创作第七十五节】别只写提示词，三种条件图让AI生成更可控",
+      "url": "https://www.super-i.cn/info-2997.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2995,
+      "title": "【抖音爆火】从 Midjourney 图片到可灵古风大片",
+      "url": "https://www.super-i.cn/info-2995.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2981,
+      "title": "SD2.5视频四宫格抽卡法｜效率翻倍",
+      "url": "https://www.super-i.cn/info-2981.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2980,
+      "title": "【提示词创作第七十四节】用 AI 创作创意品牌短片的完整方法",
+      "url": "https://www.super-i.cn/info-2980.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2978,
+      "title": "【视频技巧】用深度九宫格控制AI视频：角色、场景与镜头分工",
+      "url": "https://www.super-i.cn/info-2978.html",
+      "catalogPage": 5,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2978.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文全文/19图引用/3独立视频63帧含合成重复；未全程看听"
+    },
+    {
+      "id": 2977,
+      "title": "【提示词创作第七十三节】可灵 O3 与 Seedance 2.0 怎么选？单帧or多模态",
+      "url": "https://www.super-i.cn/info-2977.html",
+      "catalogPage": 5,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2976,
+      "title": "【提示词创作第七十二节】用结构控制AI画面的构图、动作与运镜",
+      "url": "https://www.super-i.cn/info-2976.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2974,
+      "title": "【品牌广告】用 Codex 统筹一支 AI 时尚短片",
+      "url": "https://www.super-i.cn/info-2974.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2973,
+      "title": "《和刺猬面对面》利用Codex制作分镜、创意、skill、脚本",
+      "url": "https://www.super-i.cn/info-2973.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2972,
+      "title": "【IP设计】从2D角色到IP海报：一套可复现的AI视觉设计流程",
+      "url": "https://www.super-i.cn/info-2972.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2971,
+      "title": "【提示词分享】一张图做出梦核校园：Midjourney × 可灵 O3 完整流程",
+      "url": "https://www.super-i.cn/info-2971.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2970,
+      "title": "【品牌短片】《布达佩斯大饭店》的视觉语言：用AI做一支口红品牌短片",
+      "url": "https://www.super-i.cn/info-2970.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2969,
+      "title": "【电商服装】一键复刻爆款服装视频",
+      "url": "https://www.super-i.cn/info-2969.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2967,
+      "title": "【提示词创作第七十一节】从参考图到统一调色：稳定多段 AI 视频的视觉风格",
+      "url": "https://www.super-i.cn/info-2967.html",
+      "catalogPage": 6,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2967.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文已读；插图与实际调色未核对"
+    },
+    {
+      "id": 2966,
+      "title": "【图片技巧】Image 2.0画面优化指南：解决斑点、油腻与纹理失控",
+      "url": "https://www.super-i.cn/info-2966.html",
+      "catalogPage": 6,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2966.md",
+      "mediaStatus": "4张插图已观察；其余未逐张核对",
+      "lastStudied": "2026-10-26",
+      "evidence": [
+        "正文全文",
+        "案例插图4张"
+      ]
+    },
+    {
+      "id": 2964,
+      "title": "【提示词创作第六十九节】从“抽卡”到可控拍片，seedance2.0提示词写法",
+      "url": "https://www.super-i.cn/info-2964.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2962,
+      "title": "【办公提效】让 Codex 连接飞书：从选品调研到运营看板",
+      "url": "https://www.super-i.cn/info-2962.html",
+      "catalogPage": 6,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "飞书调研与运营看板"
+    },
+    {
+      "id": 2955,
+      "title": "【提示词创作第六十九节】一个点子，如何写成能拍的AI短片剧本？",
+      "url": "https://www.super-i.cn/info-2955.html",
+      "catalogPage": 6,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2955.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文六节全读；两GitHub指定文件已读，剩余附件见笔记断点；插图/效果未验证"
+    },
+    {
+      "id": 2923,
+      "title": "【服装电商】50万赞穿搭视频，如何用AI完整复刻？",
+      "url": "https://www.super-i.cn/info-2923.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2922,
+      "title": "【AI打斗】只用角色资产！3套Seedance 2.0打斗提示词",
+      "url": "https://www.super-i.cn/info-2922.html",
+      "catalogPage": 6,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2922.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "11独立内容图；3独立片79帧；未试听"
+    },
+    {
+      "id": 2921,
+      "title": "【风格分享】二步做出上美影×迪士尼的AI图片",
+      "url": "https://www.super-i.cn/info-2921.html",
+      "catalogPage": 6,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2919,
+      "title": "【AI网页】用Codex做一个新中式服装网站",
+      "url": "https://www.super-i.cn/info-2919.html",
+      "catalogPage": 6,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "服装网站搭建"
+    },
+    {
+      "id": 2918,
+      "title": "《和刺猬面对面-AI工作流/AI短剧流程》",
+      "url": "https://www.super-i.cn/info-2918.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2917,
+      "title": "【提示词创作第六十八节】用俯视调度图写 AI 视频提示词",
+      "url": "https://www.super-i.cn/info-2917.html",
+      "catalogPage": 7,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2917.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文/剧本TXT/Skill包5文全文/12图引用/3视频49帧；未全程看听"
+    },
+    {
+      "id": 2916,
+      "title": "【品牌短片】用 AI 制作一支复古服装品牌短片：从参考图到成片剪辑",
+      "url": "https://www.super-i.cn/info-2916.html",
+      "catalogPage": 7,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2916.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文全文/29图引用/2独立视频35帧已看；未全程看听或试听"
+    },
+    {
+      "id": 2915,
+      "title": "【抖音爆火】AI舞蹈复刻教程：从参考视频到原创角色成片",
+      "url": "https://www.super-i.cn/info-2915.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2913,
+      "title": "【抖音爆火】用 AI 复刻爆款宠物短剧：从参考分析到 Seedance 视频生成",
+      "url": "https://www.super-i.cn/info-2913.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2911,
+      "title": "【创意视频】小白也能做！AI生成真人版蜘蛛侠视频教程",
+      "url": "https://www.super-i.cn/info-2911.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2910,
+      "title": "【品牌短片】AI宠物广告完整流程",
+      "url": "https://www.super-i.cn/info-2910.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2907,
+      "title": "【提示词创作第六十六节】镜头角度，才是AI画面的电影感开关",
+      "url": "https://www.super-i.cn/info-2907.html",
+      "catalogPage": 7,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson2907.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文与附件DOCX全文已读；图例未逐一观察；透视另核对厂商来源"
+    },
+    {
+      "id": 2906,
+      "title": "【服装电商】AI电扇换装转场完整教程",
+      "url": "https://www.super-i.cn/info-2906.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2904,
+      "title": "【汽车品牌】如何用AI制作高级棚拍汽车广告",
+      "url": "https://www.super-i.cn/info-2904.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2903,
+      "title": "【电商3C】一组产品图，生成15秒鼠标CG广告",
+      "url": "https://www.super-i.cn/info-2903.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2901,
+      "title": "【提示词创作第六十五节】不用参考图，也能捏出原创AI角色脸",
+      "url": "https://www.super-i.cn/info-2901.html",
+      "catalogPage": 7,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson2901.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文与附件Skill全文已读；图像未逐一观察；布光词另核对厂商来源"
+    },
+    {
+      "id": 2900,
+      "title": "【创意玩法】一张照片，做出游戏截图感",
+      "url": "https://www.super-i.cn/info-2900.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2899,
+      "title": "【提示词创作第六十四节】AI画面想要真实，先学会这5种打光",
+      "url": "https://www.super-i.cn/info-2899.html",
+      "catalogPage": 7,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2899.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文、20套DOC全文与15内容图；ARRI官方手册指定页核术语；静态示例无动态/受控生成验证"
+    },
+    {
+      "id": 2898,
+      "title": "【AI动画】用一张故事板，生成一条AI动画短片",
+      "url": "https://www.super-i.cn/info-2898.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2896,
+      "title": "【AI短剧】AI对话戏老越轴？一张图稳住正反打",
+      "url": "https://www.super-i.cn/info-2896.html",
+      "catalogPage": 7,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2894,
+      "title": "【AI 3D】一张图做出可用3D战甲模型",
+      "url": "https://www.super-i.cn/info-2894.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2893,
+      "title": "【提示词创作第六十三节】怎样生成一套有打击感的 AI 打斗提示词",
+      "url": "https://www.super-i.cn/info-2893.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2892,
+      "title": "【提示词创作第六十二节】不会写提示词？画几根线，也能让 AI 看懂你的画面",
+      "url": "https://www.super-i.cn/info-2892.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2890,
+      "title": "【电商服装】不用拍摄，也能做一周开车穿搭视频",
+      "url": "https://www.super-i.cn/info-2890.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2889,
+      "title": "【情绪短片】从参考视频到成片：用 Codex制作一支高端卫浴情绪短片",
+      "url": "https://www.super-i.cn/info-2889.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2886,
+      "title": "【提示词创作第六十一节】不用死磕长提示词：用 Codex 自动完成任务",
+      "url": "https://www.super-i.cn/info-2886.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2885,
+      "title": "【风格分享】三步做出上美影质感的AI图片",
+      "url": "https://www.super-i.cn/info-2885.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2883,
+      "title": "【创意视频】用AI做一条“机票穿搭转场”视频，全流程拆解 摘要",
+      "url": "https://www.super-i.cn/info-2883.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2881,
+      "title": "【提示词创作第六十节】用空镜讲故事，让AI视频有节奏、有情绪",
+      "url": "https://www.super-i.cn/info-2881.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2880,
+      "title": "【提示词创作第五十九节】让AI短剧真正“活起来”",
+      "url": "https://www.super-i.cn/info-2880.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2867,
+      "title": "【品牌宣传】从小作坊到智能工厂：用AI制作一支家具品牌成长短片",
+      "url": "https://www.super-i.cn/info-2867.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2862,
+      "title": "【提示词创作第五十八节】别再用首尾帧硬接视频了，AI长视频其实要这样做",
+      "url": "https://www.super-i.cn/info-2862.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2859,
+      "title": "【AI短剧】我用 AI 做了一部女频古风短剧，关键不是提示词，而是这套工作流",
+      "url": "https://www.super-i.cn/info-2859.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2858,
+      "title": "【AI视频】用 AI 制作一条企业宣传片：从图片到成片的完整流程",
+      "url": "https://www.super-i.cn/info-2858.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2856,
+      "title": "【AI影视】风骨荒原：东方奇幻世界设定",
+      "url": "https://www.super-i.cn/info-2856.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2851,
+      "title": "【AI短片】用AI做一支30秒日系预告短片，我是这样完成的",
+      "url": "https://www.super-i.cn/info-2851.html",
+      "catalogPage": 8,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2850,
+      "title": "【提示词创作第五十七节】用AI故事板，让视频生成更稳定",
+      "url": "https://www.super-i.cn/info-2850.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2848,
+      "title": "【AI视频】用 AI 做复杂动作视频：从分镜到成片的两种方法",
+      "url": "https://www.super-i.cn/info-2848.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2847,
+      "title": "【提示词创作第五十六节】不用写提示词，也能做出自己的 AI Skill",
+      "url": "https://www.super-i.cn/info-2847.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2845,
+      "title": "【AI视频】分镜逻辑怎么补？用“赶去见人”案例拆解",
+      "url": "https://www.super-i.cn/info-2845.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2843,
+      "title": "【提示词创作第五十五节】用妆造提升AI角色质感",
+      "url": "https://www.super-i.cn/info-2843.html",
+      "catalogPage": 9,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2843.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "DOCX 11节全文；13内容图；1视频10帧；未试听；令牌工作流未访问"
+    },
+    {
+      "id": 2841,
+      "title": "【AI技巧】AI 视频场景不穿帮：4 种保持环境一致的方法",
+      "url": "https://www.super-i.cn/info-2841.html",
+      "catalogPage": 9,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2841.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文/16图引用/5播放器去重4视频42帧；未全程看听"
+    },
+    {
+      "id": 2838,
+      "title": "【提示词创作第五十四节】让AI视频人物动作更自然的提示词写法",
+      "url": "https://www.super-i.cn/info-2838.html",
+      "catalogPage": 9,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2838.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文8章/DOCX15节全文/7图引用/12独立片136帧；未全程看听"
+    },
+    {
+      "id": 2836,
+      "title": "【AI影视】用AI复刻大师镜头：从角色创建到电影感视频生成",
+      "url": "https://www.super-i.cn/info-2836.html",
+      "catalogPage": 9,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2836.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "10内容图；5生成片+5参考片95帧；未试听"
+    },
+    {
+      "id": 2834,
+      "title": "【电商服装】用三张图生成服装工厂宣传视频：3步完整教程",
+      "url": "https://www.super-i.cn/info-2834.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2832,
+      "title": "【提示词创作第五十三节】让AI人物更像真人的关键，不是脸，而是“有事可做”",
+      "url": "https://www.super-i.cn/info-2832.html",
+      "catalogPage": 9,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson2832.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文重读；九条媒体共72张抽样（此前22+本轮50），未完整看听"
+    },
+    {
+      "id": 2829,
+      "title": "【提示词创作第五十二节】告别低效反推：掌握“画面结构拆解法”",
+      "url": "https://www.super-i.cn/info-2829.html",
+      "catalogPage": 9,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson2829.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "两张实际输入/生成图与15.1秒视频12张时序样本；未完整看听"
+    },
+    {
+      "id": 2803,
+      "title": "【创意视频】硬核拆解百万赞神作：用AI复刻《丧尸清道夫》全流程实录",
+      "url": "https://www.super-i.cn/info-2803.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2801,
+      "title": "【电商设计】从零到整套落地：AI全流程制作亚马逊产品头图教程",
+      "url": "https://www.super-i.cn/info-2801.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2799,
+      "title": "【UI设计】一张图用AI做App：从柴犬照片到全套品牌UI界面",
+      "url": "https://www.super-i.cn/info-2799.html",
+      "catalogPage": 9,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "App UI 设计"
+    },
+    {
+      "id": 2797,
+      "title": "【提示词创作第五十一节】告别“NPC感”：三步重塑AI视频角色演技",
+      "url": "https://www.super-i.cn/info-2797.html",
+      "catalogPage": 9,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2797.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "5内容图含声音表；6视频67帧；未试听"
+    },
+    {
+      "id": 2796,
+      "title": "【AI入门】AI 小白工具入门教程：从聊天、出图到视频创作",
+      "url": "https://www.super-i.cn/info-2796.html",
+      "catalogPage": 9,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2794,
+      "title": "【提示词创作第五十节】告别无效指令：AI视频提示词优化的三大核心法则",
+      "url": "https://www.super-i.cn/info-2794.html",
+      "catalogPage": 10,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2794.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "5内容图；8独立视频75帧；未试听"
+    },
+    {
+      "id": 2793,
+      "title": "【提示词创作第四十九节】赋予AI角色“活人感”的3个核心提示词法则",
+      "url": "https://www.super-i.cn/info-2793.html",
+      "catalogPage": 10,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2793.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "7内容图；5视频46帧；未试听"
+    },
+    {
+      "id": 2792,
+      "title": "【电商3c】零基础AI视频教程：实战制作挂脖风扇广告",
+      "url": "https://www.super-i.cn/info-2792.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2790,
+      "title": "【电商赋能】AI视频复刻全攻略：轻松搞定TVC与UGC",
+      "url": "https://www.super-i.cn/info-2790.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2788,
+      "title": "【电商3C】AI全流程解析：如何制作高质量泰式反转广告",
+      "url": "https://www.super-i.cn/info-2788.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2786,
+      "title": "【企业宣传片】用AI制作一支150s人文科技宣传片",
+      "url": "https://www.super-i.cn/info-2786.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2785,
+      "title": "【提示词创作第四十八节】如何控制 AI 角色的语气、语速和音色？",
+      "url": "https://www.super-i.cn/info-2785.html",
+      "catalogPage": 10,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2785.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "4内容图；7视频49帧；核心音轨未试听"
+    },
+    {
+      "id": 2783,
+      "title": "【品牌】企业二十四节气海报AI工作流",
+      "url": "https://www.super-i.cn/info-2783.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2781,
+      "title": "【创意玩法第六节】Image 2.0与即梦Seedance 2.0的视觉进阶全案教程",
+      "url": "https://www.super-i.cn/info-2781.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2780,
+      "title": "【电商3C】 image2.0 详情页3.0全新工作流， 一个人干翻整个设计部",
+      "url": "https://www.super-i.cn/info-2780.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2778,
+      "title": "【电商视频】AI 爆款短视频裂变教程：从选品到生成的高阶标准化工作流",
+      "url": "https://www.super-i.cn/info-2778.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2777,
+      "title": "【品牌运营逻辑—理论篇 第四节】流量运营逻辑",
+      "url": "https://www.super-i.cn/info-2777.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2776,
+      "title": "【品牌运营逻辑—理论篇 第三节】流量终局",
+      "url": "https://www.super-i.cn/info-2776.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2775,
+      "title": "【品牌运营逻辑—理论篇 第二节】品牌运营逻辑",
+      "url": "https://www.super-i.cn/info-2775.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2774,
+      "title": "【品牌运营逻辑—理论篇 第一节】开篇",
+      "url": "https://www.super-i.cn/info-2774.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2772,
+      "title": "【提示词分享】 Image 2 来了！ Image 2提示词分享",
+      "url": "https://www.super-i.cn/info-2772.html",
+      "catalogPage": 10,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2771,
+      "title": "【提示词创作第四十七节】AI光影重构大师课：从提示词逻辑到后期精准控制",
+      "url": "https://www.super-i.cn/info-2771.html",
+      "catalogPage": 11,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2771.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文/16图引用含13内容图和嵌文已读；无视频/附件/新生成"
+    },
+    {
+      "id": 2769,
+      "title": "【创意视频】零基础AI视频教程：5步打造K-pop女团舞蹈MV",
+      "url": "https://www.super-i.cn/info-2769.html",
+      "catalogPage": 11,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2769.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文全读，21图引用（4标识17内容），两视频hash相同只计1条24.775秒成片21帧；未试听"
+    },
+    {
+      "id": 2767,
+      "title": "【创意视频】用AI制作专属猫咪Vlog的保姆级图文教程",
+      "url": "https://www.super-i.cn/info-2767.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2765,
+      "title": "【电商带货】三步构建AI宠物带货视频工作流",
+      "url": "https://www.super-i.cn/info-2765.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2763,
+      "title": "【提示词创作第四十六节】精准掌控画面人物比例",
+      "url": "https://www.super-i.cn/info-2763.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2761,
+      "title": "【AI短视频】AI零基础打造工厂老板IP",
+      "url": "https://www.super-i.cn/info-2761.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2759,
+      "title": "【自媒体赋能】实拍结合AI：零成本搭建随意变换的视频影棚",
+      "url": "https://www.super-i.cn/info-2759.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2757,
+      "title": "【提示词创作第四十五节】玩转AI空间控制：告别人物乱放，精准掌控角色站位",
+      "url": "https://www.super-i.cn/info-2757.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2754,
+      "title": "【TVC广告】Ai帮我拍了一支‘蓝色青春’宝矿力广告",
+      "url": "https://www.super-i.cn/info-2754.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2753,
+      "title": "【AI漫剧】彻底解决AI场景一致性，720全景图“虚拟影棚”取景",
+      "url": "https://www.super-i.cn/info-2753.html",
+      "catalogPage": 11,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2753.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文/14图引用/3全景查看视频44帧；人物仅静态融合，未全程看听"
+    },
+    {
+      "id": 2751,
+      "title": "【创作技巧】利用 Seedance 2.0 零基础制作专属 Logo MG 动画",
+      "url": "https://www.super-i.cn/info-2751.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2747,
+      "title": "【电商3C】高质感3C数码海报生成指南：用AI掌握逆光剪影美学",
+      "url": "https://www.super-i.cn/info-2747.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2750,
+      "title": "【提示词创作第四十四节】从“盲盒改图”到“像素级操控”：AI视觉标注与精准修正",
+      "url": "https://www.super-i.cn/info-2750.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2745,
+      "title": "【创作技巧】Blender + Seedance 2.0 打造完美汽车运镜",
+      "url": "https://www.super-i.cn/info-2745.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2743,
+      "title": "【提示词分享】上美影风格",
+      "url": "https://www.super-i.cn/info-2743.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2740,
+      "title": "【提示词创作第四十三节】如何彻底解决产品画面不一致的致命难题？",
+      "url": "https://www.super-i.cn/info-2740.html",
+      "catalogPage": 11,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2738,
+      "title": "AI赋能自媒体：5个AI视频玩法与实操全解析",
+      "url": "https://www.super-i.cn/info-2738.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2736,
+      "title": "【创意玩法第五节】Higgsfield情绪板：三步精准复刻AI绘画风格",
+      "url": "https://www.super-i.cn/info-2736.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2735,
+      "title": "三维扫描 - Formbuilder品牌短片",
+      "url": "https://www.super-i.cn/info-2735.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2732,
+      "title": "【电商3c】零基础用AI批量生成高转化产品卖点海报",
+      "url": "https://www.super-i.cn/info-2732.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2729,
+      "title": "【创新玩法第四节】运动镜头不穿帮：横屏视频无损转竖屏图文教程",
+      "url": "https://www.super-i.cn/info-2729.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2728,
+      "title": "【提示词创作第四十二节】告别生硬替换：AI视频与图像局部元素的融合指南",
+      "url": "https://www.super-i.cn/info-2728.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2726,
+      "title": "【创意视频】一镜到底，炫酷吸睛！数码产品爆炸图视频全流程教学",
+      "url": "https://www.super-i.cn/info-2726.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2721,
+      "title": "【电商数码】用 Gemini 自动化生成 Seedance 2.0 产品 CG 大片",
+      "url": "https://www.super-i.cn/info-2721.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2718,
+      "title": "【提示词创作第四十一节】深度解析“大透视”空间感与实拍级镜头美学",
+      "url": "https://www.super-i.cn/info-2718.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2717,
+      "title": "【创新玩法第三节】让任意视频秒变电影级“黄金时刻”！",
+      "url": "https://www.super-i.cn/info-2717.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2716,
+      "title": "【电商3C】告别杂乱拼凑！AI 多产品商业级组合场景工作流完全指南",
+      "url": "https://www.super-i.cn/info-2716.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2714,
+      "title": "【创意玩法第二节】60秒看懂21种神仙排版！附全套AI提示词",
+      "url": "https://www.super-i.cn/info-2714.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2711,
+      "title": "【电商3C】视觉张力拉满！一键直出“大透视”产品海报",
+      "url": "https://www.super-i.cn/info-2711.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2710,
+      "title": "【提示词创作第四十节】AI 视频生成机制解析：反向提示词策略与空间坐标系构建",
+      "url": "https://www.super-i.cn/info-2710.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2707,
+      "title": "【创意玩法第一节】告别“滤镜思维”：用AI还原真实Riso印刷级高级设计感",
+      "url": "https://www.super-i.cn/info-2707.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2705,
+      "title": "【品牌CG】我用AI把新一代小米SU7开到了圣托里尼",
+      "url": "https://www.super-i.cn/info-2705.html",
+      "catalogPage": 12,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2700,
+      "title": "【品牌视觉】用AI微观图形，5分钟复制顶级“专业高级感”",
+      "url": "https://www.super-i.cn/info-2700.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2692,
+      "title": "【创意美学】0基础教你用AI制作“喜鹊谋杀案风”城市宣传片",
+      "url": "https://www.super-i.cn/info-2692.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2690,
+      "title": "【提示词创作第三十九节】告别塑料AI味！两大前景遮挡神技，一键解锁电影感",
+      "url": "https://www.super-i.cn/info-2690.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2686,
+      "title": "【3D漫剧】告别“开盲盒”！AI 3D漫剧角色极速资产化工作流",
+      "url": "https://www.super-i.cn/info-2686.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2684,
+      "title": "【品牌美学】别再逐帧手绘了！25秒搞定Rotoscope涂鸦特效",
+      "url": "https://www.super-i.cn/info-2684.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2683,
+      "title": "【品牌美学】拒绝复杂提示词！一键搞定超吸睛90s/Y2K千禧风大片",
+      "url": "https://www.super-i.cn/info-2683.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2680,
+      "title": "【提示词创作第三十八节】如何不用提示词给画面调色？ - HEX调色法",
+      "url": "https://www.super-i.cn/info-2680.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2679,
+      "title": "【提示词创作第三十七节】90%的人踩坑：AI视频多角色失控？3个技巧拿捏！",
+      "url": "https://www.super-i.cn/info-2679.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2677,
+      "title": "【品牌服装】4步复刻商业级大地色服装大片",
+      "url": "https://www.super-i.cn/info-2677.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2674,
+      "title": "【提示词创作第三十六节】打破AI摆拍感：3个情绪蒙太奇技巧",
+      "url": "https://www.super-i.cn/info-2674.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2671,
+      "title": "【提示词创作第三十五节】别再死磕“大片感”！3个高级思路，重塑你的AI想象力",
+      "url": "https://www.super-i.cn/info-2671.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2670,
+      "title": "【创意美学】抖音超火的3D跑酷爽片怎么做？MJ+即梦Seedance2.0全流程",
+      "url": "https://www.super-i.cn/info-2670.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2668,
+      "title": "【电商服装】拒绝假人感！AI一键复刻爆款UGC对镜自拍视频",
+      "url": "https://www.super-i.cn/info-2668.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2666,
+      "title": "【品牌美学】质感再造：如何用 AI 工作流将平面图像转化为逼真的十字绣动画",
+      "url": "https://www.super-i.cn/info-2666.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2663,
+      "title": "【品牌CG】用AI打造阿迪达斯鞋子CG",
+      "url": "https://www.super-i.cn/info-2663.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2657,
+      "title": "【电商服装】用Lovart对话流，一键复刻4款穿搭海报",
+      "url": "https://www.super-i.cn/info-2657.html",
+      "catalogPage": 13,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2655,
+      "title": "【提示词创作第三十四节】告别工具人：3招掌握AI视频导演思维",
+      "url": "https://www.super-i.cn/info-2655.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2652,
+      "title": "【提示词创作第三十三节】3个维度彻底讲透镜头情绪匹配",
+      "url": "https://www.super-i.cn/info-2652.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2651,
+      "title": "【提示词分享】Nano Banana Pro 提示词玩法分享",
+      "url": "https://www.super-i.cn/info-2651.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2649,
+      "title": "【电商服装】Seedance 2.0 服装视频全攻略｜5种风格从0到1制作指南",
+      "url": "https://www.super-i.cn/info-2649.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2647,
+      "title": "【提示词创作第三十二节】告别AI“塑料感”：3个底层，赋予画面电影级“氛围感”",
+      "url": "https://www.super-i.cn/info-2647.html",
+      "catalogPage": 14,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2647.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "17独立内容图；无视频"
+    },
+    {
+      "id": 2646,
+      "title": "【电商服装】即梦Seedance2.0太强了！一张图生成丝滑变装视频",
+      "url": "https://www.super-i.cn/info-2646.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2644,
+      "title": "【提示词创作第三十一节】告别“抽卡”玄学：三步法让AI精准复刻你脑中的画面",
+      "url": "https://www.super-i.cn/info-2644.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2643,
+      "title": "【电商服装】全网首发！AI黑衣人“赛博试衣”工作流",
+      "url": "https://www.super-i.cn/info-2643.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2642,
+      "title": "【商业广告】当服装遇上马年，AI一键搞定服装广告大片",
+      "url": "https://www.super-i.cn/info-2642.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2640,
+      "title": "【电商服装】AI 服装营销全链路：从 0 到 1 复刻爆款 UGC 穿搭视频工作流",
+      "url": "https://www.super-i.cn/info-2640.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2638,
+      "title": "【提示词创作第三十节】拒绝“盲盒式”烧钱：3招教你榨干AI废片的每一滴价值",
+      "url": "https://www.super-i.cn/info-2638.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2637,
+      "title": "【提示词创作第二十九节】AI微表情的精准控制心法",
+      "url": "https://www.super-i.cn/info-2637.html",
+      "catalogPage": 14,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2637.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "7页DOC全文；3图；9独立视频85帧；未试听"
+    },
+    {
+      "id": 2634,
+      "title": "【提示词创作第二十八节】AI视频生成的“降维打击”：从动作清单到状态流",
+      "url": "https://www.super-i.cn/info-2634.html",
+      "catalogPage": 14,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2634.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "6内容图；7独立视频69帧；未试听"
+    },
+    {
+      "id": 2633,
+      "title": "【提示词创作第二十七节】如何用AI反向破译你脑海中的画面？",
+      "url": "https://www.super-i.cn/info-2633.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2632,
+      "title": "【提示词创作第二十六节】告别“AI味”：用三大构图原则重塑画面叙事感",
+      "url": "https://www.super-i.cn/info-2632.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2630,
+      "title": "【电商服装】一张图都没拍？我用 AI 做了整套拓路者冲锋衣详情页",
+      "url": "https://www.super-i.cn/info-2630.html",
+      "catalogPage": 14,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2628,
+      "title": "【电商品牌】从0到1打造「Cozy Kitizen」高级感宠物品牌全案",
+      "url": "https://www.super-i.cn/info-2628.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2625,
+      "title": "【电商服装】不仅是换装：教你用 AI 生成连贯、真实的口播视频",
+      "url": "https://www.super-i.cn/info-2625.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2623,
+      "title": "【电商服装】从零构建 Nike x Super-i 商业概念短片",
+      "url": "https://www.super-i.cn/info-2623.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2621,
+      "title": "【提示词创作第二十五节】环境决定真实：打破AI绘图的“塑料感”魔咒",
+      "url": "https://www.super-i.cn/info-2621.html",
+      "catalogPage": 15,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2621.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "19内容图；无视频"
+    },
+    {
+      "id": 2620,
+      "title": "【提示词创作第二十四节】AI视频一致性完全攻略：告别“抽卡”",
+      "url": "https://www.super-i.cn/info-2620.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2619,
+      "title": "【FlowPix】提示词即创意，工作流即未来",
+      "url": "https://www.super-i.cn/info-2619.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2617,
+      "title": "【电商服装】一张图裂变 9 种硬核户外场景，解决电商摄影痛点",
+      "url": "https://www.super-i.cn/info-2617.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2616,
+      "title": "【影视制作】用AI工作流制作童话小剧场《卖火柴的小女孩》",
+      "url": "https://www.super-i.cn/info-2616.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2614,
+      "title": "【电商服装】“低头杀+对镜拍” 电商爆款视频素材",
+      "url": "https://www.super-i.cn/info-2614.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2611,
+      "title": "【提示词创作第二十三节】告别“AI塑料感”——数据驱动型电影级调色实战指南",
+      "url": "https://www.super-i.cn/info-2611.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2610,
+      "title": "【提示词创作第二十二节】拒绝“看图说话”：AI视频反推的真正逻辑—运动学解构",
+      "url": "https://www.super-i.cn/info-2610.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2609,
+      "title": "【实用教程】零成本打造“像真人一样”的知识博主数字人！",
+      "url": "https://www.super-i.cn/info-2609.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2607,
+      "title": "【电商美妆】这不是真人！AI生成的UGC视频已经进化到这个地步了？",
+      "url": "https://www.super-i.cn/info-2607.html",
+      "catalogPage": 15,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "priorEvidence": "上一阶段已读正文并有概览；本阶段待逐篇深化",
+      "note": "lessons/lesson2607.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "五张关键帧界面、剪辑图、39秒成片20时序+8接点样本；未完整看听"
+    },
+    {
+      "id": 2604,
+      "title": "【提示词创作第二十一节】告别AI视频“摆拍感”：用运镜逻辑重塑真实影像",
+      "url": "https://www.super-i.cn/info-2604.html",
+      "catalogPage": 15,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2604.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文、6内容图、3条5秒视频46抽样（各10+奔跑密集16）；未全程看听，评论2视频另记未看"
+    },
+    {
+      "id": 2603,
+      "title": "【提示词创作第二十节】室内光线的终极逻辑：打破“塑料廉价感”的三大核心法则",
+      "url": "https://www.super-i.cn/info-2603.html",
+      "catalogPage": 15,
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "note": "lessons/lesson2603.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文及4图全读；ARRI第9页及PBRT漫反射定义核对；无模型机制/控制实验依据"
+    },
+    {
+      "id": 2602,
+      "title": "【品牌美学】荒诞无尽夏：AI 艺术创作揭秘",
+      "url": "https://www.super-i.cn/info-2602.html",
+      "catalogPage": 15,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2598,
+      "title": "【电商服装】AI视频流拆解：一件单品如何自动裂变出4种爆款生活方式？",
+      "url": "https://www.super-i.cn/info-2598.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2597,
+      "title": "【提示词创作第十九节】参考图的“降维”逻辑：如何彻底告别“盲目抽卡”？",
+      "url": "https://www.super-i.cn/info-2597.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2593,
+      "title": "【电商服装】AI全自动：一张白底图，裂变10条电商广告片",
+      "url": "https://www.super-i.cn/info-2593.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2591,
+      "title": "【提示词创作十八节】2026年了，为什么你的Midjourney人像依然“油腻”？",
+      "url": "https://www.super-i.cn/info-2591.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2590,
+      "title": "【电商服装】电商黑科技：素人种草视频全自动生成流",
+      "url": "https://www.super-i.cn/info-2590.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2587,
+      "title": "【电商美妆】一张图生成三套情人节营销大片",
+      "url": "https://www.super-i.cn/info-2587.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2586,
+      "title": "【提示词创作第十七节】风格即选择：AI画面风格提取三步法",
+      "url": "https://www.super-i.cn/info-2586.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2583,
+      "title": "【提示词创作第十六节】拒绝“抽卡式”反推：教你像AI架构师一样拆解画面",
+      "url": "https://www.super-i.cn/info-2583.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2580,
+      "title": "【电商服装工作流】AI 批量制作 Plog 图文",
+      "url": "https://www.super-i.cn/info-2580.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2578,
+      "title": "【电商服装工作流】0成本！一键量产服装电商主图",
+      "url": "https://www.super-i.cn/info-2578.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2575,
+      "title": "【提示词分享】有机理有手感的插画",
+      "url": "https://www.super-i.cn/info-2575.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2574,
+      "title": "【提示词创作第十五节】打破“代码迷信”：JSON 提示词的真正威力与三大误区",
+      "url": "https://www.super-i.cn/info-2574.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2570,
+      "title": "【提示词创作第十四节】进阶！三个步骤教你正确掌握AI的json生图",
+      "url": "https://www.super-i.cn/info-2570.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2566,
+      "title": "【提示词创作第十三节】打破“AI塑料感”—利用“假因果”赋予画面叙事灵魂",
+      "url": "https://www.super-i.cn/info-2566.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2564,
+      "title": "【电商服装工作流】一张图+AI，一键生成Ins风氛围感平铺穿搭",
+      "url": "https://www.super-i.cn/info-2564.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2554,
+      "title": "【电商服装工作流】如何用一张单品图批量生成高品质Lookbook",
+      "url": "https://www.super-i.cn/info-2554.html",
+      "catalogPage": 16,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2551,
+      "title": "网页开屏Banner升级：从抽象线条到IP联动的视觉进化",
+      "url": "https://www.super-i.cn/info-2551.html",
+      "catalogPage": 17,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "网页开屏 Banner"
+    },
+    {
+      "id": 2550,
+      "title": "【提示词分享】多种风格提示词分享",
+      "url": "https://www.super-i.cn/info-2550.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2547,
+      "title": "【电商服装工作流】告别昂贵外模：3 步实现“人、货、场”自动化生成",
+      "url": "https://www.super-i.cn/info-2547.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2546,
+      "title": "【品牌美学】剪贴画风格创作提示词",
+      "url": "https://www.super-i.cn/info-2546.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2544,
+      "title": "【电商服装工作流】AI设计不求人：版型+纹样自由组合，3分钟出图！",
+      "url": "https://www.super-i.cn/info-2544.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2541,
+      "title": "【电商服装工作流】你的专属时尚摄影棚：一键生成黑底闪光灯大片",
+      "url": "https://www.super-i.cn/info-2541.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2540,
+      "title": "【品牌美学】用AI 工具为咖啡品牌制作宣传广告",
+      "url": "https://www.super-i.cn/info-2540.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2535,
+      "title": "【品牌美学】人人都是好莱坞导演： 掌控光影与镜头语言",
+      "url": "https://www.super-i.cn/info-2535.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2533,
+      "title": "【品牌美学工作流】从白底图到商用大片：工业产品 Banner 标准化工作流",
+      "url": "https://www.super-i.cn/info-2533.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2530,
+      "title": "【电商服装】电商黑科技Keevx实测：输入链接=产出视频？亲测有效！",
+      "url": "https://www.super-i.cn/info-2530.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2528,
+      "title": "【品牌美学】一键复刻：超燃漫画风视觉形象生成攻略",
+      "url": "https://www.super-i.cn/info-2528.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2526,
+      "title": "【品牌CG】0成本做CG？一张草图搞定小米15 Ultra大片",
+      "url": "https://www.super-i.cn/info-2526.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2524,
+      "title": "【电商服装工作流】一张白底图搞定种草视频？这个工作流太香了",
+      "url": "https://www.super-i.cn/info-2524.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2521,
+      "title": "【提示词创作第十二节】驾驭AI的“幻觉链反应”—如何将误读转化为创造力",
+      "url": "https://www.super-i.cn/info-2521.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2520,
+      "title": "【创意视频】从照片到动漫MV，我用这套AI工作流搞定了老板的婚礼视频。",
+      "url": "https://www.super-i.cn/info-2520.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2516,
+      "title": "【品牌工作流】如何用一张图搭建完整的品牌体系",
+      "url": "https://www.super-i.cn/info-2516.html",
+      "catalogPage": 17,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2515,
+      "title": "【提示词创作第十一节】学!如何用“时间词“强行带出ai情绪与动态",
+      "url": "https://www.super-i.cn/info-2515.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2513,
+      "title": "【电商服装工作流】上传一张图，自动生成高转化电商详情页！",
+      "url": "https://www.super-i.cn/info-2513.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2511,
+      "title": "【品牌美学】Nike看了都想打钱？揭秘我的AI梦核视频",
+      "url": "https://www.super-i.cn/info-2511.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2509,
+      "title": "【提示词创作第十节】特征塌陷：AI绘画的“失控”美学与情绪掌控指南",
+      "url": "https://www.super-i.cn/info-2509.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2508,
+      "title": "【电商服装工作流】5分钟内搞定全套圣诞营销物料",
+      "url": "https://www.super-i.cn/info-2508.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2493,
+      "title": "【提示词创作第九节】打破平面魔咒：利用“伪透视”欺骗 AI 视觉系统",
+      "url": "https://www.super-i.cn/info-2493.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2492,
+      "title": "【电商服装工作流】海外ins 0成本搞定“买家秀”",
+      "url": "https://www.super-i.cn/info-2492.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2465,
+      "title": "【电商服装】做服装种草还在愁没模特？AI一键生成‘会说话’的博主，太逼真了！",
+      "url": "https://www.super-i.cn/info-2465.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2464,
+      "title": "【提示词创作第八节】：鲁棒性破坏：掌控AI的“可控失控感”",
+      "url": "https://www.super-i.cn/info-2464.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2463,
+      "title": "【提示词创作第七节】：你需要学会再提示词里“剪词”",
+      "url": "https://www.super-i.cn/info-2463.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2462,
+      "title": "【品牌美学】用 AI 做古驰广告？tiktok视频全流程",
+      "url": "https://www.super-i.cn/info-2462.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2449,
+      "title": "【提示词创作第六节】：小白必看——如何利用“扰动词”控制 AI 生图？",
+      "url": "https://www.super-i.cn/info-2449.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2435,
+      "title": "【品牌美学】AI 太香了！不用摄影师，做 Nike 爆款视频",
+      "url": "https://www.super-i.cn/info-2435.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2433,
+      "title": "【提示词创作第五节】：利用“误解机制”反向控制画质——越禁止，越真实",
+      "url": "https://www.super-i.cn/info-2433.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2420,
+      "title": "【电商3C】单人日更商业级音箱切片：Sora2 + 剪映标准化流程",
+      "url": "https://www.super-i.cn/info-2420.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2405,
+      "title": "【电商3C】想做产品宣传却缺设备？漫步者音箱 AI 视频教程：免费工具也能出精品",
+      "url": "https://www.super-i.cn/info-2405.html",
+      "catalogPage": 18,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2392,
+      "title": "【品牌CG】商业级音箱 CG 视频教程，AI 工具组合实操指南",
+      "url": "https://www.super-i.cn/info-2392.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2377,
+      "title": "【提示词创作第四节】：模拟真实设备与纪实瞬间 —— 让 AI 学会“抓拍”",
+      "url": "https://www.super-i.cn/info-2377.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2362,
+      "title": "Gemini 3.0 降维打击：零代码手搓时尚网站",
+      "url": "https://www.super-i.cn/info-2362.html",
+      "catalogPage": 19,
+      "status": "excluded",
+      "relevance": "excluded",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法",
+      "exclusionReason": "时尚网站搭建"
+    },
+    {
+      "id": 2333,
+      "title": "【电商3C】从提示词到成品：漫步者音箱 AI 详情页教程",
+      "url": "https://www.super-i.cn/info-2333.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2331,
+      "title": "【创意视频】打造 “燃炸全场” 的网球创意视频教程",
+      "url": "https://www.super-i.cn/info-2331.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1456,
+      "title": "品牌提升水果饮料宣传视频",
+      "url": "https://www.super-i.cn/info-1456.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2311,
+      "title": "【电商服装】LV 手袋-用 AI 工具链，我们交付了商业级成片",
+      "url": "https://www.super-i.cn/info-2311.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2291,
+      "title": "【电商家居】超强一致性！你也能出宜家官方级商业宣传图",
+      "url": "https://www.super-i.cn/info-2291.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2290,
+      "title": "【提示词创作第三节】：掌控相机角度让 AI 理解“怎么拍”",
+      "url": "https://www.super-i.cn/info-2290.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2267,
+      "title": "【品牌宣传】用 AI 做香奈儿服饰展示视频",
+      "url": "https://www.super-i.cn/info-2267.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2254,
+      "title": "【服装出海】Sora2图转视频铺量TK视频",
+      "url": "https://www.super-i.cn/info-2254.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2238,
+      "title": "【品牌美学】用 AI 工具链做出大牌既视感的精华 CG",
+      "url": "https://www.super-i.cn/info-2238.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2226,
+      "title": "【品牌美学】甲方夸爆-AI做“力量感”Banner实例",
+      "url": "https://www.super-i.cn/info-2226.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2223,
+      "title": "【提示词创作第二节】：三个技巧控制光线",
+      "url": "https://www.super-i.cn/info-2223.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2206,
+      "title": "【创意视频】用 AI “造” 出篮球创意大片",
+      "url": "https://www.super-i.cn/info-2206.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2205,
+      "title": "【提示词创作第一节】：控制 Prompt 的构图",
+      "url": "https://www.super-i.cn/info-2205.html",
+      "catalogPage": 19,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2176,
+      "title": "【品牌升级】 AI生成MIDI键盘宣传片",
+      "url": "https://www.super-i.cn/info-2176.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2174,
+      "title": "【品牌美学】3步搞定粉底液大片，即梦 + 剪映零门槛封神",
+      "url": "https://www.super-i.cn/info-2174.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2157,
+      "title": "【品牌美学】用 AI 三步做出爆款美妆宣传视频",
+      "url": "https://www.super-i.cn/info-2157.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2145,
+      "title": "【品牌美学】YSL-0 基础爆改 YSL 口红广告大片",
+      "url": "https://www.super-i.cn/info-2145.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2130,
+      "title": "【品牌美学】4 个 AI 工具做保时捷广告",
+      "url": "https://www.super-i.cn/info-2130.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2099,
+      "title": "【品牌升级】蕴光-品牌美妆包装升级项目教学",
+      "url": "https://www.super-i.cn/info-2099.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2095,
+      "title": "【品牌美学】- NIKE 运动鞋 CG 广告",
+      "url": "https://www.super-i.cn/info-2095.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2093,
+      "title": "【品牌升级】蕴光 - 美妆品牌Logo升级项目教学",
+      "url": "https://www.super-i.cn/info-2093.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2079,
+      "title": "【品牌提升】AI速成品牌故事",
+      "url": "https://www.super-i.cn/info-2079.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2061,
+      "title": "【品牌美学】尊界S800广告视频",
+      "url": "https://www.super-i.cn/info-2061.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2060,
+      "title": "【品牌美学】苹果-Iphone宣传视频教程",
+      "url": "https://www.super-i.cn/info-2060.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2059,
+      "title": "【品牌美学】Dior精华乳：高级丝滑感品牌视频教学",
+      "url": "https://www.super-i.cn/info-2059.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2037,
+      "title": "【品牌美学】哈吉克汉堡-AI创意宣传视频项目教学",
+      "url": "https://www.super-i.cn/info-2037.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2027,
+      "title": "Camellia-生成钻戒氛围感大片",
+      "url": "https://www.super-i.cn/info-2027.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2026,
+      "title": "【品牌美学】y2k风格提示词分享",
+      "url": "https://www.super-i.cn/info-2026.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2025,
+      "title": "【品牌美学】梦幻彩色提示词分享",
+      "url": "https://www.super-i.cn/info-2025.html",
+      "catalogPage": 20,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2013,
+      "title": "让小米 YU7 穿梭在国风微缩山水间！",
+      "url": "https://www.super-i.cn/info-2013.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1997,
+      "title": "【品牌提升】羊毛毡微型品宣动画教学",
+      "url": "https://www.super-i.cn/info-1997.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1995,
+      "title": "Whipnotic-奶油品宣创意视频项目教学",
+      "url": "https://www.super-i.cn/info-1995.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1966,
+      "title": "品牌提升-古今名人“夸爆”手机创意视频",
+      "url": "https://www.super-i.cn/info-1966.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1950,
+      "title": "Reactive-扫地机器人TVC广告项目教学",
+      "url": "https://www.super-i.cn/info-1950.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1936,
+      "title": "Yema-摩托头盔产品展示创意视频教学",
+      "url": "https://www.super-i.cn/info-1936.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1935,
+      "title": "设计教程-Sora 2 时代的商业觉醒",
+      "url": "https://www.super-i.cn/info-1935.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1926,
+      "title": "Uncolive-收腹裤TikTok爆款视频教学",
+      "url": "https://www.super-i.cn/info-1926.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1920,
+      "title": "【品牌提升】零成本打造专业级证件照",
+      "url": "https://www.super-i.cn/info-1920.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1919,
+      "title": "【品牌提升】轻松生成手机壳高级 CG 视频",
+      "url": "https://www.super-i.cn/info-1919.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1904,
+      "title": "【3C品牌】魔音-音箱超写实电商产品图项目教学",
+      "url": "https://www.super-i.cn/info-1904.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1903,
+      "title": "【品牌提升】用ai打造质感 iMac CG 视觉",
+      "url": "https://www.super-i.cn/info-1903.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1875,
+      "title": "【3C品牌】Aether-轻盈智能手表宣传图教学",
+      "url": "https://www.super-i.cn/info-1875.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1859,
+      "title": "【品牌提升】AI 生成游戏鼠标产品CG全流程",
+      "url": "https://www.super-i.cn/info-1859.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1858,
+      "title": "【品牌提升】AI生成耳机宣传视频",
+      "url": "https://www.super-i.cn/info-1858.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1824,
+      "title": "【品牌提升】迷幻摄影风格提示词分享",
+      "url": "https://www.super-i.cn/info-1824.html",
+      "catalogPage": 21,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1823,
+      "title": "【品牌提升】AI 游戏手柄产品 CG 图文教程",
+      "url": "https://www.super-i.cn/info-1823.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1808,
+      "title": "【品牌提升】3C类AI广告宣传视频",
+      "url": "https://www.super-i.cn/info-1808.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1795,
+      "title": "Hedgehog-保湿水产品宣传项目教学",
+      "url": "https://www.super-i.cn/info-1795.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1772,
+      "title": "【品牌提升】AI 全流程打造创意衬衫广告",
+      "url": "https://www.super-i.cn/info-1772.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1759,
+      "title": "【品牌提升】ai做出时尚单品动态广告",
+      "url": "https://www.super-i.cn/info-1759.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1758,
+      "title": "【品牌提升】跨境电商AI场景图怎么做？",
+      "url": "https://www.super-i.cn/info-1758.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1992,
+      "title": "比亚迪-仰望U8汽车TVC广告项目教学",
+      "url": "https://www.super-i.cn/info-1992.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1634,
+      "title": "保健品品牌-AI制作保健品广告",
+      "url": "https://www.super-i.cn/info-1634.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1599,
+      "title": "Urdru-保健品电商功效视频项目教学",
+      "url": "https://www.super-i.cn/info-1599.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1598,
+      "title": "【品牌美学】迷幻风格提示词分享",
+      "url": "https://www.super-i.cn/info-1598.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1504,
+      "title": "品牌提升-为洗面奶生成逼真泡沫！",
+      "url": "https://www.super-i.cn/info-1504.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1480,
+      "title": "【品牌提升】AI制作产品宣传页教程",
+      "url": "https://www.super-i.cn/info-1480.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1479,
+      "title": "品牌提升-Nano Banana电商场景适配",
+      "url": "https://www.super-i.cn/info-1479.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1360,
+      "title": "品牌提升-生物类首页DNA链动效",
+      "url": "https://www.super-i.cn/info-1360.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1445,
+      "title": "品牌提升AI去品牌化处理",
+      "url": "https://www.super-i.cn/info-1445.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1576,
+      "title": "Urdru-保健品虚拟主播带货项目教学",
+      "url": "https://www.super-i.cn/info-1576.html",
+      "catalogPage": 22,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1573,
+      "title": "Urdru-保健品多语种口播项目教学",
+      "url": "https://www.super-i.cn/info-1573.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2571,
+      "title": "第五节：动效视频分镜策划速通",
+      "url": "https://www.super-i.cn/info-2571.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2698,
+      "title": "第四节：账号运营技巧 及 常见问题解决方法（全网独家）",
+      "url": "https://www.super-i.cn/info-2698.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2697,
+      "title": "第三节：AI账号运营基础理论",
+      "url": "https://www.super-i.cn/info-2697.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2696,
+      "title": "第二节：提示词进阶—AI生图教程",
+      "url": "https://www.super-i.cn/info-2696.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2695,
+      "title": "第一节：从零到一学习提示词创作（基础版）",
+      "url": "https://www.super-i.cn/info-2695.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 2701,
+      "title": "前言：AI生成内容商业认知与工具选型（第一期直播课节选）",
+      "url": "https://www.super-i.cn/info-2701.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1454,
+      "title": "品牌美学 - 全息点阵风格提示词分享",
+      "url": "https://www.super-i.cn/info-1454.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1358,
+      "title": "品牌提升-科技类logo动效生成",
+      "url": "https://www.super-i.cn/info-1358.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1340,
+      "title": "品牌提升-电商业AI模特图诞生教学",
+      "url": "https://www.super-i.cn/info-1340.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1482,
+      "title": "【品牌美学】 幻想梦境风格提示词分享",
+      "url": "https://www.super-i.cn/info-1482.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1575,
+      "title": "品牌提升-美妆爆品宣传片教程",
+      "url": "https://www.super-i.cn/info-1575.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1463,
+      "title": "品牌提升-Nano Banana电商模特",
+      "url": "https://www.super-i.cn/info-1463.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1670,
+      "title": "Urdru-保健品身材延时摄影宣传教学",
+      "url": "https://www.super-i.cn/info-1670.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1725,
+      "title": "【品牌美学】韦斯·安德森风格提示词分享",
+      "url": "https://www.super-i.cn/info-1725.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1706,
+      "title": "【服装品牌】短袖产品广告视频全流程教程",
+      "url": "https://www.super-i.cn/info-1706.html",
+      "catalogPage": 23,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1705,
+      "title": "【品牌美学】独特摄影风格提示词分享",
+      "url": "https://www.super-i.cn/info-1705.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1687,
+      "title": "【品牌提升】四步打造创意植物生长视频",
+      "url": "https://www.super-i.cn/info-1687.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1671,
+      "title": "【品牌提升】电商 “自动换衣 + 动态走秀”",
+      "url": "https://www.super-i.cn/info-1671.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1653,
+      "title": "【品牌提升】AI产品宣传视频",
+      "url": "https://www.super-i.cn/info-1653.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1652,
+      "title": "【设计教程】AI生图一致性教学",
+      "url": "https://www.super-i.cn/info-1652.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1631,
+      "title": "富吃虾条-电商官网宣传图制作全流程",
+      "url": "https://www.super-i.cn/info-1631.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1526,
+      "title": "品牌提升-LTX多角度模特教学",
+      "url": "https://www.super-i.cn/info-1526.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1743,
+      "title": "【品牌提升】用AI 打造科技感冲锋衣",
+      "url": "https://www.super-i.cn/info-1743.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1742,
+      "title": "【品牌提升】AI一键生成专属儿童模特海报",
+      "url": "https://www.super-i.cn/info-1742.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 1741,
+      "title": "Nike-服装类广告宣传视频项目教学",
+      "url": "https://www.super-i.cn/info-1741.html",
+      "catalogPage": 24,
+      "status": "screened",
+      "relevance": "candidate",
+      "screeningBasis": "目录标题及已查看简介；相关性为初筛，正文未读不得推定方法"
+    },
+    {
+      "id": 3114,
+      "title": "【AI技能】不会设计也能出配图？这4个skill绝了",
+      "url": "https://www.super-i.cn/info-3114.html",
+      "status": "discovered",
+      "discoveredFrom": "3110最新教程栏；原24页目录快照之后新增",
+      "reason": "待读简介判断是否涉及Milimili视觉资产"
+    },
+    {
+      "id": 3115,
+      "title": "【AI影视】第一步：从剧本大纲到人物、场景与道具资产",
+      "url": "https://www.super-i.cn/info-3115.html",
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "2769页最新教程栏新增，正文未读，不推定方法",
+      "note": "lessons/lesson3115.md",
+      "lastStudied": "2026-10-26",
+      "mediaStatus": "正文、48轮96条HTML全文，47网页内容图+6内嵌图；静态资产未有成片；实际图与正文/版本差异均已记"
+    },
+    {
+      "id": 3116,
+      "title": "【AI影视】第二步：从资产到视频分镜与生成实操",
+      "url": "https://www.super-i.cn/info-3116.html",
+      "status": "textStudied",
+      "relevance": "candidate",
+      "screeningBasis": "2922页面最新教程栏新发现，待查正文",
+      "note": "lessons/lesson3116.md",
+      "lastStudied": "2026-10-27",
+      "mediaStatus": "23内容图概览；三段DOC全文；7独立视频84帧；未试听"
+    }
+  ]
+}
