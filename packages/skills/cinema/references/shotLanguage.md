@@ -110,3 +110,15 @@
 - [Panavision：摄影机运动及其叙事用途](https://www.panavision.com/highlights/highlights-detail/5-camera-moves-and-their-effect-on-your-audience)
 - [Panavision：为故事选择光线](https://www.panavision.com/highlights/highlights-detail/5-lighting-techniques-to-elevate-your-shot)
 - [ARRI：布光手册入口](https://www.arri.com/en/learn/lighting/lighting-handbook)
+
+## 参考转译与可执行摄影模板
+
+先区分源片可见事实、分析推测和本项目新设计。实际切点、人物位置、遮挡和结果可作为分析依据；单截图不能恢复完整路径、精确焦距、声音或原始提示词。转译只借所需观看关系，保留本项目身份、时段、天气与空间，分析时间线不另作一份执行稿。
+
+填写现有 camera.design：观看目的；起幅主体/焦点/遮挡；subjectPath；cameraPath；事件触发与停止条件；落幅及剪点。高度、俯仰、距离、焦距和主体画面大小分开：透视依赖拍摄位置，换焦距并不自动改变前后比例。需要推轨变焦时同时说明主体大小目标与背景变化，须看视频判断是否真正执行。
+
+纪实发现式镜头可从门框遮挡开始，主体先动后相机寻找并停稳；延迟和抖幅由当前设计决定，不默认半秒或全部手持。轨道、固定镜头与清楚开场同样有效。遮挡揭示须有可通行的相机路径，不能穿墙或让障碍自动透明。
+
+正反打按固定世界地标核对每个拍摄方向；俯视图中的人物路径、相机路径和时间独立标清。场景母图只证明已展示空间，全景转向不提供平移视差，白模预演只约束所选构图/路径，不能证明生成器精确复现三维运动。
+
+镜头检查分别记录起幅、关键事件、落幅及剪接；只看到人物放大不能认证推轨变焦，只有末幅到位不能证明路线和完整停靠正确。

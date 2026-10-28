@@ -99,16 +99,16 @@ metadata:
 
 开拍前调 `POST /api/ai/media/preflight` 核对：清单里几个角色、实际几份档案、缺哪些。缺口在分镜阶段会变成每镜漂移，那时候再补已经拍废一批。
 
-当前租户的图像模型是编辑版（`gpt-image-2/edit`），必须给参考图才能出图。所以角色卡的实际做法是：先定一张基准脸（可从既有生成结果抽帧或用户上传），再用它派生出三视图与造型变体，不能纯文生图。
+先查询当前租户的实际图像能力；仅支持编辑时提供有效参考，支持文生图时可据已确认设计生成。教程或旧项目的模型名称不代表当前账号配置，不能虚构基准脸或静默切换模型。
 
 ### 镜头时长、身份锁定与生成后核对
 
 生成前逐项确认，缺任一项不进入量产：
 
-- **时长按内容决定，不按全片均分，也不用固定 5 秒。** 先读 `listMediaModels` 拿当前模型的真实 `duration` 区间（如 MiniMax-H3 为 4–15 秒），按「动作阶段数 × 每阶段所需秒数」与「台词字数 ÷ 语速」两者取大。一个镜头里出现两次以上动作转折、或需要完整因果（触发 → 反应 → 余波）时，用该模型的**上限区间一次生成**，不拆成多个短碎片。同场戏的镜头时长应有差异；只有蒙太奇、快切段落才用 2–5 秒。生成上限是能力，不是每镜固定长度。
+- **时长按内容和实际能力决定。** 查询当前支持时长，结合动作串并行、空间距离、反应停留和实测台词安排。字数只作未录音时的粗估，不按动作个数乘固定秒数，不因两次转折强制用模型上限。合段同时满足参考、声音、内部切镜和动作容量；不足时沿完整因果拆分，保留已定剧情与生成范围。
 - **人物镜头必须传已采用的角色参考图**（`images` + `mode:["imageReference:N"]`），身份参考与场景参考分开，`notes` 写清各自管什么。没有角色资产时先生成资产，不用文字描述代替像素级身份。纯文本模式只允许用于无人空镜、环境、流体、光效等不涉及人脸的镜头；人脸镜头用纯文本等于每镜重新选角。
 - **同场景的连续镜头共用一张定场帧作参考**，或用上一镜末帧作 `firstFrame`，保证空间、光向、道具位置承接。不靠文字写「同一个房间」。
-- **生成后必须抽帧比对**：身份（同一人）、服装（同色同款）、场景（同空间同光向）。三项任一不符即重跑该镜，不带缺陷进入成片。配音与口型另按声音通道核对，字幕不是发声。
+- **生成后核对实际输出**：身份、当前造型、世界空间与光源；关键动作检查完整过程，声音实际试听。严重偏差先诊断并在授权内修受影响部分，不因轻微差异自动重跑；抽帧不替代完整动态，字幕不是发声。
 - **台词时长按真实语速估算**；模型不支持原生发声时先落实配音通道，不删台词、不把字幕当已出声。
 
 ### 按当前镜头内容选择专业资料
@@ -224,3 +224,24 @@ metadata:
 ## 镜头方法接入
 
 涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](../cinema/references/masterShots.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。
+
+## 制作模板的按需取用与落地
+
+本轮自动读取的正文不等于所有参考已读。根据当前采用任务读取下表对应模板，已有具体设计直接复用；简短“继续”先回读项目状态再取相关资料。只将本镜适用内容写进现有字段，不把全部方法叠加给媒体模型。
+
+| 当前制作内容 | 读取的现有模板 | 进入执行的位置 |
+| --- | --- | --- |
+| 点子、故事、信息揭示与剧本修订 | [故事方法](../story/references/core-methodology.md) | 采用故事与场次 goal/obstacle/change/knowledge/causes |
+| 角色、妆造、场景、道具与产品结构 | [资产](references/assets.md)、[视觉设计](references/methods/visualDesign.md)、[妆造](references/methods/characterStyling.md) | 已采用资产、当前变体与真实参考 |
+| 光源、材质、色板、重光与调色 | [色彩与用光](references/methods/colorAndLight.md) | World/Look、lighting、realism及实际剪辑grade |
+| 特写、关系、倾听与声音表演 | [表演](../cinema/references/performanceDirection.md) | action/performance、逐句delivery及唯一时间线 |
+| 摄影、空间路线、白模和参考转译 | [摄影](../cinema/references/shotLanguage.md)、[参考执行](../cinema/references/referenceQuality.md) | camera.design、blocking、实际输入与降级 |
+| 打斗、群战、动作/深度参考 | [动作](../cinema/references/combatDesign.md) | combat、interactions及同一timeline |
+| 广告、产品片、UGC和餐厅推广 | [广告转译](../adfilm/references/creativeTranslation.md) | adDirection、advertising及当前商品事实 |
+| MV、唱跳、原曲和混剪 | [MV编排](../musicfilm/references/musicVideoDirection.md) | musicVideo、歌曲入点、舞台/造型单元 |
+| 旅行与手机视角 | [旅拍动作](../travelWeddingDirector/references/cameraActionMethods.md) | 每镜拍摄者、设备支撑、视点、持物与地点 |
+| 最终提示词、分段与接续 | [五板块](../videoPromptDirector/references/fiveBlockWriting.md)、[分段](../videoPromptDirector/references/segmentPlanning.md) | 节点generationPrompt或正式ShotSpec编译请求 |
+| 声音、剪辑与整片验收 | [声音覆盖](../cinema/references/coverage.md)、[检查](../continuity/references/shotChecklist.md) | 实测音频、剪辑轨道及实际看听记录 |
+| 失败修复与采用版传播 | [修复](../videoPromptDirector/references/failureRepair.md)、[状态交付](references/stateAndDelivery.md) | 原规格受影响项、新候选及真实依赖 |
+
+进入模型专用格式时保持这些创作内容，按已选模型规则编译，不附加另一套标题/时间轴。案例里的固定人数、镜数、秒数、色板数量、抖动、慢推、去光或重试次数不成为全局配额。教程方法、提示意图、实际请求与结果证据分开；未知机制和未经验证的成功率不写成产品能力。
