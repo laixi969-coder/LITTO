@@ -11,7 +11,6 @@ import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/file
 import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
-import { compactVideoPrompt } from "@toonflow/providers/media/meta";
 import { matchesAspect, mediaRatios } from "@toonflow/providers/aspect";
 import { coverageGate } from "@/utils/media/coverage";
 import { blockingLine } from "@/utils/media/blocking";
@@ -19,6 +18,59 @@ import { modelAccess } from "@/utils/modelAvailability";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { assertCurrentSpeechAudio } from "@/utils/media/voiceDecision";
 import { isDirectorPrompt } from "@/utils/media/videoPrompt";
+import { getConfiguredModel, streamAi } from "@/utils/ai";
+import { selectedModel } from "@/utils/modelSelection";
+import { recordTextUsage } from "@/utils/usage";
+
+// ACT: 缓存同进程相同编译结果，最多 100 条；重启后重新编译，指纹不一致时拒绝旧请求而非重复生成。
+const promptOptimizations = new Map<string, Promise<string>>();
+
+function promptLimit(kind: "image" | "video", providerId: string, modelId: string) {
+  if (providerId === "tencentWand") {
+    if (kind === "image") return 2000;
+    if (modelId === "kling-video-v3" || modelId === "kling-video-v3-omni") return 3072;
+    if (["kling-video-v3-turbo", "kling-video-v2.6", "kling-video-v2.5-turbo", "kling-video-o1"].includes(modelId)) return 2500;
+    if (["minimax-video-v2.3", "minimax-video-v2.3-fast"].includes(modelId)) return 2000;
+    if (["minimax-video-h3", "minimax-video-h3-max"].includes(modelId)) return 7000;
+    if (modelId.startsWith("pixverse-video-")) return 5000;
+  }
+  if (kind === "video" && providerId === "meta" && modelId === "MiniMax-H3") return 10000;
+  if (kind === "video" && providerId === "kling") return 2500;
+  if (kind === "video" && providerId === "vidu") return 20000;
+}
+
+async function optimizeCompiledPrompt(directory: string, sections: Record<string, string>, prompt: string, negativePrompt: string | undefined, limit: number) {
+  const suffix = negativePrompt ? `\n画面中不得出现：${negativePrompt}` : "";
+  if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
+  const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "Reference binding"]);
+  const essential = Object.entries(sections).filter(([key, value]) => value && protectedKeys.has(key)).map(([key, value]) => `${key.toUpperCase()}: ${value}`).join("\n");
+  const baseline = "PHOTOGRAPHICBASELINE: 保持已定媒介、身份、年龄、造型、干净完整状态及自然肤质；明确的剧情和视觉设计优先。";
+  const budget = limit - [baseline, essential, suffix].join("\n").length - 32;
+  if (budget < 100) throw new Error(`模型提示词上限 ${limit} 字符，保留动作、对白和关键约束后空间不足；请拆分镜头或精简规格。未提交生成。`);
+  const choice = selectedModel("text");
+  if (!choice) throw new Error(`提示词超过模型 ${limit} 字符上限，需要先配置对话模型才能自动精简；未提交生成。`);
+  const source = Object.fromEntries(Object.entries(sections).filter(([key, value]) => value && !protectedKeys.has(key)));
+  const key = createHash("sha256").update(JSON.stringify([directory, choice, limit, essential, source, suffix])).digest("hex");
+  let pending = promptOptimizations.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const configured = getConfiguredModel(choice.providerId, choice.modelId);
+      const stream = streamAi(configured, { systemPrompt: `你是电影提示词编辑。仅压缩输入的镜头背景和视觉设定，去重并合并同义表述，保留具体人物身份、服饰、环境、摄影、光线、接戏、参考用途及明确禁止事项。不能增加剧情、改变动作、对白或约束。只输出压缩后的正文，不要代码块或解释，最多 ${budget} 字符。`, messages: [{ role: "user", timestamp: Date.now(), content: [{ type: "text", text: JSON.stringify(source) }] }] }, AbortSignal.timeout(90000));
+      for await (const _event of stream) { /* 等待语言模型完成精简 */ }
+      const result = await stream.result();
+      recordTextUsage({ ...result, provider: configured.providerId });
+      if (result.stopReason !== "stop") throw new Error(result.errorMessage || "语言模型未完成提示词精简");
+      const compact = result.content.filter(part => part.type === "text").map(part => part.text).join("").trim();
+      if (!compact || compact.length > budget || compact.startsWith("```")) throw new Error("自动精简结果为空或仍超出模型限制");
+      return [baseline, essential, `VISUALCONTEXT: ${compact}`].filter(Boolean).join("\n");
+    })();
+    if (promptOptimizations.size >= 100) promptOptimizations.delete(promptOptimizations.keys().next().value!);
+    promptOptimizations.set(key, pending);
+    void pending.catch(() => { if (promptOptimizations.get(key) === pending) promptOptimizations.delete(key); });
+  }
+  try { return await pending; }
+  catch (cause) { throw new Error(`自动精简失败：${cause instanceof Error ? cause.message : String(cause)}。请精简镜头规格或拆分镜头；未提交生成。`); }
+}
 
 export function workspaceProject(directory: string, create = true) {
   const tenant = currentTenant();
@@ -181,7 +233,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
         // 先持久化回执与交付检查点；恢复只收取原结果，不创建子任务或重新生成。
         const previous = api.scoped(context.workspaceId).get("generation_jobs", context.jobId)?.parameters?.remoteTask;
         if (previous?.id && task.id && previous.id !== task.id) throw new Error("原供应商任务号不可替换，禁止重新提交");
-        api.dbRun("UPDATE generation_jobs SET parameters=json_set(parameters,'$.remoteTask',json(?)) WHERE id=? AND workspace_id=?", JSON.stringify({ ...previous, ...task, id: task.id ?? previous?.id, providerId, modelId, mediaType: input.kind, mode: request.mode, updatedAt: new Date().toISOString() }), context.jobId, context.workspaceId);
+        api.dbRun("UPDATE generation_jobs SET parameters=json_set(parameters,'$.remoteTask',json(?),'$.recoveryFailures',?) WHERE id=? AND workspace_id=?", JSON.stringify({ ...previous, ...task, id: task.id ?? previous?.id, providerId, modelId, mediaType: input.kind, mode: request.mode, updatedAt: new Date().toISOString() }), task.id && !["submitting", "unknown"].includes(task.status) ? 0 : Number(api.scoped(context.workspaceId).get("generation_jobs", context.jobId)?.parameters?.recoveryFailures ?? 0), context.jobId, context.workspaceId);
       }, { jobId: context.jobId, task: recovery });
       const outputs = [];
       for (const file of files) {
@@ -247,9 +299,6 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
       result.compiled.warnings.push(`配音规划未完成：${cause instanceof Error ? cause.message : String(cause)}`);
     }
   }
-  if (kind === "video" && request.providerId === "meta" && request.modelId === "MiniMax-H3") {
-    result.compiled.prompt = compactVideoPrompt(result.compiled.prompt);
-  }
   if (kind === "video" && result.audioMode === "generated") {
     if (!model.audio || request.generateAudio === false) throw Object.assign(new Error("本镜对白或声音方案需要生成声音，不能关闭音轨、删除台词或改成成片叠对白；此次未提交生成"), { status: 400 });
     request = { ...request, generateAudio: true };
@@ -261,9 +310,18 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
   if (!result.compiled.prompt.includes("BLOCKING:")) {
     const blocking = await blockingLine(directory, request.outputName);
-    if (blocking) result.compiled.prompt = `${blocking}\n\n${result.compiled.prompt}`;
+    if (blocking) {
+      result.compiled.prompt = `${blocking}\n\n${result.compiled.prompt}`;
+      result.compiled.sections.blocking = [blocking.replace(/^BLOCKING:\s*/, ""), result.compiled.sections.blocking].filter(Boolean).join("; ");
+    }
   }
-  assertPromptPolicy({ ...request, prompt: result.compiled.prompt }, kind, result.compiled.inputs);
+  const limit = promptLimit(kind, request.providerId, request.modelId);
+  if (limit) {
+    const original = result.compiled.prompt;
+    result.compiled.prompt = await optimizeCompiledPrompt(directory, result.compiled.sections, original, result.compiled.negativePrompt || request.negativePrompt, limit);
+    if (result.compiled.prompt !== original) result.compiled.warnings.push(`已根据模型 ${limit} 字符上限自动精简视觉背景；动作、对白、时间线与关键约束保留原文。请核对预览和生成结果。`);
+  }
+  assertPromptPolicy({ ...request, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt }, kind, result.compiled.inputs);
   result.fingerprint = createHash("sha256").update(JSON.stringify([result.fingerprint, result.compiled.prompt, request.ratio, request.size, request.resolution, request.duration, request.generateAudio, request.cameraTrajectory, request.imageAndCameraOnly])).digest("hex");
   return { ...result, request: { ...request, shotId, productionFingerprint: result.fingerprint, prompt: result.compiled.prompt, negativePrompt: result.compiled.negativePrompt || request.negativePrompt, seed: request.seed ?? result.compiled.seed } };
 }

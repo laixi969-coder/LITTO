@@ -123,7 +123,9 @@ const plugin: ToolPlugin = {
           const input = schema.parse(params);
           if (input.kind === "image" && !permissions.allowImage || input.kind === "video" && !permissions.allowVideo) throw new Error("当前工具未获此类媒体生成权限");
           const shots = await media.generateShots!(input.kind, input.requests, signal, progress => onUpdate?.({ content: [{ type: "text", text: JSON.stringify({ progress }) }], details: {} }));
-          const result = { progress: `已返回 ${shots.length}/${input.requests.length} 镜`, shots };
+          const blocked = shots.filter(shot => shot.status === "blocked").length;
+          const result = { progress: `已返回 ${shots.length}/${input.requests.length} 镜，成功 ${shots.length - blocked} 镜，失败或受阻 ${blocked} 镜`, shots };
+          if (blocked) throw new Error(JSON.stringify(result));
           return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
         },
       });

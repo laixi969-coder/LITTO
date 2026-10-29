@@ -262,6 +262,15 @@ function recommendedDuration(map: unknown, requested: number | undefined) {
  * 入队前也调用一次——排在队列里执行时才失败，用户看到的是「提交成功然后红了一片」，说不清哪一步错了。
  */
 export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "image" | "video" | "audio", compiledInputs: { sent: boolean; mediaId: string | null; role: string }[] = []) {
+  if (mediaType === "video" && request.providerId === "tencentWand" && request.modelId === "kling-video-v3") {
+    const directorPrompt = isDirectorPrompt(request.prompt);
+    const spec = directorPrompt || request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
+    const motionTiming = !directorPrompt && !request.prompt.includes(videoMotionTiming) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
+    const prompt = withPhotographicBaseline([spec, request.prompt, motionTiming].filter(Boolean).join("\n\n"));
+    const actualPrompt = [prompt, request.negativePrompt ? `画面中不得出现：${request.negativePrompt}` : ""].filter(Boolean).join("\n");
+    const length = Array.from(actualPrompt).length;
+    if (length > 3072) invalid(`腾讯 TokenHub 可灵 V3 提示词为 ${length} 字符，超过 3072 字符上限（建议不超过 2500）。请精简重复的世界、风格和角色描述，优先保留本镜动作、对白、时间线及必要约束；参考图仍按原配置发送。精简后重新编译，不会自动截断或提交生成。`);
+  }
   if (mediaType === "video") {
     const review = inspectVideoPrompt(request.prompt, request.duration);
     if (review.applicable && request.duration === undefined) invalid("五板块视频请求须显式设置 duration，与时间线总时长一致");
@@ -646,11 +655,14 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
     while (true) {
       signal?.throwIfAborted();
       const state = api.jobView(api.scoped(currentTenant()!.workspaceId).get("generation_jobs", job.id, true));
-      if (state.status !== reported || Date.now() - reportedAt >= 10000) {
-        reported = state.status;
+      const progressState = `${state.status}:${state.error ?? ""}:${state.parameters?.remoteTask?.status ?? ""}`;
+      if (progressState !== reported || Date.now() - reportedAt >= 10000) {
+        reported = progressState;
         reportedAt = Date.now();
         const label = state.status === "QUEUED" ? "已入队，等待执行" : state.status === "RUNNING" ? "任务处理中（供应商未提供百分比）" : state.status;
-        onProgress?.(`任务 ${job.id} · ${label} · 已等待 ${Math.floor((Date.now() - started) / 1000)} 秒`);
+        const elapsed = Math.floor((Date.now() - started) / 1000);
+        const remoteStatus = state.parameters?.remoteTask?.status;
+        onProgress?.(`任务 ${job.id} · ${label}${remoteStatus ? ` · 供应商状态 ${remoteStatus}` : ""} · 已等待 ${elapsed} 秒${state.error && ["QUEUED", "RUNNING"].includes(state.status) ? `。${state.error}` : ""}${elapsed >= 120 && ["QUEUED", "RUNNING"].includes(state.status) ? "。等待已超过 2 分钟，尚未取得生成结果；当前状态不代表生成成功，请勿重复提交。" : ""}`);
       }
       if (state.status === "SUCCEEDED") return state.files;
       if (["FAILED", "CANCELLED", "TIMEOUT"].includes(state.status)) throw new Error(`${state.error || "媒体生成已停止"}。任务 ${job.id} 已停止。${request.shotId ? "相同镜头请求不会自动重发。确认需要重做后使用新的 regenerationId，同一次重做须复用该 ID。" : "请核查失败原因后再决定是否重试。"}`);

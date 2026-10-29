@@ -20,7 +20,7 @@ import { createReportTool } from "@/agent/tools/report";
 import { runDelegatedAgent } from "@/agent/runtime/delegation";
 import {
   agentAttachmentsSchema, getActiveAgentSession, getAgentStats, getParentSessionFile, getSubAgentInfo,
-  getToolResultText, hasPendingAgentQuestion, registerAgentSession, updateSubAgent,
+  getToolResultText, registerAgentSession, updateSubAgent,
   type ActiveAgentSession,
 } from "@/agent/runtime/sessions";
 import { isMemoryEnabled } from "@/utils/personalization";
@@ -38,6 +38,7 @@ type AgentOptions = {
   thinkingLevel?: "off" | "low" | "medium" | "high";
   sessionFile?: string;
   resendFrom?: string;
+  steeringOnly?: boolean;
   canvas?: CanvasContext;
   question?: QuestionContext;
   signal?: AbortSignal;
@@ -57,6 +58,7 @@ export async function run(
     thinkingLevel = "off",
     sessionFile,
     resendFrom,
+    steeringOnly,
     canvas,
     question,
     signal,
@@ -91,19 +93,16 @@ export async function run(
   const { path: sessionsDir } = await resolveWorkspacePath(cwd, ".agent/sessions", true);
   const sessionPath = sessionFile ? (await resolveWorkspacePath(sessionsDir, sessionFile)).path : undefined;
   const active = sessionPath ? getActiveAgentSession(sessionPath) : undefined;
-  if (active && hasPendingAgentQuestion(active)) {
-    // ACT: 新消息结束旧提问，必须等旧执行释放文件锁后再继续，避免并发写入同一会话。
-    await active.abort();
-    signal?.throwIfAborted();
-  } else if (active) {
-    if (!getParentSessionFile(active.history)) throw Object.assign(new Error("对话正在运行，请等待回复完成"), { status: 409 });
-    if (resendFrom) throw Object.assign(new Error("子 Agent 运行时不能重发历史消息"), { status: 409 });
-    if (!active.session?.isStreaming) throw Object.assign(new Error("子 Agent 正在准备或结束回复，请稍后发送"), { status: 409 });
-    if (attachments.length || mentions.length) throw Object.assign(new Error("请等子 Agent 当前回复结束后发送附件或提及"), { status: 400 });
-    await active.session.prompt(prompt.trim(), { streamingBehavior: "steer", expandPromptTemplates: false });
+  if (active) {
+    if (resendFrom) throw Object.assign(new Error("对话运行时不能重发历史消息"), { status: 409 });
+    if (!active.session?.isStreaming) throw Object.assign(new Error("对话正在准备或结束回复，请稍后发送"), { status: 409 });
+    if (attachments.length || mentions.length) throw Object.assign(new Error("请等当前回复结束后发送附件或提及"), { status: 400 });
+    // ACT: steer 同步入队，不经过 prompt 的异步预处理，避免收尾竞态另起一轮执行。
+    await active.session.steer(prompt.trim());
     send({ type: "accepted" });
     return;
   }
+  if (steeringOnly) throw Object.assign(new Error("上一轮对话已结束，请重新发送消息"), { status: 409 });
   const { provider, runtime } = await createAgentModel(providerId, modelId, thinkingLevel);
   if (sessionPath) {
     const file = await stat(sessionPath).catch((error: NodeJS.ErrnoException) => {
@@ -247,24 +246,26 @@ export async function run(
     const resumeLeafId = history.getLeafId();
     let userMessageId = history.getBranch().findLast((entry) => entry.type === "message" && entry.message.role === "user")?.id;
     function sendUserMessage() {
-      const entry = history.getBranch().findLast((item) => item.type === "message" && item.message.role === "user");
-      if (!entry || entry.id === userMessageId) return;
-      userMessageId = entry.id;
-      const firstMessage = !messageAccepted;
-      messageAccepted = true;
-      if (firstMessage && (attachments.length || mentions.length || prompt.trimStart().startsWith("/skill:"))) {
-        history.appendCustomEntry("toonflowUserMessage", { messageId: entry.id, content: prompt.trim(), attachments, mentions });
-        if (!history.getSessionName() && history.getBranch().filter((item) => item.type === "message" && item.message.role === "user").length === 1) {
-          history.appendSessionInfo((prompt.trim().replace(/\{\{mention:([^{}]+)\}\}/g, (text, id: string) => {
-            const mention = mentions.find(item => item.id === id);
-            return mention ? `@${mention.label}` : text;
-          }) || attachments[0]?.name || mentions[0]?.label || "新对话").slice(0, 60));
+      const branch = history.getBranch();
+      const offset = branch.findIndex(item => item.id === userMessageId);
+      for (const entry of branch.slice(offset + 1).filter(item => item.type === "message" && item.message.role === "user")) {
+        userMessageId = entry.id;
+        const firstMessage = !messageAccepted;
+        messageAccepted = true;
+        if (firstMessage && (attachments.length || mentions.length || prompt.trimStart().startsWith("/skill:"))) {
+          history.appendCustomEntry("toonflowUserMessage", { messageId: entry.id, content: prompt.trim(), attachments, mentions });
+          if (!history.getSessionName() && history.getBranch().filter((item) => item.type === "message" && item.message.role === "user").length === 1) {
+            history.appendSessionInfo((prompt.trim().replace(/\{\{mention:([^{}]+)\}\}/g, (text, id: string) => {
+              const mention = mentions.find(item => item.id === id);
+              return mention ? `@${mention.label}` : text;
+            }) || attachments[0]?.name || mentions[0]?.label || "新对话").slice(0, 60));
+          }
         }
+        const saved = history.getBranch().findLast(item => item.type === "custom" && item.customType === "toonflowUserMessage" && (item.data as { messageId?: string })?.messageId === entry.id);
+        const original = saved?.type === "custom" ? saved.data as { content: string; attachments: z.infer<typeof agentAttachmentsSchema>; mentions?: AgentMention[] } : undefined;
+        const content = entry.type === "message" && entry.message.role === "user" ? entry.message.content : "";
+        send({ type: "userMessage", id: entry.id, content: original?.content ?? (typeof content === "string" ? content : getToolResultText(content)), attachments: original?.attachments, mentions: original?.mentions });
       }
-      const saved = history.getBranch().findLast(item => item.type === "custom" && item.customType === "toonflowUserMessage" && (item.data as { messageId?: string })?.messageId === entry.id);
-      const original = saved?.type === "custom" ? saved.data as { content: string; attachments: z.infer<typeof agentAttachmentsSchema>; mentions?: AgentMention[] } : undefined;
-      const content = entry.type === "message" && entry.message.role === "user" ? entry.message.content : "";
-      send({ type: "userMessage", id: entry.id, content: original?.content ?? (typeof content === "string" ? content : getToolResultText(content)), attachments: original?.attachments, mentions: original?.mentions });
     }
     let firstTokenAt: number | undefined;
     let modelError: string | undefined;

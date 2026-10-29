@@ -30,11 +30,19 @@ async function fetchJson(context: ProviderContext, path: string, signal: AbortSi
   const key = String(context.config.apiKey ?? "").trim().replace(/^Bearer\s+/i, "");
   if (!key) throw new Error("请填写腾讯 TokenHub API Key");
   const baseUrl = (String(context.config.baseUrl ?? "").trim() || "https://tokenhub.tencentmaas.com").replace(/\/+$/, "");
-  const response = await context.tool.fetch(`${baseUrl}/v1/wand/${path}`, {
-    method: body ? "POST" : "GET", signal, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  const result = await response.json().catch(() => ({})) as Record<string, any>;
+  const requestTimeout = AbortSignal.timeout(60000);
+  let response: Response;
+  let result: Record<string, any>;
+  try {
+    response = await context.tool.fetch(`${baseUrl}/v1/wand/${path}`, {
+      method: body ? "POST" : "GET", signal: AbortSignal.any([signal, requestTimeout]), headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    result = await response.json().catch(error => { if (requestTimeout.aborted || signal.aborted) throw error; return {}; }) as Record<string, any>;
+  } catch (error) {
+    if (!signal.aborted && requestTimeout.aborted) throw new Error(`腾讯 TokenHub ${body ? "提交" : "查询"}请求超过 60 秒未响应；${body ? "提交结果待核查，请勿重复生成" : "将查询原任务，不会重新提交"}`);
+    throw error;
+  }
   if (!response.ok) throw Object.assign(new Error(context.tool.errorMessage(result) || `腾讯 WAND 请求失败（HTTP ${response.status}）`), { status: response.status });
   return result;
 }
@@ -177,7 +185,7 @@ function videoModel(id: string): ProviderModel | undefined {
 }
 
 export default {
-  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.9.0", rules,
+  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.9.1", rules,
   readme: "使用腾讯云 TokenHub 国内站 API Key。支持 Vega、Kling、MiniMax、混元视频、Vidu 及 PixVerse 的已接入模式；视频本地图片随请求传输。Vega 支持音画同出及图片、音频参考；图生图的本地图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为公网 HTTPS 地址。参考音频不保证声音或口型完全一致。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/135738)",
   models: [
     { id: "minimax-speech-2.8-hd", label: "MiniMax Speech 2.8 HD · 配音", type: "audio", voices: [{ title: "青涩男声", voice: "male-qn-qingse" }] },

@@ -296,9 +296,20 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
     const cur = get("SELECT * FROM generation_jobs WHERE id=?", job.id)!;
     if (cur.status === "CANCELLED") return;
     const p = cur.parameters ? JSON.parse(cur.parameters) : {};
+    if (cur.provider_id === "workspaceMedia" && p.remoteTask?.id && /prompt length cannot exceed 3072 characters/i.test(err.message)) {
+        // 供应商已返回确定的提示词限制；保留回执供核查，不能把错误当成可恢复的查询。
+        p.remoteTask.status = "blocked";
+        run("UPDATE generation_jobs SET parameters=?,status='FAILED',error=?,duration_ms=?,finished_at=? WHERE id=?", j(p), "腾讯 TokenHub 可灵 V3 提示词超过 3072 字符。请精简重复的世界、风格和角色描述，保留本镜动作、对白和时间线后重新编译；原供应商任务已保留，请先核查，不会自动重发。", durationMs, now(), job.id);
+        return;
+    }
     if (cur.provider_id === "workspaceMedia" && workspaceResumable(p) && err.retryable !== false) {
-        // 查询失败只退避查询同一个任务，不消耗生成重试次数，也不重新冻结/扣费。
-        run("UPDATE generation_jobs SET status='QUEUED',run_after=?,error=? WHERE id=?", new Date(Date.now() + 15000).toISOString(), `恢复原任务查询：${err.message}`.slice(0, 300), job.id);
+        // ACT: 连续查询失败最多恢复两次；超时或三次失败后保留原回执，人工恢复只查询原任务。
+        p.recoveryFailures = Number(p.recoveryFailures || 0) + 1;
+        if (!err.timeout && p.recoveryFailures < 3) {
+            run("UPDATE generation_jobs SET status='QUEUED',run_after=?,error=?,parameters=? WHERE id=?", new Date(Date.now() + 15000).toISOString(), `原任务查询失败（${p.recoveryFailures}/3）：${err.message}；将再次查询，不会重新生成`.slice(0, 300), j(p), job.id);
+            return;
+        }
+        run("UPDATE generation_jobs SET parameters=?,status=?,error=?,duration_ms=?,finished_at=? WHERE id=?", j(p), err.timeout ? "TIMEOUT" : "FAILED", `原任务查询${err.timeout ? "超时" : "连续失败"}，供应商结果待核查，未重新提交：${err.message}`.slice(0, 300), durationMs, now(), job.id);
         return;
     }
     if (cur.provider_id === "workspaceMedia" && workspaceResumable(p) && err.retryable === false) {
@@ -375,7 +386,7 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
             const settled = get("SELECT id FROM credit_ledger WHERE workspace_id=? AND job_id=? AND type='GENERATION_CHARGE'", workspaceId, id);
             const held = o.held || (settled ? 0 : estimate(o.modelId, o.kind, o.parameters).credits);
             if (!o.held) hold(workspaceId, id, held);
-            const parameters = workspaceRecovery ? { ...o.parameters, remoteTask: { ...task, status: "recovering" } } : o.parameters;
+            const parameters = workspaceRecovery ? { ...o.parameters, recoveryFailures: 0, remoteTask: { ...task, status: "recovering" } } : o.parameters;
             run("UPDATE generation_jobs SET status='QUEUED', attempts=?, held=?, run_after=?, finished_at=NULL,error=NULL,parameters=? WHERE id=?", workspaceRecovery ? o.attempts : 0, held, now(), j(parameters), id);
         });
         kick();

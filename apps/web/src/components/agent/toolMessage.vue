@@ -7,7 +7,8 @@
       <el-button v-if="task.file" link @click="emit('openSubAgent', task.file)">{{ task.status === 'inputRequired' ? '打开子任务处理确认' : '查看子任务' }}</el-button>
     </div>
   </div>
-  <div v-else-if="tool.status === 'running' && generationProgress" class="generationProgress" role="status">{{ generationProgress }}</div>
+  <div v-else-if="generationProgress" class="generationProgress" role="status">{{ generationProgress }}</div>
+  <div v-if="tool.status === 'error'" class="rendererError" role="alert">{{ failureSummary }}</div>
   <section v-if="renderer" class="toolInteraction" :class="{ awaiting: tool.status === 'running' && !!tool.question }" :data-tool-id="tool.id" tabindex="-1">
     <div v-if="tool.status === 'running' && tool.question" class="attentionHeader"><icon-message-question :size="16" /><strong>需要你确认</strong><el-button link @click="collapsed = false">查看提出此问题的步骤</el-button></div>
     <component :is="renderer" :tool="tool" :directory="directory" @copy="emit('copy', $event)" />
@@ -101,6 +102,11 @@ const subAgentTasks = computed<{ name: string; status: string; result: string; f
 const generationProgress = computed(() => {
   const data = progressData.value;
   return typeof data?.progress === "string" ? `${data.progress}${typeof data.elapsedSeconds === "number" ? ` · 已等待 ${data.elapsedSeconds} 秒` : ""}` : "";
+});
+const failureSummary = computed(() => {
+  const shots = progressData.value?.shots;
+  if (Array.isArray(shots)) return shots.filter(shot => shot.status === "blocked").map(shot => `镜头 ${shot.shotId}：${shot.error || "生成受阻"}`).join("\n");
+  return typeof tool.result === "string" ? tool.result.slice(0, 1000) : "工具执行失败，请展开查看错误详情";
 });
 
 function formatToolData(value: unknown) {

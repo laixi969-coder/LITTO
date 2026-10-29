@@ -247,6 +247,8 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       generateAudio: (request, signal, onProgress) => generateAndPublish("audio", request, signal, onProgress),
       async generateShots(kind, requests, signal, onProgress) {
         let completed = 0;
+        const failures: string[] = [];
+        const report = (progress: string) => onProgress?.(`已返回 ${completed}/${requests.length} 镜，失败或受阻 ${failures.length} 镜。${progress}${failures.length ? `\n${failures.join("\n")}` : ""}`);
         return Promise.all(requests.map(async request => {
           try {
             mediaSignal(signal)?.throwIfAborted();
@@ -262,11 +264,12 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
               }
             }
             const production = await prepareShot(cwd, kind, parsed.shotId!, parsed);
-            const files = await generateAndPublish(kind, { ...production.request, productionFingerprint: production.fingerprint }, signal);
+            const files = await generateAndPublish(kind, { ...production.request, productionFingerprint: production.fingerprint }, signal, progress => report(`镜头 ${parsed.shotId} · ${progress}`));
             return { shotId: parsed.shotId!, status: "success" as const, files };
           } catch (error) {
+            failures.push(`镜头 ${request.shotId}：${error instanceof Error ? error.message : String(error)}`);
             return { shotId: request.shotId!, status: "blocked" as const, error: error instanceof Error ? error.message : String(error) };
-          } finally { onProgress?.(`已返回 ${++completed}/${requests.length} 镜；已有任务复用，失败不自动重发`); }
+          } finally { completed++; report("已有任务复用，失败不自动重发"); }
         }));
       },
     },

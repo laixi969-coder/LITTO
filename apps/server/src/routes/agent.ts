@@ -14,6 +14,7 @@ const inputSchema = z.object({
   thinkingLevel: z.enum(["off", "low", "medium", "high"]).optional(),
   sessionFile: z.string().regex(/^[\w-]+\.jsonl$/).optional(),
   resendFrom: z.string().min(1).max(128).optional(),
+  steeringOnly: z.boolean().optional(),
   canvas: z.strictObject({
     id: z.string().min(1).max(256),
     tools: z.array(z.strictObject({
@@ -40,15 +41,24 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   const bridge = canvas ? u.canvas.createCanvasContext(cwd, canvas as CanvasInfo, send) : undefined;
   const controller = new AbortController();
   const questions = u.question.createQuestionContext(cwd, send, () => controller.abort());
-  const close = () => { bridge?.dispose(); questions.dispose(); controller.abort(Object.assign(new Error("观察连接已关闭"), { code: "observerDisconnected" })); };
+  const close = () => { clearInterval(heartbeat); bridge?.dispose(); questions.dispose(); controller.abort(Object.assign(new Error("观察连接已关闭"), { code: "observerDisconnected" })); };
   res.once("close", close);
+  res.once("error", close);
+  req.socket.once("close", close);
+  const heartbeat = setInterval(() => {
+    if (res.destroyed || res.writableEnded) close();
+    else res.write("\n");
+  }, 20000);
   try {
     await u.agent.run({ ...options, cwd, canvas: bridge?.context, question: questions.context, signal: controller.signal, onCancel: close }, send);
     send({ type: "done" });
   } catch (error) {
     send({ type: "error", message: error instanceof Error ? translateError(error) : translateMessage("Agent 运行失败") });
   } finally {
+    clearInterval(heartbeat);
     res.off("close", close);
+    res.off("error", close);
+    req.socket.off("close", close);
     bridge?.dispose();
     questions.dispose();
     res.end();

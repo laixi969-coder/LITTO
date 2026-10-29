@@ -11,10 +11,22 @@ export async function* readAgentEvents(response: Response, signal: AbortSignal) 
   if (!response.body) throw new Error("未收到响应流");
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let pending = "";
+  let readError: Error | undefined;
+  let idleTimer: ReturnType<typeof setTimeout>;
+  const cancel = () => { void reader.cancel().catch(() => {}); };
+  signal.addEventListener("abort", cancel, { once: true });
   try {
     while (true) {
-      const { value, done } = await reader.read();
       signal.throwIfAborted();
+      // ACT: 服务端每 20 秒发心跳，连续 75 秒收不到任何数据才判定观察连接失联。
+      idleTimer = setTimeout(() => {
+        readError = new Error("已超过 75 秒未收到服务端响应，连接可能中断。正在核对任务状态，请勿重复提交生成。");
+        cancel();
+      }, 75000);
+      const { value, done } = await reader.read();
+      clearTimeout(idleTimer);
+      signal.throwIfAborted();
+      if (readError) throw readError;
       pending += value ?? "";
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
@@ -30,6 +42,8 @@ export async function* readAgentEvents(response: Response, signal: AbortSignal) 
       if (done) throw new Error("连接已中断，请重试");
     }
   } finally {
+    clearTimeout(idleTimer!);
+    signal.removeEventListener("abort", cancel);
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
@@ -149,7 +163,8 @@ export function createConversationStream(messages: Ref<AgentMessage[]>) {
         ?? messages.value.find(message => message.role === "user" && !message.entryId && message.content === event.content);
       if (existing) { existing.entryId = event.id; existing.error = undefined; existing.mentions = event.mentions; }
       else messages.value.push({ id: event.id, entryId: event.id, role: "user", content: event.content ?? "", attachments: event.attachments, mentions: event.mentions });
-      ensureReply(event.id);
+      if (reply?.replyTo && reply.replyTo !== event.id) finish();
+      if (reply) reply.replyTo = event.id;
     } else if (["text", "thinking", "tool", "question"].includes(event.type)) {
       ensureReply().receive(event as Extract<AgentEvent, { type: "text" | "thinking" | "tool" | "question" }>);
     } else if (event.type === "error") {

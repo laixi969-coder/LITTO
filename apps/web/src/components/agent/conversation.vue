@@ -69,9 +69,9 @@
               <template v-else>
                 <el-button v-if="item.content" class="messageAction" text circle aria-label="复制消息" title="复制消息" @click="copyMessage(mentionPlainText(item.content, item.mentions))"><icon-copy :size="14" /></el-button>
                 <template v-if="item.role === 'user'">
-                  <el-button class="messageAction" text circle :disabled="locked || remoteRunning" aria-label="编辑消息" title="编辑消息" @click="editMessage(item)"><icon-pencil :size="14" /></el-button>
+                  <el-button class="messageAction" text circle :disabled="locked || busy || remoteRunning" aria-label="编辑消息" title="编辑消息" @click="editMessage(item)"><icon-pencil :size="14" /></el-button>
                 </template>
-                <el-button v-if="!item.report" class="messageAction" text circle :loading="deletingId === item.id" :disabled="locked || remoteRunning" aria-label="删除消息" title="删除消息" @click="deleteMessage(item)"><icon-trash v-if="deletingId !== item.id" :size="14" /></el-button>
+                <el-button v-if="!item.report" class="messageAction" text circle :loading="deletingId === item.id" :disabled="locked || busy || remoteRunning" aria-label="删除消息" title="删除消息" @click="deleteMessage(item)"><icon-trash v-if="deletingId !== item.id" :size="14" /></el-button>
               </template>
             </div>
           </div>
@@ -82,7 +82,7 @@
     <div v-if="compacting" class="compactionStatus" role="status">
       <span>正在压缩上下文…</span>
     </div>
-    <div class="runControls"><el-button v-if="pendingQuestions.length" class="pendingQuestionButton" text @click="showPendingQuestion">有 {{ pendingQuestions.length }} 项待确认 · 点击处理</el-button><span v-else>{{ activity === 'running' ? '可以随时停止当前任务' : '下一步由你决定' }}</span><el-button class="stopButton" :disabled="!busy && !(remoteRunning && initialSession?.parentFile)" @click="busy ? stopMessage() : emit('stopRequest')"><icon-player-stop-filled :size="12" />停止</el-button></div>
+    <div class="runControls"><el-button v-if="pendingQuestions.length" class="pendingQuestionButton" text @click="showPendingQuestion">有 {{ pendingQuestions.length }} 项待确认 · 点击处理</el-button><span v-else role="status">{{ activity === 'running' ? executionStatus : '下一步由你决定' }}</span><el-button class="stopButton" :disabled="!busy && !remoteRunning" @click="busy ? stopMessage() : emit('stopRequest')"><icon-player-stop-filled :size="12" />停止</el-button></div>
     <div class="messageInput">
       <div v-if="editingId" class="editingBanner"><span>编辑消息</span><el-button text size="small" :disabled="busy" @click="cancelEdit">取消</el-button></div>
       <div
@@ -109,11 +109,11 @@
       <teleport v-for="target in draftMentionTargets" :key="target.key" :to="target.element"><mentionThumbnail v-bind="mentionThumbnailProps(target.mention)" :directory="directory"><icon-photo :size="14" /></mentionThumbnail></teleport>
       <mentionContent ref="draftMentionPreview" :mentions="draftMentions" :directory="directory" removable @remove="removeDraftMention" />
       <div class="senderActions">
-        <input ref="attachmentInput" type="file" accept="image/*,video/*,audio/mpeg,.mp3,.txt,.lrc,.srt" multiple hidden :disabled="locked || !directory" @change="selectAttachments" />
-        <el-button text :disabled="locked || !directory" title="图片、视频、MP3、TXT、LRC 或 SRT" @click="attachmentInput?.click()"><icon-photo :size="16" />上传素材</el-button>
-        <modelPopover v-model="selectedModel" v-model:reasoningEffort="reasoningEffort" :active="active" :disabled="locked || remoteRunning" @saving="modelSaving = $event" />
-        <mentionMenu ref="mentionMenuRef" :directory="directory" :active="active" :disabled="locked || !directory" :query="mentionQuery" :editor="senderElement" :currentCanvasId="createCanvasContext?.()?.id" @open="captureMentionPosition" @select="insertMentions" @dismiss="mentionQuery = undefined" />
-        <skillMenu ref="skillMenuRef" :directory="directory" :active="active" :disabled="locked || !directory" :query="skillQuery" :editor="senderElement" @select="selectSkill" @dismiss="skillQuery = undefined" />
+        <input ref="attachmentInput" type="file" accept="image/*,video/*,audio/mpeg,.mp3,.txt,.lrc,.srt" multiple hidden :disabled="locked || busy || remoteRunning || !directory" @change="selectAttachments" />
+        <el-button text :disabled="locked || busy || remoteRunning || !directory" title="图片、视频、MP3、TXT、LRC 或 SRT" @click="attachmentInput?.click()"><icon-photo :size="16" />上传素材</el-button>
+        <modelPopover v-model="selectedModel" v-model:reasoningEffort="reasoningEffort" :active="active" :disabled="locked || busy || remoteRunning" @saving="modelSaving = $event" />
+        <mentionMenu ref="mentionMenuRef" :directory="directory" :active="active" :disabled="locked || busy || remoteRunning || !directory" :query="mentionQuery" :editor="senderElement" :currentCanvasId="createCanvasContext?.()?.id" @open="captureMentionPosition" @select="insertMentions" @dismiss="mentionQuery = undefined" />
+        <skillMenu ref="skillMenuRef" :directory="directory" :active="active" :disabled="locked || busy || remoteRunning || !directory" :query="skillQuery" :editor="senderElement" @select="selectSkill" @dismiss="skillQuery = undefined" />
         <el-popover
           v-model:visible="contextMenuVisible"
           trigger="click"
@@ -207,6 +207,52 @@ const remoteRunning = ref(props.initialSession?.running ?? false);
 const stats = ref(props.initialSession?.stats);
 const contextUsage = ref(props.initialSession?.contextUsage);
 const busy = ref(false);
+const steering = ref(false);
+const lastProgressAt = ref(Date.now());
+const executionStartedAt = ref(Date.now());
+const statusNow = ref(Date.now());
+const observationError = ref("");
+watch(() => busy.value || remoteRunning.value, (running, _previous, onCleanup) => {
+  if (!running) return;
+  executionStartedAt.value = lastProgressAt.value = statusNow.value = Date.now();
+  const timer = setInterval(() => { statusNow.value = Date.now(); }, 1000);
+  onCleanup(() => clearInterval(timer));
+}, { immediate: true });
+const executionStatus = computed(() => {
+  if (observationError.value) return observationError.value;
+  const elapsed = Math.max(0, Math.floor((statusNow.value - executionStartedAt.value) / 1000));
+  const silent = Math.max(0, Math.floor((statusNow.value - lastProgressAt.value) / 1000));
+  return silent >= 60 ? `已等待 ${elapsed} 秒，连续 ${silent} 秒没有新的执行进展；暂未收到结果，可以停止任务。`
+    : `正在处理 · 本次观察已持续 ${elapsed} 秒 · 可随时停止`;
+});
+// ACT: 只在主对话没有本地响应流时核对服务端；恢复观察不重发生成请求。
+watch(() => props.active && !props.initialSession?.parentFile && !busy.value && remoteRunning.value && !!props.sessionFile, (observe, _previous, onCleanup) => {
+  if (!observe || !directory) return;
+  const lifetime = new AbortController();
+  let timer: ReturnType<typeof setTimeout>;
+  onCleanup(() => { lifetime.abort(); clearTimeout(timer); });
+  async function refresh() {
+    try {
+      const { data } = await axios.get<{ code: number; data: AgentConversation }>("/api/agent/get", {
+        params: { directory, sessionFile: props.sessionFile }, headers: { "x-toonflow-workspace": "1" }, signal: lifetime.signal, timeout: 10000,
+      });
+      if (lifetime.signal.aborted || data.code !== 200) return;
+      observationError.value = "";
+      if (JSON.stringify(data.data.messages.at(-1)) !== JSON.stringify(messages.value.at(-1))) lastProgressAt.value = Date.now();
+      stream.finish();
+      messages.value = data.data.messages;
+      stats.value = data.data.stats;
+      contextUsage.value = data.data.contextUsage;
+      remoteRunning.value = !!data.data.running;
+    } catch {
+      // 查询失败不等于任务结束，保留状态并稍后重新读取。
+      if (!lifetime.signal.aborted) observationError.value = "无法获取任务最新状态，正在重新连接；任务结果尚不确定，请勿重复提交生成。";
+    } finally {
+      if (!lifetime.signal.aborted && remoteRunning.value) timer = setTimeout(refresh, 3000);
+    }
+  }
+  void refresh();
+}, { immediate: true });
 const modelSaving = ref(false);
 const compacting = ref(false);
 const pendingQuestions = computed(() => messages.value.flatMap((item, index) => (item.parts ?? []).flatMap(part =>
@@ -220,7 +266,7 @@ const activityLabels = { idle: "准备就绪", running: "AI 正在工作", atten
 watch(activity, state => emit("activity", state), { immediate: true });
 const deletingId = ref<string>();
 const restoringAttachment = ref(false);
-const locked = computed(() => props.disabled || busy.value || deletingId.value !== undefined || restoringAttachment.value);
+const locked = computed(() => props.disabled || steering.value || deletingId.value !== undefined || restoringAttachment.value);
 const editingId = ref<string>();
 const draftMentions = ref<AgentMention[]>([]);
 const draftMentionTargets = shallowRef<{ key: symbol; element: HTMLElement; mention: AgentMention }[]>([]);
@@ -324,6 +370,7 @@ watch(() => props.active, active => {
 });
 
 function applyEvent(event: AgentEvent) {
+  if (["text", "thinking", "tool", "question", "subAgentEvent"].includes(event.type)) lastProgressAt.value = Date.now();
   if (event.type === "tool" && event.tool.status === "success" && event.tool.name === "requestProductionDecision" && event.tool.args?.operation === "selectModel") {
     void refreshModelSelection().catch(() => ElMessage.error("模型选择已处理，界面同步失败；保存其他设置前将再次同步"));
   }
@@ -461,7 +508,7 @@ async function copyMessage(content: string) {
 
 async function editMessage(item: AgentMessage) {
   const instance = sender;
-  if (!instance || locked.value || remoteRunning.value || item.role !== "user") return;
+  if (!instance || locked.value || busy.value || remoteRunning.value || item.role !== "user") return;
   if (!editingId.value) editDraft = { model: instance.getModel(), mentions: [...draftMentions.value], attachments: [...draftAttachments.value] };
   editingId.value = item.id;
   draftMentions.value = [...item.mentions ?? []];
@@ -488,7 +535,7 @@ async function cancelEdit() {
 }
 
 async function deleteMessage(item: AgentMessage) {
-  if (locked.value || remoteRunning.value || item.streaming || item.report) return;
+  if (locked.value || busy.value || remoteRunning.value || item.streaming || item.report) return;
   deletingId.value = item.id;
   try {
     if (item.entryId || item.replyTo) {
@@ -607,6 +654,31 @@ async function sendMessage(source?: AgentMessage) {
   if (source && (source.role !== "user" || resendIndex < 0)) return;
   const resendFrom = source ? source.entryId ?? messages.value.slice(resendIndex + 1).find(item => item.role === "user" && item.entryId)?.entryId : undefined;
   if (locked.value || modelSaving.value || !instance || (!prompt && !attachments.length)) return;
+  if (busy.value || remoteRunning.value) {
+    if (source || attachments.length || mentions.length) return ElMessage.warning("回复进行中只能补充文字，请等待结束后发送附件或提及");
+    if (!props.sessionFile || !directory || !selectedModelChoice.value) return ElMessage.warning("对话正在准备，请稍后发送");
+    steering.value = true;
+    try {
+      const model = selectedModelChoice.value;
+      const signal = AbortSignal.timeout(15000);
+      const response = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Accept-Language": locale.value, "Content-Type": "application/json", "x-toonflow-workspace": "1" },
+        body: JSON.stringify({ prompt, directory, providerId: model.providerId, modelId: model.modelId, sessionFile: props.sessionFile, steeringOnly: true }),
+        signal,
+      });
+      let accepted = false;
+      for await (const event of readAgentEvents(response, signal)) {
+        if (event.type === "accepted") { accepted = true; break; }
+      }
+      if (!accepted) throw new Error("服务端未确认接收，请重新发送");
+      await instance.reset();
+      ElMessage.success("消息已接收，将在当前工具处理后交给助手；若有待确认事项，请先处理确认");
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : "发送失败，请重试");
+    } finally { steering.value = false; }
+    return;
+  }
   if (!canManageModels()) {
     modelSaving.value = true;
     try { await refreshModelSelection(); await loadAvailableModels(); }
@@ -622,8 +694,8 @@ async function sendMessage(source?: AgentMessage) {
   const draftModel = !source ? instance.getModel() : undefined;
   controller = requestController;
   busy.value = true;
+  observationError.value = "";
   compacting.value = false;
-  instance.disable();
   const reply = reactive<AgentMessage>({ id: crypto.randomUUID(), role: "assistant", content: "", parts: [], streaming: true });
   const userMessage = reactive<AgentMessage>({ id: crypto.randomUUID(), role: "user", content: prompt, attachments, mentions });
   let ownsStream = !remoteRunning.value;
@@ -680,6 +752,7 @@ async function sendMessage(source?: AgentMessage) {
           }
           break;
         case "userMessage":
+          if (accepted) { applyEvent(event); break; }
           if (!ownsStream) {
             messages.value.push(reply);
             stream.begin(reply);
@@ -719,7 +792,8 @@ async function sendMessage(source?: AgentMessage) {
       ElMessage.error(`${message}；文字和附件已还原，可修改后重新发送`);
     }
     else if ((source && !accepted) || !ownsStream) { userMessage.error = message; ElMessage.error(message); }
-    else reply.error = message;
+    else stream.receive({ type: "error", message });
+    if (requestStarted && ownsStream && !forwarded && props.sessionFile) remoteRunning.value = true;
     if (ownsStream && props.initialSession?.parentFile && props.sessionFile) {
       emit("event", { type: "subAgentEvent", file: props.sessionFile, event: { type: "error", message } });
     }
@@ -733,6 +807,7 @@ async function sendMessage(source?: AgentMessage) {
       }).catch(() => {});
     }
     if (ownsStream && !forwarded) stream.finish();
+    requestController.abort();
     compacting.value = false;
     busy.value = false;
     controller = undefined;
