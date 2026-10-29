@@ -177,7 +177,7 @@ function videoModel(id: string): ProviderModel | undefined {
 }
 
 export default {
-  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.8.0", rules,
+  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.9.0", rules,
   readme: "使用腾讯云 TokenHub 国内站 API Key。支持 Vega、Kling、MiniMax、混元视频、Vidu 及 PixVerse 的已接入模式；视频本地图片随请求传输。Vega 支持音画同出及图片、音频参考；图生图的本地图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为公网 HTTPS 地址。参考音频不保证声音或口型完全一致。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/135738)",
   models: [
     { id: "minimax-speech-2.8-hd", label: "MiniMax Speech 2.8 HD · 配音", type: "audio", voices: [{ title: "青涩男声", voice: "male-qn-qingse" }] },
@@ -195,14 +195,14 @@ export default {
     { id: "kling-video-v3-turbo", label: "Kling Video V3 Turbo", type: "video", mode: ["text", "singleImage"], durationResolutionMap: [{ duration: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["720P", "1080P"] }] },
     { id: "kling-video-v2.6", label: "Kling Video V2.6", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: "optional", durationResolutionMap: [{ duration: [5, 10], resolution: ["720P", "1080P"] }] },
     { id: "kling-video-v2.5-turbo", label: "Kling Video V2.5 Turbo", type: "video", mode: ["text", "singleImage", "endFrameOptional"], durationResolutionMap: [{ duration: [5, 10], resolution: ["720P", "1080P"] }] },
-    { id: "minimax-video-h3", label: "MiniMax Video H3", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "2K"] }] },
-    { id: "pixverse-video-v6.0", label: "PixVerse V6", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:7"]], audio: "optional", durationResolutionMap: [{ duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["360P", "540P", "720P", "1080P"] }] },
+    { id: "minimax-video-h3", label: "MiniMax Video H3", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], audio: true, nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "2K"] }] },
+    { id: "pixverse-video-v6.0", label: "PixVerse V6", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:7"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["360P", "540P", "720P", "1080P"] }] },
     { id: "pixverse-video-c1", label: "PixVerse C1", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:7"]], audio: "optional", durationResolutionMap: [{ duration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["360P", "540P", "720P", "1080P"] }] },
-    { id: "pixverse-video-v5.6", label: "PixVerse V5.6", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:7"]], audio: "optional", durationResolutionMap: [{ duration: [5, 8, 10], resolution: ["360P", "540P", "720P"] }, { duration: [5, 8], resolution: ["1080P"] }] },
+    { id: "pixverse-video-v5.6", label: "PixVerse V5.6", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:7"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [5, 8, 10], resolution: ["360P", "540P", "720P"] }, { duration: [5, 8], resolution: ["1080P"] }] },
     { id: "vidu-video-q4-preview", label: "Vidu Q4 Preview", type: "video", mode: ["singleImage", ["imageReference:15", "audioReference:3"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], resolution: ["540P", "720P", "1080P", "2K", "4K"] }] },
     { id: "hy-video-v1.5", label: "混元视频 1.5", type: "video", mode: ["text", "singleImage"], durationResolutionMap: [{ duration: [5], resolution: ["720P"] }] },
     { id: "kling-video-v4", label: "Kling Video V4", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:10"]], durationResolutionMap: [{ duration: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], resolution: ["720P", "1080P"] }] },
-    { id: "minimax-video-h3-max", label: "MiniMax Video H3 Max", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], durationResolutionMap: [{ duration: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480P", "768P"] }] },
+    { id: "minimax-video-h3-max", label: "MiniMax Video H3 Max", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], audio: true, nativeDialogue: true, durationResolutionMap: [{ duration: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480P", "768P"] }] },
     { id: "wand-vega-image-lite", label: "Vega Image Lite", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-flash", label: "Vega Image Flash", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-pro", label: "Vega Image Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
@@ -356,7 +356,7 @@ export default {
     }
     if (["minimax-video-h3", "minimax-video-h3-max"].includes(request.model) && Array.isArray(request.mode)) {
       if (JSON.stringify(request.mode) !== JSON.stringify(["imageReference:9", "audioReference:3"]) || !request.images?.length || request.images.length > 9 || (request.audios?.length ?? 0) > 3 || request.videos?.length || request.firstFrame || request.lastFrame) throw new Error("MiniMax 参考模式需要 1–9 张图片和最多 3 段音频");
-      if (request.seed !== undefined || request.cameraTrajectory || request.generateAudio !== undefined) throw new Error("MiniMax 参考模式不支持指定种子、相机轨迹或音频开关");
+      if (request.seed !== undefined || request.cameraTrajectory || request.generateAudio === false) throw new Error("MiniMax 参考模式不支持指定种子、相机轨迹或关闭原生音频");
       const model = this.models?.find(item => item.id === request.model);
       const duration = request.duration ?? 5, resolution = (request.resolution ?? "768P").toUpperCase();
       if (!model?.durationResolutionMap?.some(item => item.duration.includes(duration) && item.resolution.includes(resolution))) throw new Error("MiniMax 参考模式的时长或分辨率无效");
@@ -385,7 +385,7 @@ export default {
       if (request.mode === "text" && (request.firstFrame || request.lastFrame) || request.lastFrame && !request.firstFrame || ["singleImage", "endFrameOptional"].includes(String(request.mode)) && !request.firstFrame || request.mode === "singleImage" && request.lastFrame) throw new Error("请按所选模式提供首帧和尾帧");
       const kling = klingModels.includes(request.model);
       const supportsAudio = ["kling-video-v3", "kling-video-v2.6"].includes(request.model);
-      if (request.seed !== undefined || request.cameraTrajectory || request.generateAudio !== undefined && !supportsAudio) throw new Error("此 TokenHub 模式不支持指定种子、相机轨迹或音频开关");
+      if (request.seed !== undefined || request.cameraTrajectory || (kling ? request.generateAudio !== undefined && !supportsAudio : request.generateAudio === false)) throw new Error("此 TokenHub 模式不支持指定种子、相机轨迹或所选音频设置");
       if (request.model === "kling-video-v3-turbo" && request.lastFrame) throw new Error("Kling V3 Turbo 不支持尾帧");
       const model = this.models?.find(item => item.id === request.model);
       const duration = request.duration ?? 5;
