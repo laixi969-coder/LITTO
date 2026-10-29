@@ -4,6 +4,7 @@ import deepSeek from "./src/language/deepSeek";
 import atlasCloudText from "./src/language/atlasCloud";
 import easyRouterText from "./src/language/easyRouter";
 import openRouter from "./src/language/openRouter";
+import tokenHub from "./src/language/tokenHub";
 import apiMart from "./src/media/apiMart";
 import meta from "./src/media/meta";
 import agnes from "./src/media/agnes";
@@ -26,5 +27,5 @@ export type ProviderTask = MediaTask;
 export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[1];
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
-export const languageProviders = [deepSeek, atlasCloudText, easyRouterText, openRouter] as const;
+export const languageProviders = [deepSeek, atlasCloudText, easyRouterText, openRouter, tokenHub] as const;
 export const mediaProviders = [apiMart, meta, agnes, volcengine, volcSpeech, bailian, kling, vidu, atlasCloud, easyRouter, qwenSpeech, museTalk, gen3c, tencentWand] as const;
