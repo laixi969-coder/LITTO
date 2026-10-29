@@ -6,7 +6,7 @@ import { requestVoiceDecision } from "@/utils/media/voiceDecision";
 import { z } from "zod";
 import conf from "@/utils/conf";
 import { listMediaModels } from "@/utils/media/generation";
-import { modelSelectionSchema, selectedModel } from "@/utils/modelSelection";
+import { modelSelectionSchema, selectedModel, usesPlatformDefaults } from "@/utils/modelSelection";
 import { requestMediaQuality } from "@/utils/media/quality";
 
 async function requestModelDecision(toolCallId: string, input: { data: Record<string, unknown>; reconsider?: boolean }, question: QuestionContext, signal?: AbortSignal) {
@@ -22,7 +22,7 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
     nextAction: { tool: "requestProductionDecision", operation: "configureVoice", lipSyncProviderId: requested.providerId, lipSyncModelId: requested.modelId },
     answer: "该口型模型可用，但 selectModel 不保存口型选择。先 productionSpec(readVoice)，保留已有角色、台词及候选，在 project 中设置 lipSyncProviderId/lipSyncModelId，再 requestProductionDecision(configureVoice,{project}) 保存。随后用已采用声音和人物原片调用 generateVideo，purpose=standalone，不传 shotId/productionFingerprint。无需修改默认视频模型，也无需放行 approveTake；处理后实际看听、inspectSpeech/importSpeech，再 reviewProduction 采用。",
   };
-  if (tenant) {
+  if (usesPlatformDefaults()) {
     const selection = selectedModel(data.kind);
     if (!selection) throw new Error("该类平台默认模型尚未设置，请由超级管理员在管理后台 → 默认模型中配置");
     if (!available.some(model => model.type === data.kind && model.providerId === selection.providerId && model.modelId === selection.modelId))
