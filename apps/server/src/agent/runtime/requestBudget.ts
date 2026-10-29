@@ -12,7 +12,7 @@ const historyImageNote = "[历史图片预览已省略；原始素材与会话�
 // ACT: 只转换出站副本，不修改会话或素材。预算独立于供应商的 token 窗口。
 export function createRequestBudget() {
   const previews = new Map<string, { data: string; mimeType: string }>();
-  async function prepare(payload: unknown, reduced = false): Promise<Record<string, unknown>> {
+  async function prepare(payload: unknown, reduced = false, tokenHubVideo = false): Promise<Record<string, unknown>> {
     const body = structuredClone(payload) as Record<string, unknown>;
     const compactText = (text: string) => {
       try {
@@ -36,10 +36,12 @@ export function createRequestBudget() {
       }
     }
     const images: { part: Record<string, any>; kind: string; data: string; mime: string }[] = [];
+    let videoBytes = 0;
     function visit(value: unknown) {
       if (!value || typeof value !== "object") return;
       if (Array.isArray(value)) { value.forEach(visit); return; }
       const part = value as Record<string, any>;
+      if (tokenHubVideo && part.type === "video_url" && typeof part.video_url?.url === "string" && part.video_url.url.startsWith("data:video/")) videoBytes += Buffer.byteLength(part.video_url.url);
       const url = part.type === "image_url" ? part.image_url?.url : part.type === "input_image" ? part.image_url : undefined;
       const data = typeof url === "string" ? /^data:(image\/[^;,]+);base64,([\s\S]+)$/.exec(url) : null;
       if (data) images.push({ part, kind: part.type, mime: data[1]!, data: data[2]! });
@@ -74,8 +76,8 @@ export function createRequestBudget() {
     }
     const bytes = Buffer.byteLength(JSON.stringify(body));
     // ACT: 本地超限先使用现有减量档；不发送注定失败的请求，也不等待模型或 413 才减量。
-    if (bytes > requestBytes && !reduced && images.length) return prepare(payload, true);
-    if (bytes > requestBytes) throw new Error(`本次模型请求为 ${(bytes / 1024 / 1024).toFixed(2)} MB，超过 1.76 MB 请求预算。已精简重复的项目总览${images.length ? "并减量历史图片" : ""}，原始记录未改动；请压缩文字上下文或减少本次视频/附件，不能原样重试。`);
+    if (bytes - videoBytes > requestBytes && !reduced && images.length) return prepare(payload, true, tokenHubVideo);
+    if (bytes - videoBytes > requestBytes || videoBytes && bytes > 100 * 1024 * 1024) throw new Error(`本次模型请求为 ${(bytes / 1024 / 1024).toFixed(2)} MB，超过请求预算。请减少文字上下文或视频/附件后重试，原始记录未改动。`);
     return body;
   }
   return prepare;
@@ -94,7 +96,8 @@ export function installRequestBudget(session: AgentSession) {
         access?.assert();
         for (let attempt = 0; attempt < 2; attempt++) {
           const stream = await streamFunction(model, context, { ...options,
-            onPayload: async (payload, requestModel) => prepare(await options?.onPayload?.(payload, requestModel) ?? payload, attempt > 0),
+            onPayload: async (payload, requestModel) => prepare(await options?.onPayload?.(payload, requestModel) ?? payload, attempt > 0,
+              /^(?:tokenhub|tokenhub-intl)\.tencentmaas\.(?:com|cn)$/.test(new URL(model.baseUrl).hostname)),
           });
           const pending: AssistantMessageEvent[] = [];
           let emitted = false;

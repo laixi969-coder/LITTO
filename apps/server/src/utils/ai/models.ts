@@ -10,6 +10,7 @@ const modelSchema = z.object({
   inputTokenLimit: z.number().int().positive().optional(),
   outputTokenLimit: z.number().int().positive().optional(),
   output_modalities: z.array(z.string()).optional(),
+  status: z.string().optional(),
   created: modelTimeSchema, created_at: modelTimeSchema, createdAt: modelTimeSchema,
   release_date: modelTimeSchema, releaseDate: modelTimeSchema,
 });
@@ -23,6 +24,7 @@ const openRouterModelSchema = modelSchema.extend({
 export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl: string; protocol: string; apiKey: string }) {
   const url = new URL(await assertPublicHttpUrl(apiUrl));
   const openRouter = url.origin === "https://openrouter.ai";
+  const tokenHub = /^(?:tokenhub|tokenhub-intl)\.tencentmaas\.(?:com|cn)$/.test(url.hostname);
   if (openRouter) {
     // 公开模型目录不能证明密钥有效；快速连接和高级配置共用这一步，不产生生成费用。
     const response = await modelFetch(new URL("/api/v1/key", url), {
@@ -72,12 +74,13 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
     for (const item of items) {
       const id = item.id?.trim();
       if (!id) throw new Error("模型列表包含无效的模型 ID");
+      if (tokenHub && (item.status && !["online", "pre-offline"].includes(item.status) || /^(?:wand-vega-(?:image|video)|kling-video|vidu-(?:video|image)|pixverse-video|minimax-(?:video|speech|music|voice)|hy-(?:image|video|3d)|yt-video|kinfra-(?:text|vl)-embedding)/i.test(id))) continue;
       const routerModel = openRouter ? openRouterModelSchema.parse(item) : undefined;
       if (routerModel && (!routerModel.architecture?.input_modalities.includes("text")
         || routerModel.architecture.output_modalities.length !== 1 || routerModel.architecture.output_modalities[0] !== "text")) continue;
       if (url.hostname === "api.atlascloud.ai" && item.output_modalities && !item.output_modalities.includes("text")) continue;
       if (["api.atlascloud.ai", "easyrouter.io"].includes(url.hostname) && /embed|whisper|tts|dall-e|image|moderation|audio|realtime|transcribe|rerank|speech|video|sora|seedance|seedream|pixverse|veo|kling|wan\d|wan-|minimax-h3|happyhorse|nano.?banana/i.test(id)) continue;
-      models.set(id, { id, label: item.display_name || item.displayName || (openRouter ? item.name : undefined) || id,
+      models.set(id, { id, label: item.display_name || item.displayName || (openRouter || tokenHub ? item.name : undefined) || id,
         createdAt: item.releaseDate ?? item.release_date ?? item.createdAt ?? item.created_at ?? item.created ?? undefined,
         contextWindow: openRouter ? routerModel?.context_length ?? undefined : item.inputTokenLimit,
         maxOutputTokens: openRouter ? routerModel?.top_provider?.max_completion_tokens ?? undefined : item.outputTokenLimit });

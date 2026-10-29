@@ -13,6 +13,7 @@ export const textPresets: TextPreset[] = [
   { id: "easyRouter", label: "EasyRouter", apiUrl: "https://easyrouter.io/v1", protocol: "openai-completions", probeModel: "gpt-5.4-nano", defaultModel: "gpt-5.4-nano", keyHelp: "在 EasyRouter 控制台创建 API Key，文字模型按 Key 可用列表获取。" },
   { id: "openRouter", label: "OpenRouter", apiUrl: "https://openrouter.ai/api/v1", protocol: "openai-completions", probeModel: "", defaultModel: "openai/gpt-4o-mini", keyHelp: "在 openrouter.ai/settings/keys 创建 API Key；验证密钥后自动获取文字模型，调用费用由 OpenRouter 账户结算。" },
   { id: "tokenHub", label: "腾讯云 TokenHub", apiUrl: "https://tokenhub.tencentmaas.com/v1", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "在腾讯云 TokenHub 创建广州地域 API Key；其他地域或 Token Plan 请使用自定义地址。" },
+  { id: "token01", label: "Token01", apiUrl: "https://www.token01.net/v1", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "在 Token01 控制台创建令牌，并选择对应的模型分组。" },
   { id: "custom", label: "其他（OpenAI 兼容）", apiUrl: "", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "填写服务商给你的 API 地址和 Key；只要它兼容 OpenAI 的接口就能用。", custom: true },
 ];
 
@@ -28,7 +29,7 @@ export const mediaPresets: MediaPreset[] = [
   { id: "kling", label: "可灵", desc: "Kling Image 2.1 和 Video 2.6，支持本地图片参考及视频首帧。API Key 或旧 AK/SK 认证均可使用，也支持可灵协议中转。", baseUrl: "https://api-singapore.klingai.com/v1", secret: true, keyHelp: "在可灵开放平台创建 API Key；使用旧认证时在 Key 中填 Access Key，并填写 Secret Key。" },
   { id: "atlasCloud", label: "Atlas Cloud", desc: "同步图片、视频和音频目录，按官方参数定义接入语音、音乐与音效生成；异步任务自动轮询。", baseUrl: "https://api.atlascloud.ai/api/v1", keyHelp: "在 Atlas Cloud 控制台创建 API Key；图片、视频、音频共用。支持根地址、/v1 或 /api/v1，系统自动识别。" },
   { id: "easyRouter", label: "EasyRouter", desc: "同步图片、视频和语音模型，支持 GPT 与 Gemini TTS 配音，以及已适配的图片和视频生成。", baseUrl: "https://easyrouter.io/v1", keyHelp: "在 EasyRouter 控制台创建 API Key，并开通对应模型权限。地址以 /v1 结尾。" },
-  { id: "tencentWand", label: "腾讯 WAND · TokenHub", desc: "支持 Vega 图像、视频及视频音频参考；图生图的本地图片通过服务的公网地址临时中转。", baseUrl: "https://tokenhub.tencentmaas.com", keyHelp: "在腾讯云 TokenHub 创建国内站 API Key，并开通对应模型。" },
+  { id: "tencentWand", label: "腾讯 WAND · TokenHub", desc: "支持已适配的图片、视频及 MiniMax Speech 2.8 HD 配音；图生图的本地图片通过服务的公网地址临时中转。", baseUrl: "https://tokenhub.tencentmaas.com", keyHelp: "在腾讯云 TokenHub 创建国内站 API Key，并开通对应模型。" },
 ];
 
 // Models that are not for chatting/script-writing: hide them from the auto-fetched list so the picker stays short.

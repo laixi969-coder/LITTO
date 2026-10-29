@@ -14,6 +14,7 @@
     "./language/atlasCloud": "./src/language/atlasCloud.ts",
     "./language/easyRouter": "./src/language/easyRouter.ts",
     "./language/openRouter": "./src/language/openRouter.ts",
+    "./language/token01": "./src/language/token01.ts",
     "./media/apiMart": "./src/media/apiMart.ts",
     "./media/meta": "./src/media/meta.ts",
     "./media/agnes": "./src/media/agnes.ts",
