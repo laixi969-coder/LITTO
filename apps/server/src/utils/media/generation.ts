@@ -407,7 +407,8 @@ async function generateMediaUnrecorded(
       model: request.modelId, prompt, negativePrompt: request.negativePrompt, seed: request.seed,
       images,
       videos, audios, firstFrame, lastFrame,
-      ratio: model.lipSync ? undefined : request.ratio, resolution: request.resolution, duration,
+      // 已安装的 WAND 适配器可能仍是旧版；首帧画幅在本地核验，调用时交由供应商按首帧决定。
+      ratio: model.lipSync || request.providerId === "tencentWand" && (firstFrame || request.mode === "singleImage" && images?.length === 1) ? undefined : request.ratio, resolution: request.resolution, duration,
       generateAudio: request.generateAudio, mode: request.mode,
       cameraTrajectory: request.cameraTrajectory, imageAndCameraOnly: request.imageAndCameraOnly,
     }));
