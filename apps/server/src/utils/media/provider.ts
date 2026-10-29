@@ -1,6 +1,6 @@
 import { t, translateMessage, validationOptions } from "@/lib/i18n";
 import { createHash } from "node:crypto";
-import { Readable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 import { lstat, mkdir, readFile, readdir, unlink, writeAtomic } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
@@ -323,7 +323,8 @@ export async function updateBuiltinMediaProvider(fileName: string, revision: str
     for (const model of current.models) {
       const builtinModel = models.get(model.id);
       // 声音能力须与新适配器协议一致，不能被旧版本的 optional/true 覆盖；其余用户字段保留。
-      models.set(model.id, { ...builtinModel, ...model, ...(builtinModel ? { audio: builtinModel.audio, nativeDialogue: builtinModel.nativeDialogue, ...(id === "tencentWand" ? { mode: builtinModel.mode } : {}) } : {}) });
+      models.set(model.id, { ...builtinModel, ...model, ...(builtinModel ? { audio: builtinModel.audio, nativeDialogue: builtinModel.nativeDialogue,
+        ...((id === "tencentWand" && builtinModel.type === "video") || (id === "volcengine" && /^doubao-seedance-2-[05]-/.test(model.id)) ? { mode: builtinModel.mode, durationResolutionMap: builtinModel.durationResolutionMap } : {}) } : {}) });
     }
     const property = parsed.modelProperty;
     if (property?.type !== "ObjectProperty") invalid("内置适配器缺少模型列表");
@@ -445,6 +446,18 @@ export async function loadMediaProviderSource(source: string, config: Record<str
         const { width, height } = probe.streams.find(stream => stream.codec_type === "video") ?? {};
         if (!width || !height) throw new Error("无法读取首帧实际宽高，未提交生成");
         if (!matchesAspect(width, height, ratio)) throw new Error(`首帧实际 ${width}×${height}，与选定画幅 ${ratio} 不一致；未提交生成，不自动裁剪或覆盖所选比例`);
+      },
+      audioDuration: async (input: MediaInput) => {
+        if (input.type === "url" || !cwd) throw new Error("核验音频时长需要先将音频导入工作区");
+        const bytes = input.type === "binary" ? input.data : Buffer.from(input.data.replace(/^data:[^,]+,/, ""), "base64");
+        const ffmpeg = await createWorkspaceFfmpeg(cwd, signal);
+        let size = 0;
+        const output = new Writable({ write(chunk, _encoding, callback) { size += chunk.length; callback(); } });
+        // ACT: 最长只需判断是否超过 30 秒，解码 31 秒即可拒绝超长音频，避免管道输入无法探测 MP3 时长。
+        await new Promise<void>((resolve, reject) => ffmpeg(Readable.from([bytes])).audioChannels(1).audioFrequency(8000).duration(31).format("s16le").output(output).on("end", () => resolve()).on("error", reject).run());
+        const duration = size / 16000;
+        if (!duration) throw new Error("无法读取参考音频时长");
+        return duration;
       },
       audio: { convert: (input: Uint8Array, options: AudioConvertOptions) => convertAudio(input, options, signal) },
       ffmpeg: async () => {

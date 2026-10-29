@@ -106,6 +106,8 @@ interface ProviderTools {
   image: typeof Bun.Image;
   /** 核对已读入的首帧是否符合选定比例；只检查，不裁剪或拉伸。URL 须先导入工作区。 */
   assertAspectRatio(input: MediaInput, ratio: string): Promise<void>;
+  /** 读取工作区音频的实际时长，URL 须先导入工作区。 */
+  audioDuration(input: MediaInput): Promise<number>;
   /**
    * 音频裁剪转码；仅接受 WAV 格式的内存字节并返回处理后的内存字节，不支持文件路径、URL 或其他压缩格式输入。
    */

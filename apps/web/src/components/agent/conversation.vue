@@ -881,6 +881,7 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
   if (!ready || !message || !instance || message.directory !== directory) return;
   workspaceStore.pendingAgentMessage = null;
   if (message.model) selectedModel.value = message.model;
+  reasoningEffort.value = message.reasoningEffort;
   draftAttachments.value = [...message.attachments ?? []];
   await fillPrompt(message.prompt);
   if (sender === instance && props.active) void sendMessage();

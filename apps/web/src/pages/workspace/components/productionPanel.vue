@@ -58,6 +58,12 @@
               <label>上传参考照片（可选）<input type="file" accept="image/png,image/jpeg,image/webp" @change="run(() => uploadReference($event, true))" /></label>
             </div>
             <img v-if="assetImage" class="assetPortrait" :src="mediaUrl(assetImage.url)" :alt="`${asset.name || '角色'}定妆参考`" />
+            <div v-if="editingAsset && (asset.type === 'Character' || asset.type === 'Creature')" class="fieldGrid">
+              <label>上传角色音色参考<input type="file" accept="audio/mpeg,audio/wav,audio/x-wav" @change="run(() => uploadAssetAudio($event))" /></label>
+              <label>角色音色参考<select v-model="assetAudioReference"><option value="">选择音频</option><option v-for="ref in references.filter(item => item.kind === 'audio')" :key="ref.id" :value="ref.id">{{ ref.name }}</option></select></label>
+              <button type="button" :disabled="!assetAudioReference" @click="run(bindAssetAudio)">绑定音色</button>
+              <div v-for="item in assetAudioBindings" :key="item.id">{{ references.find(ref => ref.id === item.referenceId)?.name }} <button type="button" @click="run(() => removeAssetAudio(item))">解除绑定</button></div>
+            </div>
             <details class="assetImagePicker">
               <summary>从上传或生成结果中选图（{{ assetImages.length }}）</summary>
               <button type="button" @click="run(refreshAssetLibrary)">刷新图片</button>
@@ -142,7 +148,7 @@
               <label v-if="kind === 'video'">模式<select v-model="modeKey"><option value="">选择模式</option><option v-for="mode in modes" :key="JSON.stringify(mode)" :value="JSON.stringify(mode)">{{ modeLabel(mode) }}</option></select></label>
               <label v-if="kind === 'video'">分辨率<select v-model="resolution"><option value="">选择分辨率</option><option v-for="value in resolutions" :key="value">{{ value }}</option></select></label>
               <label v-if="kind === 'video'">生成时长（含剪辑余量）<select v-model.number="duration"><option v-for="value in durations" :key="value" :value="value">{{ value }} 秒</option></select></label>
-              <label v-if="kind === 'video' && draft.musicVideo && selectedModel?.audio === 'optional'"><input v-model="generateAudio" type="checkbox" />生成声音</label>
+              <label v-if="kind === 'video' && selectedModel?.audio === 'optional'"><input v-model="generateAudio" type="checkbox" />生成声音</label>
               <label v-if="kind === 'image' && selectedModel?.imageSizes?.length">尺寸<select v-model="size"><option v-for="value in selectedModel.imageSizes" :key="value">{{ value }}</option></select></label>
               <label>画幅<select v-model="ratio"><option v-for="value in selectedModel?.cameraTrajectory ? ['20:11'] : selectedModel?.imageRatios?.length ? selectedModel.imageRatios : ['16:9', '9:16', '1:1']" :key="value">{{ value }}</option></select></label>
               <template v-if="kind === 'video' && selectedModel?.cameraTrajectory">
@@ -299,6 +305,7 @@ const observationKinds = [["anatomy_failure", "多肢、身体结构或遮挡错
 const world = ref<Record<string, any>>({}), look = ref<Record<string, any>>({}), worldDirty = ref(false);
 const assets = ref<any[]>([]), shots = ref<any[]>([]), sequences = ref<any[]>([]), references = ref<any[]>([]);
 const editingAsset = ref(""), assetVersions = ref<any[]>([]);
+const assetAudioReference = ref(""), assetAudioBindings = ref<any[]>([]);
 const emptyPersona = () => ({ bearing: "", gaze: "", focus: "", rapport: "" });
 const asset = ref({ type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", referenceMediaIds: [] as string[], personaTags: emptyPersona() });
 let savedAsset = JSON.stringify(asset.value);
@@ -362,7 +369,7 @@ const qualityLabel = computed(() => ({ basic: "基础检查 · 集中预览", vi
 const reviewFields = computed(() => realismFields.filter(field => qualityPlan.value.checks.includes(field[0])));
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
 const modeLabel = (mode: unknown) => Array.isArray(mode) ? `多参考 (${mode.join(" / ")})` : ({ singleImage: "首帧", startFrameOptional: "首帧可选", startEndRequired: "首尾帧", endFrameOptional: "首帧与可选尾帧", text: "纯文本" }[String(mode)] ?? String(mode));
-const generateAudio = ref(false);
+const generateAudio = ref(true);
 watch([kind, modelKey, modeKey, resolution, duration, size, ratio, shotId, generateAudio], () => { preview.value = null; pendingRequestId = ""; });
 watch(selectedModel, model => {
   modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? "";
@@ -431,10 +438,11 @@ async function saveWorld() {
   await request(`/projects/${projectId}/looks/project`, "PUT", look.value);
   worldDirty.value = false; preview.value = null; message.value = "世界与影调已保存";
 }
-function clearAsset() { assetDetails = {}; editingAsset.value = ""; assetVersions.value = []; asset.value = { type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", referenceMediaIds: [] as string[], personaTags: emptyPersona() }; savedAsset = JSON.stringify(asset.value); }
+function clearAsset() { assetDetails = {}; editingAsset.value = ""; assetVersions.value = []; assetAudioBindings.value = []; assetAudioReference.value = ""; asset.value = { type: "Character", name: "", description: "", invariants: "", speech: "", behavior: "", authoritativeReference: "", referenceMediaIds: [] as string[], personaTags: emptyPersona() }; savedAsset = JSON.stringify(asset.value); }
 async function editAsset(item: any) {
   if (JSON.stringify(asset.value) !== savedAsset) throw new Error("请先保存当前资产，再切换编辑对象");
   const value = await request(`/assets/${item.id}`); assetDetails = value; editingAsset.value = item.id; assetVersions.value = value.versions;
+  assetAudioBindings.value = value.bindings.filter((binding: any) => binding.role === "AUDIO"); assetAudioReference.value = "";
   asset.value = { type: value.type, name: value.name, description: value.description, invariants: value.invariants.join("\n"), speech: value.attributes?.characterDirection?.speech ?? "", behavior: value.attributes?.characterDirection?.behavior ?? "", authoritativeReference: value.attributes?.authoritativeReference ?? "", referenceMediaIds: references.value.filter(ref => value.references.includes(ref.id) && ref.mediaId).map(ref => ref.mediaId), personaTags: { ...emptyPersona(), ...(value.personaTags ?? {}) } };
   savedAsset = JSON.stringify(asset.value);
   if (assetEditor.value) { assetEditor.value.open = true; assetEditor.value.scrollIntoView({ block: "start", behavior: "smooth" }); }
@@ -521,7 +529,7 @@ async function selectShot(id: string) {
   draft.value = structuredClone(toRaw(detail.value));
   draft.value.realism ??= Object.fromEntries(realismFields.map(field => [field[0], ""]));
   duration.value = draft.value.generationDuration ?? draft.value.duration;
-  generateAudio.value = draft.value.musicVideo?.audioMode === "generated";
+  generateAudio.value = !draft.value.musicVideo || draft.value.musicVideo.audioMode === "generated";
   selectPendingVersion();
   void refreshJobs().catch(() => {});
   await refreshCandidatePool();
@@ -581,6 +589,21 @@ async function uploadReference(event: Event, forAsset = false) {
   else binding.value.referenceId = reference.id;
   input.value = "";
 }
+async function uploadAssetAudio(event: Event) {
+  const previous = binding.value.referenceId;
+  await uploadReference(event);
+  assetAudioReference.value = binding.value.referenceId;
+  binding.value.referenceId = previous;
+}
+async function bindAssetAudio() {
+  if (assetAudioBindings.value.some(item => item.referenceId === assetAudioReference.value)) throw new Error("该音频已绑定");
+  const result = await request(`/assets/${editingAsset.value}/bindings`, "POST", { referenceId: assetAudioReference.value, role: "AUDIO", lockLevel: "CONTROL", weight: 1 });
+  assetAudioBindings.value.push(result); assetAudioReference.value = ""; preview.value = null;
+}
+async function removeAssetAudio(item: any) {
+  await request(`/bindings/${item.id}?confirm=1`, "DELETE");
+  assetAudioBindings.value = assetAudioBindings.value.filter(binding => binding.id !== item.id); preview.value = null;
+}
 async function bindReference() { await saveShot(); await request(`/shots/${shotId.value}/bindings`, "POST", { ...binding.value, ...(cropEnabled.value ? { crop: referenceCrop.value } : {}) }); detail.value = await request(`/shots/${shotId.value}`); preview.value = null; }
 async function removeBinding(item: any) {
   await ElMessageBox.confirm("解除此参考将改变镜头约束，已有输出需重新检查。", "解除参考", { confirmButtonText: "解除", cancelButtonText: "取消" });
@@ -589,7 +612,7 @@ async function removeBinding(item: any) {
 function generationRequest() {
   const model = selectedModel.value; if (!model) throw new Error("请选择模型");
   if (model.cameraTrajectory && (!cameraTrajectory.value || !imageAndCameraOnly.value)) throw new Error("请导入轨迹并确认图像与相机控制范围");
-  return { providerId: model.providerId, modelId: model.modelId, ratio: ratio.value, ...(kind.value === "image" ? (size.value ? { size: size.value } : {}) : { mode: modeKey.value ? JSON.parse(modeKey.value) : undefined, resolution: resolution.value, duration: duration.value, ...(draft.value?.musicVideo && model.audio === "optional" ? { generateAudio: generateAudio.value } : {}), ...(model.cameraTrajectory ? { cameraTrajectory: cameraTrajectorySchema.parse(cameraTrajectory.value), imageAndCameraOnly: imageAndCameraOnly.value } : {}) }) };
+  return { providerId: model.providerId, modelId: model.modelId, ratio: ratio.value, ...(kind.value === "image" ? (size.value ? { size: size.value } : {}) : { mode: modeKey.value ? JSON.parse(modeKey.value) : undefined, resolution: resolution.value, duration: duration.value, ...(model.audio === "optional" ? { generateAudio: generateAudio.value } : {}), ...(model.cameraTrajectory ? { cameraTrajectory: cameraTrajectorySchema.parse(cameraTrajectory.value), imageAndCameraOnly: imageAndCameraOnly.value } : {}) }) };
 }
 async function loadTrajectory(event: Event) {
   const input = event.target as HTMLInputElement;

@@ -135,7 +135,10 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const assets = [...relevantIds].map(id => projectAssets.get(id)!) as any[];
     const assetBindings = assets.flatMap(asset => {
         // 已审看主帧承载视频身份；不再挤占单首帧模式的输入槽。
-        if (kind === "video" && extra.startFrameMediaId || asset.attributes?.authoritativeReference) return [];
+        const audio = kind === "video" && ["Character", "Creature"].includes(asset.type)
+            ? s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).filter(binding => binding.role === "AUDIO")
+                .map(binding => ({ ...binding, notes: `${asset.name} 的音色参考` })) : [];
+        if (kind === "video" && extra.startFrameMediaId || asset.attributes?.authoritativeReference) return audio;
         const role = ["Character", "Creature"].includes(asset.type) ? "IDENTITY"
             : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
         const inherited: Row[] = s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).filter(binding => binding.role === role)
@@ -143,7 +146,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         const references = (asset.references ?? []).filter((id: string) => !inherited.some(binding => binding.referenceId === id))
             .filter((id: string) => s.get("refs", id)?.kind === "image")
             .map((referenceId: string) => ({ referenceId, role, weight: 1, lockLevel: "LOCK", crop: null, notes: `${asset.name} 的已绑定资产参考` }));
-        return [...inherited, ...references];
+        return [...inherited, ...references, ...audio];
     });
     const bindings = [...s.list("reference_bindings", { targetType: "shot", targetId: shotId }), ...assetBindings].filter(binding => {
         if (!["IDENTITY", "WARDROBE", "GEOMETRY", "ENVIRONMENT"].includes(binding.role)) return true;
@@ -235,7 +238,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         const supported = adapterSupports && !!caps[roleCap[b.role]] && used < maxInputs && ref?.mediaId;
         if (supported) {
             const mediaId = b.crop ? ensureReferenceCrop(s, proj, b.referenceId, b.crop) : ref!.mediaId;
-            inputs.push({ referenceId: b.referenceId, mediaId, role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: true }); used++;
+            inputs.push({ referenceId: b.referenceId, mediaId, ...(b.notes ? { text: b.notes } : {}), role: b.role, weight: b.weight, lockLevel: b.lockLevel, sent: true }); used++;
         }
         else {
             const why = !adapterSupports ? "adapter cannot send this role" : !caps[roleCap[b.role]] ? `model lacks ${roleCap[b.role]}` : used >= maxInputs ? "input limit reached" : "reference has no media";

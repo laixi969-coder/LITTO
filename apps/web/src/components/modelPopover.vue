@@ -1,7 +1,6 @@
 <template>
   <div class="modelPopover">
     <el-popover
-      v-if="isAuthDisabled()"
       v-model:visible="visible"
       trigger="click"
       placement="top-start"
@@ -11,17 +10,17 @@
       popperClass="agentModelPopover"
       :popperStyle="{ padding: '20px', maxWidth: 'calc(100vw - 24px)' }">
       <template #reference>
-        <el-button class="modelButton" text :disabled="disabled" :aria-label="`选择对话模型，当前：${selectedModelChoice?.label ?? '未选择'}`" title="选择对话模型与推理等级">
+        <el-button class="modelButton" text :disabled="disabled" :aria-label="`选择推理等级，当前模型：${selectedModelChoice?.label ?? '未选择'}`" :title="isAuthDisabled() ? '选择对话模型与推理等级' : '选择推理等级'">
           <span class="modelLabel">模型</span>
           <modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="14" />
-          <span class="modelName">{{ selectedModelChoice?.label ?? "选择模型" }}</span>
+          <span class="modelName">{{ selectedModelChoice?.label ?? (isAuthDisabled() ? "选择模型" : "等待管理员设置默认模型") }}</span>
           ·
           <span class="reasoningLabel">{{ reasoningLabel }}</span>
           <icon-chevron-down :size="12" />
         </el-button>
       </template>
       <el-form class="modelOptions" labelPosition="top">
-        <el-form-item label="模型">
+        <el-form-item v-if="isAuthDisabled()" label="模型">
           <el-select :modelValue="selectedModel" filterable :loading="loading || saving" :disabled="disabled || loading || saving" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="暂无可用模型，请先添加供应商并配置 API Key" @change="selectModel">
             <template #prefix><modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="18" /></template>
             <el-option-group v-for="provider in modelGroups" :key="provider.id" :label="provider.label">
@@ -41,7 +40,6 @@
         </el-form-item>
       </el-form>
     </el-popover>
-    <span v-else class="modelButton">{{ selectedModelChoice?.label ?? "等待管理员设置默认模型" }}</span>
   </div>
 </template>
 
@@ -97,6 +95,7 @@ async function selectModel(value: string) {
   error.value = "";
   try {
     await saveSettings(current => ({ modelSelection: { ...current.modelSelection as Record<string, unknown>, text: { providerId: chosen.providerId, modelId: chosen.modelId } } }));
+    if (selectedModel.value !== value) reasoningEffort.value = "";
     selectedModel.value = value;
     pendingChoice.value = "";
     ElMessage.success(`已选用 ${chosen.label}`);
@@ -106,8 +105,7 @@ async function selectModel(value: string) {
 }
 const selectedModelChoice = computed(() => modelChoices.value.find(item => item.value === selectedModel.value));
 const reasoningLabel = computed(() => reasoningOptions.find(item => item.value === reasoningEffort.value)?.label ?? "默认");
-watch(selectedModel, () => { reasoningEffort.value = ""; });
-watch(visible, open => { if (open) { void loadAvailableModels(); void loadModels(); } });
+watch(visible, open => { if (open && isAuthDisabled()) { void loadAvailableModels(); void loadModels(); } });
 watch([modelChoices, selectedModel], ([items]) => {
   if (!items.some(item => item.value === selectedModel.value)) selectedModel.value = items[0]?.value ?? "";
 }, { immediate: true });

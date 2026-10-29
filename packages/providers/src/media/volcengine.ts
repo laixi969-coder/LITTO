@@ -56,13 +56,16 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 
 export default {
   resumeMedia,
-  id: "volcengine", label: "火山方舟", version: "1.2.3", rules,
-  readme: "使用火山方舟 API Key。内置 Seedream 4.5 / 5 Pro 与 Seedance 1.5 Pro / 2.5，支持本地图片参考、首帧和首尾帧；Seedance 2.5 支持最多 30 张图片的身份/场景参考，尚未接入音视频参考与编辑。API 地址可改为兼容方舟协议的中转；模型 ID 可在模型配置中替换为控制台接入点 ID。\n\n[官方文档](https://docs.volcengine.com/docs/ark/seedream-4-0-5-0?lang=zh)",
+  id: "volcengine", label: "火山方舟", version: "1.3.0", rules,
+  readme: "使用火山方舟 API Key。Seedance 2.0 和 2.5 支持音画同出及图片、音频参考；视频参考与编辑尚未接入。参考音频不保证声音或口型完全一致，须遵守模型对格式、时长和大小的限制。API 地址可改为兼容方舟协议的中转；模型 ID 可在模型配置中替换为控制台接入点 ID。\n\n[视频接口文档](https://docs.volcengine.com/docs/ark/create-video-generation-task-api)",
   models: [
     { id: "doubao-seedream-4-5-251128", label: "Seedream 4.5", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "doubao-seedream-5-0-pro-260628", label: "Seedream 5 Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["2K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
     { id: "doubao-seedance-1-5-pro-251215", label: "Seedance 1.5 Pro", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12], resolution: ["480P", "720P", "1080P"] }] },
-    { id: "doubao-seedance-2-5-260628", label: "Seedance 2.5", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:30"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "doubao-seedance-2-5-260628", label: "Seedance 2.5", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:30"], ["imageReference:30", "audioReference:10"], ["audioReference:10"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], resolution: ["480P", "720P", "1080P"] }] },
+    { id: "doubao-seedance-2-0-260128", label: "Seedance 2.0", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480P", "720P", "1080P", "4K"] }] },
+    { id: "doubao-seedance-2-0-fast-260128", label: "Seedance 2.0 Fast", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480P", "720P"] }] },
+    { id: "doubao-seedance-2-0-mini-260615", label: "Seedance 2.0 Mini", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480P", "720P"] }] },
   ] satisfies ProviderModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const result = await fetchJson(this, "/models", this.signal ?? AbortSignal.timeout(30000));
@@ -78,6 +81,9 @@ export default {
         if (/^doubao-seedream-5-0-pro-/.test(id)) return model.type === "image" && /5-0-pro/.test(model.id);
         if (/^doubao-seedream-4-5-/.test(id)) return model.type === "image" && /4-5/.test(model.id);
         if (/^doubao-seedance-2-5-/.test(id)) return model.type === "video" && /2-5/.test(model.id);
+        if (/^doubao-seedance-2-0-fast-/.test(id)) return model.type === "video" && /2-0-fast/.test(model.id);
+        if (/^doubao-seedance-2-0-mini-/.test(id)) return model.type === "video" && /2-0-mini/.test(model.id);
+        if (/^doubao-seedance-2-0-\d/.test(id)) return model.type === "video" && /2-0-\d/.test(model.id);
         if (/^doubao-seedance-1-5-/.test(id)) return model.type === "video" && /1-5/.test(model.id);
         return false;
       });
@@ -123,10 +129,25 @@ export default {
     if (request.mode === "text" && (request.firstFrame || request.lastFrame)) throw new Error("文生视频模式不能附带首尾帧");
     if ((request.mode === "singleImage" || request.mode === "endFrameOptional") && !request.firstFrame) throw new Error("请选择视频首帧");
     if (request.mode === "singleImage" && request.lastFrame) throw new Error("使用尾帧时请选择尾帧可选模式");
-    if (request.videos?.length || request.audios?.length) throw new Error("当前方舟适配器尚未接入视频与音频参考");
+    if (request.videos?.length) throw new Error("当前方舟适配器尚未接入视频参考");
+    if (request.audios?.length && !referenceMode) throw new Error("使用音频参考时请选择参考模式");
     if (request.images?.length && !referenceMode) throw new Error("使用身份图片时请选择模型声明的多参考模式");
     const referenceLimit = Array.isArray(request.mode) ? Number(request.mode.find(value => value.startsWith("imageReference:"))?.split(":")[1] ?? 0) : 0;
-    if (referenceMode && (!request.images?.length || request.images.length > Math.min(referenceLimit, 30))) throw new Error(`此模式须提供 1–${Math.min(referenceLimit, 30)} 张图片参考`);
+    const audioLimit = Array.isArray(request.mode) ? Number(request.mode.find(value => value.startsWith("audioReference:"))?.split(":")[1] ?? 0) : 0;
+    if (referenceMode && ((!request.images?.length && !request.audios?.length) || (request.images?.length ?? 0) > referenceLimit || (request.audios?.length ?? 0) > audioLimit)) throw new Error("参考素材数量不符合所选模式");
+    if (referenceMode && !request.images?.length && !(/seedance-2-5/.test(request.model) || /Seedance 2\.5/i.test(model?.label ?? ""))) throw new Error("此模型使用音频参考时须同时提供图片");
+    let audioDuration = 0;
+    const isSeedance25 = /seedance-2-5/.test(request.model) || /Seedance 2\.5/i.test(model?.label ?? "");
+    for (const input of request.audios ?? []) {
+      if (input.type === "url") throw new Error("参考音频须先导入工作区，以便核验时长");
+      const bytes = input.type === "binary" ? Buffer.from(input.data) : Buffer.from(input.data.replace(/^data:[^,]+,/, ""), "base64");
+      if (!["audio/mpeg", "audio/wav", "audio/x-wav"].includes(input.mimeType) || !bytes.length || bytes.length > 15 * 1024 * 1024) throw new Error("参考音频须为不超过 15 MB 的 MP3 或 WAV");
+      const duration = await this.tool.audioDuration(input);
+      // ACT: MP3 管道解码可能包含编码填充，容许 0.1 秒误差，最终以供应商校验为准。
+      if (duration < 1.9 || duration > (isSeedance25 ? 30.1 : 15.1)) throw new Error("参考音频时长不符合 Seedance 模型要求");
+      audioDuration += duration;
+    }
+    if (audioDuration > (isSeedance25 ? 30 : 15) + (request.audios?.length ?? 0) * 0.1) throw new Error("参考音频总时长超出 Seedance 模型限制");
     if (request.lastFrame && !request.firstFrame) throw new Error("尾帧须搭配首帧");
     const duration = request.duration ?? 5;
     // ACT: 时长与分辨率按所选模型的 durationResolutionMap 动态校验；
@@ -135,20 +156,23 @@ export default {
     if (!capability.length) throw new Error("当前模型未配置 durationResolutionMap，请先同步模型或配置接入点能力");
     const resolution = (request.resolution ?? "720P").toLowerCase();
     if (!Number.isInteger(duration) || !capability.some(row => row.duration.includes(duration) && row.resolution.some(value => value.toLowerCase() === resolution))) throw new Error("当前模型不支持此时长与分辨率组合，请按 durationResolutionMap 配置");
-    // Seedance 2.5 首帧模式由输入图决定画幅，官方仅接受 adaptive。
-    const seedance25 = /seedance-2-5/.test(request.model) || /Seedance 2\.5/i.test(model?.label ?? "");
-    if (seedance25 && request.firstFrame && request.ratio) await this.tool.assertAspectRatio(request.firstFrame, request.ratio);
-    const ratio = seedance25 && request.firstFrame ? "adaptive" : request.ratio ?? "16:9";
+    // Seedance 2.x 首帧模式由输入图决定画幅。
+    const seedance2 = /seedance-2-[05]/.test(request.model) || /Seedance 2\.[05]/i.test(model?.label ?? "");
+    if (seedance2 && request.firstFrame && request.ratio) await this.tool.assertAspectRatio(request.firstFrame, request.ratio);
+    const ratio = seedance2 && request.firstFrame ? "adaptive" : request.ratio ?? "16:9";
     if (!["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21", "adaptive"].includes(ratio)) throw new Error("不支持此视频画幅");
     const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
-    const task = await fetchJson(this, "/contents/generations/tasks", signal, {
+    const body = {
       model: request.model, content: [
         { type: "text", text: request.prompt },
         ...(referenceMode ? (request.images ?? []).map(input => ({ type: "image_url", image_url: { url: imageUrl(input) }, role: "reference_image" })) : []),
+        ...(referenceMode ? (request.audios ?? []).map(input => ({ type: "audio_url", audio_url: { url: imageUrl(input).replace(/^data:audio\/x-wav;/, "data:audio/wav;") }, role: "reference_audio" })) : []),
         ...(request.firstFrame ? [{ type: "image_url", image_url: { url: imageUrl(request.firstFrame) }, role: "first_frame" }] : []),
         ...(request.lastFrame ? [{ type: "image_url", image_url: { url: imageUrl(request.lastFrame) }, role: "last_frame" }] : []),
       ], duration, resolution, ratio, generate_audio: request.generateAudio ?? false, watermark: request.watermark ?? false,
-    });
+    };
+    if (Buffer.byteLength(JSON.stringify(body)) > 64 * 1024 * 1024) throw new Error("方舟请求体不能超过 64 MB，请压缩参考素材");
+    const task = await fetchJson(this, "/contents/generations/tasks", signal, body);
     if (typeof task.id !== "string" || !task.id) throw new Error("方舟未返回任务 ID");
     await this.tool.reportTask?.({ id: task.id, status: "submitted", mediaType: "video" });
     return resumeMedia.call(this, { id: task.id, status: "submitted", mediaType: "video" });

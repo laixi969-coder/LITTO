@@ -15,6 +15,14 @@ async function imageUrl(context: ProviderContext, input: MediaInput) {
   return context.tool.relayImage(input);
 }
 
+function mediaValue(input: MediaInput) {
+  if (input.type === "url") {
+    if (!/^https?:\/\//i.test(input.url)) throw new Error("腾讯 WAND 素材地址须为 HTTP 或 HTTPS");
+    return input.url;
+  }
+  return `data:${input.mimeType};base64,${input.type === "binary" ? Buffer.from(input.data).toString("base64") : input.data.replace(/^data:[^,]+,/, "")}`;
+}
+
 async function fetchJson(context: ProviderContext, path: string, signal: AbortSignal, body?: object) {
   const key = String(context.config.apiKey ?? "").trim().replace(/^Bearer\s+/i, "");
   if (!key) throw new Error("请填写腾讯 TokenHub API Key");
@@ -74,16 +82,30 @@ async function submit(context: ProviderContext, kind: "image" | "video", body: o
   return resumeMedia.call(context, task);
 }
 
+function videoModel(id: string): ProviderModel | undefined {
+  const versions = ["1.0-lite","1.5-lite","1.0-pro","1.0-pro-fast","1.0-pro-mini","1.5-pro"];
+  const version = id.replace(/^wand-vega-video-/, "");
+  if (!id.startsWith("wand-vega-video-") || !versions.includes(version)) return undefined;
+  const start = version === "1.5-lite" ? 2 : 4;
+  const end = version.startsWith("1.5-") ? 30 : 15;
+  return { id, label: `Vega Video ${version.replace("-", " ")}`, type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "audioReference:3"]], audio: "optional", durationResolutionMap: [{ duration: Array.from({ length: end - start + 1 }, (_, i) => start + i), resolution: version === "1.0-lite" ? ["480P", "768P", "1080P", "2K", "4K"] : ["480P", "720P", "1080P", "2K", "4K"] }] };
+}
+
 export default {
-  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.3.0", rules,
-  readme: "使用腾讯云 TokenHub 国内站 API Key。同步模型只显示已适配的 WAND 模型，模型权限在实际生成时确认。Vega Video 1.5 Lite 暂支持文生、首帧和首尾帧，时长 6、8、10 秒及 1080P；其他档位待完整接口规格确认后接入。工作区本地参考图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为此服务的公网 HTTPS 地址。支持 PNG、JPEG，每张不超过 20 MB；链接有效期为 2 小时。负面提示词会合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
+  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.5.0", rules,
+  readme: "使用腾讯云 TokenHub 国内站 API Key。视频支持音画同出、图片与音频参考；视频本地图片和音频随请求传输。图生图的本地图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为公网 HTTPS 地址。参考音频不保证声音或口型完全一致；视频参考暂未接入。负面提示词合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
   models: [
     { id: "wand-vega-image-lite", label: "Vega Image Lite", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-flash", label: "Vega Image Flash", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-pro", label: "Vega Image Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-1.5-pro", label: "Vega Image 1.5 Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
-    { id: "wand-vega-video-1.0-lite", label: "Vega Video 1.0 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "1080P", "2K", "4K"] }] },
-    { id: "wand-vega-video-1.5-lite", label: "Vega Video 1.5 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [6, 8, 10], resolution: ["1080P"] }] },
+    {"id":"wand-vega-video-1.0-lite","label":"Vega Video 1.0 lite","type":"video","mode":["text","singleImage","endFrameOptional",["imageReference:9","audioReference:3"]],"audio":"optional","durationResolutionMap":[{"duration":[4,5,6,7,8,9,10,11,12,13,14,15],"resolution":["480P","768P","1080P","2K","4K"]}]},
+    {"id":"wand-vega-video-1.5-lite","label":"Vega Video 1.5 lite","type":"video","mode":["text","singleImage","endFrameOptional",["imageReference:9","audioReference:3"]],"audio":"optional","durationResolutionMap":[{"duration":[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],"resolution":["480P","720P","1080P","2K","4K"]}]},
+    {"id":"wand-vega-video-1.0-pro","label":"Vega Video 1.0 pro","type":"video","mode":["text","singleImage","endFrameOptional",["imageReference:9","audioReference:3"]],"audio":"optional","durationResolutionMap":[{"duration":[4,5,6,7,8,9,10,11,12,13,14,15],"resolution":["480P","720P","1080P","2K","4K"]}]},
+    {"id":"wand-vega-video-1.0-pro-fast","label":"Vega Video 1.0 pro-fast","type":"video","mode":["text","singleImage","endFrameOptional",["imageReference:9","audioReference:3"]],"audio":"optional","durationResolutionMap":[{"duration":[4,5,6,7,8,9,10,11,12,13,14,15],"resolution":["480P","720P","1080P","2K","4K"]}]},
+    {"id":"wand-vega-video-1.0-pro-mini","label":"Vega Video 1.0 pro-mini","type":"video","mode":["text","singleImage","endFrameOptional",["imageReference:9","audioReference:3"]],"audio":"optional","durationResolutionMap":[{"duration":[4,5,6,7,8,9,10,11,12,13,14,15],"resolution":["480P","720P","1080P","2K","4K"]}]},
+    {"id":"wand-vega-video-1.5-pro","label":"Vega Video 1.5 pro","type":"video","mode":["text","singleImage","endFrameOptional",["imageReference:9","audioReference:3"]],"audio":"optional","durationResolutionMap":[{"duration":[4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],"resolution":["480P","720P","1080P","2K","4K"]}]},
+
   ] satisfies ProviderModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const key = String(this.config.apiKey ?? "").trim().replace(/^Bearer\s+/i, "");
@@ -99,8 +121,8 @@ export default {
       if (!item || typeof item.id !== "string" || (modelIds && !modelIds.includes(item.id)) || (typeof item.status === "string" && !["online", "pre-offline"].includes(item.status))) return [];
       const label = typeof item.name === "string" && item.name.trim() ? item.name : imageLabels[item.id];
       if (Object.hasOwn(imageLabels, item.id)) return [{ id: item.id, label, type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: Object.keys(sizes) } satisfies ProviderModel];
-      if (item.id === "wand-vega-video-1.0-lite") return [{ id: item.id, label: typeof item.name === "string" && item.name.trim() ? item.name : "Vega Video 1.0 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "1080P", "2K", "4K"] }] } satisfies ProviderModel];
-      if (item.id === "wand-vega-video-1.5-lite") return [{ id: item.id, label: typeof item.name === "string" && item.name.trim() ? item.name : "Vega Video 1.5 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [6, 8, 10], resolution: ["1080P"] }] } satisfies ProviderModel];
+      const video = videoModel(item.id);
+      if (video) return [{ ...video, label: typeof item.name === "string" && item.name.trim() ? item.name : video.label }];
       return [];
     });
   },
@@ -119,24 +141,32 @@ export default {
     return submit(this, "image", { model: request.model, prompt, size: sizes[ratio]![index], ...(images.length ? { input: [{ content: images }] } : {}) });
   },
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
-    if (!["wand-vega-video-1.0-lite", "wand-vega-video-1.5-lite"].includes(request.model)) throw new Error("不支持此腾讯 WAND 视频模型");
+    const model = videoModel(request.model);
+    if (!model) throw new Error("不支持此腾讯 WAND 视频模型");
     if (request.mode === "singleImage" && request.images?.length === 1 && !request.firstFrame) request = { ...request, firstFrame: request.images[0], images: [] };
-    if ((request.mode !== undefined && !["text", "singleImage", "endFrameOptional"].includes(String(request.mode))) || request.images?.length || request.videos?.length || request.audios?.length) throw new Error("腾讯 WAND 当前仅支持首帧或首尾帧图片");
+    const referenceMode = Array.isArray(request.mode);
+    if (referenceMode && JSON.stringify(request.mode) !== JSON.stringify(["imageReference:9", "audioReference:3"])) throw new Error("不支持此腾讯 WAND 参考模式");
+    if (!referenceMode && request.mode !== undefined && !["text", "singleImage", "endFrameOptional"].includes(String(request.mode))) throw new Error("不支持此腾讯 WAND 视频模式");
+    if (request.videos?.length) throw new Error("腾讯 WAND 暂不支持工作区视频参考");
+    if (referenceMode && (!request.images?.length || request.images.length > 9 || (request.audios?.length ?? 0) > 3 || request.firstFrame || request.lastFrame)) throw new Error("腾讯 WAND 参考模式需要 1–9 张图片、最多 3 段音频，不能同时传首尾帧");
+    if (!referenceMode && (request.images?.length || request.audios?.length)) throw new Error("图片和音频参考请使用参考模式");
     if (request.mode === "text" && (request.firstFrame || request.lastFrame)) throw new Error("文生视频模式不能附带首尾帧");
     if (((request.mode === "singleImage" || request.mode === "endFrameOptional") && !request.firstFrame) || (request.lastFrame && !request.firstFrame)) throw new Error("请选择视频首帧");
     if (request.mode === "singleImage" && request.lastFrame) throw new Error("单图模式不支持尾帧");
-    if (request.seed !== undefined || request.cameraTrajectory || request.generateAudio || request.watermark) throw new Error("腾讯 WAND 当前不支持指定种子、相机轨迹、音频或水印");
+    if (request.seed !== undefined || request.cameraTrajectory || request.watermark) throw new Error("腾讯 WAND 当前不支持指定种子、相机轨迹或水印");
     const prompt = [request.prompt, request.negativePrompt ? `画面中不得出现：${request.negativePrompt}` : ""].filter(Boolean).join("\n");
     if (!prompt.trim()) throw new Error("请输入视频提示词");
-    const isVideo15Lite = request.model === "wand-vega-video-1.5-lite";
-    // ACT: 1.5 Lite 暂仅开放腾讯控制台示例明确展示的 6、8、10 秒和 1080P；取得完整规格后再扩展。
-    const duration = request.duration ?? (isVideo15Lite ? 6 : 5);
-    const resolution = (request.resolution ?? (isVideo15Lite ? "1080P" : "768P")).toUpperCase();
-    if (isVideo15Lite ? ![6, 8, 10].includes(duration) || resolution !== "1080P" : !Number.isInteger(duration) || duration < 4 || duration > 15 || !["768P", "1080P", "2K", "4K"].includes(resolution)) throw new Error("腾讯 WAND 视频时长或分辨率无效");
+    const duration = request.duration ?? 5;
+    const resolution = (request.resolution ?? (request.model === "wand-vega-video-1.0-lite" ? "768P" : "720P")).toUpperCase();
+    if (!model.durationResolutionMap?.some(item => item.duration.includes(duration) && item.resolution.includes(resolution))) throw new Error("腾讯 WAND 视频时长或分辨率无效");
     if (request.ratio && !["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].includes(request.ratio)) throw new Error("腾讯 WAND 视频画幅无效");
     const content: object[] = [{ type: "text", text: prompt }];
-    if (request.firstFrame) content.push({ type: "image_url", image_url: { url: await imageUrl(this, request.firstFrame) }, role: "first_frame" });
-    if (request.lastFrame) content.push({ type: "image_url", image_url: { url: await imageUrl(this, request.lastFrame) }, role: "last_frame" });
-    return submit(this, "video", { model: request.model, content, duration, resolution, ...(request.ratio ? { ratio: request.ratio } : {}) });
+    if (request.firstFrame) content.push({ type: "image_url", image_url: { url: mediaValue(request.firstFrame) }, role: "first_frame" });
+    if (request.lastFrame) content.push({ type: "image_url", image_url: { url: mediaValue(request.lastFrame) }, role: "last_frame" });
+    for (const input of request.images ?? []) content.push({ type: "image_url", image_url: { url: mediaValue(input) }, role: "reference_image" });
+    for (const input of request.audios ?? []) {
+      content.push({ type: "audio_url", audio_url: { url: mediaValue(input) }, role: "reference_audio" });
+    }
+    return submit(this, "video", { model: request.model, content, duration, resolution, options: { audio_mode: request.generateAudio === undefined ? "auto" : request.generateAudio ? "enable" : "disable" }, ...(request.ratio ? { ratio: request.ratio } : {}) });
   },
 } satisfies ProviderDefinition<typeof rules>;
