@@ -15,6 +15,7 @@ import syncBuiltins from "@/utils/plugins/syncBuiltins";
 import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback, translateError, translateMessage } from "@/lib/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
+import { readRelayImage } from "@/utils/media/relay";
 
 const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts"];
 
@@ -61,6 +62,8 @@ export async function createApp({
   // 只有部署在可信反向代理之后才采用 x-forwarded-for，否则客户端可伪造来源绕过限流。
   if (process.env.MILIMILI_TRUST_PROXY === "1") app.set("trust proxy", 1);
   app.use(securityHeaders);
+  // 临时素材链接携带访问令牌，不进入请求日志或账号会话中间件。
+  app.get("/mediaRelay/:token", readRelayImage);
 
   if (process.env.NODE_ENV === "dev") {
     await buildRoute();

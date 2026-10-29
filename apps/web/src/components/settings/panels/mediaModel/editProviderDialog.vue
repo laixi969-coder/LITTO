@@ -12,6 +12,8 @@
     <div class="providerEditor">
       <messageMarkdown v-if="provider?.readme" class="providerReadme" :content="provider.readme" />
       <form-create-form v-model="configValues" :rule="configRules" :option="formOptions" />
+      <el-button v-if="provider?.id === 'tencentWand'" :loading="testingConnection" :disabled="saving || fetching" @click="testConnection">测试连接</el-button>
+      <el-alert v-if="connectionResult" :title="connectionResult.message" :type="connectionResult.ok ? 'success' : 'error'" :closable="false" showIcon />
       <div class="modelHeader">
         <h4>模型配置 <el-text type="info">{{ models.length }}</el-text></h4>
         <el-space>
@@ -99,6 +101,8 @@ const models = ref<MediaProviderModel[]>([]);
 const modelEditorVisible = ref(false);
 const editingModelIndex = ref<number>();
 const saving = ref(false);
+const testingConnection = ref(false);
+const connectionResult = ref<{ ok: boolean; message: string }>();
 const configValues = ref<Record<string, unknown>>({});
 const configRules = computed(() => formCreate.copyRules([...(mediaProviders.find(item => item.id === provider?.id)?.rules ?? [
   { type: "input", field: "apiKey", title: "API Key", value: "", props: { type: "password", showPassword: true, autocomplete: "off" } },
@@ -179,6 +183,7 @@ watch(visible, isVisible => {
     return;
   }
   formError.value = "";
+  connectionResult.value = undefined;
   modelEditorVisible.value = false;
   editingModelIndex.value = undefined;
   const configs = settings.value.mediaProviderConfigs as Record<string, Record<string, unknown>> | undefined;
@@ -187,6 +192,21 @@ watch(visible, isVisible => {
   catalogueError.value = "";
   if (syncOnOpen) void fetchModels();
 }, { immediate: true });
+
+async function testConnection() {
+  if (testingConnection.value) return;
+  const apiKey = typeof configValues.value.apiKey === "string" ? configValues.value.apiKey.trim() : "";
+  const baseUrl = typeof configValues.value.baseUrl === "string" ? configValues.value.baseUrl.trim() : "";
+  if (!apiKey) { connectionResult.value = { ok: false, message: "请填写 TokenHub API Key" }; return; }
+  testingConnection.value = true;
+  connectionResult.value = undefined;
+  try {
+    const { data } = await axios.post<{ data: { ok: boolean; message: string } }>("/api/providers/test", { kind: "media", providerId: "tencentWand", apiKey, baseUrl }, { timeout: 30000 });
+    connectionResult.value = data.data;
+  } catch (error) {
+    connectionResult.value = { ok: false, message: axios.isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "连接测试失败" };
+  } finally { testingConnection.value = false; }
+}
 
 function modelTags(model: MediaProviderModel) {
   const modes = Array.isArray(model.mode) ? model.mode.flat().filter((mode): mode is string => typeof mode === "string") : [];

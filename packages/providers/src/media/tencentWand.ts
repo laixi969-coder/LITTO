@@ -1,10 +1,6 @@
 const rules = [
   { type: "input", field: "apiKey" as const, title: "TokenHub API Key", value: "", props: { type: "password", showPassword: true, autocomplete: "off" } },
   { type: "input", field: "baseUrl" as const, title: "API 地址", value: "https://tokenhub.tencentmaas.com" },
-  { type: "input", field: "cosBucket" as const, title: "COS 存储桶名称（含 AppID）", value: "" },
-  { type: "input", field: "cosRegion" as const, title: "COS 地域", value: "" },
-  { type: "input", field: "accessKey" as const, title: "COS SecretId", value: "", props: { type: "password", showPassword: true, autocomplete: "off" } },
-  { type: "input", field: "secret" as const, title: "COS SecretKey", value: "", props: { type: "password", showPassword: true, autocomplete: "off" } },
 ] as const;
 
 const sizes: Record<string, string[]> = {
@@ -14,42 +10,9 @@ const sizes: Record<string, string[]> = {
   "16:9": ["1280x720", "2560x1440", "3840x2160"], "21:9": ["1512x648", "2520x1080", "5040x2160"],
 };
 
-async function cosSignature(method: string, host: string, path: string, accessKey: string, secret: string, duration: number) {
-  const now = Math.floor(Date.now() / 1000);
-  const time = `${now - 60};${now + duration}`;
-  const encoder = new TextEncoder();
-  const hex = (value: ArrayBuffer) => Buffer.from(value).toString("hex");
-  const hmac = async (key: string, value: string) => {
-    const imported = await crypto.subtle.importKey("raw", encoder.encode(key), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-    return hex(await crypto.subtle.sign("HMAC", imported, encoder.encode(value)));
-  };
-  const http = `${method.toLowerCase()}\n${path}\n\nhost=${host}\n`;
-  const digest = hex(await crypto.subtle.digest("SHA-1", encoder.encode(http)));
-  const signature = await hmac(await hmac(secret, time), `sha1\n${time}\n${digest}\n`);
-  return `q-sign-algorithm=sha1&q-ak=${encodeURIComponent(accessKey)}&q-sign-time=${time}&q-key-time=${time}&q-header-list=host&q-url-param-list=&q-signature=${signature}`;
-}
-
-async function imageUrl(context: ProviderContext, input: MediaInput, signal: AbortSignal) {
-  if (input.type === "url") {
-    if (!/^https?:\/\//i.test(input.url)) throw new Error("腾讯 WAND 图片地址须为 HTTP 或 HTTPS");
-    return input.url;
-  }
-  if (!["image/png", "image/jpeg"].includes(input.mimeType)) throw new Error("腾讯 WAND 参考图片须为 PNG 或 JPEG");
-  const bytes = input.type === "binary" ? Buffer.from(input.data) : Buffer.from(input.data.replace(/^data:[^,]+,/, ""), "base64");
-  if (!bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error("腾讯 WAND 参考图片须不超过 20 MB");
-  const bucket = String(context.config.cosBucket ?? "").trim();
-  const region = String(context.config.cosRegion ?? "").trim();
-  const accessKey = String(context.config.accessKey ?? "").trim();
-  const secret = String(context.config.secret ?? "").trim();
-  if (!/^[a-z0-9][a-z0-9-]*-\d+$/.test(bucket) || !/^[a-z0-9-]+$/.test(region) || !accessKey || !secret) throw new Error("请在媒体模型设置中填写有效的 COS 存储桶、地域、SecretId 和 SecretKey");
-  const host = `${bucket}.cos.${region}.myqcloud.com`;
-  const path = `/littoWand/${crypto.randomUUID()}.${input.mimeType === "image/png" ? "png" : "jpg"}`;
-  const url = `https://${host}${path}`;
-  const authorization = await cosSignature("PUT", host, path, accessKey, secret, 900);
-  const response = await context.tool.fetch(url, { method: "PUT", signal, headers: { Authorization: authorization, "Content-Type": input.mimeType }, body: bytes });
-  if (!response.ok) throw new Error(`COS 图片上传失败（HTTP ${response.status}），请检查存储桶和写入权限`);
-  // ACT: 2 小时覆盖排队与生成；COS 对象由存储桶生命周期规则清理，避免提前删除导致任务失败。
-  return `${url}?${new URLSearchParams(await cosSignature("GET", host, path, accessKey, secret, 7200))}`;
+async function imageUrl(context: ProviderContext, input: MediaInput) {
+  if (input.type === "url" && !/^https?:\/\//i.test(input.url)) throw new Error("腾讯 WAND 图片地址须为 HTTP 或 HTTPS");
+  return context.tool.relayImage(input);
 }
 
 async function fetchJson(context: ProviderContext, path: string, signal: AbortSignal, body?: object) {
@@ -112,17 +75,36 @@ async function submit(context: ProviderContext, kind: "image" | "video", body: o
 }
 
 export default {
-  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.1.0", rules,
-  readme: "使用腾讯云 TokenHub 国内站 API Key。图生图和图生视频使用腾讯云 COS 中转工作区图片：填写存储桶名称（含 AppID）、地域和具有该桶 PutObject、GetObject 权限的 SecretId / SecretKey。图片保存在 littoWand/ 路径，建议为该前缀设置生命周期规则自动清理；私有桶使用 2 小时有效的签名链接。支持 PNG、JPEG，每张不超过 20 MB。负面提示词会合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
+  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.2.0", rules,
+  readme: "使用腾讯云 TokenHub 国内站 API Key。同步模型只显示已适配的 WAND 模型，模型权限在实际生成时确认。工作区本地参考图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为此服务的公网 HTTPS 地址。支持 PNG、JPEG，每张不超过 20 MB；链接有效期为 2 小时。负面提示词会合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
   models: [
     { id: "wand-vega-image-lite", label: "Vega Image Lite", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-flash", label: "Vega Image Flash", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-pro", label: "Vega Image Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
+    { id: "wand-vega-image-1.5-pro", label: "Vega Image 1.5 Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-video-1.0-lite", label: "Vega Video 1.0 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "1080P", "2K", "4K"] }] },
   ] satisfies ProviderModel[],
+  async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
+    const key = String(this.config.apiKey ?? "").trim().replace(/^Bearer\s+/i, "");
+    if (!key) throw new Error("请填写腾讯 TokenHub API Key");
+    const baseUrl = (String(this.config.baseUrl ?? "").trim() || "https://tokenhub.tencentmaas.com").replace(/\/+$/, "");
+    const response = await this.tool.fetch(`${baseUrl}/v1/models`, { headers: { Authorization: `Bearer ${key}`, Accept: "application/json" }, signal: this.signal ?? AbortSignal.timeout(30000), redirect: "error" });
+    if (!response.ok) throw new Error(`获取腾讯 TokenHub 模型目录失败（HTTP ${response.status}）`);
+    const result = await response.json() as { data?: { id?: unknown; name?: unknown; status?: unknown }[] };
+    if (!Array.isArray(result.data)) throw new Error("腾讯 TokenHub 模型目录格式错误");
+    // ACT: 目录不提供生成协议和参数，只有已适配的模型可导入；新协议需先适配。
+    const imageLabels: Record<string, string> = { "wand-vega-image-lite": "Vega Image Lite", "wand-vega-image-flash": "Vega Image Flash", "wand-vega-image-pro": "Vega Image Pro", "wand-vega-image-1.5-pro": "Vega Image 1.5 Pro" };
+    return result.data.flatMap<ProviderModel>(item => {
+      if (!item || typeof item.id !== "string" || (modelIds && !modelIds.includes(item.id)) || (typeof item.status === "string" && !["online", "pre-offline"].includes(item.status))) return [];
+      const label = typeof item.name === "string" && item.name.trim() ? item.name : imageLabels[item.id];
+      if (Object.hasOwn(imageLabels, item.id)) return [{ id: item.id, label, type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: Object.keys(sizes) } satisfies ProviderModel];
+      if (item.id === "wand-vega-video-1.0-lite") return [{ id: item.id, label: typeof item.name === "string" && item.name.trim() ? item.name : "Vega Video 1.0 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "1080P", "2K", "4K"] }] } satisfies ProviderModel];
+      return [];
+    });
+  },
   resumeMedia,
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
-    if (!["wand-vega-image-lite", "wand-vega-image-flash", "wand-vega-image-pro"].includes(request.model)) throw new Error("不支持此腾讯 WAND 图片模型");
+    if (!["wand-vega-image-lite", "wand-vega-image-flash", "wand-vega-image-pro", "wand-vega-image-1.5-pro"].includes(request.model)) throw new Error("不支持此腾讯 WAND 图片模型");
     if (request.mask || (request.images?.length ?? 0) > 10) throw new Error("腾讯 WAND 最多支持 10 张参考图，不支持蒙版");
     if (request.seed !== undefined || request.quality || request.outputFormat || (request.n !== undefined && request.n !== 1)) throw new Error("腾讯 WAND 当前不支持指定种子、画质、格式或多张输出");
     const prompt = [request.prompt, request.negativePrompt ? `画面中不得出现：${request.negativePrompt}` : ""].filter(Boolean).join("\n");
@@ -130,9 +112,8 @@ export default {
     const ratio = request.ratio ?? "1:1";
     const index = ["1K", "2K", "4K"].indexOf((request.size ?? "1K").toUpperCase());
     if (!sizes[ratio] || index < 0) throw new Error("不支持此腾讯 WAND 图片尺寸或画幅");
-    const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const images = [];
-    for (const input of request.images ?? []) images.push({ type: "input_image", image_url: await imageUrl(this, input, signal) });
+    for (const input of request.images ?? []) images.push({ type: "input_image", image_url: await imageUrl(this, input) });
     return submit(this, "image", { model: request.model, prompt, size: sizes[ratio]![index], ...(images.length ? { input: [{ content: images }] } : {}) });
   },
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
@@ -149,10 +130,9 @@ export default {
     const resolution = (request.resolution ?? "768P").toUpperCase();
     if (!Number.isInteger(duration) || duration < 4 || duration > 15 || !["768P", "1080P", "2K", "4K"].includes(resolution)) throw new Error("腾讯 WAND 视频时长或分辨率无效");
     if (request.ratio && !["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].includes(request.ratio)) throw new Error("腾讯 WAND 视频画幅无效");
-    const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const content: object[] = [{ type: "text", text: prompt }];
-    if (request.firstFrame) content.push({ type: "image_url", image_url: { url: await imageUrl(this, request.firstFrame, signal) }, role: "first_frame" });
-    if (request.lastFrame) content.push({ type: "image_url", image_url: { url: await imageUrl(this, request.lastFrame, signal) }, role: "last_frame" });
+    if (request.firstFrame) content.push({ type: "image_url", image_url: { url: await imageUrl(this, request.firstFrame) }, role: "first_frame" });
+    if (request.lastFrame) content.push({ type: "image_url", image_url: { url: await imageUrl(this, request.lastFrame) }, role: "last_frame" });
     return submit(this, "video", { model: request.model, content, duration, resolution, ...(request.ratio ? { ratio: request.ratio } : {}) });
   },
 } satisfies ProviderDefinition<typeof rules>;

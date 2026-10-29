@@ -28,7 +28,7 @@ export const mediaPresets: MediaPreset[] = [
   { id: "kling", label: "可灵", desc: "Kling Image 2.1 和 Video 2.6，支持本地图片参考及视频首帧。API Key 或旧 AK/SK 认证均可使用，也支持可灵协议中转。", baseUrl: "https://api-singapore.klingai.com/v1", secret: true, keyHelp: "在可灵开放平台创建 API Key；使用旧认证时在 Key 中填 Access Key，并填写 Secret Key。" },
   { id: "atlasCloud", label: "Atlas Cloud", desc: "同步图片、视频和音频目录，按官方参数定义接入语音、音乐与音效生成；异步任务自动轮询。", baseUrl: "https://api.atlascloud.ai/api/v1", keyHelp: "在 Atlas Cloud 控制台创建 API Key；图片、视频、音频共用。支持根地址、/v1 或 /api/v1，系统自动识别。" },
   { id: "easyRouter", label: "EasyRouter", desc: "同步图片、视频和语音模型，支持 GPT 与 Gemini TTS 配音，以及已适配的图片和视频生成。", baseUrl: "https://easyrouter.io/v1", keyHelp: "在 EasyRouter 控制台创建 API Key，并开通对应模型权限。地址以 /v1 结尾。" },
-  { id: "tencentWand", label: "腾讯 WAND · TokenHub", desc: "支持 Vega 文生图、图生图和图生视频；使用本地图片需要在媒体模型设置中配置腾讯云 COS。", baseUrl: "https://tokenhub.tencentmaas.com", keyHelp: "在腾讯云 TokenHub 创建国内站 API Key，并开通对应模型。" },
+  { id: "tencentWand", label: "腾讯 WAND · TokenHub", desc: "支持 Vega 文生图、图生图和图生视频；本地图片通过服务的公网地址临时中转。", baseUrl: "https://tokenhub.tencentmaas.com", keyHelp: "在腾讯云 TokenHub 创建国内站 API Key，并开通对应模型。" },
 ];
 
 // Models that are not for chatting/script-writing: hide them from the auto-fetched list so the picker stays short.

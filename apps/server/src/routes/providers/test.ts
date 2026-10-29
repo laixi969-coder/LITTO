@@ -5,13 +5,14 @@ import { success } from "@/lib/responseFormat";
 import u from "@/utils";
 import { assertPublicHttpUrl, guardedFetch, UnsafeUpstreamError } from "@/utils/ssrf";
 import modelFetch from "@/utils/ai/modelFetch";
+import { isMasked } from "@/utils/secrets";
 
 /**
  * Connection test for the "connect your models" wizard. Makes the cheapest real, non-generating call it can and answers in plain Chinese.
  * The key is only ever used for that one request: it is never logged, stored or echoed back.
  */
 const mediaProviders: Record<string, { label: string; customUrl?: boolean; verifyUrl?: (region: string, baseUrl?: string) => string }> = {
-  tencentWand: { label: "腾讯 WAND · TokenHub" },
+  tencentWand: { label: "腾讯 WAND · TokenHub", customUrl: true, verifyUrl: (_region, baseUrl) => `${(baseUrl?.trim() || "https://tokenhub.tencentmaas.com").replace(/\/+$/, "")}/v1/models` },
   // APIMart is OpenAI-compatible; listing models is an authenticated, free request.
   apiMart: { label: "APIMart", verifyUrl: region => `${region === "2" ? "https://api.apimart.ai/v1" : "https://api.apib.ai/v1"}/models` },
   meta: { label: "秘塔 MiniMax" },
@@ -91,9 +92,15 @@ async function mediaTest({ providerId, apiKey, region, baseUrl, secret }: { prov
     if (!provider.verifyUrl) return { ok: true, verified: false, message: `配置格式检查通过，尚未验证 ${provider.label} 的密钥和模型权限；首次生成时确认。` };
     if (baseUrl?.trim() && !provider.customUrl) return failure("此服务商暂不支持自定义地址");
     const response = await guardedFetch(provider.verifyUrl(region, baseUrl), { headers: { Accept: "application/json", Authorization: `Bearer ${apiKey.trim().replace(/^Bearer\s+/i, "")}` }, signal: AbortSignal.timeout(20000) });
+    if (response.ok && providerId === "tencentWand") {
+      const result = await response.json() as { data?: unknown };
+      if (!Array.isArray(result?.data)) return failure("腾讯 TokenHub 返回的模型目录格式无效");
+      return { ok: true, verified: true, message: "TokenHub 密钥验证成功；模型调用权限需在实际生成时确认。" };
+    }
     await response.body?.cancel();
     if (response.ok) return { ok: true, verified: true, message: `${provider.label} 连接成功` };
     if (response.status === 401 || response.status === 403) return failure(explain(response.status));
+    if (providerId === "tencentWand") return failure(explain(response.status));
     // Any other answer means the key was not rejected, but we cannot prove it works either.
     return { ok: true, verified: false, message: `${provider.label} 没有拒绝这个 Key，但无法提前验证；生成第一张图时会确认。` };
   } catch (error) {
@@ -113,7 +120,15 @@ export default Router().post("/", validateFields({
   probeModel: z.string().max(200).optional(),
 }), async (req, res) => {
   const body = req.body as { kind: "text" | "media"; apiUrl?: string; apiKey: string; secret?: string; baseUrl?: string; protocol?: string; providerId?: string; region?: "1" | "2"; probeModel?: string };
-  if (body.kind === "media") return void res.json(success(await mediaTest({ providerId: body.providerId ?? "", apiKey: body.apiKey, region: body.region ?? "1", baseUrl: body.baseUrl, secret: body.secret })));
+  if (body.kind === "media") {
+    let apiKey = body.apiKey;
+    if (body.providerId === "tencentWand" && isMasked(apiKey)) {
+      const stored = u.conf.get("settings.mediaProviderConfigs.tencentWand") as Record<string, unknown> | undefined;
+      if (!stored || typeof stored.apiKey !== "string" || (body.baseUrl?.trim() || "https://tokenhub.tencentmaas.com") !== (typeof stored.baseUrl === "string" && stored.baseUrl.trim() || "https://tokenhub.tencentmaas.com")) return void res.json(success(failure("API 地址已变化或未保存密钥，请重新填写 API Key")));
+      apiKey = stored.apiKey;
+    }
+    return void res.json(success(await mediaTest({ providerId: body.providerId ?? "", apiKey, region: body.region ?? "1", baseUrl: body.baseUrl, secret: body.secret })));
+  }
   if (!body.apiUrl) return void res.json(success(failure("请先选择服务商或填写 API 地址")));
   res.json(success(await textTest({ apiUrl: body.apiUrl, apiKey: body.apiKey, protocol: body.protocol ?? "openai-completions", probeModel: body.probeModel })));
 });
