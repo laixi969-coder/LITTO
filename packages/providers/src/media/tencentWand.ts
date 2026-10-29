@@ -92,7 +92,7 @@ function videoModel(id: string): ProviderModel | undefined {
 }
 
 export default {
-  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.5.1", rules,
+  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.5.2", rules,
   readme: "使用腾讯云 TokenHub 国内站 API Key。视频支持音画同出、图片与音频参考；视频本地图片和音频随请求传输。图生图的本地图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为公网 HTTPS 地址。参考音频不保证声音或口型完全一致；视频参考暂未接入。负面提示词合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
   models: [
     { id: "wand-vega-image-lite", label: "Vega Image Lite", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
@@ -169,6 +169,6 @@ export default {
     for (const input of request.audios ?? []) {
       content.push({ type: "audio_url", audio_url: { url: mediaValue(input) }, role: "reference_audio" });
     }
-    return submit(this, "video", { model: request.model, content, duration, resolution, options: { audio_mode: request.generateAudio === undefined ? "auto" : request.generateAudio ? "enable" : "disable" }, ...(request.ratio ? { ratio: request.ratio } : {}) });
+    return submit(this, "video", { model: request.model, content, duration, resolution, options: { audio_mode: request.generateAudio === undefined ? "auto" : request.generateAudio ? "enable" : "disable" }, ...(!request.firstFrame && request.ratio ? { ratio: request.ratio } : {}) });
   },
 } satisfies ProviderDefinition<typeof rules>;
