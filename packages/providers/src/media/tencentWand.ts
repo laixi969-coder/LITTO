@@ -92,7 +92,7 @@ function videoModel(id: string): ProviderModel | undefined {
 }
 
 export default {
-  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.5.0", rules,
+  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.5.1", rules,
   readme: "使用腾讯云 TokenHub 国内站 API Key。视频支持音画同出、图片与音频参考；视频本地图片和音频随请求传输。图生图的本地图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为公网 HTTPS 地址。参考音频不保证声音或口型完全一致；视频参考暂未接入。负面提示词合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
   models: [
     { id: "wand-vega-image-lite", label: "Vega Image Lite", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
@@ -153,7 +153,9 @@ export default {
     if (request.mode === "text" && (request.firstFrame || request.lastFrame)) throw new Error("文生视频模式不能附带首尾帧");
     if (((request.mode === "singleImage" || request.mode === "endFrameOptional") && !request.firstFrame) || (request.lastFrame && !request.firstFrame)) throw new Error("请选择视频首帧");
     if (request.mode === "singleImage" && request.lastFrame) throw new Error("单图模式不支持尾帧");
-    if (request.seed !== undefined || request.cameraTrajectory || request.watermark) throw new Error("腾讯 WAND 当前不支持指定种子、相机轨迹或水印");
+    if (request.seed !== undefined) throw new Error("腾讯 WAND 视频接口不支持指定种子，请移除 seed 后重试");
+    if (request.cameraTrajectory) throw new Error("腾讯 WAND 视频接口不支持数值相机轨迹");
+    if (request.watermark) throw new Error("腾讯 WAND 视频接口不支持设置水印");
     const prompt = [request.prompt, request.negativePrompt ? `画面中不得出现：${request.negativePrompt}` : ""].filter(Boolean).join("\n");
     if (!prompt.trim()) throw new Error("请输入视频提示词");
     const duration = request.duration ?? 5;
