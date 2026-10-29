@@ -472,6 +472,18 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             : "既定画外声，画内人物不冒认此句"}`;
     }).join("\n");
     if (techniqueDirection) sections["Objective" in sections ? "Selected techniques" : "selectedTechniques"] = techniqueDirection;
+    if (kind === "video" && model.limits.workspaceExecution && !("Objective" in sections)) {
+        // ACT: 只缩短固定教学文字，保留所有镜头规格；规格本身超限时提示修改，不截断。
+        const motion = "按时间线以实际速度完成动作和结果，保持接触、重量及声音同步；只在指定时刻切镜或慢动作。";
+        if (sections.motionTiming) sections.motionTiming = sections.motionTiming.replace(videoMotionTiming, motion);
+        if (sections.constraints) sections.constraints = sections.constraints.replace(videoMotionTiming, motion);
+        sections.renderingStandard = "保持指定媒介、光照和材质，保留自然肤质。";
+        sections.visualDefaults = "遵循既定状态、光照和妆容，不擅自添加污损、疲态或磨皮。";
+        sections.photographicBaseline = "保持指定媒介、身份、年龄、造型、光照和自然肤质；明确的剧情与视觉设计优先。";
+        if (sections.referenceUse) sections.referenceUse = "参考仅用于各自指定用途；保持人物身份、服装和体态，表情服从当前动作。";
+        if (sections.continuityContext) sections.continuityContext = sections.continuityContext.replace(/^.*?: (?=\{)/, "接续状态，遵循本镜起点和动作顺序：");
+        if (interaction.required) sections.objectInteraction = interaction.instruction.replace(/^[^\n]*/, "保持物体形状、位置和接触连续，按计划完成接触、交接和释放。");
+    }
     // 剪辑、声音和叙事仍交各自真实流程，不当作单镜视觉动作；返回待执行项目供导演继续。
     for (const stage of ["edit", "audio", "story"] as const) {
         const planned = techniquePlan(shot, stage);

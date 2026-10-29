@@ -25,14 +25,17 @@ import { recordTextUsage } from "@/utils/usage";
 // ACT: 缓存同进程相同编译结果，最多 100 条；重启后重新编译，指纹不一致时拒绝旧请求而非重复生成。
 const promptOptimizations = new Map<string, Promise<string>>();
 
-function promptLimit(kind: "image" | "video", providerId: string, modelId: string) {
+function promptLimit(kind: "image" | "video", providerId: string, modelId: string, mode: MediaGenerationRequest["mode"], generateAudio?: boolean) {
   if (providerId === "tencentWand") {
     if (kind === "image") return 2000;
     if (modelId === "kling-video-v3" || modelId === "kling-video-v3-omni") return 3072;
+    // ACT: V4 混合语言按比例计数；先按非英语上限保守处理，避免预览后因语言比例变化超限。
+    if (modelId === "kling-video-v4") return 11000;
     if (["kling-video-v3-turbo", "kling-video-v2.6", "kling-video-v2.5-turbo", "kling-video-o1"].includes(modelId)) return 2500;
     if (["minimax-video-v2.3", "minimax-video-v2.3-fast"].includes(modelId)) return 2000;
     if (["minimax-video-h3", "minimax-video-h3-max"].includes(modelId)) return 7000;
     if (modelId.startsWith("pixverse-video-")) return 5000;
+    if (modelId.startsWith("vidu-video-")) return Array.isArray(mode) && !(modelId === "vidu-video-q4-preview" || modelId === "vidu-video-q3-turbo" && generateAudio !== false) ? 2000 : 5000;
   }
   if (kind === "video" && providerId === "meta" && modelId === "MiniMax-H3") return 10000;
   if (kind === "video" && providerId === "kling") return 2500;
@@ -40,9 +43,9 @@ function promptLimit(kind: "image" | "video", providerId: string, modelId: strin
 }
 
 async function optimizeCompiledPrompt(directory: string, sections: Record<string, string>, prompt: string, negativePrompt: string | undefined, limit: number) {
-  const suffix = negativePrompt ? `\n画面中不得出现：${negativePrompt}` : "";
+  const suffix = negativePrompt ? `\n画面中不得出现：${negativePrompt}。` : "";
   if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
-  const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "Reference binding"]);
+  const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding"]);
   const essential = Object.entries(sections).filter(([key, value]) => value && protectedKeys.has(key)).map(([key, value]) => `${key.toUpperCase()}: ${value}`).join("\n");
   const baseline = "PHOTOGRAPHICBASELINE: 保持已定媒介、身份、年龄、造型、干净完整状态及自然肤质；明确的剧情和视觉设计优先。";
   const budget = limit - [baseline, essential, suffix].join("\n").length - 32;
@@ -315,7 +318,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
       result.compiled.sections.blocking = [blocking.replace(/^BLOCKING:\s*/, ""), result.compiled.sections.blocking].filter(Boolean).join("; ");
     }
   }
-  const limit = promptLimit(kind, request.providerId, request.modelId);
+  const limit = promptLimit(kind, request.providerId, request.modelId, request.mode, request.generateAudio);
   if (limit) {
     const original = result.compiled.prompt;
     result.compiled.prompt = await optimizeCompiledPrompt(directory, result.compiled.sections, original, result.compiled.negativePrompt || request.negativePrompt, limit);

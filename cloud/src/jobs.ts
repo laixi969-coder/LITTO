@@ -299,7 +299,7 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
     if (cur.provider_id === "workspaceMedia" && p.remoteTask?.id && /prompt length cannot exceed 3072 characters/i.test(err.message)) {
         // 供应商已返回确定的提示词限制；保留回执供核查，不能把错误当成可恢复的查询。
         p.remoteTask.status = "blocked";
-        run("UPDATE generation_jobs SET parameters=?,status='FAILED',error=?,duration_ms=?,finished_at=? WHERE id=?", j(p), "腾讯 TokenHub 可灵 V3 提示词超过 3072 字符。请精简重复的世界、风格和角色描述，保留本镜动作、对白和时间线后重新编译；原供应商任务已保留，请先核查，不会自动重发。", durationMs, now(), job.id);
+        run("UPDATE generation_jobs SET parameters=?,status='FAILED',error=?,duration_ms=?,finished_at=? WHERE id=?", j(p), "供应商提示词超过 3072 字符。请重新编译并检查当前模型的最终长度；原供应商任务已保留，请先核查，不会自动重发。", durationMs, now(), job.id);
         return;
     }
     if (cur.provider_id === "workspaceMedia" && workspaceResumable(p) && err.retryable !== false) {

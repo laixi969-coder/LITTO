@@ -265,7 +265,7 @@ export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "
   if (mediaType === "video" && request.providerId === "tencentWand" && request.modelId === "kling-video-v3") {
     const directorPrompt = isDirectorPrompt(request.prompt);
     const spec = directorPrompt || request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
-    const motionTiming = !directorPrompt && !request.prompt.includes(videoMotionTiming) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
+    const motionTiming = !request.shotId && !directorPrompt && !/^MOTIONTIMING:/m.test(request.prompt) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
     const prompt = withPhotographicBaseline([spec, request.prompt, motionTiming].filter(Boolean).join("\n\n"));
     const actualPrompt = [prompt, request.negativePrompt ? `画面中不得出现：${request.negativePrompt}` : ""].filter(Boolean).join("\n");
     const length = Array.from(actualPrompt).length;
@@ -372,7 +372,7 @@ async function generateMediaUnrecorded(
   if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
   const directorPrompt = isDirectorPrompt(request.prompt);
   const spec = directorPrompt || request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
-  const motionTiming = mediaType === "video" && !directorPrompt && !request.prompt.includes(videoMotionTiming) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
+  const motionTiming = mediaType === "video" && !request.shotId && !directorPrompt && !/^MOTIONTIMING:/m.test(request.prompt) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
   const prompt = withPhotographicBaseline([spec, request.prompt, motionTiming].filter(Boolean).join("\n\n"));
   // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
   const referenceReads = new Map<string, ReturnType<typeof readReference>>();
