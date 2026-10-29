@@ -29,6 +29,7 @@ export function createQuestionContext(cwd: string, send: (event: Extract<AgentEv
         pendingQuestions.set(callId, { cwd, userId: tenant?.userId, workspaceId: tenant?.workspaceId, request, finish, cancel() { onCancel?.(); abort(); } });
         activeQuestions.add(callId);
         signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) { abort(); return; }
         try { send({ ...request, type: "question", toolCallId, callId }); }
         catch (error) { finish(error instanceof Error ? error : new Error("发送提问失败")); }
       });

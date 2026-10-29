@@ -38,6 +38,8 @@ function promptLimit(kind: "image" | "video", providerId: string, modelId: strin
     if (modelId.startsWith("vidu-video-")) return Array.isArray(mode) && !(modelId === "vidu-video-q4-preview" || modelId === "vidu-video-q3-turbo" && generateAudio !== false) ? 2000 : 5000;
   }
   if (kind === "video" && providerId === "meta" && modelId === "MiniMax-H3") return 10000;
+  if (kind === "video" && providerId === "apiMart" && modelId === "kling-v3") return 2500;
+  if (kind === "video" && providerId === "atlasCloud" && modelId === "kwaivgi/kling-v3.0-std/image-to-video") return 2500;
   if (kind === "video" && providerId === "kling") return 2500;
   if (kind === "video" && providerId === "vidu") return 20000;
 }
@@ -45,7 +47,7 @@ function promptLimit(kind: "image" | "video", providerId: string, modelId: strin
 async function optimizeCompiledPrompt(directory: string, sections: Record<string, string>, prompt: string, negativePrompt: string | undefined, limit: number) {
   const suffix = negativePrompt ? `\n画面中不得出现：${negativePrompt}。` : "";
   if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
-  const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding"]);
+  const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding", "Objective", "Immutable locks", "Target duration", "Timeline", "Audio direction", "Avoid"]);
   const essential = Object.entries(sections).filter(([key, value]) => value && protectedKeys.has(key)).map(([key, value]) => `${key.toUpperCase()}: ${value}`).join("\n");
   const baseline = "PHOTOGRAPHICBASELINE: 保持已定媒介、身份、年龄、造型、干净完整状态及自然肤质；明确的剧情和视觉设计优先。";
   const budget = limit - [baseline, essential, suffix].join("\n").length - 32;

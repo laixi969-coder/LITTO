@@ -48,7 +48,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   const heartbeat = setInterval(() => {
     if (res.destroyed || res.writableEnded) close();
     else res.write("\n");
-  }, 20000);
+  }, 5000);
   try {
     await u.agent.run({ ...options, cwd, canvas: bridge?.context, question: questions.context, signal: controller.signal, onCancel: close }, send);
     send({ type: "done" });

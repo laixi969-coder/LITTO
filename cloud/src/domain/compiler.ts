@@ -11,7 +11,7 @@ import type { ShotInput } from "./schema.ts";
 import { cameraDirectionIssues, creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair } from "./continuity.ts";
-import { physicalInteractionPlan, videoMotionTiming } from "@toonflow/tool-media-generation/runtime";
+import { physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
 import { musicSource } from "./music.ts";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
@@ -65,6 +65,7 @@ export function renderCompiledPrompt(sections: Record<string, string>) {
 
 // ACT: 同一渲染约束用于自由生成与镜头编译；只约束已选写实媒介，不将插画/动画改成摄影。
 const photographicRendering = "Keep the chosen medium. For photography, use coherent source lighting, contact shadows, material-specific roughness and scale-appropriate texture; preserve natural skin detail without smoothing or artificial sharpening.";
+const compactVideoMotion = "按时间线以实际速度完成动作和结果，保持接触、重量及声音同步；只在指定时刻切镜或慢动作。";
 
 function effectiveLook(s: Scope, projectId: string, sequenceId?: string, shotId?: string) {
   const looks = s.list("looks", { projectId });
@@ -364,10 +365,11 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         sections.motionTiming = J([
             (musicVideo || cam.design?.timeline) && "The execution timeline defines the action order, timing and explicitly timed camera changes. Apply untimed path and camera descriptions only where compatible; never introduce an extra action, cut or pause from background context.",
             !musicVideo && !cam.design?.timeline && cam.design?.timing && `Action timing: ${cam.design.timing}`,
-            videoMotionTiming,
+            compactVideoMotion,
         ]);
         sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
-        sections.renderingStandard = photographicRendering;
+        sections.renderingStandard = "保持指定媒介、光照和材质，保留自然肤质。";
+        if (sections.continuityContext) sections.continuityContext = sections.continuityContext.replace(/^.*?: (?=\{)/, "接续状态，遵循本镜起点和动作顺序：");
     }
     let negativePrompt = J(shotAvoid(freedom));
     if (kind === "video" && musicVideo) {
@@ -447,7 +449,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const interaction = physicalInteractionPlan(kind === "image" ? { ...shot, camera: undefined, musicVideo: undefined, interactions: undefined }
         : { ...shot, interactions: shot.interactions?.map((event: any) => ({ ...event, assetIds: event.assetIds.map(assetName) })) });
     if (interaction.required) {
-        sections.objectInteraction = kind === "video" ? interaction.instruction : "Preserve the reference object's geometry, openings and support surfaces. Show the actual interaction opening or contact surface clearly enough to establish the planned action; do not invent an opening or hide impossible contact.";
+        sections.objectInteraction = kind === "video" ? interaction.instruction.replace(/^[^\n]*/, "保持物体形状、位置和接触连续，按计划完成接触、交接和释放。") : "Preserve the reference object's geometry, openings and support surfaces. Show the actual interaction opening or contact surface clearly enough to establish the planned action; do not invent an opening or hide impossible contact.";
         warnings.push("物体交互预检：核对参考与起始画面中的真实入口、承托面、尺寸和动作路径；文字约束不代表视觉已核实。结果需检查接近、接触、进入或交接及释放后的承托，无法看清时不得记为通过。");
     }
     // 整片弧线和参考研究留给导演；执行只取当前节拍及已采用的统一视觉关系。
@@ -460,9 +462,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             productRead: shot.advertising?.productRead,
         });
     }
-    sections["Objective" in sections ? "Visual defaults" : "visualDefaults"] = cleanVisualDefaults;
+    sections["Objective" in sections ? "Visual defaults" : "visualDefaults"] = kind === "video" ? "遵循既定状态、光照和妆容，不擅自添加污损、疲态或磨皮。" : cleanVisualDefaults;
     if (inputs.length || assets.some(asset => asset.type === "Character" || asset.type === "Creature")) {
-        sections["Objective" in sections ? "Reference roles" : "referenceUse"] = characterReferenceUse;
+        sections["Objective" in sections ? "Reference roles" : "referenceUse"] = kind === "video" ? "参考仅用于各自指定用途；保持人物身份、服装和体态，表情服从当前动作。" : characterReferenceUse;
     }
     const techniqueDirection = compileTechniqueDirection(shot, kind);
     if (kind === "video" && brief?.dialogue.lines.length) sections.speechCoverage = brief.dialogue.lines.map((line, index) => {
@@ -472,18 +474,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             : "既定画外声，画内人物不冒认此句"}`;
     }).join("\n");
     if (techniqueDirection) sections["Objective" in sections ? "Selected techniques" : "selectedTechniques"] = techniqueDirection;
-    if (kind === "video" && model.limits.workspaceExecution && !("Objective" in sections)) {
-        // ACT: 只缩短固定教学文字，保留所有镜头规格；规格本身超限时提示修改，不截断。
-        const motion = "按时间线以实际速度完成动作和结果，保持接触、重量及声音同步；只在指定时刻切镜或慢动作。";
-        if (sections.motionTiming) sections.motionTiming = sections.motionTiming.replace(videoMotionTiming, motion);
-        if (sections.constraints) sections.constraints = sections.constraints.replace(videoMotionTiming, motion);
-        sections.renderingStandard = "保持指定媒介、光照和材质，保留自然肤质。";
-        sections.visualDefaults = "遵循既定状态、光照和妆容，不擅自添加污损、疲态或磨皮。";
-        sections.photographicBaseline = "保持指定媒介、身份、年龄、造型、光照和自然肤质；明确的剧情与视觉设计优先。";
-        if (sections.referenceUse) sections.referenceUse = "参考仅用于各自指定用途；保持人物身份、服装和体态，表情服从当前动作。";
-        if (sections.continuityContext) sections.continuityContext = sections.continuityContext.replace(/^.*?: (?=\{)/, "接续状态，遵循本镜起点和动作顺序：");
-        if (interaction.required) sections.objectInteraction = interaction.instruction.replace(/^[^\n]*/, "保持物体形状、位置和接触连续，按计划完成接触、交接和释放。");
-    }
+    // ACT: 视频规格保留原文，只缩短通用规则；空间不足时由调用方明确报错，不截断内容。
+    if (kind === "video" && model.limits.workspaceExecution) sections["Objective" in sections ? "PHOTOGRAPHICBASELINE" : "photographicBaseline"] = "保持指定媒介、身份、年龄、造型、光照和自然肤质；明确的剧情与视觉设计优先。";
     // 剪辑、声音和叙事仍交各自真实流程，不当作单镜视觉动作；返回待执行项目供导演继续。
     for (const stage of ["edit", "audio", "story"] as const) {
         const planned = techniquePlan(shot, stage);
