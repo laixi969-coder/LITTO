@@ -75,14 +75,15 @@ async function submit(context: ProviderContext, kind: "image" | "video", body: o
 }
 
 export default {
-  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.2.0", rules,
-  readme: "使用腾讯云 TokenHub 国内站 API Key。同步模型只显示已适配的 WAND 模型，模型权限在实际生成时确认。工作区本地参考图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为此服务的公网 HTTPS 地址。支持 PNG、JPEG，每张不超过 20 MB；链接有效期为 2 小时。负面提示词会合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
+  id: "tencentWand", label: "腾讯 WAND · TokenHub", version: "1.3.0", rules,
+  readme: "使用腾讯云 TokenHub 国内站 API Key。同步模型只显示已适配的 WAND 模型，模型权限在实际生成时确认。Vega Video 1.5 Lite 暂支持文生、首帧和首尾帧，时长 6、8、10 秒及 1080P；其他档位待完整接口规格确认后接入。工作区本地参考图片通过临时链接中转，服务管理员需将 MILIMILI_PUBLIC_URL 设置为此服务的公网 HTTPS 地址。支持 PNG、JPEG，每张不超过 20 MB；链接有效期为 2 小时。负面提示词会合并进正文。\n\n[图片接口文档](https://cloud.tencent.com/document/product/1823/137203) · [视频接口文档](https://cloud.tencent.com/document/product/1823/138195)",
   models: [
     { id: "wand-vega-image-lite", label: "Vega Image Lite", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-flash", label: "Vega Image Flash", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-pro", label: "Vega Image Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-image-1.5-pro", label: "Vega Image 1.5 Pro", type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"] },
     { id: "wand-vega-video-1.0-lite", label: "Vega Video 1.0 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "1080P", "2K", "4K"] }] },
+    { id: "wand-vega-video-1.5-lite", label: "Vega Video 1.5 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [6, 8, 10], resolution: ["1080P"] }] },
   ] satisfies ProviderModel[],
   async fetchModels(modelIds?: string[]): Promise<ProviderModel[]> {
     const key = String(this.config.apiKey ?? "").trim().replace(/^Bearer\s+/i, "");
@@ -99,6 +100,7 @@ export default {
       const label = typeof item.name === "string" && item.name.trim() ? item.name : imageLabels[item.id];
       if (Object.hasOwn(imageLabels, item.id)) return [{ id: item.id, label, type: "image", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: Object.keys(sizes) } satisfies ProviderModel];
       if (item.id === "wand-vega-video-1.0-lite") return [{ id: item.id, label: typeof item.name === "string" && item.name.trim() ? item.name : "Vega Video 1.0 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "1080P", "2K", "4K"] }] } satisfies ProviderModel];
+      if (item.id === "wand-vega-video-1.5-lite") return [{ id: item.id, label: typeof item.name === "string" && item.name.trim() ? item.name : "Vega Video 1.5 Lite", type: "video", mode: ["text", "singleImage", "endFrameOptional"], audio: false, durationResolutionMap: [{ duration: [6, 8, 10], resolution: ["1080P"] }] } satisfies ProviderModel];
       return [];
     });
   },
@@ -117,7 +119,7 @@ export default {
     return submit(this, "image", { model: request.model, prompt, size: sizes[ratio]![index], ...(images.length ? { input: [{ content: images }] } : {}) });
   },
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
-    if (request.model !== "wand-vega-video-1.0-lite") throw new Error("不支持此腾讯 WAND 视频模型");
+    if (!["wand-vega-video-1.0-lite", "wand-vega-video-1.5-lite"].includes(request.model)) throw new Error("不支持此腾讯 WAND 视频模型");
     if (request.mode === "singleImage" && request.images?.length === 1 && !request.firstFrame) request = { ...request, firstFrame: request.images[0], images: [] };
     if ((request.mode !== undefined && !["text", "singleImage", "endFrameOptional"].includes(String(request.mode))) || request.images?.length || request.videos?.length || request.audios?.length) throw new Error("腾讯 WAND 当前仅支持首帧或首尾帧图片");
     if (request.mode === "text" && (request.firstFrame || request.lastFrame)) throw new Error("文生视频模式不能附带首尾帧");
@@ -126,9 +128,11 @@ export default {
     if (request.seed !== undefined || request.cameraTrajectory || request.generateAudio || request.watermark) throw new Error("腾讯 WAND 当前不支持指定种子、相机轨迹、音频或水印");
     const prompt = [request.prompt, request.negativePrompt ? `画面中不得出现：${request.negativePrompt}` : ""].filter(Boolean).join("\n");
     if (!prompt.trim()) throw new Error("请输入视频提示词");
-    const duration = request.duration ?? 5;
-    const resolution = (request.resolution ?? "768P").toUpperCase();
-    if (!Number.isInteger(duration) || duration < 4 || duration > 15 || !["768P", "1080P", "2K", "4K"].includes(resolution)) throw new Error("腾讯 WAND 视频时长或分辨率无效");
+    const isVideo15Lite = request.model === "wand-vega-video-1.5-lite";
+    // ACT: 1.5 Lite 暂仅开放腾讯控制台示例明确展示的 6、8、10 秒和 1080P；取得完整规格后再扩展。
+    const duration = request.duration ?? (isVideo15Lite ? 6 : 5);
+    const resolution = (request.resolution ?? (isVideo15Lite ? "1080P" : "768P")).toUpperCase();
+    if (isVideo15Lite ? ![6, 8, 10].includes(duration) || resolution !== "1080P" : !Number.isInteger(duration) || duration < 4 || duration > 15 || !["768P", "1080P", "2K", "4K"].includes(resolution)) throw new Error("腾讯 WAND 视频时长或分辨率无效");
     if (request.ratio && !["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].includes(request.ratio)) throw new Error("腾讯 WAND 视频画幅无效");
     const content: object[] = [{ type: "text", text: prompt }];
     if (request.firstFrame) content.push({ type: "image_url", image_url: { url: await imageUrl(this, request.firstFrame) }, role: "first_frame" });
