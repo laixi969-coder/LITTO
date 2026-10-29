@@ -236,7 +236,7 @@ async function saveModels() {
       return { ...item, id, label };
     });
     const nextConfig = { ...configValues.value };
-    for (const field of ["apiKey", "secret", "baseUrl"]) {
+    for (const field of ["apiKey", "accessKey", "secret", "baseUrl"]) {
       if (typeof nextConfig[field] !== "string") continue;
       nextConfig[field] = (nextConfig[field] as string).trim();
       if ((nextConfig[field] as string).length > (field === "baseUrl" ? 2048 : 8192)) throw new Error(`${field === "baseUrl" ? "API 地址" : "密钥"}过长`);
@@ -252,7 +252,7 @@ async function saveModels() {
     });
     if (configSaved) {
       const maskedConfig = { ...nextConfig };
-      for (const field of ["apiKey", "secret"]) {
+      for (const field of ["apiKey", "accessKey", "secret"]) {
         const value = maskedConfig[field];
         if (typeof value === "string" && value) maskedConfig[field] = `••••${value.slice(-4)}`;
       }

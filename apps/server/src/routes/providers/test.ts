@@ -11,6 +11,7 @@ import modelFetch from "@/utils/ai/modelFetch";
  * The key is only ever used for that one request: it is never logged, stored or echoed back.
  */
 const mediaProviders: Record<string, { label: string; customUrl?: boolean; verifyUrl?: (region: string, baseUrl?: string) => string }> = {
+  tencentWand: { label: "腾讯 WAND · TokenHub" },
   // APIMart is OpenAI-compatible; listing models is an authenticated, free request.
   apiMart: { label: "APIMart", verifyUrl: region => `${region === "2" ? "https://api.apimart.ai/v1" : "https://api.apib.ai/v1"}/models` },
   meta: { label: "秘塔 MiniMax" },

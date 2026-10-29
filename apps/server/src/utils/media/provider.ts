@@ -61,7 +61,7 @@ function mediaErrorMessage(value: unknown, config: Record<string, unknown>, dept
   }
   if (!message || /^\s*<(?:!doctype|html|head|body)\b/i.test(message)) return "";
   for (const [key, secret] of Object.entries(config)) {
-    if (!/api.?key|secret|token|password|authorization|cookie/i.test(key) || typeof secret !== "string" || !secret.trim()) continue;
+    if (!/api.?key|access.?key|secret|token|password|authorization|cookie/i.test(key) || typeof secret !== "string" || !secret.trim()) continue;
     const token = secret.trim().replace(/^Bearer\s*/i, "");
     if (token) message = message.replaceAll(token, "••••••");
   }
@@ -263,7 +263,10 @@ export async function addMediaProviderConnection(input: { templateId: string; id
   if (!template || !["apiKey", "baseUrl"].every(field => template.rules.some(rule => rule.field === field))) invalid("请选择支持自定义地址与 API Key 的接口类型");
   if (mediaProviders.some(provider => provider.id.toLowerCase() === input.id.toLowerCase())) invalid("此 ID 已由内置供应商使用，请填写新的供应商 ID", 409);
   if ((await listMediaProviders()).some(provider => provider.id.toLowerCase() === input.id.toLowerCase())) invalid("供应商 ID 已存在，请使用其他 ID", 409);
-  const installed = await getMediaProvider(input.templateId);
+  const installed = await getMediaProvider(input.templateId).catch(async error => {
+    if (error.status !== 404 || !builtinDirectory) throw error;
+    return readProvider(builtinDirectory, `${input.templateId}.ts`);
+  });
   const entries = properties(parseProvider(installed.source).object);
   let source = installed.source;
   // ACT: 复用现有协议实现，只替换导出对象的身份字段；不把名称或密钥拼成可执行代码。
@@ -319,7 +322,7 @@ export async function updateBuiltinMediaProvider(fileName: string, revision: str
     for (const model of current.models) {
       const builtinModel = models.get(model.id);
       // 声音能力须与新适配器协议一致，不能被旧版本的 optional/true 覆盖；其余用户字段保留。
-      models.set(model.id, { ...builtinModel, ...model, ...(builtinModel ? { audio: builtinModel.audio, nativeDialogue: builtinModel.nativeDialogue } : {}) });
+      models.set(model.id, { ...builtinModel, ...model, ...(builtinModel ? { audio: builtinModel.audio, nativeDialogue: builtinModel.nativeDialogue, ...(id === "tencentWand" ? { mode: builtinModel.mode } : {}) } : {}) });
     }
     const property = parsed.modelProperty;
     if (property?.type !== "ObjectProperty") invalid("内置适配器缺少模型列表");
