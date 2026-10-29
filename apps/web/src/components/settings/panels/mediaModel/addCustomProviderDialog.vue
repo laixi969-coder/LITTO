@@ -52,7 +52,8 @@
           </div>
           <messageMarkdown v-if="providerReadme" class="providerReadme" :content="providerReadme" />
           <el-divider v-if="providerReadme" contentPosition="left">连接配置</el-divider>
-          <form-create-form v-model:api="formApi" :rule="providerRules" :option="formOptions" />
+          <el-text v-if="hasSavedKey" type="info">已有连接配置，将直接使用已保存的密钥。</el-text>
+          <form-create-form v-else v-model:api="formApi" :rule="providerRules" :option="formOptions" />
           <div class="modelHeader">
             <el-text tag="strong">模型列表 <el-text type="info">{{ models.length }}</el-text></el-text>
           </div>
@@ -132,7 +133,7 @@ import museTalkSource from "@toonflow/providers/media/museTalk?raw";
 import tencentWandSource from "@toonflow/providers/media/tencentWand?raw";
 import type { MediaProvider } from "./types";
 import { providerPrompt } from "./providerPrompt";
-import { saveSettings } from "@/stores/settings";
+import { saveSettings, settings } from "@/stores/settings";
 import { writeClipboardText } from "@/lib/clipboard";
 
 const { mode = "connection" } = defineProps<{ mode?: "connection" | "builtin" | "custom" }>();
@@ -141,6 +142,10 @@ const emit = defineEmits<{ added: [provider: MediaProvider] }>();
 const providerSources: Record<string, string> = { apiMart: apiMartSource, meta: metaSource, agnes: agnesSource, volcengine: volcengineSource, volcSpeech: volcSpeechSource, bailian: bailianSource, kling: klingSource, vidu: viduSource, atlasCloud: atlasCloudSource, easyRouter: easyRouterSource, qwenSpeech: qwenSpeechSource, museTalk: museTalkSource, tencentWand: tencentWandSource };
 const selectedProvider = ref<string>(mediaProviders[0]?.id ?? "");
 const activeProvider = computed(() => mediaProviders.find(provider => provider.id === selectedProvider.value));
+const hasSavedKey = computed(() => {
+  const configs = settings.value.mediaProviderConfigs as Record<string, Record<string, unknown>> | undefined;
+  return typeof configs?.[selectedProvider.value]?.apiKey === "string" && !!configs[selectedProvider.value]!.apiKey;
+});
 const models = computed<MediaProvider["models"]>(() => activeProvider.value?.models ?? []);
 const providerReadme = computed(() => {
   const provider = activeProvider.value;
@@ -215,12 +220,12 @@ async function readSourceFile(event: Event) {
 async function addProvider() {
   if (mode === "connection") return addConnection();
   if (saving.value || !source.value.trim()) return;
-  if (mode === "builtin" && !formApi.value) return;
+  if (mode === "builtin" && !hasSavedKey.value && !formApi.value) return;
   saving.value = true;
   formError.value = "";
   try {
     let values: Record<string, unknown> | undefined;
-    if (mode === "builtin") {
+    if (mode === "builtin" && !hasSavedKey.value) {
       if (!(await formApi.value!.validate().then(() => true, () => false))) return;
       values = formApi.value!.formData();
       if ("apiKey" in values) {
@@ -247,6 +252,7 @@ async function addProvider() {
       });
     }
     invalidateNodeModels("media");
+    window.dispatchEvent(new CustomEvent("toonflow:plugin-installed", { detail: { type: "provider", name: addedProvider.value!.id } }));
     visible.value = false;
   } catch (error) {
     const message = axios.isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "添加失败，请重试";

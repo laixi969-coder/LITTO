@@ -31,6 +31,7 @@
     </div>
     <div class="providerActions">
       <el-button class="addButton" type="primary" :icon="IconPlus" @click="openAdd('connection')">添加供应商</el-button>
+      <el-button @click="openAdd('builtin')">安装内置供应商</el-button>
       <el-button @click="openConnectModel('media')">选择已知供应商</el-button>
     </div>
     <component :is="mediaProviderDialog" v-model="providerDialogVisible" :mode="addMode" @added="saveProviderItem" />
