@@ -65,7 +65,7 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 }
 
 export default {
-  id: "token01", label: "Token01", version: "1.1.6", rules, resumeMedia,
+  id: "token01", label: "Token01", version: "1.1.7", rules, resumeMedia,
   readme: "使用 Token01 令牌生成图片和视频。模型可用性以令牌分组为准。支持文生图、单图编辑及各模型支持的视频生成模式；参考素材需要可访问的公网中转地址。\n\n[图片文档](https://token01.apifox.cn/api-530538219) · [视频文档](https://token01.apifox.cn/api-530551459)",
   models: [
     {"id": "vidu-q2", "label": "vidu-q2", "type": "image", "mode": ["text", "singleImage"], "imageSizes": ["1K"], "imageRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]},
@@ -176,6 +176,7 @@ export default {
     const body = {
       model: input.model, prompt: [input.prompt, input.negativePrompt ? `画面中不得出现：${input.negativePrompt}` : ""].filter(Boolean).join("\n"), ...(!edit ? { duration } : {}),
       ...(workflow ? { resolution: resolution.toLowerCase(), ratio } : { size: kling ? ({ "720P": "std", "1080P": "pro", "4K": "4k" } as Record<string, string>)[resolution] : resolution.toLowerCase() }),
+      ...(input.model === "kling-3.0-Omni" ? { resolution: resolution.toLowerCase(), ratio } : {}),
       ...(first ? { first_frame_url: first } : {}), ...(last ? { last_frame_url: last } : {}),
       ...(imageUrls.length ? { reference_images: imageUrls } : {}), ...(videoUrls.length ? { video_urls: videoUrls } : {}), ...(audioUrls.length ? { audio_urls: audioUrls } : {}),
       ...(!workflow ? { metadata: seedance ? { ratio, generate_audio: input.generateAudio ?? false, ...(input.watermark !== undefined ? { watermark: input.watermark } : {}) } : { parameters } } : {}),
