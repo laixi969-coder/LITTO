@@ -83,7 +83,21 @@ app.get("/media/:id/file", async (c) => {
     const mime = key === m.thumbnail_key ? "image/jpeg" : key === m.proxy_key ? "video/mp4" : m.mime;
     const buf = await storage.get(key);
     // SVG could carry script: serve it inert.
-    return new Response(new Uint8Array(buf), { headers: { "content-type": mime, "cache-control": "private, max-age=300", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff" } });
+    const headers: Record<string, string> = { "content-type": mime, "cache-control": "private, max-age=300", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff", "accept-ranges": "bytes" };
+    const range = c.req.header("range");
+    if (range) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        const start = match && (match[1] ? Number(match[1]) : match[2] ? Math.max(0, buf.length - Number(match[2])) : NaN);
+        const end = match && (match[1] && match[2] ? Math.min(Number(match[2]), buf.length - 1) : buf.length - 1);
+        if (start === null || end === null || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= buf.length) {
+            return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${buf.length}` } });
+        }
+        headers["content-range"] = `bytes ${start}-${end}/${buf.length}`;
+        headers["content-length"] = String(end - start + 1);
+        return new Response(new Uint8Array(buf.subarray(start, end + 1)), { status: 206, headers });
+    }
+    headers["content-length"] = String(buf.length);
+    return new Response(new Uint8Array(buf), { headers });
 });
 
 app.route("/auth", authPublic);

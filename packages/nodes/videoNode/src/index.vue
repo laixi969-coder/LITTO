@@ -27,6 +27,7 @@
         ref="player"
         :src="previewUrl"
         @loadedmetadata="resizeVideo" />
+      <div v-else-if="outputFile" class="exportLoading" role="status">{{ previewError || "正在加载视频…" }}</div>
       <input ref="fileInput" class="fileInput" type="file" accept="video/*" aria-label="选择视频" :disabled="uploading || exporting" @change="uploadVideo" />
       <el-button
         v-if="!exporting && !outputs.video"
@@ -46,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { IconVideo, IconUpload, IconTransfer } from "@tabler/icons-vue";
 import { ElButton, ElMessage, ElProgress } from "element-plus";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
@@ -66,11 +67,13 @@ const player = ref<InstanceType<typeof videoPlayer>>();
 const exportProgress = computed(() => (node.data as typeof node.data & { exportProgress?: number }).exportProgress);
 const exporting = computed(() => typeof exportProgress.value === "number");
 const videoWidth = ref(0);
+const previewError = ref("");
 
 const outputFile = computed(() => outputs.value.video?.dataType === "VIDEO" ? outputs.value.video.value : undefined);
+watch(outputFile, () => { previewError.value = ""; });
 const previewUrl = files.useFileUrl(
   outputFile,
-  (error) => showError(error, "视频读取失败")
+  (error) => { previewError.value = "视频读取失败，请重新打开画布"; showError(error, "视频读取失败"); }
 );
 
 nodeEvent.on("save", (reason) => {

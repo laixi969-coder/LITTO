@@ -13,7 +13,7 @@ import { translateError, translateMessage } from "@/lib/i18n";
 export async function runDelegatedAgent(options: {
   cwd: string; parentFile: string; name: string; task: string;
   providerId: string; modelId: string; thinkingLevel: "off" | "low" | "medium" | "high";
-  canvas?: CanvasContext; signal?: AbortSignal; send: (event: AgentEvent) => void; onProgress?: (text: string, state?: Pick<SubAgentResult, "status" | "file">) => void;
+  canvas?: CanvasContext; signal?: AbortSignal; autonomousDecisions?: boolean; send: (event: AgentEvent) => void; onProgress?: (text: string, state?: Pick<SubAgentResult, "status" | "file">) => void;
 }) {
   const { cwd, parentFile, name, task, providerId, modelId, thinkingLevel, canvas, signal, onProgress } = options;
   const child = await createAgentConversation(cwd, { parentFile, name, task, providerId, modelId, thinkingLevel });
@@ -49,7 +49,7 @@ export async function runDelegatedAgent(options: {
   const controller = new AbortController();
   const childSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   const bridge = canvas ? createCanvasContext(cwd, canvas, send) : undefined;
-  const questions = createQuestionContext(cwd, send, () => controller.abort());
+  const questions = createQuestionContext(cwd, send, () => controller.abort(), options.autonomousDecisions);
   const result: SubAgentResult = { name, file: child.file, status: "running", result: "准备执行" };
   try {
     await run({ prompt: task, cwd, sessionFile: child.file, providerId, modelId, thinkingLevel, canvas: bridge?.context, question: questions.context, signal: childSignal, onCancel: () => controller.abort() }, send);

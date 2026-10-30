@@ -20,6 +20,8 @@ export type ShotDraft = {
     techniques?: ShotInput["techniques"];
     source?: ShotInput["source"];
     visibleAssetIds?: string[];
+    continuity?: ShotInput["continuity"];
+    continuityFromIndex?: number;
 };
 
 const HEADING = /^\s*((?:INT|EXT|I\/E)[./ ].*|内景.*|外景.*|场景.*|SCENE\b.*)$/i;

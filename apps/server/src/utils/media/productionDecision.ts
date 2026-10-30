@@ -47,7 +47,7 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
   const response = await question.ask(toolCallId, request, signal);
   signal?.throwIfAborted();
   const index = request.options.indexOf(response.answer);
-  if (response.skipped || index < 0 || index >= models.length) return { ...request, ...response, applied: false };
+  if (response.requestedChanges || response.skipped || index < 0 || index >= models.length) return { ...request, ...response, applied: false };
   const chosen = models[index]!;
   if (!(await listMediaModels(true)).some(model => model.type === data.kind && model.providerId === chosen.providerId && model.modelId === chosen.modelId)) throw new Error("所选模型已不可用，本次未更改设置");
   signal?.throwIfAborted();
@@ -63,7 +63,13 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
 export async function requestProductionDecision(directory: string, toolCallId: string, input: { operation: string; data: Record<string, unknown>; reconsider?: boolean }, question: QuestionContext, signal?: AbortSignal) {
   signal?.throwIfAborted();
   if (input.operation === "selectQuality") return requestMediaQuality(directory, toolCallId, input, question, signal);
-  if (input.operation === "selectModel") return requestModelDecision(toolCallId, input, question, signal);
+  if (input.operation === "selectModel") {
+    const result = await requestModelDecision(toolCallId, input, question, signal);
+    if (result.applied && input.data.kind === "video") {
+      return { ...result, answer: `${result.answer}。以最新选定模型为准，旧模型专项停止适用；保留创作规格，按当前模式、参考与声音能力重新编译` };
+    }
+    return result;
+  }
   if (input.operation === "selectVoice" || input.operation === "configureVoice") return requestVoiceDecision(directory, toolCallId, input, question, signal);
   const api = cloud(), tenant = currentTenant();
   if (!api || !tenant || tenant.role === "VIEWER") throw new Error("制作选择需要已登录且有编辑权限的工作区");
@@ -72,19 +78,9 @@ export async function requestProductionDecision(directory: string, toolCallId: s
   const prepared = api.prepareProductionDecision(scope, projectId, input, input.reconsider);
   if (prepared.completed) return { title: prepared.request.title, applied: true, selectedId: prepared.selectedId, reviewRequired: prepared.reviewRequired,
     answer: prepared.reviewRequired ? "选择已保存，无需重复确认；技术检查须由助手复核，原生成与导出门禁仍生效" : "此决定已保存且仍有效，无需重复确认" };
-  if (prepared.action.operation === "updateShot" && !input.reconsider) {
-    try {
-      const { shotId, patch } = prepared.action.data;
-      const result = api.workspaceProduction(scope, projectId, "updateShot", { ...patch, shotId }, tenant.userId);
-      return { title: prepared.request.title, applied: true, result, answer: "镜头修改已保存；此修改不需要再次确认" };
-    } catch (error) {
-      // 复用领域层的确认边界；仅已采用镜头的实质变更继续展示确认卡。
-      if ((error as { code?: string }).code !== "needs_confirmation") throw error;
-    }
-  }
   const response = await question.ask(toolCallId, prepared.request, signal);
   signal?.throwIfAborted();
-  if (response.skipped || response.answer === "暂不决定" || response.values?.decision === "暂不决定") return { ...prepared.request, ...response, applied: false };
+  if (response.requestedChanges || response.skipped || response.answer === "暂不决定" || response.values?.decision === "暂不决定") return { ...prepared.request, ...response, applied: false };
   const member = api.dbGet("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", tenant.workspaceId, tenant.userId);
   if (!member || member.role === "VIEWER") throw new Error("制作选择的编辑权限已失效");
   if (workspaceProject(directory) !== projectId) throw new Error("工作目录关联项目已改变，请重新确认");

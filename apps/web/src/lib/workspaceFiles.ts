@@ -2,6 +2,7 @@ import axios from "axios";
 import { toValue, type MaybeRefOrGetter } from "vue";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { registerApiLanguage } from "@/lib/i18n";
+import { getMe } from "@/lib/session";
 
 type WorkspaceEntry = { name: string; path: string; type: "file" | "directory" };
 const client = axios.create({ baseURL: "/api/workspaces/files", headers: { "x-toonflow-workspace": "1" } });
@@ -44,6 +45,11 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
 
   function acquireUrl(path: string, mimeType?: string) {
     const directory = getDirectory();
+    const account = getMe();
+    if (account && (mimeType?.startsWith("video/") || mimeType?.startsWith("audio/"))) {
+      const params = new URLSearchParams({ directory, path, workspaceId: account.workspaceId, userId: account.user.id });
+      return { url: Promise.resolve(`/api/workspaces/files/read?${params}`), release() {} };
+    }
     const key = JSON.stringify([directory, path, mimeType]);
     let entry = fileUrls.get(key);
     if (!entry) {

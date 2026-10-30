@@ -100,7 +100,7 @@ export async function requestMediaQuality(directory: string, toolCallId: string,
   const request = { title: kind === "image" ? "选择图片精度" : "选择视频分辨率", question: `${model.providerLabel} · ${model.label}。选择后用于当前项目；较高分辨率可能增加算力消耗。${kind === "video" ? "具体时长须与所选分辨率匹配。" : "多格图的精度指整张图片，拆格后每格像素会减少。"}`, options: options.concat("暂不决定") };
   const response = await question.ask(toolCallId, request, signal);
   signal?.throwIfAborted();
-  if (response.skipped || !options.includes(response.answer)) return { ...request, ...response, applied: false };
+  if (response.requestedChanges || response.skipped || !options.includes(response.answer)) return { ...request, ...response, applied: false };
   return { ...request, ...await saveMediaQuality(directory, { kind, providerId: model.providerId, modelId: model.modelId, value: response.answer }, saved.content, signal) };
 }
 

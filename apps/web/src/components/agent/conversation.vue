@@ -108,6 +108,7 @@
       <div ref="senderElement" class="senderEditor" @keydown.capture="handleSenderKeydown"></div>
       <teleport v-for="target in draftMentionTargets" :key="target.key" :to="target.element"><mentionThumbnail v-bind="mentionThumbnailProps(target.mention)" :directory="directory"><icon-photo :size="14" /></mentionThumbnail></teleport>
       <mentionContent ref="draftMentionPreview" :mentions="draftMentions" :directory="directory" removable @remove="removeDraftMention" />
+      <el-checkbox v-model="autonomousDecisions" :disabled="locked || busy || remoteRunning" title="本次消息授权助手处理常规故事和项目制作决定；费用、事实确认和满意度仍需你决定">自动处理常规决定</el-checkbox>
       <div class="senderActions">
         <input ref="attachmentInput" type="file" accept="image/*,video/*,audio/mpeg,.mp3,.txt,.lrc,.srt" multiple hidden :disabled="locked || busy || remoteRunning || !directory" @change="selectAttachments" />
         <el-button text :disabled="locked || busy || remoteRunning || !directory" title="图片、视频、MP3、TXT、LRC 或 SRT" @click="attachmentInput?.click()"><icon-photo :size="16" />上传素材</el-button>
@@ -207,6 +208,7 @@ const remoteRunning = ref(props.initialSession?.running ?? false);
 const stats = ref(props.initialSession?.stats);
 const contextUsage = ref(props.initialSession?.contextUsage);
 const busy = ref(false);
+const autonomousDecisions = ref(false);
 const steering = ref(false);
 const lastProgressAt = ref(Date.now());
 const executionStartedAt = ref(Date.now());
@@ -722,7 +724,7 @@ async function sendMessage(source?: AgentMessage) {
     const response = await fetch("/api/agent", {
       method: "POST",
       headers: { "Accept-Language": locale.value, "Content-Type": "application/json", "x-toonflow-workspace": "1" },
-      body: JSON.stringify({ prompt, mentions, attachments: attachments.map(({ name, path, mimeType }) => ({ name, path, mimeType })), directory, providerId: model.providerId, modelId: model.modelId, thinkingLevel: reasoningEffort.value || undefined, sessionFile: props.sessionFile, resendFrom, canvas: canvasContext ? { id: canvasContext.id, tools: canvasContext.tools } : undefined }),
+      body: JSON.stringify({ prompt, mentions, attachments: attachments.map(({ name, path, mimeType }) => ({ name, path, mimeType })), directory, providerId: model.providerId, modelId: model.modelId, thinkingLevel: reasoningEffort.value || undefined, autonomousDecisions: autonomousDecisions.value, sessionFile: props.sessionFile, resendFrom, canvas: canvasContext ? { id: canvasContext.id, tools: canvasContext.tools } : undefined }),
       signal: requestController.signal,
     });
     for await (const event of readAgentEvents(response, requestController.signal)) {

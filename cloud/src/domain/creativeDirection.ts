@@ -30,13 +30,13 @@ export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; n
     if (!stylingSchema.safeParse(asset.attributes?.styling).success) issues.push(`${asset.name} 缺少 attributes.styling 的 makeup、hair、costume、accessories 设计；可明确自然妆或无配饰及其理由，不默认素衣或华服`);
   }
   const brief = parsed.data;
+  const timeline = shot.camera?.design?.timeline ?? shot.musicVideo?.timeline;
   if (characters.length && (brief.kind === "performance" || brief.kind === "combat")) {
-    if (!shot.action?.trim() || !shot.performance?.gesture?.trim() || !shot.performance?.timing?.trim()) issues.push("人物戏须明确行动目标、可见表演、触发与反应节拍；情绪标签不能代替表演");
+    if (!shot.action?.trim() || !shot.performance?.gesture?.trim() || !timeline?.length && !shot.performance?.timing?.trim()) issues.push("人物戏须明确行动目标、可见表演、触发与反应节拍；有执行时间线时不另编表演秒数，情绪标签不能代替表演");
     if (!Object.values(shot.blocking ?? {}).some(value => value.trim()) || !shot.camera?.design?.subjectPath?.trim()) issues.push("人物戏须明确相对位置与人物路径；有意不移动时写明停留位置、注意对象和叙事作用，不用摄影机运动代替人物行为");
-    if (!shot.camera?.design?.purpose?.trim() || !shot.camera?.design?.cut?.trim() || !shot.camera?.design?.timing?.trim()) issues.push("人物戏须明确镜头传递的信息、局部行动节拍及剪辑入出依据，不能用固定时长填满空动作");
+    if (!shot.camera?.design?.purpose?.trim() || !shot.camera?.design?.cut?.trim() || !timeline?.length && !shot.camera?.design?.timing?.trim()) issues.push("人物戏须明确镜头传递的信息、局部行动节拍及剪辑入出依据，不能用固定时长填满空动作");
   }
   if (brief.kind === "combat" && !brief.combat) issues.push("武打镜头须先设计 combat 的局面转折、标志性动作、攻防因果与摄影覆盖，不能只填写强度或激烈形容词");
-  const timeline = shot.camera?.design?.timeline ?? shot.musicVideo?.timeline;
   if (brief.kind === "combat") {
     const design = shot.camera?.design;
     if (!design?.mode || !timeline?.length) issues.push("动作戏须明确 singleTake/multiShot 和唯一执行时间线，将空间交代、避让、交锋、位移及结果落到本镜实际节拍；不能用笼统打斗代替");

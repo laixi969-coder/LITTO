@@ -29,7 +29,7 @@ metadata:
 
 - 消费者洞察靠 [insight](../insight/SKILL.md)。
 - 一致性靠 [continuity](../continuity/SKILL.md)：产品的形状、颜色、logo 与包装必须锁定；多镜头状态表照它做。
-- 画布操作与阶段确认靠 [canvas](../canvas/SKILL.md)；资产参考板、Seedance 分段与提示词靠 [workflow](../workflow/SKILL.md)。进入 workflow 的 Seedance 执行态后，**分段、时长、镜头格式一律以它为准**，本技能只负责广告内容层（策略、脚本、产品镜头、合规）。技能位置以 `available_skills` 中的 `location` 为准。
+- 画布操作与阶段确认靠 [canvas](../canvas/SKILL.md)；资产参考板、Seedance 分段与提示词靠 [workflow](../workflow/SKILL.md)。本技能负责广告内容层（策略、脚本、产品镜头、合规）；分段服从完整事件与当前供应商模式，Seedance 专项只在实际选用时参与编译，不能覆盖广告意图。技能位置以 `available_skills` 中的 `location` 为准。
 
 ## 故事工作台与真实反馈
 

@@ -12,7 +12,8 @@
         <pre class="errorText">{{ tool.result }}</pre>
       </details>
     </template>
-    <p v-else-if="question" class="questionText" :tabindex="storyDecision ? 0 : undefined">{{ question }}</p>
+    <el-input v-else-if="question && waiting && editingChanges" v-model="changeText" type="textarea" :autosize="{ minRows: 4, maxRows: 16 }" :disabled="submitting" aria-label="编辑方案正文" />
+    <p v-else-if="question && !toolResult?.editedContent" class="questionText" :tabindex="storyDecision ? 0 : undefined">{{ question }}</p>
     <div v-if="images.length" class="questionImages">
       <figure v-for="item in images" :key="item.id">
         <a :href="previewUrl(item.url)" target="_blank" rel="noopener noreferrer" :aria-label="`查看${item.title}原图`">
@@ -31,10 +32,10 @@
         <p v-if="previewFailures.has(item.url)" role="alert">预览加载失败 <el-button size="small" @click="retryPreview(item.url)">重新加载</el-button></p>
       </figure>
     </div>
-    <div v-if="waiting && storyDecision && !formRules.length" class="questionActions">
+    <div v-if="waiting && !editingChanges && storyDecision && !formRules.length" class="questionActions">
       <el-button v-for="(option, index) in options" :key="option" :type="index < options.length - 1 ? 'primary' : 'default'" :disabled="!directory || submitting || (index < options.length - 1 && !imagesReady)" @click="submitAnswer(false, option)">{{ option }}</el-button>
     </div>
-    <template v-else-if="waiting">
+    <template v-else-if="waiting && !editingChanges">
       <form-create v-if="formRules.length" v-model="formValues" v-model:api="formApi" :rule="formRules" :option="formOptions" />
       <template v-else>
         <el-radio-group v-if="options.length" v-model="selected" class="questionOptions" :disabled="submitting" :aria-label="question">
@@ -58,8 +59,19 @@
         <el-button :disabled="!directory || submitting" @click="submitAnswer(true)">跳过</el-button>
       </div>
     </template>
+    <div v-if="waiting" class="changeRequest">
+      <el-button v-if="!editingChanges" :disabled="submitting || !question" @click="changeText = question; editingChanges = true">编辑方案</el-button>
+      <template v-else>
+        <el-text v-if="changeText.length > 8000" type="danger">编辑后的内容不能超过 8000 字</el-text>
+        <div class="questionActions">
+          <el-button type="primary" :loading="submitting" :disabled="!directory || !changeText.trim() || changeText === question || changeText.length > 8000" @click="submitChanges">提交修改</el-button>
+          <el-button :disabled="submitting" @click="editingChanges = false">取消</el-button>
+        </div>
+      </template>
+    </div>
     <p v-if="submitError" class="submitError" role="alert">{{ submitError }}</p>
     <p v-else-if="answer" class="answerText">{{ answer }}</p>
+    <p v-if="toolResult?.automated && toolResult.automationReason" class="answerText">助手决定的依据：{{ toolResult.automationReason }}</p>
   </el-card>
 </template>
 
@@ -107,6 +119,8 @@ const storyDecision = computed(() => storyApproval.value || ["requestStoryDecisi
 const title = computed(() => props.tool.question?.title || toolResult.value?.title || (typeof props.tool.args?.title === "string" ? props.tool.args.title.trim() : "") || (props.tool.name === "requestKeyframeApproval" ? "确认采用主关键帧" : storyApproval.value ? "确认采用故事" : "请确认"));
 const selected = ref("");
 const text = ref("");
+const editingChanges = ref(false);
+const changeText = ref("");
 const submitting = ref(false);
 const submitError = ref("");
 const submittedAnswer = ref("");
@@ -173,7 +187,7 @@ const options = computed(() => {
 const toolResult = computed(() => {
   if (props.tool.status !== "success" || !props.tool.result) return;
   try {
-    return JSON.parse(props.tool.result) as Partial<QuestionRequest> & { answer?: unknown; skipped?: boolean; approved?: boolean; applied?: boolean };
+    return JSON.parse(props.tool.result) as Partial<QuestionRequest> & { answer?: unknown; skipped?: boolean; requestedChanges?: boolean; editedContent?: boolean; automaticPending?: boolean; automated?: boolean; automationReason?: string; approved?: boolean; applied?: boolean };
   } catch { return; }
 });
 const skipped = computed(() => submittedSkipped.value || toolResult.value?.skipped === true);
@@ -187,6 +201,9 @@ const statusText = computed(() => {
   if (props.tool.status === "error") return storyDecision.value ? "未保存" : "待重新生成";
   if (props.tool.status === "interrupted") return "已停止";
   if (submitting.value) return "正在提交";
+  if (toolResult.value?.requestedChanges) return "已提出修改";
+  if (toolResult.value?.automaticPending) return "等待助手决定";
+  if (toolResult.value?.automated) return "助手已决定";
   if (storyApproval.value && props.tool.status === "success") return toolResult.value?.approved ? "已采用" : "未采用";
   if (storyDecision.value && props.tool.status === "success") return toolResult.value?.applied ? "已保存" : "未确认";
   if (storyDecision.value && answer.value) return "正在处理";
@@ -194,6 +211,24 @@ const statusText = computed(() => {
   if (answer.value) return "已回答";
   return waiting.value ? "等待回答" : "提问记录";
 });
+
+async function submitChanges() {
+  const callId = props.tool.question?.callId;
+  const value = changeText.value.trim();
+  if (!waiting.value || submitting.value || !props.directory || !callId || !value || value.length > 8000) return;
+  submitting.value = true;
+  submitError.value = "";
+  try {
+    const response = await axios.post("/api/agent/answer", {
+      directory: props.directory, callId, requestedChanges: true, editedContent: true, answer: value,
+    }, { headers: { "x-toonflow-workspace": "1" } });
+    if (response.data.code !== 200) throw new Error(response.data.message || "提交修改意见失败");
+    submittedAnswer.value = response.data.data.answer;
+  } catch (error) {
+    const message = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+    submitError.value = message || (error instanceof Error ? error.message : "提交修改意见失败，请重试；已填写内容保留");
+  } finally { submitting.value = false; }
+}
 
 async function submitAnswer(skip: boolean, choice?: string) {
   const callId = props.tool.question?.callId;
@@ -224,6 +259,7 @@ async function submitAnswer(skip: boolean, choice?: string) {
 
 <style scoped lang="scss">
 .questionCard {
+  .changeRequest { margin-top: 12px; }
   .questionMedia {
     figure { margin: 12px 0; video, audio { display: block; width: 100%; max-height: 360px; } figcaption { margin-top: 6px; overflow-wrap: anywhere; } }
   }

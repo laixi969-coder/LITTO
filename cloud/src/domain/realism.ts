@@ -9,6 +9,7 @@ import { z } from "zod";
 import { techniqueVersion, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 import { assertSpeechPlan } from "./speechPlanning.ts";
 import { mediaAspectIssue } from "./qualityInspection.ts";
+import { getEdit, resolveClip } from "./nle.ts";
 export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 // 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
 export const audioReviewSchema = z.object({
@@ -19,7 +20,7 @@ export const audioReviewSchema = z.object({
 
 export const reviewedSegmentsSchema = z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).strict().refine(range => range.end > range.start)).max(80).default([]);
 export const techniqueReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(8);
-export const motionReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(147);
+export const motionReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(149);
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
@@ -60,6 +61,8 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
   const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
   const advertising = adContext(s, shot);
   const data = {
+    ...(shot.continuity?.mode === "continuous" && previous ? { continuationCut: getEdit(s, previous.sequenceId, false).clips
+      .filter(clip => clip.shotId === previous.id).map(clip => ({ mediaId: resolveClip(s, clip).mediaId, in: clip.in, out: clip.in + clip.duration * clip.speed, speed: clip.speed })) } : {}),
     ...(shot.techniques?.length ? { techniqueVersion } : {}),
     ...(advertising ? { advertising } : {}),
     musicSource: type === "take" && shot.musicVideo?.sourceMediaId ? s.get("media", shot.musicVideo.sourceMediaId) : null,
@@ -96,6 +99,12 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     if (!source || source.projectId !== item.projectId || media?.id !== continuation.mediaId || media?.hash !== continuation.hash
       || shotFingerprint(s, source.shotId) !== continuation.fingerprint
       || continuityPredecessor(s, s.get("shots", item.shotId)!)?.id !== source.shotId) throw conflict("接戏帧的前镜视频或规格已改变，请从当前前镜重新提取并检查", "continuation_stale");
+    if (continuation.sourceCut) {
+      const shot = s.get("shots", source.shotId)!;
+      const cut = continuation.sourceCut;
+      const clip = getEdit(s, shot.sequenceId, false).clips.find(item => item.id === cut.clipId);
+      if (!clip || resolveClip(s, clip).mediaId !== source.mediaId || clip.in !== cut.sourceIn || clip.in + clip.duration * clip.speed !== cut.sourceOut || clip.speed !== cut.speed) throw conflict("前镜实际剪点已改变，原接戏帧不再对应切点，请重新提取并检查", "continuation_stale");
+    }
   }
   const latest = s.list("qc_reports", { targetType: type, targetId: item.id }, "created_at DESC, rowid DESC")[0];
   const evidence = latest?.evidence;

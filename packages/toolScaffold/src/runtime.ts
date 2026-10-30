@@ -212,6 +212,8 @@ export interface QuestionAnswer {
   answer: string;
   values?: Record<string, string | number | boolean | string[]>;
   skipped?: boolean;
+  requestedChanges?: boolean;
+  editedContent?: boolean;
 }
 
 export type ToolCall = {
@@ -224,7 +226,8 @@ export type ToolCall = {
 };
 
 export interface QuestionContext {
-  decisionSource?: { kind: "agent"; taskId: string };
+  decisionSource?: { kind: "agent"; taskId: string; reason?: string };
+  autonomousDecisions?: boolean;
   ask(toolCallId: string, request: QuestionRequest, signal?: AbortSignal): Promise<QuestionAnswer>;
 }
 

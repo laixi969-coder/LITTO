@@ -35,7 +35,7 @@ const plugin: ToolPlugin = {
     return [{
       name: "askUser",
       label: "提问器",
-      description: "需要用户补充信息或作出选择时调用。单个选择题使用 options，多个问题使用 fields。结果包含 answer，多问题还包含 values；用户跳过整组提问时返回 skipped: true。",
+      description: "需要用户补充信息或作出选择时调用。单个选择题使用 options，多个问题使用 fields。结果包含 answer，多问题还包含 values；用户跳过时返回 skipped: true，提出修改时返回 requestedChanges: true，editedContent: true 表示 answer 是编辑后的完整正文。修改不能视为批准。已授权范围内可自行判断的常规决定不必提问。",
       promptSnippet: "一次询问一个或多个问题；用户可以回答或跳过，跳过不代表阶段确认通过。",
       parameters: z.toJSONSchema(questionSchema, { io: "input", target: "draft-07" }),
       executionMode: "sequential",

@@ -13,8 +13,8 @@ import { compactProductionRead, qualityReviewPlan, needsLipSync } from "@toonflo
 import { productionQualityView } from "./qualityInspection.ts";
 import { runQc } from "./qc.ts";
 import { approveTake, promoteHero } from "./lifecycle.ts";
-import { selectWorkingTake, applyOps, getEdit, editView } from "./nle.ts";
-import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema, motionReviewSchema } from "./realism.ts";
+import { selectWorkingTake, applyOps, getEdit, editView, resolveClip } from "./nle.ts";
+import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema, motionReviewSchema, requireReviewed } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
 import { searchFilmTechniques, techniqueStages } from "@toonflow/tool-media-generation/filmTechniques";
 import { adReadiness, saveAdDirection } from "./adDirection.ts";
@@ -32,6 +32,15 @@ export async function extractContinuationFrame(s: Scope, projectId: string, data
   if (!shot || !take || !sourceShot || !media || [shot, take, sourceShot, media].some(item => item.projectId !== projectId)) throw notFound("project continuation source");
   if (continuityPredecessor(s, shot)?.id !== sourceShot.id) throw bad("接戏帧必须来自本镜明确接续的前镜视频");
   if (!media.mime.startsWith("video/")) throw bad("接戏来源必须是实际视频，不能使用静态主帧代替");
+  if (shot.continuity?.mode === "continuous") {
+    if (sourceShot.approvedTakeId !== take.id || take.status !== "approved") throw bad("连续动作须从前镜已采用视频取帧，不能使用未采用候选");
+    requireReviewed(s, "take", take);
+  }
+  const edit = getEdit(s, sourceShot.sequenceId, true);
+  const clips = edit.clips.filter(clip => clip.shotId === sourceShot.id && edit.tracks.some(track => track.id === clip.trackId && track.kind === "video" && !track.muted));
+  if (clips.length !== 1 || resolveClip(s, clips[0]).mediaId !== media.id) throw bad("接戏来源须对应时间线中唯一采用的视频片段，请先明确前镜的实际剪入剪出位置");
+  const clip = clips[0];
+  const sourceCut = { clipId: clip.id, sourceIn: clip.in, sourceOut: clip.in + clip.duration * clip.speed, speed: clip.speed };
   const fingerprint = shotFingerprint(s, sourceShot.id);
   const directory = await mkdtemp(join(tmpdir(), "milimiliContinuation"));
   try {
@@ -41,18 +50,21 @@ export async function extractContinuationFrame(s: Scope, projectId: string, data
     await writeFile(source, bytes);
     const probe = await probeFile(source);
     if (!probe?.hasVideo || !probe.duration) throw bad("前镜视频不可读取");
-    const seconds = input.seconds ?? Math.max(0, Math.min(sourceShot.duration, probe.duration) - 0.1);
+    const seconds = input.seconds ?? Math.max(clip.in, Math.min(sourceCut.sourceOut, probe.duration) - 1 / edit.fps);
+    if (shot.continuity?.mode === "continuous" && (seconds < clip.in || seconds >= sourceCut.sourceOut || sourceCut.sourceOut - seconds > Math.max(0.15, 2 / edit.fps))) throw bad("连续动作接戏帧须位于前镜实际剪出点附近；需要更早画面时先调整前镜剪点，不能重复播放已发生动作");
     if (seconds >= probe.duration) throw bad("接戏时间须在实际视频内");
     const extracted = await runCmd("ffmpeg", ["-v", "error", "-ss", String(seconds), "-i", source, "-frames:v", "1", output]);
     if (extracted.code !== 0) throw bad("前镜接戏帧提取失败");
     const image = await readFile(output);
     if (s.get("takes", take.id)?.mediaId !== media.id || shotFingerprint(s, sourceShot.id) !== fingerprint || continuityPredecessor(s, s.get("shots", shot.id)!)?.id !== sourceShot.id) throw conflict("提取期间前镜或接戏来源已改变", "stale");
-    const sourceKey = sha256(JSON.stringify([take.id, media.hash, fingerprint, seconds]));
+    const currentClip = getEdit(s, sourceShot.sequenceId, false).clips.find(item => item.id === clip.id);
+    if (!currentClip || currentClip.in !== sourceCut.sourceIn || currentClip.in + currentClip.duration * currentClip.speed !== sourceCut.sourceOut || currentClip.speed !== sourceCut.speed || resolveClip(s, currentClip).mediaId !== media.id) throw conflict("取帧期间前镜剪点已改变，请重新提取", "stale");
+    const sourceKey = sha256(JSON.stringify([take.id, media.hash, fingerprint, seconds, sourceCut]));
     let frame = s.list("keyframes", { shotId: shot.id }).find(item => item.meta?.continuationSource?.key === sourceKey);
     if (!frame) {
       const saved = s.list("media", { projectId, hash: sha256(image) })[0] ?? await saveMedia(s.workspaceId, projectId, image, { source: "continuationFrame" });
       if (shotFingerprint(s, sourceShot.id) !== fingerprint || s.get("shots", shot.id)?.projectId !== projectId) throw conflict("保存期间接戏规格已改变", "stale");
-      frame = s.insert("keyframes", { project_id: projectId, shot_id: shot.id, media_id: saved.id, status: "variant", meta: { source: "continuationFrame", continuationSource: { key: sourceKey, takeId: take.id, mediaId: media.id, hash: media.hash, fingerprint, seconds } } });
+      frame = s.insert("keyframes", { project_id: projectId, shot_id: shot.id, media_id: saved.id, status: "variant", meta: { source: "continuationFrame", continuationSource: { key: sourceKey, takeId: take.id, mediaId: media.id, hash: media.hash, fingerprint, seconds, sourceCut } } });
     }
     return { keyframe: frame, image, seconds, sourceTakeId: take.id, reviewStatus: "unverified" };
   } finally { await rm(directory, { recursive: true, force: true }); }

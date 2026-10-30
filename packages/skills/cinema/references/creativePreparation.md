@@ -14,9 +14,9 @@ creativeBrief.kind 按本镜内容选 combat（武打，必须有 combat 编排�
 
 先在整场写出争夺目标、空间障碍、主动权转移和高潮，再拆镜。creativeBrief.combat 保存本镜的 dramaticTurn（局面如何变化）、signature（有辨识度且符合角色的动作设计）、coverage（观众怎样看清接触与反应，实际剪辑接点）。不以提高 intensity、加招式数量或追加“激烈”代替设计。
 
-beats 每项保存 attackerId、defenderId、action、reaction、endState、supportingAction。ID 必须来自当前镜头资产；第三人的行为应真实改变路线或压力，没有第三人时明确写无。攻击、防守和结果必须连成因果，不能把“出手—格挡—回位—等待”写成激烈交锋。招式是银幕编排，不需要使用流派术语。
+beats 每项保存 timelineIndex、attackerId、defenderId、action、reaction、endState、supportingAction。timelineIndex 绑定唯一执行时间线中的对应节拍；ID 必须来自当前镜头资产。第三人的行为应真实改变路线或压力，没有第三人时明确写无。攻击、防守和结果必须连成因果，不能把“出手—格挡—回位—等待”写成激烈交锋。招式是银幕编排，不需要使用流派术语。
 
-先把一段有价值的攻防拍好，再扩展组合。每个生成单元围绕一个清晰转折，复杂多人接触、快速换位和精确口型不要全挤进同一段。按模型容量拆生成素材，由剪辑构成整场节奏；不降低整场精彩程度，也不按九宫格或模型最大时长机械均分。实际秒数仍以 musicVideo.timeline 为唯一执行时间线，combat 是设计依据，两者必须一致。
+先把一段有价值的攻防拍好，再扩展组合。每个生成单元围绕一个清晰转折，复杂多人接触、快速换位和精确口型不要全挤进同一段。按模型容量拆生成素材，由剪辑构成整场节奏；不降低整场精彩程度，也不按九宫格或模型最大时长机械均分。剧情/广告使用 camera.design.timeline，MV 使用 musicVideo.timeline；同一镜头只保留一份执行时间线，combat.beats 通过 timelineIndex 对应，不再另起时序。
 
 小样必须代表目标片的动作力度和造型，不能用普通对练验证成功后声称大片质量达标。失败先分辨编排不精彩、参考不合适、模型未执行哪一项；同一参考和同一动作的提示词对照只改变一个变量，不凭单次失败宣判模型上限，也不重复堆词抽卡。
 

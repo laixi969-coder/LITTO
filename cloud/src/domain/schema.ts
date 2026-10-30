@@ -192,6 +192,12 @@ export const shotInput = z.object({
         sceneText: z.string().max(12000).optional(), speech: z.string().max(6000).optional(), knowledge: z.string().max(2000).optional(),
     }).strict().optional(),
     continuityFromShotId: z.string().min(1).max(128).nullable().optional().describe("明确接续本项目更早序列或本序列更早镜头的末态；分集首镜显式指定，不按场景名推断倒叙或时间跳跃"),
+    continuity: z.object({
+        mode: z.enum(["opening", "continuous", "coverage", "parallel", "ellipsis", "montage"]),
+        reason: directionText.describe("为什么在此切镜，观众从前镜的什么信息理解本镜；首镜写建立什么事件"),
+        visual: directionText.describe("本镜起点如何承接动作阶段、视线、空间或视觉母题；换机位不复制前镜构图"),
+        audio: directionText.describe("切点的对白、环境声、音乐如何连接；无声明确写无声，不新增对白"),
+    }).strict().optional().describe("正式生成前由导演填写的跨镜关系；continuous/coverage须指定continuityFromShotId，parallel可指定本支线更早镜头，opening/ellipsis/montage不继承无关前镜状态"),
     narrativeFunction: z.enum(NARRATIVE_FUNCTIONS).default("Establish"),
     assetIds: z.array(z.string()).default([]),
     visibleAssetIds: z.array(z.string()).optional().describe("本镜实际出镜的资产，须为 assetIds 的子集；画外声音保留在对白中。省略时兼容旧镜头，沿用 assetIds；空数组表示无人无物出镜"),

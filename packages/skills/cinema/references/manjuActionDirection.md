@@ -89,7 +89,7 @@ MILI MILI 于 2026-10-10 基于漫剧老李 Short-Drama Director Suite 改写。
 | 接触、惯性、身体及衣物次级运动 | realism.motion；超自然边界写入 realism.world |
 | 预期变化与跨镜接戏 | intendedStateDelta；实际结果在看过输出后再记录 |
 
-先 read，再按工具实际 schema 保存并 compile；不新增臆造的 combatLevel、martialStyle 等顶层字段。动作视频可复用现有 musicVideo.timeline 保存唯一执行节拍，不代表需要音乐；没有该字段时用 action 与 camera.design.timing。MV 另沿用真实音乐分析时间，不将预估节拍声称为精准卡点。分镜图沿用资产与干净参考帧规则，不把宫格当作普通首帧直接送给视频模型。
+先 read，再按工具实际 schema 保存并 compile；不新增臆造的 combatLevel、martialStyle 等顶层字段。剧情和广告动作使用 camera.design.timeline，MV 使用 musicVideo.timeline，combat.beats.timelineIndex 绑定所用时间线；只保留一份执行节拍，不用笼统 timing 替代正式动作时间线。MV 另沿用真实音乐分析时间，不将预估节拍声称为精准卡点。分镜图沿用资产与干净参考帧规则，不把宫格当作普通首帧直接送给视频模型。
 
 交付包含动作节拍、空间与摄影安排、邻镜承接及待核对项。用户只要方案时停止在方案；要求实际生成时复用已确认授权和规格。生成后检查身体/兵器数量、遮挡连续性、动作相位、角色反应、实际音画同步；未观看视频不得宣称动作验收通过。
 

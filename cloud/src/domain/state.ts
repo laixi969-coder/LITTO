@@ -70,7 +70,9 @@ export function recomputeStates(s: Scope, sequenceId: string) {
       for (const shot of shots) {
         const reference = shot.continuityFromShotId ? results.get(shot.continuityFromShotId) : undefined;
         if (shot.continuityFromShotId && !reference) throw bad("接戏来源须为同项目中更早序列的镜头或本序列更早镜头，不能跨项目、向后引用或引用已删除镜头；请先调整接戏依赖");
-        const start = seed(reference?.state ?? previousState ?? emptyState(), shot, assets, shot.sceneId !== (reference?.sceneId ?? previousScene));
+        // ACT: 新分镜只沿明确的事件线继承；旧记录保持原语义，不改写已有素材或自动猜测平行叙事。
+        const inherited = reference?.state ?? (shot.continuity ? null : previousState);
+        const start = seed(inherited ?? emptyState(), shot, assets, shot.sceneId !== (reference?.sceneId ?? (shot.continuity ? null : previousScene)));
         const approved = shot.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
         const result = applyDelta(start, approved?.meta?.observedStateDelta ?? shot.intendedStateDelta ?? {});
         for (const [kind, data] of [["start", start], ["result", result]] as const) {
@@ -87,7 +89,7 @@ export function recomputeStates(s: Scope, sequenceId: string) {
 }
 
 export function continuityPredecessor(s: Scope, shot: Record<string, any>) {
-  if (!shot.continuityFromShotId) return s.list("shots", { sequenceId: shot.sequenceId }, "ord, id").filter(item => item.ord < shot.ord).at(-1) ?? null;
+  if (!shot.continuityFromShotId) return shot.continuity ? null : s.list("shots", { sequenceId: shot.sequenceId }, "ord, id").filter(item => item.ord < shot.ord).at(-1) ?? null;
   const previous = s.get("shots", shot.continuityFromShotId);
   const sequences = s.list("sequences", { projectId: shot.projectId }, "ord, id");
   const previousIndex = sequences.findIndex(item => item.id === previous?.sequenceId);

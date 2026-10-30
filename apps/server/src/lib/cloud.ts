@@ -42,7 +42,10 @@ export async function mountCloud(app: Express) {
 }
 
 function tenantOf(req: Request): Tenant | null {
-  const auth = embed!.resolveSession(embed!.tokenFromHeaders({ authorization: req.get("authorization"), cookie: req.get("cookie") }), req.get("x-workspace-id"));
+  const mediaRead = req.method === "GET" && req.path.toLowerCase().replace(/\/+$/, "") === "/workspaces/files/read";
+  const workspaceId = mediaRead && typeof req.query.workspaceId === "string" ? req.query.workspaceId : req.get("x-workspace-id");
+  const auth = embed!.resolveSession(embed!.tokenFromHeaders({ authorization: req.get("authorization"), cookie: req.get("cookie") }), workspaceId);
+  if (auth && mediaRead && typeof req.query.userId === "string" && req.query.userId !== auth.user.id) throw new Error("账号已切换，请重新打开项目");
   return auth && { userId: auth.user.id, email: auth.user.email, isAdmin: auth.user.isAdmin, workspaceId: auth.workspaceId, role: auth.role };
 }
 

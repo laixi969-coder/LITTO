@@ -45,7 +45,8 @@ export function inspectVideoPrompt(prompt: string, duration?: number) {
 export function positivePromptText(prompt: string) {
   const authored = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(prompt)?.[1] ?? prompt;
   return authored
+    .replace(/^[ \t]*(?:FORBIDDENCHANGES|AVOID)[ \t]*[:：][^\n]*/gim, "")
     .split(/【(?:负面提示词|负面约束)】|^\s*(?:NEGATIVE(?:PROMPT)?|负面提示词)\s*[:：]/im)[0]!
-    .replace(/(?:没有|无|不带|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得|不能|非(?=动画|插画|漫画|卡通|二次元|像素|3D|CG|写实|拼图))[^。；;\n]*/g, "")
+    .replace(/(?:没有|无|不带|不留|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得|不能|非(?=动画|插画|漫画|卡通|二次元|像素|3D|CG|写实|拼图))[^。；;\n]*/g, "")
     .replace(/\b(?:no|not|without|avoid|remove)\b[^.;\n]*/gi, "");
 }

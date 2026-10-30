@@ -57,7 +57,7 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["source", "continuityFromShotId", "sceneId", "narrativeFunction", "action", "assetIds", "visibleAssetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "interactions", "creativeBrief", "advertising", "techniques"] as const;
+const CORE = ["source", "continuityFromShotId", "continuity", "sceneId", "narrativeFunction", "action", "assetIds", "visibleAssetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "interactions", "creativeBrief", "advertising", "techniques"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
@@ -74,6 +74,7 @@ export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, conf
     if (actionChanged || timelineChanged || speechChanged) {
         // ACT: 不用关键词猜测动作矛盾；要求调用方同次复核依赖字段，语义一致性仍由导演检查最终编译文本。
         const missing = [
+            shot.continuity && patch.continuity === undefined && "continuity（切镜动机、动作承接和声音连接）",
             shot.camera?.design && patch.camera === undefined && "camera（起止状态、主体路径、运镜与节拍）",
             timelineChanged && patch.action === undefined && "action（与新时间线一致的行动概述）",
             speechChanged && patch.action === undefined && "action（对白窗口变化后的实时行动与完整因果）",
@@ -143,11 +144,12 @@ export function createShotsFromDrafts(s: Scope, projectId: string, sequenceId: s
     tx(() => {
         if (opts.replace) for (const sh of s.list("shots", { sequenceId })) if (!sh.approvedTakeId && !sh.heroKeyframeId) s.softDelete("shots", sh.id);
         for (const d of drafts) {
+            if (d.continuityFromIndex !== undefined && (!Number.isInteger(d.continuityFromIndex) || d.continuityFromIndex < 0 || d.continuityFromIndex >= out.length)) throw bad("分镜接戏索引须指向本批更早镜头");
             validateVisibleAssets(d);
             validateShotDirection(d);
             if (!scenes.has(d.sceneIndex)) scenes.set(d.sceneIndex, s.insert("scenes", { project_id: projectId, sequence_id: sequenceId, name: d.sceneName, ord: d.sceneIndex, data: {} }).id);
             const ord = all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", sequenceId, s.workspaceId)[0].n;
-            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, ...(d.visibleAssetIds !== undefined ? { visibleAssetIds: d.visibleAssetIds } : {}), action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration, ...(d.source ? { source: d.source } : {}), ...(d.creativeBrief ? { creativeBrief: d.creativeBrief } : {}), ...(d.techniques ? { techniques: d.techniques } : {}) } });
+            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, ...(d.visibleAssetIds !== undefined ? { visibleAssetIds: d.visibleAssetIds } : {}), action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration, ...(d.source ? { source: d.source } : {}), ...(d.creativeBrief ? { creativeBrief: d.creativeBrief } : {}), ...(d.techniques ? { techniques: d.techniques } : {}), ...(d.continuity ? { continuity: d.continuity } : {}), ...(d.continuityFromIndex !== undefined ? { continuityFromShotId: out[d.continuityFromIndex].id } : {}) } });
             out.push(shot);
         }
         recomputeStates(s, sequenceId);

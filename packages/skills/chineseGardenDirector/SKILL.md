@@ -13,6 +13,8 @@ metadata:
 
 五板块完整提示词的写作规范读取 [videoPromptDirector 五板块写作规范](../videoPromptDirector/references/fiveBlockWriting.md)，资产建立读取 [资产建立与绑定](../videoPromptDirector/references/assetBinding.md)，节点创建读取 [节点创建与写入](../videoPromptDirector/references/nodeSetup.md)。本技能只提供园林题材的空间、光线、表演、镜头库与默认选择，不重新定义通用规范。
 
+本题材方法只补当前项目未确定的视觉与动作选择，已采用的时长、画幅、媒介、配乐及人物状态优先。正式镜头写入既有规格后编译；独立节点选择五板块时才遵循该格式，文字方案不自动创建节点。项目总时长不代表单次生成容量；不能因加载本技能把 MV 改为无配乐，或把既定动画改为真人。
+
 ## 1. 默认选择
 
 - 默认中文。默认 15–30 秒、16:9 横版、自然光、保留环境声、无背景音乐。

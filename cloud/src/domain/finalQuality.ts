@@ -137,7 +137,12 @@ export function finalReviewPlan(s: Scope, sequenceId: string) {
   const edit = getEdit(s, sequenceId, false);
   const cuts = edit.tracks.filter(track => track.kind === "video" && !track.muted).flatMap(track => {
     const clips = edit.clips.filter(clip => clip.trackId === track.id).sort((a, b) => a.start - b.start);
-    return clips.slice(1).map((clip, index) => ({ id: clip.id, seconds: clip.start, leftShotId: clips[index].shotId, rightShotId: clip.shotId }));
+    return clips.slice(1).map((clip, index) => {
+      const shot = shots.find(item => item.id === clip.shotId);
+      return { id: clip.id, seconds: clip.start, leftShotId: clips[index].shotId, rightShotId: clip.shotId,
+        continuity: shot?.continuity ?? null, continuityFromShotId: shot?.continuityFromShotId ?? null,
+        criterion: "连播切点前后并听音：先核对为什么切、事件因果是否读懂，再核对动作阶段、视线、空间与声音。平行叙事按各自事件线检查，时空跳跃按设计动机检查；不能用单帧相似或已添加转场代替。" };
+    });
   });
   return { fields: finalReviewFields(sequence.kind ?? "story", shots.some(needsLipSync), shots.some(shot => !!shot.musicVideo)), cuts };
 }

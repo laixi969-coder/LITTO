@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { storyImpact } from "@toonflow/tool-scene-list/storyProject";
 import { t } from "@/lib/i18n";
 import { listMediaModels, generateMedia, readReference } from "@/utils/media/generation";
@@ -127,6 +128,35 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         const api = cloud(), tenant = currentTenant();
         if (!api || !tenant || tenant.role === "VIEWER") throw new Error("制片工具需要已登录且有编辑权限的工作区");
         const scope = api.scoped(tenant.workspaceId), projectId = workspaceProject(cwd)!;
+        const publishRender = async (renderId: string) => {
+          const render = scope.get("renders", renderId);
+          if (!render || render.projectId !== projectId || render.status !== "SUCCEEDED" || !render.mediaId) throw new Error("当前项目中没有可用的渲染成片");
+          const media = scope.get("media", render.mediaId);
+          if (!media || media.projectId !== projectId || media.mime !== "video/mp4") throw new Error("成片媒体不存在或不属于当前项目");
+          const path = `render${render.id}.mp4`;
+          const target = await resolveWorkspacePath(cwd, path, true);
+          const bytes = await api.storage.get(media.storageKey);
+          mediaSignal(signal)?.throwIfAborted();
+          if (!bytes.length || createHash("sha256").update(bytes).digest("hex") !== media.hash) throw new Error("成片媒体校验失败");
+          const release = lockWorkspaceFiles([target.path]);
+          try {
+            await writeWorkspaceFile(target.path, bytes, true).catch(async (error: NodeJS.ErrnoException) => {
+              if (error.code !== "EEXIST") throw error;
+              if (createHash("sha256").update(await readFile(target.path)).digest("hex") !== media.hash) throw new Error(`同名文件内容不同：${path}，请先处理冲突`);
+            });
+          } finally { release(); }
+          if (!canvas) return { path, published: false, message: "成片已保存到工作区，请打开画布后重试展示" };
+          try {
+            const node = await canvas.call({ name: "publishVideo", args: { path, label: `${render.manifest?.options?.draft ? "粗剪预览" : "成片"} · ${scope.get("sequences", render.sequenceId)?.name ?? "影片"}` } }, mediaSignal(signal));
+            return { path, published: true, node };
+          } catch (error) {
+            return { path, published: false, message: `成片已保存，但画布展示失败：${error instanceof Error ? error.message : error}。请重试 publishRender，无需重新渲染。` };
+          }
+        };
+        if (operation === "publishRender") {
+          const { renderId } = z.strictObject({ renderId: z.string().min(1) }).parse(data);
+          return publishRender(renderId);
+        }
         if (operation === "readAsset") {
           const { asset, images } = await api.readWorkspaceAsset(scope, projectId, data);
           const referenceImages = [];
@@ -230,7 +260,10 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const options = api.renderOptionsSchema.parse(data.options ?? {});
           const render = api.startRender(tenant.workspaceId, projectId, data.sequenceId, tenant.userId, options);
           const completed = await api.waitNleRender(scope, render.id, mediaSignal(signal));
-          return { ...completed, media: completed.mediaId ? api.mediaView(scope.get("media", completed.mediaId)) : null };
+          const media = completed.mediaId ? api.mediaView(scope.get("media", completed.mediaId)) : null;
+          const delivery = completed.status === "SUCCEEDED" && completed.mediaId
+            ? await publishRender(completed.id).catch(error => ({ published: false, message: `成片已渲染，但保存或展示失败：${error instanceof Error ? error.message : error}。请使用 publishRender 重试，无需重新渲染。` })) : null;
+          return { ...completed, media: media ? { ...media, url: media.url.startsWith("/") ? `/cloud${media.url}` : media.url } : null, delivery };
         }
         if (operation === "compile") {
           if (data.kind !== "image" && data.kind !== "video" || typeof data.shotId !== "string") throw new Error("须提供 kind 和 shotId");
@@ -283,7 +316,24 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
 export async function createAgentTools(cwd: string, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): Promise<ToolDefinition[]> {
   const tools: ToolDefinition[] = [];
   const names = new Set<string>();
-  const context = createAgentToolContext(cwd, {}, canvas, question, parentSignal);
+  const choiceScope = new AsyncLocalStorage<{ answer?: string; reason: string; applied?: boolean }>();
+  const choiceSchema = z.strictObject({ answer: z.string().trim().min(1).max(8000).optional(), reason: z.string().trim().min(1).max(2000) });
+  const decisionQuestion: QuestionContext | undefined = question?.autonomousDecisions && !question.decisionSource ? {
+    get decisionSource() {
+      const choice = choiceScope.getStore();
+      return choice?.answer ? { kind: "agent" as const, taskId: "chat", reason: choice.reason } : undefined;
+    },
+    async ask(id, request, signal) {
+      const choice = choiceScope.getStore();
+      if (!choice) return question.ask(id, request, signal);
+      signal?.throwIfAborted();
+      if (request.fields?.length || !request.options?.length) throw new Error("此决定需要用户填写或确认，不能自动处理");
+      if (!choice.answer || !request.options.slice(0, -1).includes(choice.answer)) throw Object.assign(new Error("请根据已授权范围选择完整有效选项后重试"), { automaticRequest: request });
+      choice.applied = true;
+      return { answer: choice.answer };
+    },
+  } : question;
+  const context = createAgentToolContext(cwd, {}, canvas, decisionQuestion, parentSignal);
   for (const item of await listTools()) {
     if (!item.enabled) continue;
     if (item.loadError) throw new Error(`${item.displayName}：${item.loadError}`);
@@ -294,8 +344,45 @@ export async function createAgentTools(cwd: string, canvas?: CanvasContext, ques
       if (!tool.name || typeof tool.execute !== "function") throw new Error(t`${item.displayName} 返回了无效的工具`);
       if (names.has(tool.name)) throw new Error(t`工具名称重复：${tool.name}`);
       names.add(tool.name);
+      const automatic = decisionQuestion !== question && ["requestStoryApproval", "requestStoryDecision", "requestProductionDecision"].includes(tool.name);
+      const parameters = tool.parameters as Record<string, any>;
+      const objectFields = tool.name === "updateStoryProject" ? ["action"] : tool.name === "requestStoryDecision" ? ["decision"] : tool.name === "requestProductionDecision" ? ["data"] : [];
+      if (automatic) objectFields.push("automaticChoice");
+      const properties = { ...parameters.properties, ...(automatic ? { automaticChoice: z.toJSONSchema(choiceSchema, { target: "draft-07" }), manualConfirmation: { type: "boolean" } } : {}) };
+      for (const field of objectFields) properties[field] = { anyOf: [properties[field], { type: "string", maxLength: 100000 }] };
       tools.push({
         ...tool,
+        ...(objectFields.length ? {
+          parameters: { ...parameters, properties },
+          description: automatic ? `${tool.description}\n用户已开启自动处理常规决定。故事方向、故事版本以及项目内制作方案、资产设定、镜头和剪辑默认自动处理；先不传 automaticChoice 获取真实选项，再传 automaticChoice:{reason,answer}，answer 必须与选项完全一致，reason 写明选择理由。用户明确要求亲自决定时传 manualConfirmation:true。事实确认、用户满意度、模型/精度选择、发布或跨项目资产仍须人工确认。` : tool.description,
+          async execute(id: string, params: unknown, signal?: AbortSignal, onUpdate?: any, toolContext?: any) {
+            const values = { ...params as Record<string, any> };
+            for (const field of objectFields) if (typeof values[field] === "string") {
+              try { values[field] = JSON.parse(values[field]); }
+              catch { throw new Error(`${field} 必须是有效的 JSON 对象`); }
+            }
+            const { automaticChoice, manualConfirmation, ...input } = values;
+            const allowed = tool.name === "requestStoryApproval"
+              || tool.name === "requestStoryDecision" && input.decision?.type === "chooseDirection"
+              || tool.name === "requestProductionDecision" && ["adDirection", "approveAssets", "world", "look", "updateShot", "updateAsset", "editTimeline"].includes(input.operation);
+            if (automaticChoice === undefined && (!automatic || !allowed || manualConfirmation === true)) return tool.execute(id, input, signal, onUpdate, toolContext);
+            if (!automatic) throw new Error("本次消息未授权自动决定");
+            if (!allowed) throw new Error("此决定不支持自动处理，请使用人工确认");
+            if (manualConfirmation === true) throw new Error("不能同时请求人工确认和自动决定");
+            const choice: { answer?: string; reason: string; applied?: boolean } = choiceSchema.parse(automaticChoice ?? { reason: "用户开启了自动处理常规决定" });
+            let result;
+            try { result = await choiceScope.run(choice, () => tool.execute(id, input, signal, onUpdate, toolContext)); }
+            catch (error) {
+              const request = (error as { automaticRequest?: unknown }).automaticRequest;
+              if (!request) throw error;
+              const details = { ...(request as object), applied: false, automaticPending: true, answer: "尚未保存，请使用 automaticChoice 选择完整选项后重试" };
+              return { content: [{ type: "text" as const, text: JSON.stringify(details) }], details };
+            }
+            if (!choice.applied) return result;
+            const details = result.details && typeof result.details === "object" ? { ...result.details, automated: true, automationReason: choice.reason } : result.details;
+            return { ...result, details, content: result.content.map(item => item.type === "text" && details ? { ...item, text: JSON.stringify(details) } : item) };
+          },
+        } : {}),
         promptGuidelines: [
           ...(metadata.prompt ? [metadata.prompt] : []),
           ...(tool.promptGuidelines ?? []),

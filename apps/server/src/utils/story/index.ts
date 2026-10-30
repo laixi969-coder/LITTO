@@ -65,9 +65,9 @@ export async function requestStoryApproval(directory: string, toolCallId: string
   };
   const response = await question.ask(toolCallId, request, signal);
   signal?.throwIfAborted();
-  if (response.skipped || response.answer !== request.options[0]) return { ...request, ...response, approved: false, revisionId };
+  if (response.requestedChanges || response.skipped || response.answer !== request.options[0]) return { ...request, ...response, approved: false, revisionId };
   // ACT: 确认绑定展示时的项目版本；等待期间任何修改都须重新核对，不自动套用到新版本。
-  const reason = question.decisionSource ? `AI 根据用户启动自动成片的授权采用，任务 ${question.decisionSource.taskId}` : "用户在聊天确认卡片中采用";
+  const reason = question.decisionSource ? `AI 在授权范围内采用：${question.decisionSource.reason ?? `自动成片任务 ${question.decisionSource.taskId}`}` : "用户在聊天确认卡片中采用";
   const updated = await applyStoryAction(directory, project.version, { type: "approve", id: revisionId, reason }, true);
   return { ...request, approved: true, revisionId, version: updated.version, answer: "已采用此版本，可继续已授权的后续工作" };
 }
@@ -124,7 +124,7 @@ export async function requestStoryDecision(directory: string, toolCallId: string
   const request = { title, question: content, options: [...choices.map(item => item.label), "暂不决定"] };
   const response = await question.ask(toolCallId, request, signal);
   signal?.throwIfAborted();
-  const choice = response.skipped ? undefined : choices.find(item => item.label === response.answer);
+  const choice = response.skipped || response.requestedChanges ? undefined : choices.find(item => item.label === response.answer);
   if (!choice) return { ...request, ...response, applied: false };
   const updated = await applyStoryAction(directory, project.version, choice.action, true);
   return { ...request, applied: true, version: updated.version, action: choice.action, answer: `${choice.label}，已保存` };

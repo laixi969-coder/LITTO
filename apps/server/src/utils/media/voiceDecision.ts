@@ -229,7 +229,7 @@ export async function requestVoiceDecision(directory: string, toolCallId: string
   const response = await question.ask(toolCallId, request, signal);
   signal?.throwIfAborted();
   const choice = request.options!.slice(0, -1).indexOf(response.answer);
-  if (response.skipped || choice < 0) return { ...request, ...response, applied: false };
+  if (response.requestedChanges || response.skipped || choice < 0) return { ...request, ...response, applied: false };
   if (tenant) {
     const member = cloud()?.dbGet("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", tenant.workspaceId, tenant.userId);
     if (!member || member.role === "VIEWER") throw new Error("配音方案编辑权限已失效");

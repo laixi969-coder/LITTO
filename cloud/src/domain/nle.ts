@@ -487,7 +487,8 @@ export function editView(s: Scope, row: EditRow) {
             });
             return { ...c, out: r3(c.in + c.duration * c.speed),
                 source: { kind: resolved.kind, mediaId: resolved.mediaId, mime: resolved.mime, srcDuration: resolved.srcDuration, media: resolved.mediaId ? mediaView(s.get("media", resolved.mediaId)) : null },
-                storySource: shot?.source ?? null, dialogue, shotOrder: shot?.ord ?? null, subtitle: shot?.subtitle ?? "", grade: shot?.grade ?? null };
+                storySource: shot?.source ?? null, continuity: shot?.continuity ?? null, continuityFromShotId: shot?.continuityFromShotId ?? null,
+                dialogue, shotOrder: shot?.ord ?? null, subtitle: shot?.subtitle ?? "", grade: shot?.grade ?? null };
         }) };
 
 }

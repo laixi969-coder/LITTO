@@ -15,6 +15,7 @@ const inputSchema = z.object({
   sessionFile: z.string().regex(/^[\w-]+\.jsonl$/).optional(),
   resendFrom: z.string().min(1).max(128).optional(),
   steeringOnly: z.boolean().optional(),
+  autonomousDecisions: z.boolean().optional(),
   canvas: z.strictObject({
     id: z.string().min(1).max(256),
     tools: z.array(z.strictObject({
@@ -28,7 +29,7 @@ const inputSchema = z.object({
 });
 
 export default Router().post("/", validateFields(inputSchema.shape), async (req, res) => {
-  const { directory, canvas, ...options } = inputSchema.parse(req.body);
+  const { directory, canvas, autonomousDecisions, ...options } = inputSchema.parse(req.body);
   const cwd = await u.workspace.resolveWorkspace(req, directory);
   res.set({ "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" });
   res.flushHeaders();
@@ -40,7 +41,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   };
   const bridge = canvas ? u.canvas.createCanvasContext(cwd, canvas as CanvasInfo, send) : undefined;
   const controller = new AbortController();
-  const questions = u.question.createQuestionContext(cwd, send, () => controller.abort());
+  const questions = u.question.createQuestionContext(cwd, send, () => controller.abort(), autonomousDecisions);
   const close = () => { clearInterval(heartbeat); bridge?.dispose(); questions.dispose(); controller.abort(Object.assign(new Error("观察连接已关闭"), { code: "observerDisconnected" })); };
   res.once("close", close);
   res.once("error", close);

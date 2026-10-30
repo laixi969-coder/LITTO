@@ -63,7 +63,7 @@ metadata:
 
 电影或电影感镜头的摄影设计，先读取[专业摄影与剪辑方法](../cinema/references/shotLanguage.md)，再填写镜头规格和编译提示词；沿用当前 Look，不继承其他项目的手机、纪实或广告风格。Look 按时段与场景分档：当前镜头是日景、室内白昼或清晨黄昏时，按当时段的实际光源组织光色，不把夜档的低照度、色温与低饱和基底套到非夜景画面；项目 Look 只有一档影调且含日景段落时，先补分档再继续。
 
-先形成镜头职责、摄影、表演、光线、起止状态、参考用途及锁定要求，再按实际模型能力编译提示词。只有用户明确选用或现场节点实际选定 Seedance 2.0/2.5 时，才读取[Seedance 模型规则](references/seedanceDirector.md)。这份规则约束对应模型的格式与执行，不能改写已经确认的电影或音乐创作意图。切换模型后退出专用规则，保留创作规格。
+先形成镜头职责、摄影、表演、光线、起止状态、参考用途及锁定要求，再按实际模型能力编译提示词。只有当前实际选用 Seedance 2 系列时，才读取[Seedance 模型规则](references/seedanceDirector.md)。这份规则约束对应模型的格式与执行，不能改写已经确认的电影或音乐创作意图。切换模型后退出专用规则，保留创作规格。
 
 ### 禁令：「写实」不是「做旧」
 
@@ -120,7 +120,7 @@ metadata:
 | 准备提交生成、不确定该传哪些参数 | 读取[生成参数手册](references/generationParams.md)；六个参数（shotSpec／cast／styleReference／continueFrom／composeFilm／qc）决定底线质量，人物镜没有身份参考会被直接拒绝 |
 | 定影调、选导演风格、需要可执行的色值比例 | 读取[导演色卡库](../directorPalettes/SKILL.md)；198 位导演的实测主色板（HEX＋画面占比）、情绪色板与光影特征，转成 `shotSpec.lighting` 与 `styleReference`。一镜只用一个导演的色板，主色由环境承载，肤色不被环境色污染 |
 | 需要导演视觉语言、选画风、把口语需求补成规范提示词 | 读取[导演与视觉风格](../gavenDirectImagePrompts/SKILL.md)；按 Dxx 导演／Pxx 摄影／Cxx 胶片／Rxx 印片代码选风格并展开成自然语言。项目已有 Look 时以项目为准，不叠加冲突风格；画风代码只定影调与成像，不改剧情与人物 |
-| 只要一份精简可读的逐镜提示词，不需要资产绑定与节点配置 | 读取[剧本转视频提示词](../gavenScriptToVideo/SKILL.md)；按动作因果与对白容量拆片段，逐镜写景别、运镜、时长、动作与表演。**片段上限以 listMediaModels 的真实 duration 为准**（如 MiniMax-H3 为 15 秒），该技能默认的 30 秒只适用于 Seedance 2.5 |
+| 只要一份精简可读的逐镜提示词，不需要资产绑定与节点配置 | 读取[剧本转视频提示词](../gavenScriptToVideo/SKILL.md)；按动作因果与对白容量拆片段，逐镜写景别、运镜、时长、动作与表演。**片段上限以 listMediaModels 的真实 duration 为准**，不能从技能示例或型号名称推断固定秒数 |
 | 要成片级的完整提示词：资产绑定、摄影与光影、逐镜时间线、声音、负面约束一起交付 | 读取[视频提示词导演](../videoPromptDirector/SKILL.md)；按五板块结构写完 `final_video_prompt`，用 preflight 校验结构与总时长；按生成段创建视频节点，连接资产后读取 getConfig.references，用实际 `{{ref N}}` 标记绑定，再回读 generationPrompt。总时长在模型能力内且剧情可控时优先单节点；正式镜头仍走 productionSpec 编译，不以独立片段绕过。清爽人物同时读取其中 cleanPortrait 方法 |
 | 旅拍婚礼、双人旅行或个人旅拍，需要选镜、删镜、换装 | 读取[旅拍影像提示词导演](../travelWeddingDirector/SKILL.md)；默认每镜 2 秒、4:3 写实、无 BGM，内置按镜号检索的镜头库与带版本管理的服装表。挑完镜头仍按 videoPromptDirector 的五板块成稿，不整库复制进提示词 |
 | 小清新、自然光、清透色彩、湖边庭院海边树林 | 读取[光感小清新导演](../lightFreshDirector/SKILL.md)；按光源方向与时段组织光线，多镜头按动作与光线节奏分配而不是平均切分；镜头库按镜号检索，成稿规范沿用 videoPromptDirector |

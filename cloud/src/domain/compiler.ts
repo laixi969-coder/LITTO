@@ -10,7 +10,7 @@ import { lookSchema, validateActionTimeline, validateMusicVideoTiming } from "./
 import type { ShotInput } from "./schema.ts";
 import { cameraDirectionIssues, creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
-import { checkPair } from "./continuity.ts";
+import { checkPair, continuityPlanningIssues } from "./continuity.ts";
 import { physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
 import { musicSource } from "./music.ts";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
@@ -112,6 +112,11 @@ function musicTimecode(seconds: number) {
 export function compileShot(s: Scope, shotId: string, kind: "image" | "video", modelId: string, extra: { startFrameMediaId?: string; startFrameAsReference?: boolean; repair?: { addLock?: string[]; note?: string } } = {}): Compiled {
     const shot = s.get("shots", shotId);
     if (!shot) throw notFound("shot");
+    // 制作面板的编译预览与生成入口共用已采用主帧，避免预览遗漏真实首帧而误报接戏缺失。
+    if (kind === "video" && !extra.startFrameMediaId && shot.heroKeyframeId) {
+        const hero = s.get("keyframes", shot.heroKeyframeId);
+        if (hero && hero.shotId === shot.id && hero.status === "hero") extra = { ...extra, startFrameMediaId: hero.mediaId };
+    }
     if (shot.generationDuration != null && shot.generationDuration < shot.duration) throw bad("生成时长不能短于计划使用时长");
     validateStateDelta(s, shot.projectId, shot.intendedStateDelta);
     validateVisibleAssets(shot as ShotInput);
@@ -167,11 +172,13 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         })),
     ]));
     const warnings: string[] = [];
+    warnings.push(...continuityPlanningIssues(shot, s.list("shots", { sequenceId: shot.sequenceId }, "ord, id").some(item => item.ord < shot.ord))
+        .map(issue => `创作准备未完成：${issue}`));
     if (kind === "video") warnings.push(...cameraDirectionIssues(shot as ShotInput).map(issue => `创作准备未完成：${issue}`));
     if (kind === "video") warnings.push(...speechPlanningIssues(s, shot).map(issue => `配音规划未完成：${issue}`));
     const previous = continuityPredecessor(s, shot);
     // ACT: 仅显式接戏形成生成依赖；意象蒙太奇和独立镜头仍可并行，计划末态不能冒充实际末态。
-    if (shot.continuityFromShotId && previous) {
+    if (shot.continuityFromShotId && previous && (kind === "video" || !shot.continuity || shot.continuity.mode === "continuous")) {
         const take = previous.approvedTakeId ? s.get("takes", previous.approvedTakeId) : null;
         if (!take || take.status !== "approved" || !take.meta?.observedStateDelta) {
             warnings.push("创作准备未完成：明确接续的前镜尚无已采用视频与实际末态；先完成前镜实际审阅，再编译本镜，不用计划末态并行猜测接戏");
@@ -184,6 +191,12 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         }
     }
     const overrides = s.list("continuity_issues", { shotId, status: "overridden" });
+    if (kind === "video" && shot.continuity?.mode === "continuous" && previous) {
+        const hero = shot.heroKeyframeId ? s.get("keyframes", shot.heroKeyframeId) : null;
+        if (!hero?.meta?.continuationSource?.sourceCut || hero.meta.continuationSource.takeId !== previous.approvedTakeId || hero.mediaId !== extra.startFrameMediaId || extra.startFrameAsReference) {
+            warnings.push("创作准备未完成：连续动作须 productionSpec(continuationFrame) 从前镜已采用视频的实际剪出位置取帧，检查并采用为本镜主帧后作为真实首帧发送；换机位使用 coverage，不能用独立分镜图假装接戏");
+        }
+    }
     // ACT: 复用后验规则提前提醒，不写质检记录、不把计划当实测；越轴等启发式不作为新增硬门禁。
     const continuity = checkPair(previous ?? null, { ...shot, bindings }, previous ? statesOf(s, previous.id) : null, state, projectAssets);
     warnings.push(...continuity.filter(issue => !overrides.some(item => item.category === issue.category && item.message === issue.message))
@@ -312,13 +325,14 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         assetDetails: J(appearance),
         action: kind === "image" && cam.design?.start ? "Render the specified starting frame only, before subsequent actions and their results." : clean(shot.action || shot.title, "action"),
         performance: kind === "video" ? J([
-            shot.performance?.gesture, shot.performance?.timing,
+            shot.performance?.gesture, !(cam.design?.timeline?.length || musicVideo?.timeline?.length) && shot.performance?.timing,
             shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`,
             shot.performance?.lookTarget && `looking at ${shot.performance.lookTarget}`,
             !shot.performance?.gesture && shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`,
         ]) : "",
         continuityContext: Object.values(start).some(group => Object.keys(group).length)
             ? `Continuity ledger for present subjects, not additional action instructions. Retain compatible injuries, identity and prop ownership; previous poses or contacts may predate this shot. Follow the explicit starting state and current causal action order; never reinstate completed contact, restore lost power or replay an earlier event to fill speech: ${JSON.stringify(start)}` : "",
+        shotConnection: shot.continuity ? `本镜跨镜关系 ${shot.continuity.mode}；起始画面承接要求：${shot.continuity.visual}。这是本镜起点约束，不重演前镜事件、不生成额外转场。${shot.continuity.mode === "coverage" ? "按本镜新机位保持空间、视线和动作阶段，不照搬前镜构图。" : ""}` : "",
         blocking: J([
             (kind === "video" || !cam.design?.start) && shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`,
             (kind === "video" || !cam.design?.start) && shot.blocking?.midground && `midground: ${shot.blocking.midground}`,
@@ -389,8 +403,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
                 "Immutable locks": J([sections.lock, sections.constraintPriority]),
                 "Target duration": `${shot.generationDuration ?? shot.duration} seconds`,
                 Timeline: timeline,
+                shotConnection: sections.shotConnection,
                 "Visual direction": J([
-                    Object.entries(sections).filter(([key]) => !["narrative", "action", "lock", "state", "observedState", "constraintPriority", "forbiddenChanges"].includes(key)).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join("; "),
+                    Object.entries(sections).filter(([key]) => !["narrative", "action", "lock", "state", "observedState", "constraintPriority", "forbiddenChanges", "shotConnection"].includes(key)).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join("; "),
                 ]),
                 "Audio direction": audio,
                 Preserve: "Preserve details not explicitly changed by this shot.",
@@ -430,6 +445,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             subjects: J([sections.subject, sections.assetDetails]),
             staging: J([sections.blocking, sections.shotDesign, sections.view]),
             continuityContext: sections.continuityContext,
+            shotConnection: sections.shotConnection,
             performance: sections.performance,
             camera: sections.camera,
             appearance: J([sections.world, sections.lighting, sections.look, sections.realism, sections.opticalTexture]),

@@ -1,7 +1,7 @@
 import { type Scope } from "../db.ts";
-import { cameraDirectionPlanning, videoCoveragePlanning, videoMotionTiming, videoSpeechPlanning } from "@toonflow/tool-media-generation/runtime";
+import { cameraDirectionPlanning, videoCoveragePlanning, videoMotionTiming, videoSpeechPlanning, shotContinuityPlanning } from "@toonflow/tool-media-generation/runtime";
 import { bad, notFound, sha256 } from "../util.ts";
-import { checkSequence } from "./continuity.ts";
+import { checkSequence, continuityPlanningIssues } from "./continuity.ts";
 import { createShotsFromDrafts, validateVisibleAssets } from "./shots.ts";
 import { storyboardDirector, visualDirector, assetDirector, type ShotDraft } from "./skills.ts";
 import { generateKeyframes } from "./lifecycle.ts";
@@ -30,6 +30,8 @@ const refined = z.object({ shots: z.array(z.object({
   intendedStateDelta: shotInput.shape.intendedStateDelta.removeDefault(),
   creativeBrief: creativeBriefSchema,
   techniques: shotInput.shape.techniques,
+  continuity: shotInput.shape.continuity.unwrap(),
+  continuityFromIndex: z.number().int().nonnegative().optional(),
 })).min(1).max(180) });
 
 /**
@@ -41,6 +43,8 @@ async function refineWithLlm(s: Scope, projectId: string, actor: string, script:
   const system = [
     videoMotionTiming,
     videoCoveragePlanning,
+    shotContinuityPlanning,
+    "For this draft response only, use continuityFromIndex (zero-based index in YOUR output shots, strictly earlier), not continuityFromShotId; real IDs will be assigned when saving. continuous and coverage require it. parallel may refer to an earlier shot on its own branch; opening, ellipsis and montage must omit it. Only the first shot may use opening. Every shot requires continuity{mode,reason,visual,audio}. A relation is a motivated cut, not an instruction to add another scene inside the generated clip.",
     cameraDirectionPlanning,
     videoSpeechPlanning,
     "TECHNIQUES are local design candidates, not mandatory choices or new events. Choose only useful entries, at most 8 per shot, as techniques:[{id,purpose,execution,start?,end?}]. Execution names the current subject, trigger, path and visible result; match camera/lighting fields. image/video techniques describe generation, look preserves the approved shared Look, edit/audio/story remain plans for their own real workflows, never extra visual actions. Time effects require an explicit local start/end and must not overlap speech or source-track sync. Never add slow motion, equal time slots or idle resets to combat or rescue. A continuous shot can contain several causal beats or multiple speakers when staging, capacity and the selected model permit; never split by line count alone.",
@@ -66,7 +70,10 @@ async function refineWithLlm(s: Scope, projectId: string, actor: string, script:
         const expectedDialogue = drafts.flatMap(draft => draft.sourceDialogue ? [draft.sourceDialogue] : []);
         const actualDialogue = parsed.shots.flatMap(shot => shot.creativeBrief.dialogue.lines.map(({ speakerId, text }) => ({ speakerId, text })));
         if (JSON.stringify(actualDialogue) !== JSON.stringify(expectedDialogue)) throw new Error("原文对白遗漏、重复、改词或说话人改变");
-        const next = parsed.shots.map(shot => {
+        const next = parsed.shots.map((shot, index) => {
+          if (shot.continuityFromIndex !== undefined && shot.continuityFromIndex >= index) throw new Error("接戏来源必须是输出中更早的镜头");
+          const connectionIssues = continuityPlanningIssues({ ...shot, continuityFromShotId: shot.continuityFromIndex !== undefined ? String(shot.continuityFromIndex) : null }, index > 0);
+          if (connectionIssues.length) throw new Error(connectionIssues.join("；"));
           const sources = shot.sourceIndexes.map(index => drafts[index]);
           if (sources.some(source => source.sceneIndex !== sources[0].sceneIndex)) throw new Error("不能跨场合镜");
           if (shot.sourceIndexes.length > 1 && shot.sourceIndexes.some(index => sourceCounts.get(index)! > 1)) throw new Error("重复源节拍只能独立拆镜，不能与合镜交叉");
@@ -136,8 +143,10 @@ export async function directorRun(s: Scope, projectId: string, actor: string, in
     steps.push({ step: "router", status: input.generate ? "done" : "skipped", detail: routed.map((r) => ({ shotId: r.shotId, model: r.image?.modelId, degradations: r.image?.degradations })) });
 
     if (input.generate) {
-        const jobs = shots.map((x: any) => generateKeyframes(s, x.id, actor, { count: 2 }).job.id);
-        steps.push({ step: "generate", status: "done", detail: { jobIds: jobs } });
+        const deferred = shots.filter((shot: any) => shot.continuity?.mode === "continuous" && shot.continuityFromShotId);
+        const jobs = shots.filter((shot: any) => !deferred.includes(shot)).map((shot: any) => generateKeyframes(s, shot.id, actor, { count: 2 }).job.id);
+        steps.push({ step: "generate", status: "done", detail: { jobIds: jobs, deferredShotIds: deferred.map((shot: any) => shot.id),
+            note: "连续动作镜头等待前镜实际视频与接戏帧；逐镜采用后继续，不将依赖镜头并行猜测生成。" } });
     } else steps.push({ step: "generate", status: "skipped", detail: "pass generate:true to enqueue keyframes" });
 
     steps.push({ step: "qc", status: "skipped", detail: "QC runs per Keyframe/Take once outputs exist" });

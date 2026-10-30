@@ -13,6 +13,8 @@ metadata:
 
 五板块完整提示词的通用写作规范读取 [videoPromptDirector 五板块写作规范](../videoPromptDirector/references/fiveBlockWriting.md)，资产建立规则读取 [资产建立与绑定](../videoPromptDirector/references/assetBinding.md)，节点创建规则读取 [节点创建与写入](../videoPromptDirector/references/nodeSetup.md)。本技能负责旅拍题材的镜头库、服装表与默认选择，不重新定义通用规范。
 
+本题材方法只补当前项目未确定的视觉与动作选择，已采用的时长、画幅、媒介、配乐及人物状态优先。正式镜头写入既有规格后编译；独立节点选择五板块时才遵循该格式，文字方案不自动创建节点。项目总时长不代表单次生成容量；不能因加载本技能把 MV 改为无配乐，或把既定动画改为真人。
+
 ## 1. 任务范围与默认选择
 
 - 默认中文，非必要不出现英文。准确资产标签、文件名和确有必要的器材型号保留原文；摄影参数用清楚的中文写法。

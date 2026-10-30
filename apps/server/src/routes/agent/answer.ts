@@ -9,6 +9,8 @@ export default Router().post("/", validateFields({
   callId: z.uuid(),
   cancelled: z.boolean().optional(),
   skipped: z.boolean().optional(),
+  requestedChanges: z.boolean().optional(),
+  editedContent: z.boolean().optional(),
   answer: z.string().trim().min(1).max(8000).optional(),
   values: z.record(z.string().max(64), z.union([z.string().max(8000), z.number(), z.boolean(), z.null(), z.array(z.string().max(300)).max(20)])).optional(),
 }), async (req, res) => {

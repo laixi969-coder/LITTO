@@ -22,7 +22,7 @@ export async function requestKeyframeApproval(directory: string, toolCallId: str
   };
   const response = await question.ask(toolCallId, request, signal);
   signal?.throwIfAborted();
-  if (response.skipped || response.answer !== request.options![0]) return { ...request, ...response, approved: false };
+  if (response.requestedChanges || response.skipped || response.answer !== request.options![0]) return { ...request, ...response, approved: false };
   const member = api.dbGet("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", tenant.workspaceId, tenant.userId);
   if (!member || member.role === "VIEWER") throw new Error("采用关键帧的编辑权限已失效");
   if (workspaceProject(directory) !== projectId) throw new Error("工作目录关联项目已改变，请重新确认");

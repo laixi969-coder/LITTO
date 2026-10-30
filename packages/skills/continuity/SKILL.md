@@ -14,7 +14,7 @@ metadata:
 ## 与其他技能的分工
 
 - 画布工具的调用、参数和连线规则以 [canvas](../canvas/SKILL.md) 为准；制作阶段、Seedance 提示词和资产参考板版式以 [workflow](../workflow/SKILL.md) 为准。技能位置以 `available_skills` 中的实际 `location` 为准，找不到就说明缺项，不凭记忆补造。
-- 进入 workflow 的 Seedance 执行态（PART A）后，**分段、时长、镜头格式、`{{ref N}}` 写法一律以 PART A 为准**。本技能不改这些，只提供：设定表、状态表、核对清单、修复方法。核对发现问题时，回到 PART A 受影响的段落修改，不另写一套提示词。
+- 本技能提供设定、状态、核对与修复方法，适用于所有模型。生成参数以当前供应商模式为准；已选 Seedance 2 系列读取 [模型执行](../workflow/references/seedanceDirector.md)。`{{ref N}}` 是本平台节点绑定标记，不是 Seedance 通用语法；直接 API 输入沿用真实引用字段。发现问题先修受影响的规格，再重新编译，不另写竞争时间线。
 - 新角色默认采用同一身份、同一造型的正面、右侧面、背面完整全身三视图；具体展示方式及用户指定版式的处理见 workflow 的[资产制作](../workflow/references/assets.md)，这里不另设版式。
 
 ## 1. 开拍前：先建设定，再出镜头

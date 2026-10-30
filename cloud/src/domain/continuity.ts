@@ -7,6 +7,16 @@ export type Issue = { shotId: string; relatedShotId?: string; category: string; 
 const SIZES = ["ECU", "CU", "MCU", "MS", "MWS", "WS", "EWS"];
 const sizeIdx = (s: string) => SIZES.indexOf(s.toUpperCase());
 
+export function continuityPlanningIssues(shot: Record<string, any>, hasPrevious: boolean): string[] {
+    const plan = shot.continuity;
+    if (!plan) return ["缺少跨镜承接设计，请由助手填写 continuity:{mode,reason,visual,audio}；先组织事件因果，再设计单镜，不需用户填写技术字段"];
+    const issues: string[] = [];
+    if (["continuous", "coverage"].includes(plan.mode) && !shot.continuityFromShotId) issues.push("连续动作或同场换机位须用 continuityFromShotId 指定承接的真实镜头，不能逐镜独立生成后直接拼接");
+    if (["opening", "ellipsis", "montage"].includes(plan.mode) && shot.continuityFromShotId) issues.push("开场、时空跳跃和意象蒙太奇不继承前镜末态；请清除 continuityFromShotId，起始状态写入 camera.design.start");
+    if (plan.mode === "opening" && hasPrevious) issues.push("opening 只用于序列首镜；后续新场景须说明平行关系或时空跳跃及连接动机");
+    return issues;
+}
+
 /** Rule-based continuity supervision over structured ShotSpec + State. Pure: no I/O. */
 export function checkPair(prev: any | null, shot: any, prevSt: { start: State; result: State } | null, st: { start: State; result: State }, assets: Map<string, any>): Issue[] {
     const out: Issue[] = [];

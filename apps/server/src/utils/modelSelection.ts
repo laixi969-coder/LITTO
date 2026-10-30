@@ -18,6 +18,10 @@ export function selectedModel(kind: ModelKind) {
   return parsed.success ? parsed.data[kind] ?? (kind === "videoReview" ? parsed.data.text : undefined) : undefined;
 }
 
+export function isSeedance2Model(modelId: string) {
+  return /(?:^|[-_. /])seedance(?:[-_. /]*v)?[-_. /]*2(?=$|[-_. /])/i.test(modelId);
+}
+
 export function isSelectedModel(kind: ModelKind, providerId: string, modelId: string) {
   const selected = selectedModel(kind);
   return selected?.providerId === providerId && selected.modelId === modelId;

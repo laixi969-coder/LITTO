@@ -12,6 +12,7 @@ import { agentMentionsSchema, mentionPrompt, snapshotMentions, validateMentionTo
 import { describeModelError, readAiReferences, referenceContent } from "@/utils/ai";
 import { createAgentTools } from "@/agent/tools";
 import { createAgentResources } from "@/agent/runtime/resources";
+import { loadModelSkillContext } from "@/agent/skills/production";
 import { createAgentModel } from "@/agent/runtime/model";
 import { installRequestBudget } from "@/agent/runtime/requestBudget";
 import { createSubAgentTool } from "@/agent/tools/subAgent";
@@ -154,10 +155,23 @@ export async function run(
     tools.push(await createSubAgentTool({
       cwd, tools, canvas, modelRuntime: runtime, model: runtime.getModel(providerId, modelId), thinkingLevel,
       runTask: (name, task, taskSignal, onProgress) => runDelegatedAgent({
-        cwd, parentFile: file, name, task, providerId, modelId, thinkingLevel, canvas, signal: taskSignal, send, onProgress,
+        cwd, parentFile: file, name, task, providerId, modelId, thinkingLevel, canvas, signal: taskSignal, autonomousDecisions: question?.autonomousDecisions, send, onProgress,
       }),
     }));
     if (prepareTools) tools = prepareTools(tools);
+    // ACT: 在最终工具权限确定后补回本轮新模型规则；切换成功不等于旧系统上下文自动刷新。
+    tools = tools.map(tool => tool.name !== "requestProductionDecision" ? tool : {
+      ...tool,
+      async execute(...args) {
+        const result = await tool.execute(...args);
+        const input = args[1] as { operation?: string; data?: string | { kind?: string } };
+        if (input.operation !== "selectModel" || !(result.details as { applied?: boolean } | undefined)?.applied) return result;
+        const data = typeof input.data === "string" ? JSON.parse(input.data) : input.data;
+        if (data?.kind !== "video") return result;
+        const rules = await loadModelSkillContext(cwd, tools, prompt);
+        return { ...result, content: [...result.content, { type: "text" as const, text: rules }] };
+      },
+    });
     const resources = await createAgentResources(cwd, tools, undefined, child
       ? `## 子 Agent 职责\n你正在执行委派任务：${JSON.stringify({ name: child.name, task: child.task })}。遵守当前工作区规则与授权，用户可以进入此子会话补充要求。重要进展与最终结论使用 report 上报父 Agent。`
       : instructions, prompt);

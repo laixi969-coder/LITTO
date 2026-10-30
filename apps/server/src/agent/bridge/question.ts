@@ -8,26 +8,35 @@ type PendingQuestion = { cwd: string; userId?: string; workspaceId?: string; req
 // ACT: 提问随当前流存活，不设用户答题超时；断开或停止时取消，多进程时需共享通道。
 const pendingQuestions = new Map<string, PendingQuestion>();
 
-export function createQuestionContext(cwd: string, send: (event: Extract<AgentEvent, { type: "question" }>) => void, onCancel?: () => void) {
+export function createQuestionContext(cwd: string, send: (event: Extract<AgentEvent, { type: "question" }>) => void, onCancel?: () => void, autonomousDecisions = false) {
   const tenant = currentTenant();
   const activeQuestions = new Set<string>();
+  const changeRequests = new Set<string>();
+  const activeRequests = new Set<string>();
   let disposed = false;
   const context: QuestionContext = {
+    autonomousDecisions,
     async ask(toolCallId, request, signal) {
       if (disposed) throw new Error("提问所属对话已结束");
       signal?.throwIfAborted();
+      const requestKey = JSON.stringify(request);
+      if (changeRequests.has(requestKey)) throw new Error("用户已提出修改意见；当前展示内容没有变化，请先按意见修改，不要重复确认原方案。");
+      if (activeRequests.has(requestKey)) throw new Error("同一方案已在等待用户决定，请勿重复发起确认。");
       const callId = crypto.randomUUID();
       return new Promise((resolve, reject) => {
         const finish = (result: QuestionAnswer | Error) => {
           if (!pendingQuestions.delete(callId)) return;
           activeQuestions.delete(callId);
+          activeRequests.delete(requestKey);
           signal?.removeEventListener("abort", abort);
+          if (!(result instanceof Error) && result.requestedChanges) changeRequests.add(requestKey);
           if (result instanceof Error) reject(result);
           else resolve(result);
         };
         const abort = () => finish(new Error("提问已取消"));
         pendingQuestions.set(callId, { cwd, userId: tenant?.userId, workspaceId: tenant?.workspaceId, request, finish, cancel() { onCancel?.(); abort(); } });
         activeQuestions.add(callId);
+        activeRequests.add(requestKey);
         signal?.addEventListener("abort", abort, { once: true });
         if (signal?.aborted) { abort(); return; }
         try { send({ ...request, type: "question", toolCallId, callId }); }
@@ -44,7 +53,7 @@ export function createQuestionContext(cwd: string, send: (event: Extract<AgentEv
   };
 }
 
-export function answerQuestion(cwd: string, callId: string, response: { answer?: string; values?: unknown; cancelled?: boolean; skipped?: boolean }) {
+export function answerQuestion(cwd: string, callId: string, response: { answer?: string; values?: unknown; cancelled?: boolean; skipped?: boolean; requestedChanges?: boolean; editedContent?: boolean }) {
   const pending = pendingQuestions.get(callId);
   const tenant = currentTenant();
   if (!pending || pending.cwd !== cwd || pending.userId !== tenant?.userId || pending.workspaceId !== tenant?.workspaceId) throw Object.assign(new Error("提问不存在或已结束"), { status: 404 });
@@ -54,6 +63,13 @@ export function answerQuestion(cwd: string, callId: string, response: { answer?:
   }
   if (response.skipped) {
     const result: QuestionAnswer = { answer: "用户跳过了本次提问", skipped: true };
+    pending.finish(result);
+    return result;
+  }
+  if (response.requestedChanges) {
+    const parsed = z.string().trim().min(1).max(8000).safeParse(response.answer);
+    if (!parsed.success) throw Object.assign(new Error("请输入修改意见"), { status: 400 });
+    const result: QuestionAnswer = { answer: parsed.data, requestedChanges: true, ...(response.editedContent ? { editedContent: true } : {}) };
     pending.finish(result);
     return result;
   }

@@ -117,6 +117,8 @@ export function physicalInteractionPlan(shot: Record<string, any>) {
 
 export const cameraDirectionPlanning = "每镜先设计起幅、触发、主体路径、相机路径和结束构图，明确最终必须留在画内的主体及部位；固定机位是有效设计。camera.design.cameraPath与唯一执行时间线是运镜执行依据，camera.motion及technique须同步一致，不保留默认static与推进冲突、不混用背后跟拍与后退跟拍，不用手腿等含混部位或不存在的双人构图。technique会发送给模型，写当前镜头实际方法，不堆术语。时间线存在时timing只作制作记录，运动触发与停止秒数必须写入时间线。生成前读compiled.prompt核对起幅、路径、目标部位、停止点和参考的真实控制能力，修正规格后再编译；不能用优先级声明掩盖冲突。生成后完整播放，按motionPlan的cameraStart/cameraPath/cameraEnd记录实际时间点与构图差异，目标部位出画或落点错误不能记通过。正式选片沿用明确采用版本，不以任务最后完成代替选择。";
 
+export const shotContinuityPlanning = "先把场景组织为刺激、行动、结果和反应，再拆成有观看理由的镜头。每镜保存 continuity:{mode,reason,visual,audio}：opening仅序列首镜；continuous为同机位连续动作，coverage为换机位/正反打/反应，二者须用continuityFromShotId指定更早的承接镜头；parallel为平行叙事，可指定本支线更早镜头；ellipsis为时空跳跃；montage为意象/音乐关联。后三者不能机械继承成片紧邻镜头的状态。reason说明为什么此处切与新信息的因果，visual写动作阶段、视线、空间或视觉母题，audio写声音如何跨切点或明确无声，不新增对白。先规划整场、核对分镜图的空间与起态，授权内由助手完成，不再让用户确认技术字段。continuous等待前镜已采用且审看的真实视频，productionSpec(continuationFrame)从实际剪出位置取接戏帧，检查采用后作为本镜真实首帧；coverage按共享空间换机位，不复制前镜构图，其视频仍要等承接状态有效。只并行生成没有实际接戏依赖的素材。提示词只执行本镜动作，切镜动机及声音桥留给剪辑，不生成额外场景。生成时长与实际剪入时长分开，避免每段重新起势、完整收尾；用现有readEdit/previewCut/set_cut/soundBridge按实际素材完成连接，禁止靠批量溶解遮盖事件断裂。未连播看听不能宣称接缝合格，粗剪不等于完成作品。";
+
 export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | "take" = "take") {
   const duration = Number(shot.generationDuration ?? shot.duration);
   const lines = shot.creativeBrief?.dialogue?.lines ?? [];
@@ -128,6 +130,10 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   const cameraDesign = shot.camera?.design;
   // ACT: 检查点从同一执行规格生成，不推断动作是否合格；每项仍须真实播放观察，未观察不填通过。
   const checkpoints: { id: string; start: number; end: number; criterion: string }[] = type === "take" ? [
+    ...(shot.continuity && Number.isFinite(duration) && duration > 0 ? [
+      { id: "continuityStart", start: 0, end: Math.min(1, duration), criterion: `跨镜入口 ${shot.continuity.mode}：${shot.continuity.visual}；动机：${shot.continuity.reason}。${shot.continuityFromShotId ? `对照来源镜头 ${shot.continuityFromShotId} 的实际采用画面，` : "按本镜已定时空与事件，"}检查动作阶段、视线、位置、持物与反应触发；不能用计划或单张参考冒充实际承接。` },
+      { id: "continuityEnd", start: Math.max(0, duration - 1), end: duration, criterion: `记录实际动作落点与尚未完成的行动，核对 ${cameraDesign?.end ?? shot.action}；不用多余停顿或人物复位结束每段，声音连接留待时间线连播核对：${shot.continuity.audio}` },
+    ] : []),
     ...(cameraDesign && Number.isFinite(duration) && duration > 0 ? [
       { id: "cameraStart", start: 0, end: Math.min(0.5, duration), criterion: `起幅：${cameraDesign.start}。核对实际观看方向、景别与画内主体，不能只凭参考图判定。` },
       { id: "cameraPath", start: 0, end: duration, criterion: `相机路线：${cameraDesign.cameraPath}；技法：${cameraDesign.technique}。对照唯一执行时间线检查触发、方向与停止点，区分主体移动与相机移动；固定镜头检查是否漂移。` },
@@ -190,7 +196,7 @@ export const agentReviewSchema = z.strictObject({
   observedStateDelta: z.record(z.string(), z.json()).optional().describe("实际观察到的镜尾状态变化，沿用 intendedStateDelta 分组但不得照抄计划；无变化传 {}。完整视频检查通过且提供实际末态时采用为正式镜头，并传递给后镜"),
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
   techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
-  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(147).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
+  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(149).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
   creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字，写实际妆造与调度依据。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),
