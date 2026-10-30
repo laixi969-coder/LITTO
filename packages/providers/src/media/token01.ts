@@ -40,11 +40,6 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
     await this.tool.reportTask?.({ id: task.id, status });
     if (status === "FAILURE") throw Object.assign(new Error(this.tool.errorMessage(data) || "Token01 视频生成失败"), { retryable: false, fallbackAllowed: false });
     if (status === "SUCCESS") {
-      const baseUrl = String(this.config.baseUrl ?? "").trim().replace(/\/+$/, "");
-      const expected = new URL(`${baseUrl}/videos/${encodeURIComponent(task.id)}/content`);
-      let resultUrl: URL;
-      try { resultUrl = new URL(data.result_url); } catch { throw new Error("Token01 未返回有效的视频地址"); }
-      if (resultUrl.origin !== expected.origin || resultUrl.pathname !== expected.pathname) throw new Error("Token01 返回的视频地址与任务不匹配");
       const response = await request(this, `/videos/${encodeURIComponent(task.id)}/content`, signal);
       const limit = 100 * 1024 * 1024;
       if (Number(response.headers.get("content-length")) > limit) throw new Error("视频文件超过大小限制");
@@ -70,7 +65,7 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 }
 
 export default {
-  id: "token01", label: "Token01", version: "1.1.1", rules, resumeMedia,
+  id: "token01", label: "Token01", version: "1.1.6", rules, resumeMedia,
   readme: "使用 Token01 令牌生成图片和视频。模型可用性以令牌分组为准。支持文生图、单图编辑及各模型支持的视频生成模式；参考素材需要可访问的公网中转地址。\n\n[图片文档](https://token01.apifox.cn/api-530538219) · [视频文档](https://token01.apifox.cn/api-530551459)",
   models: [
     {"id": "vidu-q2", "label": "vidu-q2", "type": "image", "mode": ["text", "singleImage"], "imageSizes": ["1K"], "imageRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]},
@@ -89,7 +84,7 @@ export default {
     {"id": "MiniMax-H3-Max", "label": "MiniMax-H3-Max", "type": "video", "mode": ["text", "singleImage", "endFrameOptional", ["imageReference:9"]], "durationResolutionMap": [{"duration": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["480P", "768P"]}]},
     {"id": "MiniMax-H3", "label": "MiniMax-H3", "type": "video", "mode": ["text", "singleImage", "endFrameOptional", ["imageReference:9"]], "durationResolutionMap": [{"duration": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["768P", "2K"]}]},
     {"id": "MiniMax-H3-Highspeed", "label": "MiniMax-H3-Highspeed", "type": "video", "mode": ["text", "singleImage", "endFrameOptional", ["imageReference:9"]], "durationResolutionMap": [{"duration": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["768P"]}]},
-    {"id": "MiniMax-H3-Fast", "label": "MiniMax-H3-Fast", "type": "video", "mode": ["text", "startEndRequired", ["imageReference:9"]], "durationResolutionMap": [{"duration": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["480P", "768P", "1088P", "1440P"]}]},
+    {"id": "MiniMax-H3-Fast", "label": "MiniMax-H3-Fast", "type": "video", "mode": ["text", "startEndRequired", ["imageReference:9"]], "durationResolutionMap": [{"duration": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["480P", "768P", "1088P", "1440P"]}], "audio": true},
     {"id": "kling-3.0-video", "label": "kling-3.0-video", "type": "video", "mode": ["text", "singleImage", "endFrameOptional"], "durationResolutionMap": [{"duration": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["720P", "1080P", "4K"]}], "audio": "optional"},
     {"id": "kling-3.0-Omni", "label": "kling-3.0-Omni", "type": "video", "mode": ["text", "singleImage", "endFrameOptional", ["imageReference:7"]], "durationResolutionMap": [{"duration": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["720P", "1080P", "4K"]}], "audio": "optional"},
     {"id": "Doubao-Seedance-2.0", "label": "Doubao-Seedance-2.0", "type": "video", "mode": ["text", "singleImage", "endFrameOptional", ["imageReference:9"], ["imageReference:9", "videoReference:3", "audioReference:3"], ["videoReference:3"], ["audioReference:3"]], "durationResolutionMap": [{"duration": [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["480P", "720P", "1080P", "4K"]}], "audio": "optional"},

@@ -324,7 +324,7 @@ export async function updateBuiltinMediaProvider(fileName: string, revision: str
       const builtinModel = models.get(model.id);
       // 声音能力须与新适配器协议一致，不能被旧版本的 optional/true 覆盖；其余用户字段保留。
       models.set(model.id, { ...builtinModel, ...model, ...(builtinModel ? { audio: builtinModel.audio, nativeDialogue: builtinModel.nativeDialogue,
-        ...((id === "tencentWand" && builtinModel.type === "video") || (id === "volcengine" && /^doubao-seedance-2-[05]-/.test(model.id)) ? { mode: builtinModel.mode, durationResolutionMap: builtinModel.durationResolutionMap } : {}) } : {}) });
+        ...((id === "tencentWand" && builtinModel.type === "video") || (id === "volcengine" && /^doubao-seedance-2-[05]-/.test(model.id)) || (id === "token01" && model.id === "MiniMax-H3-Fast") ? { mode: builtinModel.mode, durationResolutionMap: builtinModel.durationResolutionMap } : {}) } : {}) });
     }
     const property = parsed.modelProperty;
     if (property?.type !== "ObjectProperty") invalid("内置适配器缺少模型列表");
