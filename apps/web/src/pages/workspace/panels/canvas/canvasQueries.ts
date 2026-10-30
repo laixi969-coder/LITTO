@@ -1,7 +1,7 @@
 import { canvasSchemas, type CanvasToolCall } from "@toonflow/tool-canvas/runtime";
 import type { NodeToolsContext } from "@toonflow/tools-scaffold/runtime";
 
-type CanvasNode = { id: string; type?: string; label?: unknown; position: { x: number; y: number }; selected?: boolean; data: Record<string, unknown> };
+type CanvasNode = { id: string; parentNode?: string; type?: string; label?: unknown; position: { x: number; y: number }; selected?: boolean; data: Record<string, unknown> };
 type CanvasEdge = { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null };
 type ValueOptions = { textOffset: number; textLimit: number; valueOffset: number; valueLimit: number };
 type OmittedValue = { path: string[]; reason: string; total?: number; nextOffset?: number };
@@ -124,7 +124,7 @@ function projectValue(value: unknown, options: ValueOptions, path: string[] = []
 
 export function canvasNodeSummary(node: CanvasNode) {
   const label = typeof node.data.label === "string" ? node.data.label : typeof node.label === "string" ? node.label : node.id;
-  return { id: node.id, type: node.type, label: label.slice(0, 512), ...(label.length > 512 ? { labelTruncated: true } : {}), selected: !!node.selected };
+  return { id: node.id, parentNode: node.parentNode ?? null, type: node.type, label: label.slice(0, 512), ...(label.length > 512 ? { labelTruncated: true } : {}), selected: !!node.selected };
 }
 
 export function canvasEdgeSummary(edge: CanvasEdge) {

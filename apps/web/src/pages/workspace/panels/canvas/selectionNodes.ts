@@ -1,4 +1,4 @@
-import type { GraphNode } from "@vue-flow/core";
+import { getRectOfNodes, type GraphNode, type Node, type useVueFlow } from "@vue-flow/core";
 
 export function getSelectionRoots(selection: GraphNode[], nodes: GraphNode[]) {
   const selected = new Map(selection.map(node => [node.id, node]));
@@ -51,7 +51,7 @@ export function fitGroupBounds(nodes: GraphNode[], groups: Set<GraphNode>) {
     }
     const style = typeof group.style === "function" ? group.style(group) : group.style;
     group.style = { ...style, width: `${width}px`, height: `${height}px` };
-    group.dimensions = { width, height };
+    if (group.dimensions.width !== width || group.dimensions.height !== height) group.dimensions = { width, height };
   }
 }
 
@@ -110,4 +110,36 @@ export function finishGroupDrag(nodes: GraphNode[], draggedNodes: GraphNode[]) {
 
   fitGroupBounds(nodes, affected);
   if (reparented) nodes.splice(0, nodes.length, ...getSelectionTree(nodes, nodes));
+}
+
+export function groupCanvasNodes(flow: ReturnType<typeof useVueFlow>, selection: GraphNode[], label = "分组") {
+  const roots = getSelectionRoots(selection, flow.getNodes.value);
+  if (!roots.length) return [];
+  if (roots.some(node => node.draggable === false || !node.dimensions.width || !node.dimensions.height)) throw new Error("节点不可移动或尺寸尚未就绪，暂不能组合");
+  const rootIds = new Set(roots.map(node => node.id));
+  const bounds = getRectOfNodes(roots);
+  const parentNode = roots.every(node => node.parentNode === roots[0]!.parentNode) ? roots[0]!.parentNode : undefined;
+  const parentPosition = flow.findNode(parentNode)?.computedPosition ?? { x: 0, y: 0 };
+  const position = { x: bounds.x - 24, y: bounds.y - 40 };
+  const id = crypto.randomUUID();
+  const group: Node = {
+    id,
+    type: "canvasGroup",
+    parentNode,
+    position: { x: position.x - parentPosition.x, y: position.y - parentPosition.y },
+    style: { width: `${bounds.width + 48}px`, height: `${bounds.height + 64}px` },
+    connectable: false,
+    expandParent: false,
+    data: { label },
+  };
+  const nodes: Node[] = flow.getNodes.value.map(node => rootIds.has(node.id) ? {
+    ...node,
+    parentNode: id,
+    position: { x: node.computedPosition.x - position.x, y: node.computedPosition.y - position.y },
+    extent: undefined,
+    expandParent: false,
+  } : node);
+  nodes.splice(nodes.findIndex(node => rootIds.has(node.id)), 0, group);
+  flow.setNodes(nodes);
+  return [id];
 }

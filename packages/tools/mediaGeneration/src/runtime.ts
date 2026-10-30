@@ -210,7 +210,7 @@ export const imageGenerationSchema = z.strictObject({
     target: z.strictObject({ assetId: z.string().min(1).optional(), region: z.string().trim().min(1).max(500) }).optional(),
     note: z.string().trim().max(2000).optional(),
   }).optional().describe("精修已有镜头关键帧：须同时传 shotId，target 写实际对象和部位。原图作为唯一输入，只生成新候选；先 compile，generate 复用同一请求与指纹。不是蒙版编辑。"),
-  purpose: z.enum(["asset", "standalone", "storyboard"]).optional().describe("storyboard 仅用于用户明确要求的多格分镜总览；须继承已有镜头规格和资产参考，拆格后用 importKeyframe 登记各镜候选，不能将整张宫格当作单镜主帧。"),
+  purpose: z.enum(["asset", "standalone", "storyboard"]).optional().describe("storyboard 仅用于用户明确要求的多格分镜总览；须发送已采用的人物与武器参考，仅用于构图和动作规划。正式镜头按 shotId 独立生成高清关键帧，不把总览或裁格放大图直接当正式主帧。"),
   size: z.string().trim().min(1).max(64).optional(),
   quality: z.string().trim().min(1).max(64).optional().describe("图片画质档位（如 high），仅按供应商支持的值传入；与 size 输出尺寸不同。"),
 });

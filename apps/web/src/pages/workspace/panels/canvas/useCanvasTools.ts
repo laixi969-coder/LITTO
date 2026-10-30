@@ -2,6 +2,7 @@ import { nextTick, onScopeDispose, watch, type Ref } from "vue";
 import { useVueFlow, type XYPosition } from "@vue-flow/core";
 import { useNodeEvent, useNodeToolsContext, validateConnection } from "@toonflow/nodes-scaffold/runtime";
 import { canvasSchemas, type CanvasContext, type CanvasToolCall } from "@toonflow/tool-canvas/runtime";
+import { groupCanvasNodes } from "./selectionNodes";
 import { arrangeCanvas, nextCanvasPosition } from "./arrangeCanvas";
 import { canvasEdgeSummary, canvasNodeSummary, createCanvasQueries, isCanvasRead } from "./canvasQueries";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
@@ -195,6 +196,12 @@ export function useCanvasTools(options: {
         flow.removeNodes(nodeIds, true);
         await nextTick();
         return { nodeIds, removedEdgeIds: edgeIds.slice(0, 100), removedEdgeCount: edgeIds.length, truncated: edgeIds.length > 100 };
+      }
+      case "groupNodes": {
+        const { nodeIds, label } = canvasSchemas.groupNodes.parse(request.args);
+        const [groupId] = groupCanvasNodes(flow, nodeIds.map(findNode), label);
+        await nextTick();
+        return { ...nodeInfo(groupId!), nodeIds };
       }
       case "moveNodes": {
         const { moves } = canvasSchemas.moveNodes.parse(request.args);

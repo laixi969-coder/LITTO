@@ -125,6 +125,8 @@ export async function readReference(cwd: string, reference: MediaReference, medi
 async function downloadAsset(url: string, signal?: AbortSignal) {
   if (!/^https?:\/\//i.test(url)) invalid("生成结果必须使用 HTTP 或 HTTPS 地址");
   // Provider responses are not trusted in multi-tenant mode: a provider pointed at a hostile base URL could return an internal address.
+  // ACT: 单次下载最多等待 3 分钟；失败后保留原供应商回执，通过恢复原任务取回，不重新生成。
+  signal = AbortSignal.any([AbortSignal.timeout(180000), ...(signal ? [signal] : [])]);
   const response = await guardedFetch(url, { signal });
   if (!response.ok) throw new Error(t`下载生成结果失败（HTTP ${response.status}）`);
   if (Number(response.headers.get("content-length")) > maxMediaSize) {
@@ -297,6 +299,9 @@ export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "
 
   // 人物原视频也是身份锚点；专用口型模型只接收视频与声音，不能误要求额外参考图。
   const hasCompiledIdentity = compiledInputs.some(ref => ref.sent && ref.mediaId && ["IDENTITY", "START_FRAME", "PERFORMANCE"].includes(ref.role));
+  if (mediaType === "image" && request.purpose === "storyboard" && !request.images?.length && !hasCompiledIdentity && looksLikePersonShot(request.prompt)) {
+    invalid("人物分镜总览须实际发送已采用的身份参考图；先固定人物与武器资产，再规划九宫格，不能仅凭文字重新选角");
+  }
   if (mediaType === "video" && request.purpose !== "asset" && !hasCompiledIdentity && !request.images?.length && !request.videos?.length && !request.firstFrame && !request.lastFrame) {
     if (looksLikePersonShot(request.prompt)) {
       invalid("人物镜头必须提供身份参考：用 images 传已采用的定妆图、firstFrame 接上一镜末帧，或 videos 传人物原视频。纯文本生成会每镜重新选角，跨镜必然换脸；仅空镜、环境、流体、光效可用纯文本");

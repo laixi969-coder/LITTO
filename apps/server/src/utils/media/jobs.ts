@@ -95,6 +95,7 @@ export function workspaceProject(directory: string, create = true) {
 }
 
 export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string) {
+  if (request.purpose === "storyboard" && (kind !== "image" || request.shotId)) throw Object.assign(new Error("多格总览仅用于分镜规划，不绑定正式 shotId；正式镜头请独立生成高清关键帧"), { status: 400 });
   if (request.localRepair && (!request.shotId || kind !== "image")) throw Object.assign(new Error("精修须提供图像镜头 shotId"), { status: 400 });
   if (!request.shotId && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
   await assertMediaModelSelection(kind, request, directory);

@@ -1,10 +1,11 @@
 <template>
-  <main class="workspacePage" :style="{ '--agentWidth': `${agentVisible ? agentWidth : 0}px` }">
+  <main class="workspacePage" :class="{ railMinimized: activePanel === 'canvas' && railMinimized }" :style="{ '--agentWidth': `${agentVisible ? agentWidth : 0}px` }">
     <aside class="workspaceRail" aria-label="项目任务">
-      <router-link class="railBrand" to="/home"><brandLogo theme="dark" /></router-link>
-      <span class="projectTitle" :title="workspaceStore.project?.name">{{ workspaceStore.project?.name }}</span>
-      <div ref="historyTarget" class="historyTarget" />
-      <div class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起助手' : '打开助手' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
+      <el-button v-if="activePanel === 'canvas'" class="railToggle" text :aria-label="railMinimized ? '展开项目侧栏' : '收起项目侧栏'" :aria-expanded="!railMinimized" :title="railMinimized ? '展开项目侧栏' : '收起项目侧栏'" @click="railMinimized = !railMinimized"><icon-layout-sidebar :size="18" /></el-button>
+      <router-link v-show="activePanel !== 'canvas' || !railMinimized" class="railBrand" to="/home"><brandLogo theme="dark" /></router-link>
+      <span v-show="activePanel !== 'canvas' || !railMinimized" class="projectTitle" :title="workspaceStore.project?.name">{{ workspaceStore.project?.name }}</span>
+      <div v-show="activePanel !== 'canvas' || !railMinimized" ref="historyTarget" class="historyTarget" />
+      <div v-show="activePanel !== 'canvas' || !railMinimized" class="railActions"><el-button text @click="agentVisible = !agentVisible"><icon-layout-sidebar-right :size="16" />{{ agentVisible ? '收起助手' : '打开助手' }}</el-button><el-button text @click="settingsVisible = true"><icon-settings :size="16" />设置</el-button></div>
     </aside>
     <canvasPanel
       :key="workspaceStore.project?.directory"
@@ -55,7 +56,7 @@
 import { defineAsyncComponent, nextTick, onMounted, onScopeDispose, provide, ref } from "vue";
 import { onBeforeRouteLeave, useRoute } from "vue-router";
 import axios from "axios";
-import { IconLayoutDashboard, IconFileText, IconLayoutSidebarRight, IconSettings } from "@tabler/icons-vue";
+import { IconLayoutDashboard, IconFileText, IconLayoutSidebar, IconLayoutSidebarRight, IconSettings } from "@tabler/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import brandLogo from "@/components/brandLogo.vue";
 import settings from "@/components/settings/index.vue";
@@ -93,6 +94,7 @@ provide("openProductionShot", (id: string) => productionPanelRef.value?.openShot
 const documentPanel = defineAsyncComponent(() => import("./panels/document/index.vue"));
 
 const activePanel = ref<"canvas" | "document">("canvas");
+const railMinimized = ref(true);
 const route = useRoute();
 onMounted(async () => {
   anonymousData.track("workspace.canvas");
@@ -239,11 +241,14 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
 
   .workspaceRail {
     position: absolute; inset: 0 auto 0 0; z-index: 6; display: flex; flex-direction: column; width: var(--railWidth); background: var(--studioRail); color: var(--studioRailInk);
+    .railToggle { align-self: flex-end; margin: 12px; color: var(--studioRailInk); min-width: 36px; min-height: 36px; }
     .railBrand { margin: 28px 24px 16px; color: inherit; text-decoration: none; font-size: 22px; font-weight: 650; letter-spacing: -0.04em; small { font-size: 12px; font-weight: 400; color: var(--studioRailMuted); } }
     .projectTitle { padding: 0 24px 20px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid var(--studioRailHover); }
     .historyTarget { flex: 1; min-height: 0; overflow: auto; }
     .railActions { display: grid; padding: 16px; border-top: 1px solid var(--studioRailHover); .el-button { margin: 0; color: var(--studioRailInk); justify-content: flex-start; min-height: 44px; gap: 8px; } }
   }
+
+  &.railMinimized { --railWidth: 56px; .workspaceRail .railToggle { align-self: center; margin: 12px 0; } }
 
   .canvasPanel {
     position: absolute;
@@ -292,7 +297,7 @@ function saveDocumentNode(directory: string, canvasPath: string, nodeId: string,
   }
 
   .agentButton { position: absolute; top: 15px; right: 15px; z-index: 5; width: 36px; height: 36px; padding: 0; border: 1px solid var(--studioBorder); background: var(--studioSurface); &::before { content: "AI"; font-size: 12px; color: var(--studioDone); } }
-  @media (max-width: 1000px) { --railWidth: 176px; }
-  @media (max-width: 760px) { --railWidth: 0px; .workspaceRail { display: none; } .canvasPanel { right: 0; :deep(.canvasMenuPanel) { top: 58px; } :deep(.canvasMenu) { margin-left: 0; } } .panelSwitcher { left: 50%; } }
+  @media (max-width: 1000px) { --railWidth: 176px; &.railMinimized { --railWidth: 56px; } }
+  @media (max-width: 760px) { --railWidth: 0px; &.railMinimized { --railWidth: 0px; } .workspaceRail { display: none; } .canvasPanel { right: 0; :deep(.canvasMenuPanel) { top: 58px; } :deep(.canvasMenu) { margin-left: 0; } } .panelSwitcher { left: 50%; } }
 }
 </style>

@@ -15,7 +15,7 @@ deleteNodes、moveNodes、renameNodes、connectNodes、deleteEdges 均一次接�
 每次操作等待返回结果，用 getCanvasNodes/getCanvasEdges 只核对受影响节点、连接和业务输出；节点函数不存在或画布离线时说明具体问题。`,
   configRules: [],
   components: Object.fromEntries([
-    "addNode", "moveNodes", "renameNodes", "nodeTools", "connectNodes",
+    "addNode", "groupNodes", "moveNodes", "renameNodes", "nodeTools", "connectNodes",
     "deleteEdges", "selectNodes", "arrangeCanvas", "fitCanvas",
   ].map(name => [name, "src/nodeFocusCard.vue"])),
 }, import.meta.url);

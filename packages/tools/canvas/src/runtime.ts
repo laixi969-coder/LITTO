@@ -57,6 +57,7 @@ export const canvasSchemas = {
   publishFile: z.strictObject({ path: z.string().min(1).max(4096).refine(value => !/^(?:[\\/]|[a-z]:|\w+:)/i.test(value) && !value.split(/[\\/]/).includes(".."), "必须使用工作区相对路径"), label: z.string().trim().min(1).max(200).optional(), canvasId }),
   publishVideo: z.strictObject({ path: z.string().min(1).max(4096).refine(value => !/^(?:[\\/]|[a-z]:|\w+:)/i.test(value) && !value.split(/[\\/]/).includes(".."), "必须使用工作区相对路径"), label: z.string().trim().min(1).max(200).optional(), canvasId }),
   deleteNodes: z.strictObject({ nodeIds: z.array(nodeId).min(1).max(64) }),
+  groupNodes: z.strictObject({ nodeIds: z.array(nodeId).min(1).max(64).refine(value => new Set(value).size === value.length, "nodeIds 不能重复"), label: z.string().trim().min(1).max(200) }),
   moveNodes: z.strictObject({ moves: z.array(z.strictObject({ nodeId, position })).min(1).max(64) }),
   renameNodes: z.strictObject({ renames: z.array(z.strictObject({ nodeId, label: z.string().trim().min(1).max(200) })).min(1).max(64) }),
   connectNodes: z.strictObject({
@@ -87,7 +88,8 @@ export const canvasOperations = [
   { name: "publishVideo", label: "展示成片", description: "将工作区已有视频挂到画布独立视频节点，可播放和下载。同一路径复用节点，保留其他版本。path 必须是真实工作区相对路径，canvasId 可校验目标画布；失败只重试展示，不重新渲染。", parameters: canvasSchemas.publishVideo },
   { name: "publishFile", label: "展示创作结果", description: "把工作区已保存的文档（Markdown/TXT）、图片、音频或视频展示在画布。同一路径复用节点；文档更新同步到已有节点。可用于恢复历史结果。展示失败只重试此工具，不重新生成媒体。", parameters: canvasSchemas.publishFile },
   { name: "deleteNodes", label: "删除节点", description: "从激活画布批量删除指定 nodeIds 的节点及其连接边；同一批次内的父子节点可以一起删除，任一节点校验失败则整体不执行。返回 removedEdgeCount、最多 100 项 removedEdgeIds 及 truncated；截断只影响删除回执，不代表仅删除了部分连线。", parameters: canvasSchemas.deleteNodes },
-  { name: "moveNodes", label: "移动节点", description: "将激活画布指定节点批量移动到各自的画布坐标 position，一次可传入多个节点，任一项校验失败则整体不执行。", parameters: canvasSchemas.moveNodes },
+  { name: "groupNodes", label: "组合片段", description: "将指定节点组合为可整体拖动的命名单元，保留内容、连线和绝对位置，返回组合框与成员 ID。每个镜头/片段的主帧、生成节点和结果归为一组；多片段共用的角色/武器素材不纳入单个片段。只能组合可移动且尺寸已就绪的节点。", parameters: canvasSchemas.groupNodes },
+  { name: "moveNodes", label: "移动节点", description: "将激活画布指定节点批量移动到各自的 position（顶层为画布坐标，组内为相对 parentNode 的坐标；移动组合框会带动全部子节点），一次可传入多个节点，任一项校验失败则整体不执行。", parameters: canvasSchemas.moveNodes },
   { name: "renameNodes", label: "重命名节点", description: "批量修改激活画布指定节点的显示名称，一次可传入多个节点，任一项校验失败则整体不执行。", parameters: canvasSchemas.renameNodes },
   { name: "connectNodes", label: "连接节点", description: "批量连接激活画布的输出端口 sourceHandle 和输入端口 targetHandle，一次可传入多组连接。先用 getCanvasNodes 的 ports 字段确认目标节点与端口；沿用画布和节点的连接校验，任一项校验失败则整体不执行。", parameters: canvasSchemas.connectNodes },
   { name: "deleteEdges", label: "删除连线", description: "从激活画布批量删除指定 edgeIds 的连线，任一项校验失败则整体不执行。", parameters: canvasSchemas.deleteEdges },

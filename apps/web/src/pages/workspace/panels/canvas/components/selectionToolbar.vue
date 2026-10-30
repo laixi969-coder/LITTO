@@ -25,7 +25,7 @@ import { getRectOfNodes, useVueFlow, type GraphNode, type Node, type XYPosition 
 import { ElButton, ElCard, ElMessage } from "element-plus";
 import { IconCopyPlus, IconBoxMultiple, IconDeselect } from "@tabler/icons-vue";
 import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
-import { finishGroupDrag, getSelectionRoots, getSelectionTree } from "../selectionNodes";
+import { finishGroupDrag, getSelectionRoots, getSelectionTree, groupCanvasNodes } from "../selectionNodes";
 
 const props = defineProps<{
   batchHistory: (action: () => Promise<void>) => Promise<void>;
@@ -80,34 +80,7 @@ async function duplicateNodes(selection: GraphNode[], signal: AbortSignal, withE
 }
 
 function groupNodes(selection: GraphNode[]) {
-  const roots = getSelectionRoots(selection, flow.getNodes.value);
-  if (!roots.length) return [];
-  const rootIds = new Set(roots.map(node => node.id));
-  const bounds = getRectOfNodes(roots);
-  const parentNode = roots.every(node => node.parentNode === roots[0]!.parentNode) ? roots[0]!.parentNode : undefined;
-  const parentPosition = flow.findNode(parentNode)?.computedPosition ?? { x: 0, y: 0 };
-  const position = { x: bounds.x - 24, y: bounds.y - 40 };
-  const id = crypto.randomUUID();
-  const group: Node = {
-    id,
-    type: "canvasGroup",
-    parentNode,
-    position: { x: position.x - parentPosition.x, y: position.y - parentPosition.y },
-    style: { width: `${bounds.width + 48}px`, height: `${bounds.height + 64}px` },
-    connectable: false,
-    expandParent: false,
-    data: { label: "分组" },
-  };
-  const nodes: Node[] = flow.getNodes.value.map(node => rootIds.has(node.id) ? {
-    ...node,
-    parentNode: id,
-    position: { x: node.computedPosition.x - position.x, y: node.computedPosition.y - position.y },
-    extent: undefined,
-    expandParent: false,
-  } : node);
-  nodes.splice(nodes.findIndex(node => rootIds.has(node.id)), 0, group);
-  flow.setNodes(nodes);
-  return [id];
+  return groupCanvasNodes(flow, selection);
 }
 
 function ungroupNodes(selection: GraphNode[]) {

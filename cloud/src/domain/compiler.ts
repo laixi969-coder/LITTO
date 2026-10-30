@@ -148,7 +148,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         const role = ["Character", "Creature"].includes(asset.type) ? "IDENTITY"
             : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
         const inherited: Row[] = s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).filter(binding => binding.role === role)
-            .map(binding => ({ ...binding, lockLevel: ["IDENTITY", "WARDROBE"].includes(role) ? "LOCK" : binding.lockLevel }));
+            .map(binding => ({ ...binding, lockLevel: (["IDENTITY", "WARDROBE"].includes(role) || asset.type === "Prop" && role === "GEOMETRY") ? "LOCK" : binding.lockLevel }));
         const references = (asset.references ?? []).filter((id: string) => !inherited.some(binding => binding.referenceId === id))
             .filter((id: string) => s.get("refs", id)?.kind === "image")
             .map((referenceId: string) => ({ referenceId, role, weight: 1, lockLevel: "LOCK", crop: null, notes: `${asset.name} 的已绑定资产参考` }));
@@ -284,11 +284,11 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     if (["story", "serial", "adfilm", "brandFilm", "musicFilm"].includes(s.get("sequences", shot.sequenceId)?.kind ?? "story")) {
       for (const asset of assets) {
         if (asset.approvalStatus !== "approved") warnings.push(`创作准备未完成：资产「${asset.name}」尚未采用，请先固定设定再生成正式镜头`);
-        if (kind === "video" && extra.startFrameMediaId || !["Character", "Creature", "Wardrobe", "Environment", "Product", "Vehicle"].includes(asset.type)) continue;
+        if (kind === "video" && extra.startFrameMediaId || !["Character", "Creature", "Wardrobe", "Environment", "Product", "Vehicle", "Prop"].includes(asset.type)) continue;
         const role = ["Character", "Creature"].includes(asset.type) ? "IDENTITY" : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
         const referenceIds = [...(asset.references ?? []), ...s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).map(binding => binding.referenceId)];
         const mediaIds = new Set([asset.attributes?.authoritativeReference, ...referenceIds.map(id => s.get("refs", id)?.mediaId)].filter(Boolean));
-        if (!inputs.some(input => input.sent && input.role === role && mediaIds.has(input.mediaId))) warnings.push(`创作准备未完成：资产「${asset.name}」没有实际发送 ${role} 参考图，请绑定该资产参考或选择支持足够参考输入的模型`);
+        if (!inputs.some(input => input.sent && input.role === role && (mediaIds.has(input.mediaId) || referenceIds.includes(input.referenceId)))) warnings.push(`创作准备未完成：资产「${asset.name}」没有实际发送 ${role} 参考图，请绑定该资产参考或选择支持足够参考输入的模型`);
       }
     }
 

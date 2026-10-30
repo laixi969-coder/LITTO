@@ -5,6 +5,7 @@ import { ElMessage } from "element-plus";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { nextCanvasPosition } from "./arrangeCanvas";
+import { fitGroupBounds, groupCanvasNodes } from "./selectionNodes";
 
 type Lineage = {
   id: string;
@@ -19,6 +20,37 @@ type MediaJob = { id: string; label?: string; kind: Lineage["kind"]; status: str
 type LineageSnapshot = { records: Lineage[]; mediaPaths: Record<string, string> };
 type CanvasFlow = ReturnType<typeof useVueFlow>;
 const active = new Map<string, () => void>();
+
+function groupProductionNodes(flow: CanvasFlow) {
+  const groups = new Set<CanvasFlow["nodes"]["value"][number]>();
+  for (const node of [...flow.nodes.value]) {
+    const record = node.data.generationLineage as Lineage | undefined;
+    if (!record || node.data.productionUnitId || node.parentNode || node.draggable === false || !node.dimensions.width || !node.dimensions.height) continue;
+    const shotId = record.request.shotId;
+    const unitId = typeof shotId === "string" && shotId ? `shot${shotId}` : record.kind === "video" ? `video${record.id}` : undefined;
+    if (!unitId) continue;
+    let group = flow.nodes.value.find(item => item.type === "canvasGroup" && item.data.productionUnitId === unitId);
+    // ACT: 只首次归组；用户解组或移走成员后不在刷新时重新收回，也不搬动共享参考。
+    if (!group && flow.nodes.value.some(item => item.data.productionUnitId === unitId)) continue;
+    if (!group) {
+      const [id] = groupCanvasNodes(flow, [node], record.label || "视频片段");
+      group = flow.findNode(id)!;
+      group.data.productionUnitId = unitId;
+    } else {
+      if (group.draggable === false) continue;
+      const children = flow.nodes.value.filter(item => item.parentNode === group!.id);
+      flow.updateNode(node.id, {
+        parentNode: group.id,
+        position: { x: Math.max(24, ...children.map(item => item.position.x + item.dimensions.width + 48)), y: 40 },
+        extent: undefined,
+        expandParent: false,
+      });
+    }
+    flow.updateNodeData(node.id, { productionUnitId: unitId });
+    groups.add(group);
+  }
+  fitGroupBounds(flow.nodes.value, groups);
+}
 
 export function applyCanvasLineage(flow: CanvasFlow, records: Lineage[]) {
   for (const edge of flow.edges.value) if (edge.data?.lineageKind || edge.type === "simple-bezier") edge.type = "default";
@@ -54,6 +86,7 @@ export function applyCanvasLineage(flow: CanvasFlow, records: Lineage[]) {
         result.data.lineageLabel = record.label;
       }
       result.data.generationLineage = record;
+      if (generator) generator.data.generationLineage = record;
       const connect = (source: string, target: string, kind: "reference" | "result") => {
         if (source === target || flow.edges.value.some(edge => edge.source === source && edge.target === target && (edge.data?.lineageKind === kind || kind === "reference"))) return;
         // ACT: 来源线只展示历史关系，不接入 in 端口，避免改变正在运行节点的输入和参考顺序。
@@ -69,6 +102,7 @@ export function applyCanvasLineage(flow: CanvasFlow, records: Lineage[]) {
       if (generator) connect(generator.id, result.id, "result");
     }
   }
+  groupProductionNodes(flow);
   return { addedNodes, addedEdges };
 }
 
@@ -81,6 +115,13 @@ export function startCanvasLineage(flow: CanvasFlow) {
   let stopped = false;
   let loadedDirectory: string | undefined;
   let snapshot: LineageSnapshot = { records: [], mediaPaths: {} };
+  const stopDimensions = watch(() => flow.nodes.value.filter(node => node.type !== "canvasGroup").map(node => `${node.id}:${node.dimensions.width}:${node.dimensions.height}`), (_sizes, previous) => {
+    if (stopped || workspace.project?.directory !== boundDirectory) return;
+    groupProductionNodes(flow);
+    const measured = new Set(previous);
+    const parentIds = new Set(flow.nodes.value.filter(node => node.parentNode && !measured.has(`${node.id}:${node.dimensions.width}:${node.dimensions.height}`)).map(node => node.parentNode));
+    fitGroupBounds(flow.nodes.value, new Set(flow.nodes.value.filter(node => parentIds.has(node.id) && node.type === "canvasGroup" && node.data.productionUnitId)));
+  }, { flush: "post" });
   const stop = watch(() => [workspace.project?.directory, workspace.project?.projectId, ...flow.nodes.value.map(node => `${node.id}:${node.data.sourcePath ?? JSON.stringify(node.data.outputs ?? {})}`)], async () => {
     if (busy) { again = true; return; }
     const project = workspace.project;
@@ -124,7 +165,7 @@ export function startCanvasLineage(flow: CanvasFlow) {
       if (!stopped) ElMessage.error(`恢复生成来源失败：${error instanceof Error ? error.message : "读取失败"}`);
     } finally { busy = false; }
   }, { immediate: true, flush: "post" });
-  const dispose = () => { stopped = true; stop(); active.delete(flow.id); };
+  const dispose = () => { stopped = true; stop(); stopDimensions(); active.delete(flow.id); };
   active.set(flow.id, dispose);
   return dispose;
 }

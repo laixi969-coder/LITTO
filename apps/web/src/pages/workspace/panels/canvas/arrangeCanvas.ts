@@ -42,7 +42,8 @@ export async function arrangeCanvas(flow: ReturnType<typeof useVueFlow>, signal?
   const heights = nodes.map(node => node.dimensions.height).sort((left, right) => left - right);
   const nodeGap = Math.max(96, Math.min(160, heights[Math.floor(heights.length / 2)]! / 4));
   const rankGap = Math.max(160, Math.min(320, widths[Math.floor(widths.length / 2)]! / 2));
-  const groupGap = Math.max(nodeGap, rankGap) * 1.5;
+  const hasCanvasGroups = nodes.some(node => node.type === "canvasGroup");
+  const groupGap = hasCanvasGroups ? 120 : Math.max(nodeGap, rankGap) * 1.5;
   const graph = new graphlib.Graph();
   graph.setGraph({ rankdir: "LR", rankalign: "top", nodesep: nodeGap, ranksep: rankGap, edgesep: 32 });
   graph.setDefaultEdgeLabel(() => ({}));
@@ -74,7 +75,8 @@ export async function arrangeCanvas(flow: ReturnType<typeof useVueFlow>, signal?
   const { width, height } = flow.dimensions.value;
   const aspectRatio = width > 0 && height > 0 ? Math.max(0.75, Math.min(2, width / height)) : 1.6;
   const area = groups.reduce((sum, group) => sum + (group.width + groupGap) * (group.height + groupGap), 0);
-  const rowWidth = Math.max(...groups.map(group => group.width), Math.sqrt(area * aspectRatio));
+  const pairWidth = hasCanvasGroups && groups.length > 1 && aspectRatio >= 1.4 ? groups[0]!.width + groups[1]!.width + groupGap : 0;
+  const rowWidth = Math.max(pairWidth, ...groups.map(group => group.width), Math.sqrt(area * aspectRatio));
   const origin = { x: Math.min(...nodes.map(node => node.position.x)), y: Math.min(...nodes.map(node => node.position.y)) };
   let x = 0;
   let y = 0;

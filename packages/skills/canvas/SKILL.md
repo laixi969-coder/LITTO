@@ -19,7 +19,7 @@ metadata:
 3. 用 `getCanvasNodes` 按需读取目标字段，`getCanvasEdges` 查询局部连接；需要调整节点内容时，用 `getNodeTools` 读取该节点函数的描述和完整 `parameters`，通过 `nodeTools` 调用。
 4. 完成结构调整后，按需调用 `fitCanvas` 展示结果，再用 `getCanvasNodes` / `getCanvasEdges` 只核对受影响节点、名称与连接。`arrangeCanvas` 已自动适配视口，不必重复调用 `fitCanvas`。只报告工具实际完成的操作。
 
-故事或视频制作先读取 [制作阶段与确认](references/videoProduction.md#0-逐阶段协作)。默认只落实当前已确认阶段；先逐步收集信息，再展示阶段成果并询问调整，等用户明确继续。不因用户说“做一个短片”就一次创建全部分镜与生成节点，也不把提问失败、跳过或沉默当作确认。
+故事或视频制作先读取 [制作阶段与确认](references/videoProduction.md#0-逐阶段协作)。按用户已授权的阶段推进；授权内的常规制作与组合布局直接执行。仅缺少必要信息或超出授权时询问，不把提问失败、跳过或沉默当作新增授权。
 
 制作规则统一读取 [视频制作工作流](../workflow/SKILL.md)，资产按 [资产制作](../workflow/references/assets.md) 执行。画布手册只负责节点、输入与连接，不另设默认模型、固定板式或跳过主关键帧的生产路线。多镜片段仅在用户采用且模型实际支持时使用。
 
@@ -72,6 +72,7 @@ metadata:
 | 工具 | 参数 | 行为与返回 |
 | --- | --- | --- |
 | `addNode` | `{ type, position: { x, y }, label? }` | 新增节点，返回节点信息；函数用 `getNodeTools` 查询。未指定名称时使用类型的 `label`。 |
+| `groupNodes` | `{ nodeIds: [...], label }` | 将本镜主帧、生成节点与结果置于可整体拖动的组合框，保留连线与绝对位置；共用人物和武器参考留在组外。返回组合框 `node` 和成员 `nodeIds`，每批最多 64 个。 |
 | `moveNodes` | `{ moves: [{ nodeId, position: { x, y } }] }` | 批量移动，返回 `nodes` 节点信息。不可拖动的节点会拒绝操作。 |
 | `renameNodes` | `{ renames: [{ nodeId, label }] }` | 批量更新显示名称，返回 `nodes` 节点信息。不改变节点 ID。 |
 | `deleteNodes` | `{ nodeIds: [...] }` | 删除节点及其连接边，返回 `nodeIds`、`removedEdgeCount`、最多 100 项 `removedEdgeIds` 和 `truncated`；截断仅影响回执。 |
@@ -85,7 +86,7 @@ metadata:
 
 ### 参数约束
 
-- `position` 使用画布坐标，不是屏幕像素坐标；`x`、`y` 必须是有限数字。开启网格吸附时，新增和移动的位置会按网格取整，以返回的 `node.position` 为准。
+- `position` 在顶层使用画布坐标，组内使用相对 `parentNode` 的坐标，不是屏幕像素坐标；`x`、`y` 必须是有限数字。开启网格吸附时，新增和移动的位置会按网格取整，以返回的 `node.position` 为准。
 - 节点 `label` 去除首尾空白后为 1–200 个字符。
 - `addNode` 只接受当前 `availableNodeTypes` 中的类型，不接受任意 `data` 或自定义节点 ID。需要填写内容或设置节点参数时使用已注册的节点函数。
 - 上述移动、重命名、删除、连接操作每批 1–64 项，单项也使用数组参数。任一项校验失败则整批不执行；执行期间的异常不代表已产生的副作用自动回滚，恢复前仍需回读。

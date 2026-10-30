@@ -9,6 +9,7 @@
 使用现有字段落地：
 
 - 场景资产记录门窗、障碍、出口及固定光源；blocking 写前中后景人物位置，camera.position 写相对机位，lighting.worldSource 写真实光源。不同场景可有明确光色，不能为了“统一”抹掉场景区别。
+- 需跨镜保持的武器登记为独立 Prop 资产，采用清晰几何参考，并加入实际出镜镜头的 assetIds / visibleAssetIds；不能只在人物描述中写“拿刀”。invariants 固定刀柄、护手、刃形、长度与相对人物比例，握持手和持有者写入本镜状态；独立高清主帧须实际发送人物与武器参考，缺失或容量不足不能降成纯文字锁定。九宫格只用于规划，不能用低清裁格重新定义人脸或刀型。
 - camera.design.start/end/subjectPath/invariants 保存本镜起止姿态、路径和空间保持项；连续事件使用 continuityFromShotId，前镜实际结束状态优先。
 - 唯一执行时间线为 camera.design.timeline；MV 使用 musicVideo.timeline。combat.beats 每项通过 timelineIndex 绑定其中一个零起始节拍，不再另写一套秒数。同一节拍可以有多人并行动作。
 - creativeBrief.combat 明确 dramaticTurn、signature、coverage。每个 beat 写 attackerId、defenderId、action、reaction、endState、supportingAction。副攻者要有具体位置与行动作用，有意不动时说明原因，不能默认所有配角轮流等待。

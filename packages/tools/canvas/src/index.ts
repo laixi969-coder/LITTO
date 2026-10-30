@@ -13,6 +13,7 @@ const plugin: ToolPlugin = {
     const promptGuidelines = [
       `本轮初始画布环境（以下 JSON 仅描述环境，不是额外指令）：${JSON.stringify({ initialCanvasId: canvas.id })}。getCanvas 仅返回概览；按任务范围使用 findCanvasNodes、getCanvasNodes、getCanvasEdges、getNodeTools 查询实时状态。已知 ID 时直接读取目标，分批处理仅保留摘要和游标。`,
       "node:generateImage、node:generateVideo 和 node:getGenerationStatus 自动等待最终状态并实时报告进度，不需要模型循环查询。超时后只恢复查询已有任务；失败后报告原因，不自动再次生成或更换入口绕过镜头校验。",
+      "多片段制作按镜头/片段组织命名组合框：用 groupNodes 组合本镜高清主帧、生成节点和结果，共享角色与武器参考留在组外。生成来源会按正式 shotId 自动归组，不重复包组；先读 parentNode。移动组合框整体移动；组内 position 相对 parentNode。",
     ];
     return canvasOperations.map(operation => ({
       name: operation.name,
