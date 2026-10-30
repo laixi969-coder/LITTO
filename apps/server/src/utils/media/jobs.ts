@@ -232,9 +232,9 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
       }
       const files = await generateMediaDirect(directory, input.kind as "image" | "video", {
         ...request,
-        // WAND 不支持种子，任务自动生成的内部种子不能覆盖用户原始请求。
+        // 不支持种子的供应商保留原始请求，不能传入任务自动生成的内部种子。
         ...(input.negativePrompt ? { negativePrompt: input.negativePrompt } : {}),
-        ...(providerId !== "tencentWand" && input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
+        ...(providerId !== "tencentWand" && !(providerId === "token01" && input.kind === "video") && input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
       }, input.signal, async task => {
         // 先持久化回执与交付检查点；恢复只收取原结果，不创建子任务或重新生成。
         const previous = api.scoped(context.workspaceId).get("generation_jobs", context.jobId)?.parameters?.remoteTask;

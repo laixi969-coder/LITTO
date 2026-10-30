@@ -70,7 +70,7 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 }
 
 export default {
-  id: "token01", label: "Token01", version: "1.1.0", rules, resumeMedia,
+  id: "token01", label: "Token01", version: "1.1.1", rules, resumeMedia,
   readme: "使用 Token01 令牌生成图片和视频。模型可用性以令牌分组为准。支持文生图、单图编辑及各模型支持的视频生成模式；参考素材需要可访问的公网中转地址。\n\n[图片文档](https://token01.apifox.cn/api-530538219) · [视频文档](https://token01.apifox.cn/api-530551459)",
   models: [
     {"id": "vidu-q2", "label": "vidu-q2", "type": "image", "mode": ["text", "singleImage"], "imageSizes": ["1K"], "imageRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]},
@@ -134,7 +134,7 @@ export default {
     const model = this.models?.find(item => item.id === input.model && item.type === "video");
     if (!model) throw new Error("此 Token01 视频模型尚未适配");
     if (!input.prompt.trim()) throw new Error("请填写提示词");
-    if (input.negativePrompt || input.seed !== undefined || input.cameraTrajectory || input.imageAndCameraOnly || input.other && Object.keys(input.other).length) throw new Error("此视频适配不支持这些额外参数");
+    if (input.seed !== undefined || input.cameraTrajectory || input.imageAndCameraOnly || input.other && Object.keys(input.other).length) throw new Error("此视频适配不支持种子、相机轨迹或其他额外参数");
     let firstFrame = input.firstFrame;
     let images = input.images ?? [];
     const videos = input.videos ?? [];
@@ -179,7 +179,7 @@ export default {
       : vidu ? { ...(model.audio ? { audio: input.generateAudio ?? false } : {}) }
       : edit ? {} : { ratio };
     const body = {
-      model: input.model, prompt: input.prompt, ...(!edit ? { duration } : {}),
+      model: input.model, prompt: [input.prompt, input.negativePrompt ? `画面中不得出现：${input.negativePrompt}` : ""].filter(Boolean).join("\n"), ...(!edit ? { duration } : {}),
       ...(workflow ? { resolution: resolution.toLowerCase(), ratio } : { size: kling ? ({ "720P": "std", "1080P": "pro", "4K": "4k" } as Record<string, string>)[resolution] : resolution.toLowerCase() }),
       ...(first ? { first_frame_url: first } : {}), ...(last ? { last_frame_url: last } : {}),
       ...(imageUrls.length ? { reference_images: imageUrls } : {}), ...(videoUrls.length ? { video_urls: videoUrls } : {}), ...(audioUrls.length ? { audio_urls: audioUrls } : {}),

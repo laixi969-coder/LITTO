@@ -53,7 +53,7 @@ export async function relayMedia(input: MediaInput, signal?: AbortSignal) {
   timer.unref();
   const url = `${publicUrl.href.replace(/\/+$/, "")}/mediaRelay/${token}`;
   try {
-    const response = await guardedFetch(url, { signal: AbortSignal.any([AbortSignal.timeout(15000), ...(signal ? [signal] : [])]), redirect: "error" });
+    const response = await guardedFetch(url, { signal: AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])]), redirect: "error" });
     if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== input.mimeType) throw new Error("临时素材公网地址不可访问或响应不正确");
     if (!response.body) throw new Error("临时素材公网地址未返回素材");
     const reader = response.body.getReader();
