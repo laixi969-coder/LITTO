@@ -17,7 +17,7 @@ import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 import { readRelayImage } from "@/utils/media/relay";
 
-const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts"];
+const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
 
 export async function createApp({
   webRoot,

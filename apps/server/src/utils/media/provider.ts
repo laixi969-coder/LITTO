@@ -15,7 +15,7 @@ import { restoreSecrets, isMasked } from "@/utils/secrets";
 import { convertAudio } from "@/utils/media/audioProcessor";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, writeWorkspaceFile } from "@/utils/workspace/files";
-import { relayImage } from "@/utils/media/relay";
+import { relayImage, relayMedia } from "@/utils/media/relay";
 
 type Expression = Extract<ReturnType<typeof parseExpression>, { type: "ParenthesizedExpression" }>["expression"];
 type ObjectExpression = Extract<Expression, { type: "ObjectExpression" }>;
@@ -435,6 +435,7 @@ export async function loadMediaProviderSource(source: string, config: Record<str
       }, { preconnect: fetchRequest.preconnect }) as typeof fetch : fetchRequest,
       hash: Bun.hash,
       relayImage: (input: MediaInput) => relayImage(input, signal),
+      relayMedia: (input: MediaInput) => relayMedia(input, signal),
       errorMessage: (value: unknown) => mediaErrorMessage(value, providerConfig),
       image: Bun.Image,
       assertAspectRatio: async (input: MediaInput, ratio: string) => {

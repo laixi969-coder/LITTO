@@ -28,6 +28,7 @@
     "./media/qwenSpeech": "./src/media/qwenSpeech.ts",
     "./media/museTalk": "./src/media/museTalk.ts",
     "./media/gen3c": "./src/media/gen3c.ts",
-    "./media/tencentWand": "./src/media/tencentWand.ts"
+    "./media/tencentWand": "./src/media/tencentWand.ts",
+    "./media/token01": "./src/media/token01.ts"
   }
 }

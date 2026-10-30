@@ -20,6 +20,7 @@ import qwenSpeech from "./src/media/qwenSpeech";
 import museTalk from "./src/media/museTalk";
 import gen3c from "./src/media/gen3c";
 import tencentWand from "./src/media/tencentWand";
+import token01Media from "./src/media/token01";
 
 export type Provider = ProviderDefinition;
 export type CameraTrajectory = CameraTrajectorySpec;
@@ -29,4 +30,4 @@ export type AudioConvertOptions = Parameters<ProviderTools["audio"]["convert"]>[
 export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 
 export const languageProviders = [deepSeek, atlasCloudText, easyRouterText, openRouter, tokenHub, token01] as const;
-export const mediaProviders = [apiMart, meta, agnes, volcengine, volcSpeech, bailian, kling, vidu, atlasCloud, easyRouter, qwenSpeech, museTalk, gen3c, tencentWand] as const;
+export const mediaProviders = [apiMart, meta, agnes, volcengine, volcSpeech, bailian, kling, vidu, atlasCloud, easyRouter, qwenSpeech, museTalk, gen3c, tencentWand, token01Media] as const;

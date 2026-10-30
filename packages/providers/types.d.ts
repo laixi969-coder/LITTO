@@ -98,6 +98,8 @@ interface ProviderTools {
   fetch: typeof globalThis.fetch;
   /** 将本地图片转换为短期有效的公网地址；服务部署须配置可访问的公网地址。 */
   relayImage(input: MediaInput): Promise<string>;
+  /** 将本地图片、视频或音频转换为短期有效的公网地址。 */
+  relayMedia(input: MediaInput): Promise<string>;
   /** 收到远端任务号后立即持久化，供查询恢复；不代表授权重新提交。 */
   reportTask?(task: MediaTask): Promise<void>;
   /** 提取供应商错误正文中的可读原因，并隐藏配置中的密钥和 URL 查询参数。 */

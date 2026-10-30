@@ -26,10 +26,19 @@ export function readRelayImage(request: Request, response: Response) {
 }
 
 export async function relayImage(input: MediaInput, signal?: AbortSignal) {
+  if (input.type !== "url") {
+    if (!["image/png", "image/jpeg"].includes(input.mimeType)) throw new Error("腾讯 WAND 参考图片须为 PNG 或 JPEG");
+    const size = input.type === "binary" ? input.data.byteLength : Buffer.byteLength(input.data.replace(/^data:[^,]+,/, ""), "base64");
+    if (!size || size > 20 * 1024 * 1024) throw new Error("腾讯 WAND 参考图片须不超过 20 MB");
+  }
+  return relayMedia(input, signal);
+}
+
+export async function relayMedia(input: MediaInput, signal?: AbortSignal) {
   if (input.type === "url") return input.url;
-  if (!["image/png", "image/jpeg"].includes(input.mimeType)) throw new Error("腾讯 WAND 参考图片须为 PNG 或 JPEG");
+  if (!["image/png", "image/jpeg", "image/webp", "video/mp4", "video/quicktime", "video/webm", "audio/mpeg", "audio/wav", "audio/mp4"].includes(input.mimeType)) throw new Error("不支持此参考素材格式");
   const data = input.type === "binary" ? Buffer.from(input.data) : Buffer.from(input.data.replace(/^data:[^,]+,/, ""), "base64");
-  if (!data.length || data.length > 20 * 1024 * 1024) throw new Error("腾讯 WAND 参考图片须不超过 20 MB");
+  if (!data.length || data.length > 100 * 1024 * 1024) throw new Error("参考素材须不超过 100 MB");
   const base = process.env.MILIMILI_PUBLIC_URL?.trim();
   if (!base) throw new Error("临时素材中转需要服务管理员设置 MILIMILI_PUBLIC_URL 为此服务的公网 HTTPS 地址");
   const publicUrl = await assertPublicHttpUrl(base);
@@ -46,7 +55,7 @@ export async function relayImage(input: MediaInput, signal?: AbortSignal) {
   try {
     const response = await guardedFetch(url, { signal: AbortSignal.any([AbortSignal.timeout(15000), ...(signal ? [signal] : [])]), redirect: "error" });
     if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== input.mimeType) throw new Error("临时素材公网地址不可访问或响应不正确");
-    if (!response.body) throw new Error("临时素材公网地址未返回图片");
+    if (!response.body) throw new Error("临时素材公网地址未返回素材");
     const reader = response.body.getReader();
     const hash = createHash("sha256");
     let size = 0;
@@ -55,11 +64,11 @@ export async function relayImage(input: MediaInput, signal?: AbortSignal) {
         const { value, done } = await reader.read();
         if (done) break;
         size += value.length;
-        if (size > data.length) throw new Error("临时素材公网地址返回了不匹配的图片");
+        if (size > data.length) throw new Error("临时素材公网地址返回了不匹配的素材");
         hash.update(value);
       }
     } finally { await reader.cancel().catch(() => {}); }
-    if (size !== data.length || hash.digest("hex") !== createHash("sha256").update(data).digest("hex")) throw new Error("临时素材公网地址返回了不匹配的图片");
+    if (size !== data.length || hash.digest("hex") !== createHash("sha256").update(data).digest("hex")) throw new Error("临时素材公网地址返回了不匹配的素材");
     return url;
   } catch (error) {
     clearTimeout(timer);
