@@ -1,7 +1,52 @@
 import { nextTick } from "vue";
 import type { useVueFlow } from "@vue-flow/core";
 import { graphlib, layout } from "@dagrejs/dagre";
-import { getSelectionTree } from "./selectionNodes";
+import { getSelectionTree, groupCanvasNodes } from "./selectionNodes";
+
+export async function arrangeResults(flow: ReturnType<typeof useVueFlow>) {
+  const nodes = flow.getNodes.value.filter(node => !node.parentNode && !node.hidden);
+  const category = (node: typeof nodes[number]) => {
+    if (node.type === "remote-imageNode") return "image";
+    if (node.type === "remote-videoNode") return "video";
+    if (node.type !== "canvasGroup" || !node.data.productionUnitId) return undefined;
+    const children = flow.getNodes.value.filter(item => item.parentNode === node.id);
+    return children.some(item => item.type === "remote-videoNode") ? "video"
+      : children.some(item => item.type === "remote-imageNode") ? "image" : undefined;
+  };
+  const groups = ["image", "video"].map(kind => nodes.filter(node => category(node) === kind)
+    .sort((left, right) => left.position.y - right.position.y || left.position.x - right.position.x));
+  const selected = groups.flat();
+  if (!selected.length) throw new Error("画布中没有可整理的图片或视频结果");
+  if (selected.some(node => node.draggable === false || !node.dimensions.width || !node.dimensions.height)) throw new Error("结果节点不可移动或尺寸尚未就绪");
+  const snapshot = selected.map(node => ({ id: node.id, position: { ...node.position }, parentNode: node.parentNode }));
+  const sectionIds: string[] = [];
+  const others = nodes.filter(node => !selected.includes(node));
+  const x = Math.min(...selected.map(node => node.position.x));
+  let y = others.length ? Math.max(...others.map(node => node.position.y + (node.dimensions.height || 600))) + 100
+    : Math.min(...selected.map(node => node.position.y));
+  for (const group of groups) {
+    if (!group.length) continue;
+    const currentGroup = group.map(node => flow.findNode(node.id)!).filter(Boolean);
+    let left = x;
+    let rowHeight = 0;
+    for (const [index, node] of currentGroup.entries()) {
+      if (index && index % 4 === 0) { left = x; y += rowHeight + 80; rowHeight = 0; }
+      node.position = { x: left, y };
+      left += node.dimensions.width + 80;
+      rowHeight = Math.max(rowHeight, node.dimensions.height);
+    }
+    y += rowHeight + 140;
+    await nextTick();
+    const kind = category(currentGroup[0]!);
+    const [id] = groupCanvasNodes(flow, currentGroup, kind === "image" ? "图片素材" : "视频片段");
+    if (id) {
+      const section = flow.findNode(id);
+      if (section) section.data.resultSection = kind;
+      sectionIds.push(id);
+    }
+  }
+  return { snapshot, sectionIds };
+}
 
 export function nextCanvasPosition(flow: ReturnType<typeof useVueFlow>, width = 920, height = 600) {
   const nodes = flow.getNodes.value.filter(node => !node.parentNode);

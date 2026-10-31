@@ -547,6 +547,7 @@ async function registerOnCanvas(cwd: string, file: GeneratedMedia, request: Medi
           outputs: { [handle]: { dataType, value: { url: file.path, mimeType: file.mimeType } } },
           handles: [{ id: handle, type: "source", dataType, label: file.mediaType === "video" ? "视频输出" : "图像输出" }],
           lineageLabel: label,
+          pendingResultPlacement: true,
         },
       });
       canvas.nodes = nodes;

@@ -36,6 +36,11 @@
             </el-popover>
           </span>
         </el-tooltip>
+        <el-tooltip :showArrow="false" content="按图片、视频分类排列" placement="top" :hideAfter="0" :enterable="false" :triggerKeys="[]">
+          <el-button class="toolButton" text :disabled="!canArrange" aria-label="按图片、视频分类排列" @click="arrangeMediaResults">
+            <icon-layout-grid :size="17" />
+          </el-button>
+        </el-tooltip>
         <el-tooltip :showArrow="false" :content="showMap ? '隐藏地图' : '显示地图'" placement="top" :hideAfter="0" :enterable="false" :triggerKeys="[]">
           <el-button
             class="toolButton"
@@ -125,9 +130,9 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Panel, useVueFlow, type XYPosition } from "@vue-flow/core";
 import { MiniMap } from "@vue-flow/minimap";
-import { IconMap, IconMagnet, IconFocusCentered, IconMinus, IconPlus } from "@tabler/icons-vue";
+import { IconMap, IconMagnet, IconFocusCentered, IconMinus, IconPlus, IconLayoutGrid } from "@tabler/icons-vue";
 import { ElMessage } from "element-plus";
-import { arrangeCanvas } from "../arrangeCanvas";
+import { arrangeCanvas, arrangeResults } from "../arrangeCanvas";
 
 const props = defineProps<{
   canvasId: string;
@@ -143,6 +148,7 @@ const flow = useVueFlow();
 const { viewport, zoomTo, zoomIn, zoomOut, fitView, getNodes, updateNode } = flow;
 const zoomPercent = computed(() => Math.round(viewport.value.zoom * 100));
 const layoutSnapshot = ref<{ id: string; position: XYPosition }[]>();
+const resultSectionIds = ref<string[]>([]);
 const undoPopoverVisible = ref(false);
 const arranging = ref(false);
 let arrangeController: AbortController | undefined;
@@ -163,6 +169,7 @@ watch(
   () => {
     arrangeController?.abort();
     layoutSnapshot.value = undefined;
+    resultSectionIds.value = [];
     undoPopoverVisible.value = false;
   },
   { flush: "sync" }
@@ -184,6 +191,7 @@ async function arrangeNodes() {
       controller.signal.throwIfAborted();
       if (!arrangedNodeIds.length) return;
       layoutSnapshot.value = snapshot;
+      resultSectionIds.value = [];
       undoPopoverVisible.value = true;
     });
   } catch (error) {
@@ -194,6 +202,22 @@ async function arrangeNodes() {
   }
 }
 
+async function arrangeMediaResults() {
+  if (!canArrange.value) return;
+  arranging.value = true;
+  try {
+    await props.batchHistory(async () => {
+      const result = await arrangeResults(flow);
+      layoutSnapshot.value = result.snapshot;
+      resultSectionIds.value = result.sectionIds;
+      undoPopoverVisible.value = true;
+      await fitView({ padding: 0.2, duration: 200 });
+    });
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : "分类排列失败");
+  } finally { arranging.value = false; }
+}
+
 async function undoArrange() {
   const snapshot = layoutSnapshot.value;
   if (!snapshot) return;
@@ -201,9 +225,11 @@ async function undoArrange() {
     await props.batchHistory(async () => {
       const nodeIds = new Set(getNodes.value.map((node) => node.id));
       snapshot.forEach(({ id, position }) => {
-        if (nodeIds.has(id)) updateNode(id, { position });
+        if (nodeIds.has(id)) updateNode(id, { position, ...(resultSectionIds.value.includes(flow.findNode(id)?.parentNode ?? "") ? { parentNode: undefined } : {}) });
       });
+      if (resultSectionIds.value.length) flow.removeNodes(resultSectionIds.value.filter(id => nodeIds.has(id) && !getNodes.value.some(node => node.parentNode === id)));
       layoutSnapshot.value = undefined;
+      resultSectionIds.value = [];
       undoPopoverVisible.value = false;
     });
   } catch (error) {

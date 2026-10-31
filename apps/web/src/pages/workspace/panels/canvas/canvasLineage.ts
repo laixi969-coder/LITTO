@@ -6,6 +6,7 @@ import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { nextCanvasPosition } from "./arrangeCanvas";
 import { fitGroupBounds, groupCanvasNodes } from "./selectionNodes";
+import { placeResult } from "./resultSections";
 
 type Lineage = {
   id: string;
@@ -23,13 +24,24 @@ const active = new Map<string, () => void>();
 
 function groupProductionNodes(flow: CanvasFlow) {
   const groups = new Set<CanvasFlow["nodes"]["value"][number]>();
-  for (const node of [...flow.nodes.value]) {
+  for (const item of [...flow.nodes.value]) {
+    const node = flow.findNode(item.id);
+    if (!node) continue;
     const record = node.data.generationLineage as Lineage | undefined;
-    if (!record || node.data.productionUnitId || node.parentNode || node.draggable === false || !node.dimensions.width || !node.dimensions.height) continue;
+    if (node.data.pendingResultPlacement && !node.parentNode && node.dimensions.width && node.dimensions.height && (node.type === "remote-imageNode" || node.type === "remote-videoNode")) {
+      if (placeResult(flow, node, node.type === "remote-imageNode" ? "image" : "video")) {
+        const placed = flow.findNode(node.id);
+        if (placed) delete placed.data.pendingResultPlacement;
+        void nextTick().then(() => flow.findNode(node.id) && flow.fitView({ nodes: [node.id], padding: 0.2, duration: 200 })).catch(() => {});
+        continue;
+      }
+    }
+    const parent = node.parentNode ? flow.findNode(node.parentNode) : undefined;
+    if (!record || node.data.productionUnitId || (node.parentNode && !parent?.data.resultSection) || node.draggable === false || !node.dimensions.width || !node.dimensions.height) continue;
     const shotId = record.request.shotId;
     const unitId = typeof shotId === "string" && shotId ? `shot${shotId}` : record.kind === "video" ? `video${record.id}` : undefined;
     if (!unitId) continue;
-    let group = flow.nodes.value.find(item => item.type === "canvasGroup" && item.data.productionUnitId === unitId);
+    let group = flow.nodes.value.find(item => item.type === "canvasGroup" && item.data.productionUnitId === unitId && item.parentNode === node.parentNode);
     // ACT: 只首次归组；用户解组或移走成员后不在刷新时重新收回，也不搬动共享参考。
     if (!group && flow.nodes.value.some(item => item.data.productionUnitId === unitId)) continue;
     if (!group) {
@@ -48,6 +60,10 @@ function groupProductionNodes(flow: CanvasFlow) {
     }
     flow.updateNodeData(node.id, { productionUnitId: unitId });
     groups.add(group);
+  }
+  for (const group of [...groups]) {
+    const parent = group.parentNode ? flow.findNode(group.parentNode) : undefined;
+    if (parent?.data.resultSection) groups.add(parent);
   }
   fitGroupBounds(flow.nodes.value, groups);
 }

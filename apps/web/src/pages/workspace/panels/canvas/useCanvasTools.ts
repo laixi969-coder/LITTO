@@ -145,7 +145,7 @@ export function useCanvasTools(options: {
         if (!options.availableNodes.value.some(node => node.type === type)) throw new Error("请先启用对应的素材节点");
         const id = crypto.randomUUID();
         const position = nextCanvasPosition(flow, text === undefined ? 520 : 400);
-        flow.addNodes({ id, type, position, data: { label: args.label ?? path.split("/").at(-1), sourcePath: path, ...(text !== undefined ? { textSnapshot: text } : { outputs: { [kind]: { dataType: kind.toUpperCase(), value: { url: path, mimeType } } } }) } });
+        flow.addNodes({ id, type, position, data: { label: args.label ?? path.split("/").at(-1), sourcePath: path, ...(["image", "video"].includes(kind) ? { pendingResultPlacement: true } : {}), ...(text !== undefined ? { textSnapshot: text } : { outputs: { [kind]: { dataType: kind.toUpperCase(), value: { url: path, mimeType } } } }) } });
         await nextTick();
         signal.throwIfAborted();
         await flow.fitView({ nodes: [id], padding: 0.2, duration: 0 });
