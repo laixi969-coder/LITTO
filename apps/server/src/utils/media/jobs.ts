@@ -11,6 +11,7 @@ import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/file
 import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
+import { assertMultiShotCapability } from "@/utils/media/shotCapabilities";
 import { matchesAspect, mediaRatios } from "@toonflow/providers/aspect";
 import { coverageGate } from "@/utils/media/coverage";
 import { blockingLine } from "@/utils/media/blocking";
@@ -203,6 +204,9 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
         try {
           const shot = api.scoped(context.workspaceId).get("shots", request.shotId);
           if (!shot || shot.projectId !== context.projectId) throw new Error("生成镜头已失效");
+          const currentModel = (await listMediaModels(true)).find(model => model.providerId === request.providerId && model.modelId === request.modelId && model.type === "video");
+          if (!currentModel) throw new Error("生成模型已失效");
+          assertMultiShotCapability(currentModel, request.mode, shot.camera?.design?.timeline ?? shot.musicVideo?.timeline);
           if (shot.creativeBrief?.dialogue?.lines?.length && input.params.specFingerprint !== api.shotFingerprint(api.scoped(context.workspaceId), shot.id)) throw new Error("排队后镜头或对白规划已改变，停止旧请求，不自动重新提交");
           api.assertSpeechPlan(api.scoped(context.workspaceId), shot);
           await assertCurrentSpeechAudio(directory, shot, input.signal);
@@ -284,6 +288,9 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   validateCameraRequest(model, request, kind);
   if (kind === "video") {
     // 模式可能是字符串或一组参考上限；按完整候选比较，不能接受客户端自报能力。
+    const shot = api.scoped(tenant.workspaceId).get("shots", shotId);
+    if (!shot || shot.projectId !== workspaceProject(directory)) throw Object.assign(new Error("镜头不存在"), { status: 404 });
+    assertMultiShotCapability(model, request.mode, shot.camera?.design?.timeline ?? shot.musicVideo?.timeline);
     const modes = Array.isArray(model.mode) ? model.mode : [model.mode];
     if (!modes.some(mode => JSON.stringify(mode) === JSON.stringify(request.mode))) throw Object.assign(new Error("所选模式不受模型支持"), { status: 400 });
     if (model.durationResolutionMap?.length && !model.durationResolutionMap.some(rule => rule.duration.includes(request.duration!) && rule.resolution.includes(request.resolution!))) throw Object.assign(new Error("时长与分辨率组合不受模型支持"), { status: 400 });

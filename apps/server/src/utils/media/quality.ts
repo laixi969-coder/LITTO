@@ -5,11 +5,72 @@ import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/file
 import { listMediaModels } from "@/utils/media/generation";
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
+import { selectedMultiShotCapability } from "@/utils/media/shotCapabilities";
 
 const qualitySchema = z.strictObject({ kind: z.enum(["image", "video"]), providerId: z.string().min(1), modelId: z.string().min(1), value: z.string().min(1).max(64) });
 const preferencesSchema = z.array(qualitySchema).max(200);
 const ratioSchema = z.string().regex(/^[1-9]\d{0,3}:[1-9]\d{0,3}$/).or(z.literal(""));
 const aspectPreferencesSchema = z.strictObject({ imageRatio: ratioSchema.optional(), videoRatio: ratioSchema.optional() });
+
+const generationShotSchema = z.strictObject({
+  editId: z.string().trim().min(1).max(120),
+  paragraphId: z.string().trim().min(1).max(120),
+  sceneId: z.string().trim().min(1).max(120),
+  duration: z.number().finite().positive().max(3600),
+  description: z.string().trim().min(1).max(4000),
+  transition: z.enum(["continuous", "cut"]),
+  canSplitAfter: z.boolean().describe("此处完整动作和原句已结束，可安全分段；不能在对白或接触动作中间拆开"),
+  splitBefore: z.string().trim().min(1).max(500).optional(),
+  isolateReason: z.string().trim().min(1).max(500).optional(),
+});
+
+/** ACT: 只合并导演标明可兼容的连续段落，不凭文字猜换场、动作风险或模型切镜能力。 */
+export function planVideoSegments(shots: z.infer<typeof generationShotSchema>[], supportedDurations: number[], multiShotState: "supported" | "unsupported" | "unknown" = "unknown", singleTake = false) {
+  const durations = [...new Set(supportedDurations.filter(value => Number.isFinite(value) && value > 0))].sort((a, b) => a - b);
+  const maximum = durations.at(-1) ?? 0;
+  const segments: { duration: number; generationDuration: number; handles: number; splitReason: string; timeline: { editId: string; start: number; end: number; description: string; transition: "continuous" | "cut" }[] }[] = [];
+  const issues: string[] = [];
+  if (!maximum) return { segments, editShotCount: shots.length, generationCallCount: 0, issues: ["当前分辨率没有可用生成时长"] };
+  if (new Set(shots.map(shot => shot.editId)).size !== shots.length) return { segments, editShotCount: shots.length, generationCallCount: 0, issues: ["剪辑镜号 editId 不能重复"] };
+  const boundary = (index: number) => {
+    const left = shots[index - 1], right = shots[index];
+    if (!left || !right) return "段落结束";
+    if (right.splitBefore) return right.splitBefore;
+    if (left.isolateReason || right.isolateReason) return left.isolateReason ?? right.isolateReason!;
+    if (left.sceneId !== right.sceneId) return "场景变化";
+    if (left.paragraphId !== right.paragraphId) return "完整剧情段落边界";
+    if (right.transition === "cut" && (singleTake || multiShotState === "unsupported")) return singleTake ? "要求一镜到底" : "已核验当前模式不支持内部切镜";
+    return "";
+  };
+  let start = 0;
+  while (start < shots.length) {
+    let end = start, total = 0;
+    while (end < shots.length && (end === start || !boundary(end)) && Math.round((total + shots[end]!.duration) * 1e6) / 1e6 <= maximum) {
+      total = Math.round((total + shots[end]!.duration) * 1e6) / 1e6;
+      end++;
+    }
+    const splitReason = end === shots.length ? "段落结束" : boundary(end) || "模型当前分辨率时长上限";
+    // 超限只能退回已标明完整的动作/对白边界，不能按秒切断。
+    while (end > start && end < shots.length && !shots[end - 1]!.canSplitAfter) end--;
+    if (end === start) {
+      issues.push(`${shots[start]!.editId} 起的完整动作或对白无法在 ${maximum} 秒内安全分段，请重排覆盖或选择支持所需时长的模型`);
+      break;
+    }
+    let offset = 0;
+    const timeline = shots.slice(start, end).map((shot, index) => {
+      const from = offset;
+      offset = Math.round((offset + shot.duration) * 1e6) / 1e6;
+      return { editId: shot.editId, start: from, end: offset, description: shot.description, transition: index ? shot.transition : "continuous" as const };
+    });
+    const generationDuration = durations.find(value => value >= offset)!;
+    segments.push({ duration: offset, generationDuration, handles: Math.max(0, generationDuration - offset), splitReason, timeline });
+    start = end;
+  }
+  if (singleTake && segments.length > 1) issues.push("一镜到底不能拆成多次生成，请保留原方案并解决时长或输入限制");
+  const researchRequired = multiShotState !== "supported" && multiShotState !== "unsupported" && segments.some(segment => segment.timeline.some((beat, index) => index > 0 && beat.transition === "cut"));
+  if (researchRequired) issues.push("内部切镜能力未知：保留合段草案，先查实际供应商官方资料，核验能力记录后重规划；不因缺信息拆短，也不提交生成");
+  return { segments, editShotCount: shots.length, generationCallCount: segments.length, researchRequired, issues };
+}
 
 export async function readMediaAspect(directory: string) {
   const { path } = await resolveWorkspacePath(directory, "mediaPreferences.json", true);
@@ -34,6 +95,7 @@ export async function planMediaGeneration(directory: string, input: unknown) {
     quality: z.string().min(1).max(64).optional(), duration: z.number().finite().positive().max(3600).optional(),
     mode: z.union([z.string().min(1).max(100), z.array(z.string().regex(/^(image|video|audio)Reference:\d+$/)).min(1).max(3)]).optional(),
     referenceCount: z.number().int().min(0).max(100).optional(), singleTake: z.boolean().optional(),
+    shots: z.array(generationShotSchema).min(1).max(400).optional(),
   })).min(1).max(60) }).parse(input);
   const [models, saved] = await Promise.all([listMediaModels(), readMediaQuality(directory)]);
   const plans = requests.map(request => {
@@ -44,17 +106,28 @@ export async function planMediaGeneration(directory: string, input: unknown) {
     const durations = [...new Set(model.durationResolutionMap?.filter(rule => !quality || rule.resolution.includes(quality)).flatMap(rule => rule.duration) ?? [])].sort((a, b) => a - b);
     const modes = Array.isArray(model.mode) ? model.mode : [];
     const mode = request.mode ?? (modes.length === 1 && typeof modes[0] === "string" ? modes[0] : undefined);
+    const multiShotCapability = selectedMultiShotCapability(model, mode);
     const requiredReferenceCount = mode === "startEndRequired" ? 2 : mode === "singleImage" || mode === "multiReference" ? 1 : 0;
     const issues: string[] = [];
+    if (request.kind === "video" && mode === undefined) issues.push("先指定当前模型的实际生成模式，内部切镜能力不能跨模式继承");
     if (request.mode && !modes.some(item => JSON.stringify(item) === JSON.stringify(request.mode))) issues.push("所需输入模式未受当前模型明确支持，先核对参考条件，不能到生成后再要求改模型");
     if (requiredReferenceCount && (request.referenceCount ?? 0) < requiredReferenceCount) issues.push(`当前模式至少需要${requiredReferenceCount}张实际参考图，先核对已有素材或把缺图制作纳入同一批方案；不能只确认额度后再发现输入不足`);
     if (!quality && options.length > 1) issues.push("精度尚未确定；用户已指定时直接保存，否则纳入本批方案一次询问");
     if (quality && options.length && !options.includes(quality)) issues.push("所选精度不受当前模型支持，不会自动降级");
-    if (request.kind === "video" && (!request.duration || !durations.includes(request.duration))) issues.push(request.singleTake
+    if (request.shots && (request.kind !== "video" || request.duration !== undefined)) issues.push("分段规划只用于视频，使用 shots 各镜时长，不同时指定整段 duration");
+    const segmentPlan = request.kind === "video" && request.shots && quality && options.includes(quality)
+      ? planVideoSegments(request.shots, durations, multiShotCapability?.state ?? "unknown", request.singleTake) : undefined;
+    if (request.kind === "video" && request.shots && !segmentPlan) issues.push("先确定当前模型有效分辨率，再按该分辨率的实际时长规划生成段");
+    if (segmentPlan) issues.push(...segmentPlan.issues);
+    if (request.kind === "video" && !request.shots && (!request.duration || !durations.includes(request.duration))) issues.push(request.singleTake
       ? "所需一镜到底时长未受当前模型明确支持；保留长镜头方案，不自动切成短段或把拼接冒充一镜到底"
       : "生成段时长尚未确定或不受当前规格支持；按动作单元规划素材与剪辑，不按上限机械均分");
     return { ...request, mode, requiredReferenceCount, providerId: model.providerId, modelId: model.modelId, quality, qualityOptions: options, supportedDurations: durations,
-      maxSingleGenerationDuration: durations.at(-1) ?? null, modes: model.mode, audio: model.audio, ready: issues.length === 0, issues };
+      maxSingleGenerationDuration: durations.at(-1) ?? null, modes: model.mode, audio: model.audio, segmentPlan,
+      multiShotCapability, research: segmentPlan?.researchRequired ? multiShotCapability?.research ?? { query: `${model.providerId} ${model.modelId} official API multi-shot`, instruction: "先确定实际生成模式并读取官方资料；不能提交助手声明替代正式能力记录" } : undefined,
+      nextAction: segmentPlan?.researchRequired ? "research" : issues.length ? "resolveIssues" : "compile",
+      generationCallCount: segmentPlan ? segmentPlan.generationCallCount * request.count : request.count,
+      ready: issues.length === 0, issues };
   });
   return { ready: plans.every(plan => plan.ready), plans, generated: false,
     note: "本地只读能力预检，不代表参考齐备、已获生成授权或画质通过。先核对实际模式和参考输入，再compile；已授权范围无需重问，缺项集中呈现，真正新增消耗才确认。" };

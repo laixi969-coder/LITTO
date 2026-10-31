@@ -185,9 +185,13 @@ function parseProvider(source: string) {
 }
 
 function metadata(fileName: string, source: string) {
-  const { id, label, version, readme, modelsUrl, models, canSyncModels } = parseProvider(source);
+  const { id, label, version, readme, modelsUrl, models, canSyncModels, modelProperty } = parseProvider(source);
+  // 能力记录绑定实际适配实现；编辑模型列表不改变实现指纹。
+  const implementationSource = modelProperty?.type === "ObjectProperty"
+    ? source.slice(0, modelProperty.value.start!) + "[]" + source.slice(modelProperty.value.end!) : source;
   if (fileName !== `${id}.ts`) invalid("供应商 ID 与文件名不一致");
   return { fileName, id, label, version, readme, canSyncModels: canSyncModels || !!modelsUrl, modelsUrl, models,
+    implementationRevision: createHash("sha256").update(implementationSource).digest("hex"),
     revision: createHash("sha256").update(source).digest("hex"), loadError: "", builtinVersion: builtinDirectory ? mediaProviders.find(provider => provider.id === id)?.version : undefined };
 }
 

@@ -85,6 +85,20 @@ export interface CanvasContext extends CanvasInfo {
   call(request: CanvasToolCall, signal?: AbortSignal): Promise<unknown>;
 }
 
+export interface MultiShotCapability {
+  providerId: string;
+  modelId: string;
+  mode: string | string[];
+  state: "supported" | "unsupported" | "unknown";
+  control: "prompt" | "none" | "unknown";
+  providerVersion?: string;
+  implementationRevision?: string;
+  reviewedAt?: string;
+  sources: { url: string; summary: string }[];
+  reason: string;
+  research?: { query: string; urls: string[]; instruction: string };
+}
+
 export interface MediaModel {
   cameraTrajectory?: boolean;
   promptControl?: "imageAndCameraOnly";
@@ -99,6 +113,8 @@ export interface MediaModel {
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   audio?: boolean | "optional";
   nativeDialogue?: boolean;
+  /** 服务端受审阅能力表解析的只读记录；供应商自填字段和请求说明不能授权切镜。 */
+  multiShotCapabilities?: MultiShotCapability[];
   voices?: { title: string; voice: string }[];
   audioParameterSchema?: Record<string, unknown>;
   speechInstructions?: boolean;

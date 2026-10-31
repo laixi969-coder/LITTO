@@ -20,6 +20,7 @@ import { skinFinishes, videoMotionTiming, type SkinFinish } from "@toonflow/tool
 import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { inspectVideoPrompt, isDirectorPrompt, positivePromptText } from "@/utils/media/videoPrompt";
 import { autoFilmScope } from "@/utils/autoFilm/scope";
+import { readMultiShotCapabilities } from "@/utils/media/shotCapabilities";
 
 export type { SkinFinish } from "@toonflow/tool-media-generation/runtime";
 
@@ -70,6 +71,7 @@ function imageOptions(value: unknown, pattern: RegExp) {
 
 export async function listMediaModels(all = false): Promise<MediaModel[]> {
   const installedProviders = await listMediaProviders();
+  const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   return installedProviders.flatMap(provider => provider.models.flatMap(model => {
     if (provider.loadError || modelAccess("media", provider.id, model.id).reason()) return [];
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
@@ -79,6 +81,7 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
       cameraTrajectory: model.cameraTrajectory === true, promptControl: model.promptControl === "imageAndCameraOnly" ? "imageAndCameraOnly" : undefined,
       mode: model.mode, durationResolutionMap: model.durationResolutionMap, audio: model.audio, nativeDialogue: model.nativeDialogue === true, lipSync: model.lipSync === true, speechInstructions: model.speechInstructions === true,
+      ...(model.type === "video" ? { multiShotCapabilities: readMultiShotCapabilities(provider, model, record(configurations[provider.id]).baseUrl) } : {}),
       ...(model.type === "audio" ? { voices: model.voices, audioTask: model.audioTask, audioParameterSchema: record(model.inputSchema).properties } : {}),
       ...(model.type === "image" ? {
         imageSizes: imageOptions(Array.isArray(model.imageSizes) ? model.imageSizes : builtIn?.imageSizes, /^[^\u0000-\u001f\u007f]+$/),
@@ -248,17 +251,6 @@ export function withPhotographicBaseline(prompt: string, skinFinish?: SkinFinish
   return `${baseline}\n\n${body}`;
 }
 
-/** 视频未指定时长时的推荐值：取模型可用区间的上限三分之二，避免每次都落在最短档。 */
-function recommendedDuration(map: unknown, requested: number | undefined) {
-  if (typeof requested === "number" && requested > 0) return requested;
-  const ranges = Array.isArray(map) ? map : [];
-  const supported = ranges
-    .flatMap(entry => Array.isArray((entry as { duration?: unknown })?.duration) ? (entry as { duration: number[] }).duration : [])
-    .filter(value => Number.isFinite(value) && value > 0);
-  if (!supported.length) return requested;
-  return Math.round(Math.max(...supported) * 2 / 3);
-}
-
 /**
  * 提示词红线：主动做旧、以及纯文本生成人物镜。
  * 入队前也调用一次——排在队列里执行时才失败，用户看到的是「提交成功然后红了一片」，说不清哪一步错了。
@@ -366,8 +358,9 @@ async function generateMediaUnrecorded(
   if (!recovery) validateCameraRequest({ cameraTrajectory: model.cameraTrajectory, promptControl: model.promptControl }, request, mediaType);
   if (mediaType === "audio" && request.instructions?.trim() && model.speechInstructions !== true) invalid("此配音模型未声明支持情绪与语气指令，请更换模型或清空指令");
   if (mediaType === "audio" && Object.keys(request.audioParameters ?? {}).length && !model.inputSchema) invalid("此模型未提供额外音频参数定义，请清空额外参数");
-  // 视频未明确指定时长时按模型能力取推荐值：调用方漏传时不再落到供应商默认的最短档，也不强制每镜等长。
-  const duration = mediaType === "video" ? recommendedDuration(model.durationResolutionMap, request.duration) : request.duration;
+  // 生成时长由完整段落规划决定；专用口型模型沿用输入视频，不接受时长参数。
+  if (!recovery && mediaType === "video" && !model.lipSync && !request.duration) invalid("请先读取模型能力并按完整剧情段落规划生成时长，不使用默认短片段；可调用 productionSpec(planGeneration)");
+  const duration = request.duration;
   if (!recovery) assertPromptPolicy(request, mediaType);
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory, reportTask, execution?.jobId);

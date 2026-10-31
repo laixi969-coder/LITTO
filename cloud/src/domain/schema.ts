@@ -72,6 +72,7 @@ export const bindingInput = z.object({
 });
 
 const actionTimelineSchema = z.array(z.object({
+    editId: z.string().trim().min(1).max(120).optional().describe("源剪辑镜号；一个生成段可包含多个剪辑镜头，同一镜号可跨多个动作节拍"),
     start: z.number().finite().nonnegative(), end: z.number().finite().positive(),
     description: z.string().trim().min(1).max(4000),
     transition: z.enum(["continuous", "cut"]).optional(),
@@ -206,7 +207,7 @@ export const shotInput = z.object({
     camera: cameraSchema.default({}), lighting: lightingSchema.default({}),
     intendedStateDelta: stateDeltaSchema.default({}).describe("只记录镜尾变化，按 characters/wardrobe/props/environment/lighting/motion/emotional 分组；人物或持物变化为 {characters:{真实资产ID:{position:位置}},props:{真实资产ID:{heldBy:角色ID,present:true}}}，不把资产ID直接放在根层，不用字符串替代状态对象；null 删除该资产状态"),
     freedomMap: freedomMapSchema.optional(), constraints: z.array(z.string()).default([]),
-    duration: z.number().finite().positive().max(3600).default(4),
+    duration: z.number().finite().positive().max(3600).describe("本生成段计划用于剪辑的总时长，按完整剧情段落规划；必须显式提供，不默认4秒"),
     generationDuration: z.number().finite().positive().max(3600).optional(),
     musicVideo: musicVideoSchema.nullable().optional(),
     interactions: z.array(z.object({

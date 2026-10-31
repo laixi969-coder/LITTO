@@ -365,7 +365,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     };
     if (kind === "video") {
         if (cam.design?.timeline) {
-            sections.timeline = cam.design.timeline.map((item: { start: number; end: number; description: string; transition?: string }) => `【${item.start}-${item.end}s · ${item.transition === "cut" ? "切镜" : "连续动作"}】${item.description}`).join("\n");
+            sections.timeline = cam.design.timeline.map((item: { editId?: string; start: number; end: number; description: string; transition?: string }) => `【${item.start}-${item.end}s${item.editId ? ` · 源镜号 ${item.editId}` : ""} · ${item.transition === "cut" ? "切镜" : "连续动作"}】${item.description}`).join("\n");
         }
         // ACT: 时间线是执行节拍的唯一来源；验收标准、备用方案和跨镜剪点留在规格中，不发给生成模型执行。
         sections.shotDesign = cam.design ? J([
@@ -387,7 +387,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }
     let negativePrompt = J(shotAvoid(freedom));
     if (kind === "video" && musicVideo) {
-        const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}${item.transition ? ` · ${item.transition === "cut" ? "切镜" : "连续动作"}` : ""}】${item.description}`).join("\n");
+        const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}${item.editId ? ` · 源镜号 ${item.editId}` : ""}${item.transition ? ` · ${item.transition === "cut" ? "切镜" : "连续动作"}` : ""}】${item.description}`).join("\n");
         const audio = J([
             musicVideo.audioMode === "sourceTrack" && `原曲从 ${musicVideo.sourceStart}s 起对应本段 0s；最终剪辑沿用同一原曲，不在切镜处重启或重作歌曲`,
             musicVideo.audioMode === "generated" && "按以下声音设计生成本段声音；未要求音乐时不要自行配乐",

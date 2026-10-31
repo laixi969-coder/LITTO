@@ -327,7 +327,7 @@ const continuityShots = computed(() => {
   return shots.value.filter(item => item.sequenceId === sequence?.id ? item.ord < draft.value.ord
     : sequences.value.find(value => value.id === item.sequenceId)?.ord < sequence?.ord);
 });
-const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(4), size = ref("");
+const kind = ref("image"), modelKey = ref(""), modeKey = ref(""), resolution = ref(""), duration = ref(0), size = ref("");
 const ratios = ref<Record<string, string>>({ image: "", video: "" });
 const ratio = computed({ get: () => ratios.value[kind.value] ?? "", set: value => { ratios.value[kind.value] = value; } });
 const visualModels = ref<any[]>([]), visionModelKey = ref("");

@@ -40,7 +40,7 @@ const plugin: ToolPlugin = {
     const listTool: ToolDefinition = {
       name: "listMediaModels",
       label: "查询媒体模型",
-      description: "查询当前选定且可用的媒体模型；all:true 可列出供用户在聊天中选择的全部已配置模型，返回 providerId、modelId、类型、cameraTrajectory（原生数值轨迹）、promptControl（文字控制限制）、模式及支持的画幅、时长、分辨率或音色。生成前先查询；没有默认值或用户要换模型时，用 requestProductionDecision(selectModel) 在聊天中选择并保存，不要求用户前往设置页。all:true 的列表不授权自行切换模型。",
+      description: "查询当前选定且可用的媒体模型；all:true 可列出供用户在聊天中选择的全部已配置模型，返回 providerId、modelId、类型、cameraTrajectory（原生数值轨迹）、promptControl（文字控制限制）、模式及支持的画幅、时长、分辨率或音色。视频还返回逐模式multiShotCapabilities（supported/unsupported/unknown、来源、核验日期和未知项research）；它是只读能力，不能用自填说明覆盖。生成前先查询；没有默认值或用户要换模型时，用 requestProductionDecision(selectModel) 在聊天中选择并保存，不要求用户前往设置页。all:true 的列表不授权自行切换模型。",
       parameters: z.toJSONSchema(listMediaModelsSchema, { io: "input", target: "draft-07" }),
       async execute(_id, params, signal) {
         const { all } = listMediaModelsSchema.parse(params);
@@ -59,7 +59,7 @@ const plugin: ToolPlugin = {
         cameraDirectionPlanning,
         shotContinuityPlanning,
         "设计包含遮挡后揭示、绕行保持空间关系、穿门绕柱或用户指定多个机位路径时，主动使用已有3D导演台预演；普通固定、简单推近或跟拍不强制预演。先读取workflow/references/canvasExecution.md并发现节点工具，在已有生成授权内调用generatePlan；没有该入口或授权不足时说明缺项，不假装已预演。预演只用于修正镜头规格，参考视频或数值轨迹须按当前模型实际能力另行接入，不自动换模型。",
-        "按片型执行 cinema/references/referenceQuality.md。动作戏的 combat.beats.timelineIndex 绑定唯一执行时间线；摄影覆盖与多人反应必须明确。完整播放后按 motionPlan.checkpoints 用 motionReview:[{id,verdict:pass|revise,note}] 记录实际动作、空间和接触，不把失败动作改成静站，不逐项向用户确认。批次确认前先 productionSpec(planGeneration,{requests:[{kind:image|video,count,quality?,duration?,mode?,referenceCount?,singleTake?}]}) 只读核对当前模型、精度和单段时长，集中处理缺项后展示一次具体生成方案。ready只代表所检查参数，参考必须实际核对，不能当成已授权。用户禁止生成时仅做规划和compile。单段超过能力不能把拼接称一镜到底。",
+        "按片型执行 cinema/references/referenceQuality.md。动作戏的 combat.beats.timelineIndex 绑定唯一执行时间线；摄影覆盖与多人反应必须明确。完整播放后按 motionPlan.checkpoints 用 motionReview:[{id,verdict:pass|revise,note}] 记录实际动作、空间和接触，不把失败动作改成静站，不逐项向用户确认。批次确认前先 productionSpec(planGeneration,{requests:[{kind:image|video,count,quality?,duration?,mode?,referenceCount?,singleTake?,shots?}]}) 只读核对当前模型、精度和单段时长。视频先按完整剧情段落合并，shots:[{editId,paragraphId,sceneId,duration,description,transition:continuous|cut,canSplitAfter,splitBefore?,isolateReason?}]与duration互斥；canSplitAfter只在完整对白/动作后为true。内部切镜能力仅来自服务端multiShotCapabilities的供应商/精确模型版本/模式记录，不接收助手自填证据或能力状态。unknown返回nextAction=research并保留合段草案：必须先用webFetch/webSearch读取research.urls和query对应的实际供应商官方资料，核对版本、模式和适配实现；资料未经审阅写入正式能力表不能放行，查不到保持未知，不拆短、不擅自试生成。supported允许合并，unsupported才在必要切镜处拆分。返回segmentPlan含源镜号及段内timeline、duration、generationDuration、handles、editShotCount和generationCallCount；count为每段候选数量，默认方案1。每段一个制作shot，内部剪辑镜头存camera.design.timeline的editId（MV沿用musicVideo.timeline），不按每镜重复请求。补齐handles的执行时间线、完整对白和参考后compile；实际切点须看生成视频再定。集中处理缺项后展示一次具体生成方案。ready只代表所检查参数，参考必须实际核对，不能当成已授权。用户禁止生成时仅做规划和compile。单段超过能力不能把拼接称一镜到底。",
         "剧情、广告和MV均使用camera.design.mode=singleTake|multiShot。剧情广告的camera.design.timeline为[{start,end,description,transition?:continuous|cut}]，完整覆盖生成段；MV沿用musicVideo.timeline，同样支持transition，不同时写两份时间线。singleTake不允许cut。description写可见身体任务、接触结果、位移与构图；锁身份不锁坐姿或手势，不用微表情撑满时长。完整规则读取cinema/references/movementDirection.md。",
         "默认 read 只返回本项目当前资产；需要角色详情或实际参考图时 readAsset{assetId} 按需读取；referenceImages 返回可直接用于 read 和 generateImage.images 的 path、mimeType，沿用这些路径，不搜索历史生成目录或把媒体 ID 猜成路径；versions 只用于历史追溯。跨项目角色先 readLibrary{q?,favorite?,type?,tags?} 搜索已有演员或歌手；用户要求调用时 importAsset{libraryId}，要求收藏已采用角色时 publishAsset{assetId}，favoriteAsset{libraryId,favorite} 切换收藏。相同角色在同项目重复导入返回原资产，不重建脸。新角色可外部上传或内部生成图片，reference 登记图片、asset 建档，再用 selectReference 选定定妆并采用，publishAsset 保存独立角色库副本。库只带长期身份、说话与行为习惯，不继承上一项目的人物关系；导入后按本项目角色安排妆造和表演。",
         "角色资产 attributes.characterDirection{speech,behavior,relationships} 保存长期档案，导演只把当场相关策略转成 performance，把正在发声者的说话习惯转成 dialogue.delivery；configureVoice 的 roles[].speechStyle 沿用 speech。不将小传、关系和习惯清单重复贴入画面字段。visibleAssetIds 是 assetIds 的出镜子集，纯画外说话人只留对白；省略沿用 assetIds。camera.design.start 只写首帧已发生的状态，稍后入镜写进 timing。shot/updateShot 的 source 传 {sceneId}，服务端保存已采用剧本的真实正文/对白/知情快照。knowledge 供导演区分角色与观众所知，反应不得早于证据；完整账本不放入媒体执行文本。",
@@ -118,7 +118,7 @@ const plugin: ToolPlugin = {
         .refine(input => new Set(input.requests.map(request => request.shotId)).size === input.requests.length, "同批每镜只能提交一次");
       productionTools.push({
         name: "generateShots", label: "批量推进镜头", executionMode: "sequential",
-        description: "将已经就绪且已采用主帧的独立镜头批量推进生成。服务端逐镜编译真实规格并使用对应指纹，不需要模型抄写prompt或fingerprint；生成期间内部等待并显示真实完成计数，不调用模型轮询。requests每镜含shotId、providerId、modelId和所选模式/精度/时长；图片用size/ratio，视频用duration/resolution/generateAudio/mode。mode必须完整等于listMediaModels的一项，多参考不能只取子项。保留所有参考与检查门禁，严重缺陷记为blocked并继续其他镜头；已有请求复用，失败不重发。仅缺图镜头传kind:image，每镜一次，不自动新增候选或切换模型。",
+        description: "将已经就绪且已采用主帧的生成段批量推进生成。先planGeneration合并完整剧情段落；一个shot可含多个带editId的剪辑镜头，只提交一次，不按内部切镜重复请求。服务端逐镜编译真实规格并使用对应指纹，不需要模型抄写prompt或fingerprint；生成期间内部等待并显示真实完成计数，不调用模型轮询。requests每镜含shotId、providerId、modelId和所选模式/精度/时长；图片用size/ratio，视频用duration/resolution/generateAudio/mode。mode必须完整等于listMediaModels的一项，多参考不能只取子项。保留所有参考与检查门禁，严重缺陷记为blocked并继续其他镜头；已有请求复用，失败不重发。仅缺图镜头传kind:image，每镜一次，不自动新增候选或切换模型。",
         parameters: z.toJSONSchema(schema, { io: "input", target: "draft-07" }),
         async execute(_id, params, signal, onUpdate) {
           const input = schema.parse(params);

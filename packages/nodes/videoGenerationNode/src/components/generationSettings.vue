@@ -15,7 +15,7 @@
       <div v-if="durations.length || resolutions.length" class="outputOptions">
         <div v-if="durations.length" class="outputField">
           <div class="sectionLabel">时长</div>
-          <el-select v-model="duration" :disabled="disabled" :teleported="false" aria-label="视频时长">
+          <el-select v-model="duration" :disabled="disabled" :teleported="false" placeholder="按剧情段落选择" aria-label="视频时长">
             <el-option v-for="item in durations" :key="item" :value="item" :label="`${item}秒`" />
           </el-select>
         </div>
@@ -67,7 +67,7 @@ const durations = computed(() => [...new Set(mappings.value.flatMap(item => item
 const resolutions = computed(() => resolutionsFor(duration.value));
 
 function resolutionsFor(value: number | undefined) {
-  return [...new Set(mappings.value.filter(item => value !== undefined && item.duration.includes(value)).flatMap(item => item.resolution))];
+  return [...new Set(mappings.value.filter(item => value === undefined || item.duration.includes(value)).flatMap(item => item.resolution))];
 }
 
 function ratioStyle(value: string) {

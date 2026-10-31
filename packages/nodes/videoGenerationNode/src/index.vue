@@ -158,7 +158,7 @@ function getDurations(choice: NodeMediaModel) {
 
 function getResolutions(choice: NodeMediaModel, duration?: number) {
   // ACT: 当前视频分辨率使用 p 单位；出现其他单位时再统一换算。
-  return [...new Set((choice.durationResolutionMap ?? []).filter((item) => item.duration.includes(duration!)).flatMap((item) => item.resolution))]
+  return [...new Set((choice.durationResolutionMap ?? []).filter((item) => duration === undefined || item.duration.includes(duration)).flatMap((item) => item.resolution))]
     .sort((left, right) => (Number.parseFloat(left) || Infinity) - (Number.parseFloat(right) || Infinity));
 }
 // ACT: 引用改变时只替换不适用的模式；普通媒体优先作为参考，避免自动变成首尾帧。
@@ -174,7 +174,7 @@ watch([selectedModel, matchingModes, () => data.value.mode], ([choice, matches])
 watch([selectedModel, () => data.value.duration], ([choice]) => {
   if (!choice) return;
   const durations = getDurations(choice);
-  if (!durations.includes(data.value.duration!)) data.value.duration = durations[0];
+  if (!durations.includes(data.value.duration!)) data.value.duration = undefined;
   const resolutions = getResolutions(choice, data.value.duration);
   if (!resolutions.includes(data.value.resolution)) data.value.resolution = resolutions[0] ?? "";
   if (choice.audio !== "optional") data.value.generateAudio = choice.audio === true;
@@ -267,6 +267,7 @@ async function startGeneration() {
   if (uploading.value) throw new Error("视频正在替换，请等待完成");
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择视频模型");
+  if (!data.value.duration) throw new Error("请先按完整剧情段落选择生成时长");
   if (choice.cameraTrajectory && (!data.value.cameraTrajectory || !data.value.imageAndCameraOnly)) throw new Error("请先通过 setCameraTrajectory 配置并校准轨迹，或在镜头制作面板导入轨迹");
   if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
   if (!data.value.production && /\{\{ref \d+\}\}/.test(generationPrompt.value)) throw new Error("提示词含未绑定的参考标记，请重新连接资产并写入提示词");
@@ -435,7 +436,7 @@ nodeTools.register({
     if (!choice) throw new Error("请选择 getConfig 返回的有效视频模型");
     const durations = getDurations(choice);
     if (args.duration !== undefined && !durations.includes(args.duration)) throw new Error(`当前模型不支持时长 ${args.duration}，可选：${durations.join("、")}`);
-    const duration = args.duration ?? (durations.includes(data.value.duration!) ? data.value.duration : durations[0]);
+    const duration = args.duration ?? (durations.includes(data.value.duration!) ? data.value.duration : undefined);
     const resolutions = getResolutions(choice, duration);
     if (args.resolution !== undefined && !resolutions.includes(args.resolution)) throw new Error(`当前时长不支持分辨率 ${args.resolution}，可选：${resolutions.join("、")}`);
     const resolution = args.resolution ?? (resolutions.includes(data.value.resolution) ? data.value.resolution : resolutions[0] ?? "");

@@ -117,7 +117,7 @@ compile只发送当前阶段适用的具体视觉要求；edit/audio/story返回
 
 生成前核对参考顺序、配置和提示词，说明对象、数量、模型、规格与费用性质，按用户已授权范围执行。创作方向的确认不自动授权付费生成；不反复请求用户已经给过的同一授权，不擅自自动重试。
 
-执行顺序：`listMediaModels` → `productionSpec(binding)` 绑定实际已上传的参考 ID → `productionSpec(compile)`，其 data 包含 `shotId`、`kind`、`request`（实际 providerId/modelId/prompt 与模式、画幅、时长等）→ 阅读返回的 warnings/degradations → `generateImage/generateVideo` 传入同一请求、`shotId` 和返回的 `fingerprint` 作为 `productionFingerprint`。服务端用领域编译结果替代自由 Prompt。参考不支持时不能声称发送或锁定；LOCK 参考无法发送时更换模式。生成视频前通过 requestKeyframeApproval 在聊天实际检查并选定 Hero；Take 和其他制作选择通过 requestProductionDecision 在聊天完成，AI 不可自行填人工检查记录，不强制跳转面板。
+执行顺序：先 `listMediaModels` 与 `productionSpec(planGeneration)` 按已选分辨率规划完整剧情生成段；同场景连续状态且参考与切镜能力允许时优先合并，超限或独立修复风险才在完整对白/动作后拆分。剪辑镜头数与生成调用数分开：每段一个制作 shot，内部剪辑镜头用 camera.design.timeline 的 editId、局部时间码与 transition 保存，不逐镜重复生成，不默认4秒/6秒，不拉慢短动作填满上限。生成段的 duration 为拟用时长，generationDuration 为实际合法请求档位；补齐可剪余量的执行时间线并保留完整原句。然后 `listMediaModels` → `productionSpec(binding)` 绑定实际已上传的参考 ID → `productionSpec(compile)`，其 data 包含 `shotId`、`kind`、`request`（实际 providerId/modelId/prompt 与模式、画幅、时长等）→ 阅读返回的 warnings/degradations → `generateImage/generateVideo` 传入同一请求、`shotId` 和返回的 `fingerprint` 作为 `productionFingerprint`。服务端用领域编译结果替代自由 Prompt。参考不支持时不能声称发送或锁定；LOCK 参考无法发送时更换模式。生成视频前通过 requestKeyframeApproval 在聊天实际检查并选定 Hero；Take 和其他制作选择通过 requestProductionDecision 在聊天完成，AI 不可自行填人工检查记录，不强制跳转面板。
 
 ## 7. 质检与修复
 
