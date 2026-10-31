@@ -35,9 +35,9 @@ const providers = (): Record<string, P> => {
             const h = { authorization: `Bearer ${t.access_token}`, accept: "application/json", "user-agent": "milimili" };
             const me: any = await (await fetch(`${api}/user`, { headers: h })).json();
             const emails: unknown = await (await fetch(`${api}/user/emails`, { headers: h })).json().catch(() => []);
-            const primary = Array.isArray(emails) ? emails.find((e) => e.primary && e.verified) : null;
-            const email = primary?.email ?? (me.email as string);
-            return { email, subject: String(me.id), verified: !!primary || !!me.email };
+            const primary = Array.isArray(emails) ? emails.find((e) => e.primary === true && e.verified === true) : null;
+            const email = primary?.email ?? "";
+            return { email, subject: String(me.id), verified: !!primary };
         } };
     }
     if (env("MILIMILI_OAUTH_GOOGLE_ID")) {
@@ -45,7 +45,7 @@ const providers = (): Record<string, P> => {
         out.google = { id: "google", clientId: env("MILIMILI_OAUTH_GOOGLE_ID")!, authUrl: auth, scope: "openid email", async exchange(code, redirect) {
             const t = await postForm(tok, { client_id: env("MILIMILI_OAUTH_GOOGLE_ID")!, client_secret: env("MILIMILI_OAUTH_GOOGLE_SECRET")!, code, redirect_uri: redirect, grant_type: "authorization_code" });
             const me: any = await (await fetch(info, { headers: { authorization: `Bearer ${t.access_token}` } })).json();
-            return { email: me.email, subject: String(me.sub), verified: me.email_verified !== false };
+            return { email: me.email, subject: String(me.sub), verified: me.email_verified === true };
         } };
     }
     if (env("MILIMILI_OAUTH_APPLE_ID")) {

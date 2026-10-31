@@ -2,7 +2,7 @@
 import { definePlugin, useEffect, useRef, useState } from "@infinite-canvas/plugin-sdk";
 import type { CanvasNodeContentProps } from "@infinite-canvas/plugin-sdk";
 
-function SvgContent({ ctx }: CanvasNodeContentProps) {
+function svgContent({ ctx }: CanvasNodeContentProps) {
     const [editing, setEditing] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +67,7 @@ function SvgContent({ ctx }: CanvasNodeContentProps) {
                 />
             ) : svg ? (
                 // pointerEvents:none 让整块可拖动移动,双击/拖拽都命中外层节点
-                <div style={{ height: "100%", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 12, boxSizing: "border-box", pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: svg }} />
+                <img alt="SVG 预览" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`} draggable={false} style={{ height: "100%", width: "100%", objectFit: "contain", padding: 12, boxSizing: "border-box", pointerEvents: "none" }} />
             ) : (
                 <div style={{ height: "100%", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, boxSizing: "border-box", color: ctx.theme.node.placeholder, fontSize: 13, textAlign: "center", pointerEvents: "none" }}>双击编辑,粘贴 SVG 源码</div>
             )}
@@ -91,7 +91,7 @@ export default definePlugin({
             minimapColor: "#14b8a6",
             // 背景/边框透明,矢量图直接融入画布
             transparentBackground: true,
-            Content: SvgContent,
+            Content: svgContent,
         },
     ],
 });

@@ -70,7 +70,16 @@ export async function createApp({
     app.use(logger("dev"));
   }
   // Same-origin by default; set MILIMILI_CORS_ORIGINS=a,b for split deployments.
-  app.use(process.env.MILIMILI_CORS_ORIGINS ? cors({ origin: process.env.MILIMILI_CORS_ORIGINS.split(","), credentials: true }) : authEnabled() ? (_req, _res, next) => next() : cors());
+  const trustedOrigins = (process.env.MILIMILI_CORS_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean);
+  const trustedHosts = ["localhost", "127.0.0.1", "[::1]", ...(process.env.MILIMILI_TRUSTED_HOSTS ?? "").split(",").map(value => value.trim()).filter(Boolean)];
+  if (trustedOrigins.length) app.use(cors({ origin: trustedOrigins, credentials: true }));
+  app.use("/api", (req, res, next) => {
+    const origin = req.get("origin");
+    if (!authEnabled() && (!trustedHosts.includes(req.hostname)
+      || (origin ? origin !== `${req.protocol}://${req.get("host")}` && !trustedOrigins.includes(origin) : req.get("sec-fetch-site") === "cross-site")))
+      return res.status(403).json(error("页面来源校验失败，请从应用页面重试", null, 403));
+    next();
+  });
   app.use(languageRequest);
   await mountCloud(app);
   app.use("/a2a", express.json({ limit: "2mb" }));

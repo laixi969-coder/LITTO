@@ -71,16 +71,44 @@ export async function assertPublicHttpUrl(value: string | URL, { strictDns = tru
 const redirectStatuses = new Set([301, 302, 303, 307, 308]);
 /** fetch() that re-validates the target before the request and after every redirect (max 5 hops). */
 async function safeFetchImpl(input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
-  let url = await assertPublicHttpUrl(input instanceof Request ? input.url : input);
-  let options: RequestInit = { ...init, redirect: "manual" };
+  const request = input instanceof Request ? new Request(input, init) : new Request(String(input), init);
+  let url = await assertPublicHttpUrl(request.url);
+  let method = request.method;
+  let body = request.body !== null;
+  let headers = new Headers(request.headers);
+  let referrer = request.referrer;
+  let credentials = request.credentials;
   for (let hop = 0; ; hop++) {
-    const response = await fetch(url, options);
-    if (!redirectStatuses.has(response.status)) return response;
+    const response = await fetch(url, {
+      ...init, method, headers, body: body ? request.clone().body : undefined,
+      signal: request.signal, credentials, cache: request.cache,
+      referrer, referrerPolicy: request.referrerPolicy, integrity: request.integrity,
+      redirect: "manual",
+    });
+    if (!redirectStatuses.has(response.status) || request.redirect === "manual") return response;
     const location = response.headers.get("location");
     await response.body?.cancel();
+    if (request.redirect === "error") throw new UnsafeUpstreamError("请求不允许重定向");
     if (!location || hop >= 5) throw new UnsafeUpstreamError("重定向过多或缺少目标地址");
-    url = await assertPublicHttpUrl(new URL(location, url));
-    if (response.status === 303 || ((response.status === 301 || response.status === 302) && options.method === "POST")) options = { ...options, method: "GET", body: undefined };
+    const target = await assertPublicHttpUrl(new URL(location, url));
+    if (response.status === 303 && method !== "HEAD" || (response.status === 301 || response.status === 302) && method === "POST") {
+      method = "GET";
+      body = false;
+      for (const name of ["content-type", "content-length", "content-encoding", "content-language", "content-location"]) headers.delete(name);
+    }
+    if (target.origin !== url.origin) {
+      if (body || !["GET", "HEAD"].includes(method)) throw new UnsafeUpstreamError("不能向其他来源重定向请求内容");
+      // 凭据头名称由供应商定义，不能只删除 Authorization 或固定几个 API Key 名称。
+      const publicHeaders = new Headers();
+      for (const name of ["accept", "accept-language", "range"]) {
+        const value = headers.get(name);
+        if (value !== null) publicHeaders.set(name, value);
+      }
+      headers = publicHeaders;
+      referrer = "";
+      credentials = "omit";
+    }
+    url = target;
   }
 }
 export const safeFetch: typeof fetch = Object.assign(safeFetchImpl, { preconnect: fetch.preconnect }) as typeof fetch;

@@ -5,7 +5,7 @@ import { t } from "@/lib/i18n";
 import { listMediaModels, generateMedia, readReference } from "@/utils/media/generation";
 import { composeFilm } from "@/utils/media/compose";
 import { z } from "zod";
-import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
+import { createClientFfmpeg } from "@/utils/ffmpeg";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { access, constants, copyFile, lstat, mkdir, readFile, readdir, rm, rmdir, stat, withFileAccess } from "@toonflow/file";
 import {
@@ -107,7 +107,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       requestDecision: question ? (toolCallId, decision, signal) => requestStoryDecision(cwd, toolCallId, decision, question, mediaSignal(signal)) : undefined,
     },
     cwd, config, files, resolvePath, writeFile: files.writeFile, canvas, question, skills: createSkillContext(cwd),
-    ffmpeg: signal => createWorkspaceFfmpeg(cwd, signal),
+    ffmpeg: signal => createClientFfmpeg(cwd, signal),
     media: {
       requestProductionDecision: question ? (toolCallId, input, signal) => requestProductionDecision(cwd, toolCallId, input, question, mediaSignal(signal)) : undefined,
       requestKeyframeApproval: question ? (toolCallId, keyframeIds, signal) => requestKeyframeApproval(cwd, toolCallId, keyframeIds, question, mediaSignal(signal)) : undefined,

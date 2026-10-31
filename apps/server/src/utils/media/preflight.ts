@@ -1,6 +1,6 @@
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { mkdir, readFileSync, readdir, stat } from "@toonflow/file";
-import conf from "@/utils/conf";
+import { resolveDirectorPalette } from "@/utils/media/directorMatch";
 import { getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { coverageCheck, readCoverage } from "@/utils/media/coverage";
@@ -43,13 +43,11 @@ export async function preflight(cwd: string, options: { shotSpec?: Record<string
     if (review.applicable) items.push({ key: "videoPrompt", level: "block", passed: !review.errors.length, detail: review.errors.join("；") || "五板块完整，时间线与总时长一致；画质尚需实际生成验收", rule: "视频导演提示词结构" });
     if (review.warnings.length) items.push({ key: "videoPromptAdvice", level: "warn", passed: false, detail: review.warnings.join("；"), rule: "视频导演提示词建议" });
   }
-  const skills = join(dirname(conf.path), "skills");
 
   // 1. 项目影调是否已定：没有 look 就每镜各写各的，全片会散。
   const lookPath = await resolveWorkspacePath(cwd, "assets/look.json").then(item => item.path).catch(() => "");
   const look = lookPath ? await readJson<{ director?: string; note?: string }>(lookPath) : null;
-  const paletteDir = join(skills, "directorPalettes", "palettes");
-  const paletteFile = look?.director ? join(paletteDir, look.director.endsWith(".json") ? look.director : `${look.director}.json`) : "";
+  const paletteFile = look?.director ? await resolveDirectorPalette(look.director).catch(() => "") : "";
   items.push({
     key: "look",
     level: "warn",

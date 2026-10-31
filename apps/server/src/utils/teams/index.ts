@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import type { AgentCard } from "@toonflow/teams-scaffold/a2a";
 import conf from "@/utils/conf";
+import { authEnabled, currentTenant } from "@/utils/tenant";
 import { decodeText, skillPath } from "@/utils/plugins/install";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { agentsDirectory, checkName, editablePath, maxBytes, readFiles, validateFiles, withTeamFiles } from "./files";
@@ -119,6 +120,7 @@ export async function readEditableTeam(name: string) {
 }
 
 export async function saveTeamFile(name: string, path: string, content: string) {
+  if (authEnabled() && !currentTenant()?.isAdmin) throw Object.assign(new Error("仅平台管理员可以修改全局团队"), { status: 403 });
   path = skillPath(path);
   if (!editablePath(path)) throw Object.assign(new Error("只能编辑团队配置、成员说明、技能或知识文件"), { status: 403 });
   if (content.includes("\0")) throw Object.assign(new Error("文件内容不能包含空字符"), { status: 400 });

@@ -5,8 +5,8 @@ import { Readable } from "node:stream";
 
 const pkg = createRequire(import.meta.url)("./package.json");
 
-const CORS_HEADERS = {
-    "access-control-allow-origin": "*",
+const corsHeaders = {
+    "vary": "Origin",
     "access-control-allow-methods": "*",
     "access-control-allow-headers": "*",
     "access-control-expose-headers": "*",
@@ -56,16 +56,17 @@ function requestHeaders(req) {
 }
 
 function responseHeaders(upstream) {
-    const headers = { ...CORS_HEADERS };
+    const headers = { ...corsHeaders };
     upstream.headers.forEach((value, key) => {
         if (SKIP_RESPONSE_HEADERS.has(key) || key.startsWith("access-control-")) return;
         headers[key] = value;
     });
+    headers.vary = [upstream.headers.get("vary"), "Origin"].filter(Boolean).join(", ");
     return headers;
 }
 
 function sendJson(res, status, payload) {
-    res.writeHead(status, { ...CORS_HEADERS, "content-type": "application/json; charset=utf-8" });
+    res.writeHead(status, { ...corsHeaders, "content-type": "application/json; charset=utf-8" });
     res.end(JSON.stringify(payload));
 }
 
@@ -89,10 +90,21 @@ async function forward(req, res, target) {
     return upstream.status;
 }
 
-export function createProxyServer() {
+export function createProxyServer(allowedOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"]) {
+    const trustedOrigins = new Set(allowedOrigins.map(origin => new URL(origin).origin));
     return createServer((req, res) => {
+        let hostname;
+        try { hostname = new URL(`http://${req.headers.host}`).hostname; } catch { hostname = ""; }
+        const localAddress = req.socket.localAddress?.replace(/^::ffff:/, "");
+        const origin = req.headers.origin;
+        if (!["localhost", "127.0.0.1", "[::1]", localAddress].includes(hostname)
+            || (origin !== undefined ? !trustedOrigins.has(origin) : req.headers["sec-fetch-site"] === "cross-site")) {
+            sendJson(res, 403, { error: "页面来源或代理地址未授权" });
+            return;
+        }
+        if (origin) res.setHeader("access-control-allow-origin", origin);
         if (req.method === "OPTIONS") {
-            res.writeHead(204, CORS_HEADERS);
+            res.writeHead(204, corsHeaders);
             res.end();
             return;
         }
@@ -119,14 +131,16 @@ export function createProxyServer() {
 
 const args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
-    console.log(`${pkg.name} v${pkg.version}\n\nUsage: npx ${pkg.name}@latest [--port 23210] [--host 127.0.0.1]\n\nForwards http://<host>:<port>/<full-target-url> to <full-target-url> with permissive CORS headers.`);
+    console.log(`${pkg.name} v${pkg.version}\n\nUsage: npx ${pkg.name}@latest [--port 23210] [--host 127.0.0.1] [--origin http://localhost:3000]\n\nForwards http://<host>:<port>/<full-target-url> to <full-target-url> for explicitly allowed browser origins.`);
     process.exit(0);
 }
 
 const port = Number(readArg(args, "port", process.env.PORT || 23210));
 const host = readArg(args, "host", process.env.HOST || "127.0.0.1");
 
-createProxyServer().listen(port, host, () => {
+const origins = readArg(args, "origin", "http://localhost:3000,http://127.0.0.1:3000").split(",").map(value => value.trim()).filter(Boolean);
+
+createProxyServer(origins).listen(port, host, () => {
     console.log(`${pkg.name} v${pkg.version} listening on http://${host}:${port}`);
     console.log(`Fill this address into Infinite Canvas → 配置 → 本地代理: http://${host}:${port}`);
 });

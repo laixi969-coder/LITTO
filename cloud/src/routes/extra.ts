@@ -12,7 +12,7 @@ import { kick } from "../jobs.ts";
 import { snapshot } from "../metrics.ts";
 import { storage, mediaView, saveMedia, usage } from "../storage.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeAtomicSync } from "@toonflow/file";
-import { readUpload, uploadMaxBytes, uploadSlot } from "../upload.ts";
+import { readUpload, reservedUploadBytes, uploadMaxBytes, uploadSlot } from "../upload.ts";
 import { join } from "node:path";
 import { bad, forbidden, HttpError, notFound, now, ulid } from "../util.ts";
 import { config } from "../config.ts";
@@ -63,7 +63,7 @@ extra.post("/media/uploads", async (c) => {
     const b = await body(c, z.object({ size: z.number().int().positive().max(200 * 1024 * 1024), parts: z.number().int().min(1).max(2000), projectId: z.string().optional() }));
     if (b.projectId && !s.get("projects", b.projectId)) throw notFound("project");
     const q = get("SELECT quota_bytes FROM workspaces WHERE id=?", a.workspaceId)!;
-    if (usage(a.workspaceId).bytes + b.size > q.quota_bytes) throw bad("storage quota exceeded");
+    if (usage(a.workspaceId).bytes + reservedUploadBytes(a.workspaceId) + b.size > q.quota_bytes) throw bad("storage quota exceeded");
     const id = ulid();
     mkdirSync(upDir(a.workspaceId, id), { recursive: true });
     writeAtomicSync(join(upDir(a.workspaceId, id), "meta.json"), JSON.stringify({ ...b, createdAt: Date.now() }));
@@ -109,7 +109,7 @@ extra.post("/media/uploads/:id/complete", async (c) => {
     const data = Buffer.alloc(size);
     let offset = 0;
     for (let i = 0; i < meta.parts; i++) offset += readFileSync(join(d, `part-${i}`)).copy(data, offset);
-    const m = await saveMedia(a.workspaceId, meta.projectId ?? null, data, { source: "upload" });
+    const m = await saveMedia(a.workspaceId, meta.projectId ?? null, data, { source: "upload", uploadId: id });
     rmSync(d, { recursive: true, force: true });
     return c.json(mediaView(m), 201);
 });

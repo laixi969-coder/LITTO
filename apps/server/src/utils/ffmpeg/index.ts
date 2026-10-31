@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { build, createFfmpeg, downloadSources, getToolStatus, installFfmpeg, target } from "@toonflow/ffmpeg";
 import type { DownloadState, FfmpegMode, SourceId } from "@toonflow/ffmpeg";
 import conf from "@/utils/conf";
+import { authEnabled, currentTenant } from "@/utils/tenant";
 import { assertRawSpeechExport } from "@/utils/media/speechGuard";
 
 export { executeRemoteFfmpeg } from "@toonflow/ffmpeg";
@@ -17,6 +18,12 @@ const requiredListeners = new Set<() => void>();
 export function onRequired(listener: () => void) {
   requiredListeners.add(listener);
   return () => { requiredListeners.delete(listener); };
+}
+
+// 原始参数可通过滤镜和隐式输入访问进程资源；工作区路径检查不构成 FFmpeg 沙箱。
+export function createClientFfmpeg(cwd: string, signal?: AbortSignal) {
+  if (authEnabled() && !currentTenant()?.isAdmin) throw Object.assign(new Error("多人模式仅平台管理员可以执行原始 FFmpeg 参数"), { status: 403 });
+  return createWorkspaceFfmpeg(cwd, signal);
 }
 
 export async function createWorkspaceFfmpeg(cwd: string, signal?: AbortSignal, allowVideoExport = false) {

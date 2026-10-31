@@ -10,6 +10,7 @@ import { cancelJob, jobView, retryJob } from "../jobs.ts";
 import { checkSignedUrl, mediaView, saveMedia, softDeleteMedia, storage, usage } from "../storage.ts";
 import { bad, forbidden, HttpError, notFound, now } from "../util.ts";
 import { ROLES } from "../domain/schema.ts";
+import { validMutationSource } from "../requestSecurity.ts";
 import { readUpload, uploadSlot } from "../upload.ts";
 
 export const platform = new Hono();
@@ -22,6 +23,7 @@ authPublic.on("POST", ["/request-code", "/verify"], () => {
 });
 authPublic.post("/password/login", async (c) => {
   const b = await body(c, z.object({ email: z.string().trim().email().max(254), password: z.string().min(1).max(256), client: z.enum(["web", "api"]).default("web") }));
+  if (b.client === "web" && !validMutationSource({ origin: c.req.header("origin"), referer: c.req.header("referer"), marker: c.req.header("x-milimili-csrf") }, c.req.url)) throw forbidden("页面来源校验失败，请从应用页面重试");
   const r = await verifyPassword(b.email, b.password);
   if (b.client === "web") setSessionCookie(c, r.token);
   return c.json({ user: r.user, ...(b.client === "api" ? { token: r.token } : {}) });

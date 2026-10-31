@@ -40,7 +40,7 @@ async function assertPublicHost(url: URL) {
   if (isIP(host)) { if (blockedIp(host)) refuse(); return; }
   if (/^(localhost|.*\.localhost|.*\.local|.*\.internal|.*\.lan|.*\.home\.arpa)$/i.test(host)) refuse();
   const addresses = await lookup(host, { all: true, verbatim: true }).catch(() => []);
-  if (addresses.some(item => blockedIp(item.address))) refuse();
+  if (!addresses.length || addresses.some(item => blockedIp(item.address))) refuse();
 }
 
 async function fetchText(value: string, signal: AbortSignal) {

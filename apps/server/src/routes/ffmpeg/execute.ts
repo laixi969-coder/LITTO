@@ -48,7 +48,7 @@ export default Router().post("/", validateFields(inputSchema.shape), async (req,
   req.socket.once("close", close);
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   try {
-    const factory = await u.ffmpeg.createWorkspaceFfmpeg(cwd, controller.signal);
+    const factory = await u.ffmpeg.createClientFfmpeg(cwd, controller.signal);
     if (input.operation.method === "prepare") {
       res.json(success());
       return;

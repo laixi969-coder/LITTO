@@ -70,7 +70,7 @@ function normalizeModel(value: AnyTagProps[][]): AnyTagProps[][] {
       const template = document.createElement("template");
       template.innerHTML = tag.html;
       const id = template.content.querySelector<HTMLElement>(".imageReference[data-reference-id]")?.dataset.referenceId;
-      if (!id) return [tag];
+      if (!id) return [{ type: "Write", text: template.content.textContent ?? "" }];
       const reference = props.references.find(item => item.id === id);
       if (!reference) return [];
       return [{ type: "Custom", html: `<span style="display: inline-block;">${referenceHtml(reference)}</span>` }];
@@ -100,7 +100,8 @@ function releaseNodeFocus(instance: xSender) {
 
 function syncModel(value = sender?.getModel() ?? model.value) {
   // 输入法组字时只同步文本，等 compositionend 后再替换参考标签，保留正在编辑的 DOM。
-  const next = sender?.chatEditor.isComposition ? value : normalizeModel(value);
+  const current = sender?.getModel();
+  const next = sender?.chatEditor.isComposition && JSON.stringify(value) === JSON.stringify(current) ? value : normalizeModel(value);
   if (sender && JSON.stringify(sender.getModel()) !== JSON.stringify(next)) {
     const instance = sender;
     const editor = instance.chatElement.richText;
@@ -229,7 +230,7 @@ watch(senderElement, (element, _previous, onCleanup) => {
   const insertNodes = chatEditor.insertNodes.bind(chatEditor);
   chatEditor.insertNodes = async nodes => {
     // 选区粘贴会先异步删除，再插入；关闭输入框后不再创建并聚焦新节点。
-    if (sender === instance && editor.isConnected) await insertNodes(nodes);
+    if (sender === instance && editor.isConnected) await insertNodes(normalizeModel(nodes));
   };
   editor.setAttribute("role", "textbox");
   editor.setAttribute("aria-label", "生成提示词");

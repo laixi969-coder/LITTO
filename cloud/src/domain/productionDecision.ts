@@ -301,7 +301,17 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
   const key = hash(action);
   const receipt = s.list("approval_events", { projectId, entityType: "production_decision", entityId: key }, "created_at DESC, rowid DESC")[0];
   const receiptFingerprint = feedbackFingerprint ?? fingerprint;
-  if (receipt?.reason === fingerprint || receipt?.reason === receiptFingerprint) completed = true;
+  if (receipt?.reason === fingerprint || receipt?.reason === receiptFingerprint) {
+    completed = true;
+    if (action.operation === "approveTake" || action.operation === "reviewOutput" && action.data.targetType === "take") {
+      const takeIds = action.operation === "approveTake" ? action.data.takeIds : [action.data.targetId];
+      const takes = takeIds.map(takeId => s.get("takes", takeId));
+      const shot = takes[0] && s.get("shots", takes[0].shotId);
+      const clips = shot ? getEdit(s, shot.sequenceId, true).clips.filter(clip => clip.shotId === shot.id) : [];
+      selectedId = takes.find(take => take && clips.some(clip => clip.mediaId === take.mediaId))?.id;
+      if (selectedId) reviewRequired = false;
+    }
+  }
   return { action, request, fingerprint, receiptFingerprint, key, completed: completed && !reconsider, selectedId, reviewRequired };
 }
 
@@ -324,20 +334,18 @@ export async function applyProductionDecision(s: Scope, projectId: string, prepa
       // 用户表达喜好不等于完成技术质检；不补写检查项、完整试听或角色末态。
       event(s, projectId, "production_feedback", targetId, decision === "满意，继续" ? "accept" : "revise", actor, JSON.stringify({ decision, note, operation: action.operation }));
       let selected = false;
-      let reviewRequired = false;
-      if (decision === "满意，继续" && action.operation === "approveTake") {
-        const report = s.list("qc_reports", { targetType: "take", targetId }, "created_at DESC, rowid DESC")[0];
-        reviewRequired = !!report?.findings?.some((finding: Row) => finding.severity === "high");
-        if (!reviewRequired) { selectWorkingTake(s, targetId); selected = true; }
+      if (decision === "满意，继续" && (action.operation === "approveTake" || action.operation === "reviewOutput" && action.data.targetType === "take")) {
+        selectWorkingTake(s, targetId);
+        selected = true;
       }
       if (decision === "满意，继续") {
         const after = prepareProductionDecision(s, projectId, action, true);
         event(s, projectId, "production_decision", prepared.key, "apply", actor, after.receiptFingerprint);
       }
-      return { applied: decision === "满意，继续", selected, targetId, feedback: { decision, note }, reviewRequired,
+      return { applied: decision === "满意，继续", selected, targetId, feedback: { decision, note }, reviewRequired: false,
         answer: decision !== "满意，继续" ? "已记下你的想法，接下来由助手检查并提出具体修改，不需要你判断专业问题。"
-          : reviewRequired ? "已记住你选择的版本。助手会先处理检测到的问题，不会再让你填写质检表。"
-          : "已保存你的选择，继续后续制作；技术检查由助手处理，不需要重复确认。" };
+          : selected ? "已将满意的视频选入工作版，直接推进下一个片段；不要再次审核或重新生成此片段，除非用户要求修改。"
+          : "已保存你的选择，继续后续制作，不需要重复确认。" };
     });
     let autoRender: unknown;
     let autoRenderError: string | undefined;

@@ -4,6 +4,7 @@ import { basename, dirname, join, relative, sep } from "node:path";
 import { loadSkills, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import type { SkillContext, SkillLocation, SkillScope } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
+import { authEnabled, currentTenant } from "@/utils/tenant";
 import { isWithin, lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 
 export function loadAgentSkills(cwd: string, scope?: SkillScope) {
@@ -44,6 +45,7 @@ export function createSkillContext(cwd: string): SkillContext {
   async function write(request: SkillLocation & { content: string }, create: boolean, signal?: AbortSignal) {
     signal?.throwIfAborted();
     const { target, manifest, ...document } = await locate(request, create);
+    if (document.scope === "global" && authEnabled() && !currentTenant()?.isAdmin) throw Object.assign(new Error("仅平台管理员可以修改全局技能"), { status: 403 });
     if (manifest) {
       const { frontmatter } = parseFrontmatter(request.content);
       if (frontmatter.name !== request.name || typeof frontmatter.description !== "string" || !frontmatter.description.trim()) {

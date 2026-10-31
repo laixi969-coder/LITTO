@@ -47,7 +47,7 @@ ssoPublic.get("/:id/callback", async (c) => {
     if (!tr.ok || !tj.id_token) throw new HttpError(502, `IdP token error: ${tj.error_description ?? tj.error ?? tr.status}`, "sso_bad_idp");
     const claims = await verifyIdToken(tj.id_token, { issuer: conn.issuer, discoveredIssuer: d.issuer, clientId: conn.client_id, nonce: st.nonce, jwksUri: d.jwks_uri });
     const email = String(claims.email ?? "").toLowerCase();
-    if (!email || claims.email_verified === false || claims.email_verified === "false") throw new HttpError(403, "the IdP did not return a verified email", "unverified_email");
+    if (!email || !(claims.email_verified === true || claims.email_verified === "true")) throw new HttpError(403, "the IdP did not return a verified email", "unverified_email");
     if (!(JSON.parse(conn.domains) as string[]).map((x) => x.toLowerCase()).includes(domainOf(email))) throw new HttpError(403, "email domain is not allowed for this connection", "domain_not_allowed");
     const r = loginUser(email, { provider: `sso:${conn.id}`, subject: String(claims.sub) });
     if (conn.workspace_id && get("SELECT 1 FROM workspaces WHERE id=? AND deleted_at IS NULL", conn.workspace_id)) {

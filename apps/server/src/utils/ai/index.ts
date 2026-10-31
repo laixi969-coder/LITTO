@@ -118,7 +118,7 @@ export function prepareModelPayload(configured: Pick<ReturnType<typeof getConfig
 
 /** Full check including DNS resolution, for the async call sites right before a request is made. */
 export async function assertConfiguredUpstream(configured: ReturnType<typeof getConfiguredModel>) {
-  await assertPublicHttpUrl(configured.baseUrl, { strictDns: false });
+  await assertPublicHttpUrl(configured.baseUrl);
 }
 
 export function listAiModels(all = false) {

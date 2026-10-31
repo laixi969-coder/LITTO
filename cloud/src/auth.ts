@@ -176,7 +176,7 @@ export function logout(c: Context) {
     deleteCookie(c, "litto_session", { path: "/" });
 }
 
-function tokenOf(c: Context): string | null {
+export function tokenOf(c: Context): string | null {
     const h = c.req.header("authorization");
     if (h?.startsWith("Bearer ")) return h.slice(7);
     return getCookie(c, "milimili_session") ?? getCookie(c, "litto_session") ?? null;

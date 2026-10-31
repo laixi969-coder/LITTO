@@ -1,8 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { dirname, join } from "node:path";
-import conf from "@/utils/conf";
-import { readFileSync } from "node:fs";
+import { readFile } from "@toonflow/file";
+import { resolveDirectorPalette } from "@/utils/media/directorMatch";
 import { getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 
@@ -127,12 +126,10 @@ function hexToHsl(hex: string) {
  * 读取导演色卡的主色列表。色板通常是「冷主色＋暖点缀」的对立结构，
  * 取平均色相会把这种结构抹平，所以保留每个主色，判定时看画面最接近哪一个。
  */
-function paletteTarget(file: string) {
-  const base = join(dirname(conf.path), "skills", "directorPalettes", "palettes");
-  const path = join(base, file.endsWith(".json") ? file : `${file}.json`);
+async function paletteTarget(file: string) {
   let record: { name?: string; palette?: { primary?: { hex: string; name?: string; ratio?: number | null }[] } };
   try {
-    record = JSON.parse(readFileSync(path, "utf8"));
+    record = JSON.parse(await readFile(await resolveDirectorPalette(file), "utf8"));
   } catch {
     throw Object.assign(new Error(`找不到导演色卡 ${file}，请确认文件名与 data/skills/directorPalettes/palettes 下的一致`), { status: 400 });
   }
@@ -152,6 +149,7 @@ function paletteTarget(file: string) {
  * 全部本地计算、不花钱、不调用视觉模型，用于在合成前挡住黑闪、削波、冷暖跳变这类低成本可查的问题。
  */
 export async function inspectClips(cwd: string, clips: string[], options: Options = {}, signal?: AbortSignal) {
+  const target = options.palette ? await paletteTarget(options.palette) : undefined;
   const { ffmpeg, ffprobe } = await binaries();
   const reports: ClipReport[] = [];
   for (const clip of clips) {
@@ -218,9 +216,8 @@ export async function inspectClips(cwd: string, clips: string[], options: Option
       issues: total,
       blocked: reports.filter(report => report.issues.some(issue => issue.kind === "blackFlash" || issue.kind === "clipping" || issue.kind === "resolutionMismatch")).map(report => report.path),
       style: { saturationMean: Number(satMean.toFixed(1)), hueMean: Number(hueMean.toFixed(1)), outliers: style },
-      palette: options.palette
+      palette: target
         ? (() => {
-          const target = paletteTarget(options.palette);
           // 判定标准：画面色相要靠近色板里的某一个主色，而不是靠近它们的平均值。
           const drift = reports.map(report => {
             let best = { hex: "", name: "", hueDrift: 360, satDrift: 0 };

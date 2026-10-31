@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpath } from "@toonflow/file";
+import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { dirname, join } from "node:path";
 import conf from "@/utils/conf";
 
@@ -39,6 +40,12 @@ let cache: { records: DirectorRecord[]; at: number } | null = null;
 
 function paletteDirectory() {
   return join(dirname(conf.path), "skills", "directorPalettes", "palettes");
+}
+
+export async function resolveDirectorPalette(file: string) {
+  if (typeof file !== "string" || !file) throw Object.assign(new Error("导演色卡名称无效"), { status: 400 });
+  const root = await realpath(paletteDirectory());
+  return (await resolveWorkspacePath(root, file.endsWith(".json") ? file : `${file}.json`)).path;
 }
 
 function loadAll(): DirectorRecord[] {

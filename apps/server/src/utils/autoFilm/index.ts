@@ -199,8 +199,14 @@ function launch(task: AutoFilmTask, folder: string) {
             }
           }
           if (["productionSpec", "requestProductionDecision"].includes(tool.name)) {
-            const sequenceId = operationData.sequenceId ?? (operationData.shotId ? scope.get("shots", operationData.shotId)?.sequenceId : undefined);
-            if (sequenceId && !task.sequenceIds.includes(sequenceId)) throw new Error("自动成片只修改和导出本任务新建的序列，不能修改手动制作序列");
+            const sequenceIds = operationData.sequenceId === undefined ? [] : [operationData.sequenceId];
+            if (operationData.shotId) sequenceIds.push(scope.get("shots", operationData.shotId)?.sequenceId ?? "");
+            if (operationData.renderId) sequenceIds.push(scope.get("renders", operationData.renderId)?.sequenceId ?? "");
+            if (operationData.bindingId) {
+              const binding = scope.get("reference_bindings", operationData.bindingId);
+              if (binding?.targetType === "shot") sequenceIds.push(scope.get("shots", binding.targetId)?.sequenceId ?? "");
+            }
+            if (sequenceIds.some(sequenceId => !task.sequenceIds.includes(sequenceId))) throw new Error("自动成片只修改和导出本任务新建的序列，不能修改手动制作序列");
           }
           if (tool.name === "productionSpec" && input.operation === "importSpeech") {
             const { path } = await resolveWorkspacePath(task.directory, z.string().min(1).parse(operationData.videoPath));

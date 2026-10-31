@@ -1,17 +1,17 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { z } from "zod";
-import { isBlockedIp } from "@/utils/ssrf";
+import { guardedFetch, isBlockedIp } from "@/utils/ssrf";
 
 const isFakeIp = (address: string) => /^198\.(18|19)\./.test(address);
 const modelAddresses = new Map<string, { address: string; expiresAt: number }>();
 
 async function modelFetch(input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
   const url = new URL(input instanceof Request ? input.url : input);
-  if (!["https://api.deepseek.com", "https://open.bigmodel.cn"].includes(url.origin) || url.username || url.password) return fetch(input, init);
+  if (!["https://api.deepseek.com", "https://open.bigmodel.cn"].includes(url.origin) || url.username || url.password) return guardedFetch(input, init);
   const hostname = url.hostname;
   const addresses = await lookup(url.hostname, { all: true });
-  if (!addresses.some(item => isFakeIp(item.address))) return fetch(input, init);
+  if (!addresses.some(item => isFakeIp(item.address))) return guardedFetch(input, init);
 
   const request = input instanceof Request ? new Request(input, init) : new Request(String(input), init);
   request.signal.throwIfAborted();

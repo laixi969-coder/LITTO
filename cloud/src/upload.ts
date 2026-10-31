@@ -1,5 +1,21 @@
 import type { Context, Next } from "hono";
 import { HttpError } from "./util.ts";
+import { readdirSync, readFileSync } from "@toonflow/file";
+import { join } from "node:path";
+import { config } from "./config.ts";
+
+export function reservedUploadBytes(workspaceId: string, excludeId?: string) {
+  const root = join(config.dataDir, "uploads", workspaceId);
+  let entries: string[];
+  try { entries = readdirSync(root); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0; throw error; }
+  // ACT: 单进程同步扫描与预留写入不跨 await；会话规模增大时改用事务化配额账本。
+  return entries.filter(id => id !== excludeId && /^[0-9A-Z]{26}$/.test(id)).reduce((total, id) => {
+    const meta = JSON.parse(readFileSync(join(root, id, "meta.json"), "utf8"));
+    if (!Number.isSafeInteger(meta.size) || meta.size < 1 || meta.size > uploadMaxBytes) throw new Error("上传预留记录无效");
+    return total + meta.size;
+  }, 0);
+}
 
 export const uploadMaxBytes = 200 * 1024 * 1024;
 let receiving = false;

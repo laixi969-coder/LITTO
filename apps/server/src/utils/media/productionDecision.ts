@@ -77,7 +77,9 @@ export async function requestProductionDecision(directory: string, toolCallId: s
   const scope = api.scoped(tenant.workspaceId);
   const prepared = api.prepareProductionDecision(scope, projectId, input, input.reconsider);
   if (prepared.completed) return { title: prepared.request.title, applied: true, selectedId: prepared.selectedId, reviewRequired: prepared.reviewRequired,
-    answer: prepared.reviewRequired ? "选择已保存，无需重复确认；技术检查须由助手复核，原生成与导出门禁仍生效" : "此决定已保存且仍有效，无需重复确认" };
+    answer: prepared.selectedId && (input.operation === "approveTake" || input.operation === "reviewOutput" && input.data.targetType === "take")
+      ? "满意的视频已选入工作版，直接推进下一个片段；除非用户要求修改，不再审核或重新生成此片段。"
+      : prepared.reviewRequired ? "选择已保存，无需重复确认；原生成与导出门禁仍生效" : "此决定已保存且仍有效，无需重复确认" };
   const response = await question.ask(toolCallId, prepared.request, signal);
   signal?.throwIfAborted();
   if (response.requestedChanges || response.skipped || response.answer === "暂不决定" || response.values?.decision === "暂不决定") return { ...prepared.request, ...response, applied: false };

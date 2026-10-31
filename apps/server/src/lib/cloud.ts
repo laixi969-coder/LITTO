@@ -85,8 +85,9 @@ const pluginPath = /^\/(nodes|tools|providers|plugins|agents|skills)(?:\/|$)/i;
 export function requireAdminForPlugins(req: Request, res: Response, next: NextFunction) {
   if (!authEnabled() || req.method === "GET" || req.method === "HEAD") return next();
   const tenant = (req as Request & { tenant?: Tenant }).tenant;
-  if (/^\/providers(?:\/|$)/i.test(req.path) && (!tenant || !embed?.modelPermissions(tenant.userId).canManage))
+  const desktopInstall = /^\/desktop\/plugins\/install\/?$/i.test(req.path);
+  if ((/^\/providers(?:\/|$)/i.test(req.path) || desktopInstall && req.body?.type === "provider") && (!tenant || !embed?.modelPermissions(tenant.userId).canManage))
     return res.status(403).json(error("仅超级管理员可以配置、测试或修改模型供应商", null, 403));
-  if (pluginPath.test(req.path) && !tenant?.isAdmin) return res.status(403).json(error("仅平台管理员可以安装或修改插件与供应商", null, 403));
+  if ((pluginPath.test(req.path) || desktopInstall) && !tenant?.isAdmin) return res.status(403).json(error("仅平台管理员可以安装或修改插件与供应商", null, 403));
   next();
 }

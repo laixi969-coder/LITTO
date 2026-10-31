@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { mkdir, readFile } from "@toonflow/file";
 import type { FfprobeData } from "@toonflow/ffmpeg/types";
 import { Router } from "express";
@@ -9,7 +8,7 @@ import { audioGenerationSchema, imageGenerationSchema, videoGenerationSchema } f
 import { validateFields } from "@/lib/middleware";
 import { success, error } from "@/lib/responseFormat";
 import u from "@/utils";
-import conf from "@/utils/conf";
+import { resolveDirectorPalette } from "@/utils/media/directorMatch";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { looksLikePersonShot } from "@/utils/media/generation";
 import { assertAssetsReady } from "@/utils/media/flow";
@@ -106,9 +105,8 @@ async function projectLook(cwd: string): Promise<string> {
     return "";
   }
   if (!entry.director) return "";
-  const base = join(dirname(conf.path), "skills", "directorPalettes", "palettes");
   try {
-    const record = JSON.parse(readFileSync(join(base, entry.director.endsWith(".json") ? entry.director : `${entry.director}.json`), "utf8")) as {
+    const record = JSON.parse(await readFile(await resolveDirectorPalette(entry.director), "utf8")) as {
       name?: string;
       palette?: { primary?: { hex: string; name?: string; ratio?: number }[] };
       lighting?: Record<string, string>;
