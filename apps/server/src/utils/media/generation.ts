@@ -370,7 +370,7 @@ async function generateMediaUnrecorded(
   const duration = mediaType === "video" ? recommendedDuration(model.durationResolutionMap, request.duration) : request.duration;
   if (!recovery) assertPromptPolicy(request, mediaType);
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
-  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory, reportTask);
+  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory, reportTask, execution?.jobId);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;
   if (!recovery && typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
   const rules = Array.isArray(provider.rules) ? provider.rules : [];

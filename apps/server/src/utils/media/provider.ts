@@ -399,7 +399,7 @@ export async function deleteMediaProvider(fileName: string, revision: string) {
   } finally { release(); }
 }
 
-export async function loadMediaProviderSource(source: string, config: Record<string, unknown> = {}, signal?: AbortSignal, fetchRequest: typeof fetch = guardedFetch, cwd?: string, reportTask?: ProviderTools["reportTask"]) {
+export async function loadMediaProviderSource(source: string, config: Record<string, unknown> = {}, signal?: AbortSignal, fetchRequest: typeof fetch = guardedFetch, cwd?: string, reportTask?: ProviderTools["reportTask"], jobId?: string) {
   signal?.throwIfAborted();
   const { id } = parseProvider(source);
   // ACT: VM 只隔离可信供应商的全局上下文；不可信代码需要独立进程等更强隔离。
@@ -482,7 +482,26 @@ export async function loadMediaProviderSource(source: string, config: Record<str
         const requestId = ++requestCount;
         failure = undefined;
         try {
+          let diagnostic: Record<string, unknown> | undefined;
+          if (id === "token01" && name === "generateVideo" && request.model === "kling-3.0-Omni" && method === "POST" && typeof input === "string" && typeof init?.body === "string") {
+            try {
+              if (!new URL(input).pathname.endsWith("/video/generations")) throw new Error("非视频提交请求");
+              const body = JSON.parse(init.body);
+              const output = body.outputConfig && typeof body.outputConfig === "object" && !Array.isArray(body.outputConfig) ? body.outputConfig : {};
+              const parameters = body.metadata?.parameters && typeof body.metadata.parameters === "object" ? body.metadata.parameters : {};
+              const value = (input: unknown, allowed: readonly unknown[]) => input === undefined ? "missing" : allowed.includes(input) ? input : "other";
+              diagnostic = {
+                jobId: jobId && /^[a-zA-Z0-9-]{1,64}$/.test(jobId) ? jobId : undefined,
+                model: "kling-3.0-Omni", outputConfigPresent: Object.hasOwn(body, "outputConfig"),
+                resolution: value(body.resolution, ["720p", "1080p", "4k"]), duration: value(body.duration, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), ratio: value(body.ratio, ["16:9", "9:16", "1:1"]),
+                outputResolution: value(output.resolution, ["720p", "1080p", "4k"]), outputDuration: value(output.duration, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), outputAspectRatio: value(output.aspectRatio, ["16:9", "9:16", "1:1"]),
+                size: value(body.size, ["std", "pro", "4k"]), parameterAspectRatio: value(parameters.aspect_ratio, ["16:9", "9:16", "1:1"]), firstFramePresent: typeof body.first_frame_url === "string" && !!body.first_frame_url,
+              };
+              console.info("Token01 视频出站诊断", diagnostic);
+            } catch { /* ACT: 诊断失败不影响供应商请求，且不输出原始请求。 */ }
+          }
           const response = await provider.tool.fetch(input, init);
+          if (diagnostic) console.info("Token01 视频出站响应", { jobId: diagnostic.jobId, status: response.status });
           if (!response.ok) failure = { status: response.status, message: await responseErrorMessage(response, provider.config) };
           else {
             const readJson = response.json;
