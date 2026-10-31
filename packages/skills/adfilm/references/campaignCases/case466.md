@@ -1,0 +1,43 @@
+---
+id: skittles-rabbit-2010
+title: "Rabbit"
+brand: Skittles
+year: 2010
+country: US
+region: north_america
+industry: cpg
+pattern: [P11]
+category: film
+idea_type: execution
+involvement: passive_view
+channel: hybrid
+duration: campaign
+goal: [awareness, engagement]
+budget: medium
+emotion: [ironic_sincerity]
+insight_domain: joy
+media_epoch: viral_first
+awards: [unknown]
+scalability: universal
+risk: edgy
+verification_required: true
+source_url: https://www.youtube.com/watch?v=7HEF49nMsM8
+---
+
+# Rabbit (Skittles · 2010)
+
+## Insight
+Animals + Skittles absurdism = reliable territory for the brand's "Touch the Rainbow" platform. The internal logic simply applies: contact with Skittles causes impossible things to happen.
+
+## Mechanic
+A short absurdist film featuring a rabbit in Skittles' established surrealist framework. Exact details require source verification.
+
+## Why it worked
+Skittles' absurdist platform is broad enough to accommodate any starting premise. The brand's consistent internal logic means each new execution is instantly recognizable as a Skittles film, even without a logo.
+
+## Steal
+A strong creative platform should be able to accommodate almost any starting point. If your brand idea can only work with specific executions, the idea isn't strong enough.
+
+
+来源：Serge Shima，https://github.com/smixs/creative-director-skill/blob/ac06eb255371da35d1db0a146dbfcca8c8857543/creative-director/references/legendary-campaigns/cards/skittles-rabbit-2010.md
+许可：CC BY 4.0，https://creativecommons.org/licenses/by/4.0/ 。MILI MILI 改编：移除评分、情绪等级、质量/置信标签及旧关联链接；案例解释是来源作者的分析，未经本项目独立核验。

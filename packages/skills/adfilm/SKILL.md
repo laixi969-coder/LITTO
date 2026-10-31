@@ -2,7 +2,7 @@
 name: adfilm
 description: 创作商业广告、品牌片与原生短视频，支持消费者洞察、差异创意方向、Big Idea、品牌文案、脑洞与二创、Hook 和完整分镜。已整合 hiccai-insight-new、hiccai-72、hiccai-wenan、hiccai-wild 与 hiccai-pop 的适用方法；按任务选择，不强套反转或生活小故事。按用户要求交付创意成稿或衔接 MILI MILI 制作；纯叙事影片使用 cinema。
 metadata:
-  version: "1.7.0"
+  version: "1.8.0"
   displayName: 广告与原生短视频
   author: MILI MILI
 ---
@@ -12,6 +12,8 @@ metadata:
 真人商业广告与品牌片默认采用[清爽人物方法](../videoPromptDirector/references/cleanPortrait.md)：肤色自然均匀、细微纹理、轻薄妆面、克制高光和清晰毛流。从人物资产到正式镜头沿用同一参考与肤面标准，写入 look、lighting、realism.surface 后 compile 回读；五板块提示词写入第二块。此默认不改变产品本色、包装、功效证据、既定光色或明确的特殊妆效；纯产品、动画与无人画面不套人物要求。
 
 ## 先选择创作入口
+
+商业构思已接入[结构化发想与案例对照](references/commercialIdeation.md)及[571 张案例索引](references/campaignIndex.md)，只在构思、比较方向或重做创意时按需读取；保留品牌、证据和转化验收，不采用外部创意评分。来源与改编见[署名记录](references/creativeDirectorSources.md)。
 
 - **商业创意构思与重做**：用户要广告创意、Big Idea、多方向，或反馈“没创意、太普通”时，先读[创意转译与筛选](references/creativeTranslation.md)及[创意机制](references/creativeMechanisms.md)。已有产品与目标就开始，不先填分镜；先找机制不同的想法，再展开用户要求的数量。仅给品牌名时可探索，不编造型号、性能、工艺和消费者研究。
 - **广告语、旁白、对白与品牌表达**：读取[品牌文案](references/brandWriting.md)，包括高端品牌与销售任务。需要脑洞、年轻化、原创梗或二创时再读[社交脑洞](references/socialPlay.md)，不将玩梗设为全部品牌的默认语气。
