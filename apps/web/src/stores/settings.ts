@@ -160,7 +160,15 @@ export async function loadSettings() {
 async function syncModelSelection() {
   const { data, headers } = await axios.get("/api/settings/get", { timeout: 15000, headers: { "Cache-Control": "no-cache", "x-toonflow-workspace": "1" } });
   if (data.code !== 200 || !data.data || typeof data.data !== "object") throw new Error("读取最新模型选择失败，未覆盖设置");
-  if (settingsWithoutSelection(data.data) !== settingsBaseline) throw new Error("设置或项目列表已在其他页面修改，当前修改仍保留，请重新打开核对");
+  const latestBaseline = settingsWithoutSelection(data.data);
+  if (latestBaseline !== settingsBaseline) {
+    if (settingsWithoutSelection(settings.value) !== settingsBaseline) throw new Error("设置或项目列表已在其他页面修改，当前修改仍保留，请重新打开核对");
+    // ACT: 本页无本地修改时沿用服务端最新值；表单变更随后通过 update 计算，有本地修改仍拒绝覆盖。
+    applyingSettings = true;
+    try { settings.value = data.data; }
+    finally { applyingSettings = false; }
+    settingsBaseline = latestBaseline;
+  }
   settingsRevision = headers["x-settings-revision"];
   const selection = data.data.modelSelection ?? {};
   if (JSON.stringify(settings.value.modelSelection ?? {}) === JSON.stringify(selection)) return;
