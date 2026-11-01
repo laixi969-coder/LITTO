@@ -72,9 +72,22 @@
             <div class="toolbar"><el-button :disabled="!draftDirty" @click="run(saveDraft)">保存为新候选版本</el-button><el-button :disabled="!revision || draftDirty || !modelKey" @click="run(() => generate('review'))">审阅当前版本</el-button><el-button :disabled="!revision || draftDirty || revision.id === project.approvedId" @click="run(approve)">采用当前版本</el-button></div>
           </template>
           <article v-if="rewriteSceneId"><label>这一场怎么改<textarea v-model="rewriteIntent" rows="3" /></label><div class="toolbar"><el-button :disabled="!rewriteIntent.trim()" @click="run(() => generate('rewrite'))">生成局部改写候选</el-button><el-button @click="rewriteSceneId = ''">取消</el-button></div></article>
-          <details v-if="revision && !draftDirty"><summary>记录人工审阅</summary><label>逐场核对后的结论、取舍与仍需注意的问题<textarea v-model="manualReview" /></label><el-button :disabled="!manualReview.trim()" @click="run(recordReview)">我已逐场审阅，保存人工结论</el-button></details>
+          <details v-if="revision && !draftDirty"><summary>记录人工审阅</summary>
+            <label>逐场核对后的结论、取舍与仍需注意的问题<textarea v-model="manualReview" /></label>
+            <div v-for="(evidence, key) in manualQuality" :key="key" class="fields">
+              <strong>{{ qualityLabels[key] }}</strong>
+              <label>审读状态<select v-model="evidence.verdict"><option v-for="(label, value) in verdictLabels" :key="value" :value="value">{{ label }}</option></select></label>
+              <label>依据场次<select v-model="evidence.sceneId"><option v-for="scene in revision.scenes" :key="scene.sceneId" :value="scene.sceneId">{{ scene.sceneId }} · {{ scene.title }}</option></select></label>
+              <label>正文原句<textarea v-model="evidence.quote" maxlength="2000" /></label>
+              <label>判断依据<textarea v-model="evidence.basis" minlength="10" maxlength="2000" /></label>
+            </div>
+            <el-button :disabled="!manualReview.trim()" @click="run(recordReview)">我已逐场审阅，保存人工结论</el-button>
+          </details>
           <el-button v-if="revision && revision.id === project.approvedId" :disabled="draftDirty || storyStale(project, revision)" @click="run(prepareProduction)">交给助手整理制作场次表</el-button>
-          <article v-for="review in reviews" :key="review.id"><h3>审稿 · {{ review.createdAt }}</h3><p>{{ review.summary }}</p><p>实际审阅范围：{{ review.coverage.join('、') }}</p><article v-for="issue in review.issues" :key="issue.id"><strong>{{ issueLabels[issue.category] }} · {{ issue.sceneId }}</strong><blockquote>{{ issue.quote }}</blockquote><p>{{ issue.problem }}</p><p>依据：{{ issue.basis }}</p><p>最小改法：{{ issue.suggestion }}</p><p v-if="review.decisions[issue.id]">保留理由：{{ review.decisions[issue.id]!.reason }}</p><template v-else><label>如有意保留，请写理由<input v-model="issueReasons[issue.id]" /></label><el-button :disabled="!issueReasons[issue.id]?.trim()" @click="run(() => apply({ type: 'decideIssue', reviewId: review.id, issueId: issue.id, reason: issueReasons[issue.id]! }))">记录保留决定</el-button></template></article></article>
+          <article v-for="review in reviews" :key="review.id"><h3>审稿 · {{ review.createdAt }}</h3><p>{{ review.summary }}</p><p>实际审阅范围：{{ review.coverage.join('、') }}</p>
+            <article v-for="(evidence, key) in review.quality" :key="key"><strong>{{ qualityLabels[key] }} · {{ verdictLabels[evidence.verdict] }} · {{ evidence.sceneId }}</strong><blockquote>{{ evidence.quote }}</blockquote><p>依据：{{ evidence.basis }}</p></article>
+            <article v-for="issue in review.issues" :key="issue.id"><strong>{{ issueLabels[issue.category] }} · {{ issue.sceneId }}</strong><blockquote>{{ issue.quote }}</blockquote><p>{{ issue.problem }}</p><p>依据：{{ issue.basis }}</p><p>最小改法：{{ issue.suggestion }}</p><p v-if="review.decisions[issue.id]">保留理由：{{ review.decisions[issue.id]!.reason }}</p><template v-else><label>如有意保留，请写理由<input v-model="issueReasons[issue.id]" /></label><el-button :disabled="!issueReasons[issue.id]?.trim()" @click="run(() => apply({ type: 'decideIssue', reviewId: review.id, issueId: issue.id, reason: issueReasons[issue.id]! }))">记录保留决定</el-button></template></article>
+          </article>
         </template>
       </fieldset>
       <visualReferenceBoard v-if="section === 'visual' && loaded" :directory="directory" :project="project" :model="selectedModel" :apply="apply" @busy="childBusy = $event" />
@@ -118,6 +131,10 @@ const revisionId = ref(""), draft = ref<StoryDraft>(), savedDraft = ref("");
 const sourceEdit = ref<StorySource>();
 const rewriteSceneId = ref(""), rewriteIntent = ref(""), issueReasons = ref<Record<string, string>>({});
 const manualReview = ref("");
+const manualQuality = ref<NonNullable<StoryProject["reviews"][number]["quality"]>>({
+  causality: { sceneId: "", quote: "", verdict: "unverified", basis: "" },
+  payoff: { sceneId: "", quote: "", verdict: "unverified", basis: "" },
+});
 const previewRef = ref<InstanceType<typeof storyPreview>>(), feedbackRef = ref<InstanceType<typeof storyFeedback>>();
 let controller: AbortController | undefined;
 const tabs = [{ id: "sources", label: "目标与资料" }, { id: "directions", label: "创意方向" }, { id: "script", label: "剧本与审稿" }, { id: "visual", label: "视觉参考" }, { id: "preview", label: "动态分镜" }, { id: "feedback", label: "发布反馈" }];
@@ -126,6 +143,8 @@ const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", lab
 const briefFields = [{ key: "idea", label: "想法 / 创作需求" }, { key: "audience", label: "谁会看 / 在什么情境下看" }, { key: "channel", label: "观看渠道" }, { key: "intent", label: "希望观众感受什么或做什么" }, { key: "genre", label: "类型" }, { key: "tone", label: "语气与风格" }, { key: "ending", label: "结尾选择" }, { key: "constraints", label: "不可改变的内容与制作预算 / 限制" }] as const;
 const sceneFields = [{ key: "goal", label: "人物目标" }, { key: "obstacle", label: "阻碍" }, { key: "change", label: "此场改变了什么" }, { key: "knowledge", label: "人物与观众分别知道什么" }, { key: "speech", label: "实际对白 / 旁白（不含角色名与表演说明）" }] as const;
 const issueLabels = { contradiction: "明确矛盾", comprehension: "理解风险", taste: "审美建议" };
+const qualityLabels = { causality: "因果与规则", payoff: "结尾兑现" };
+const verdictLabels = { pass: "通过", revise: "需修改", unverified: "尚未核实" };
 const revision = computed(() => project.value.revisions.find(item => item.id === revisionId.value));
 const reviews = computed(() => project.value.reviews.filter(item => item.revisionId === revisionId.value));
 const draftDirty = computed(() => !!draft.value && JSON.stringify(draft.value) !== savedDraft.value);
@@ -154,6 +173,11 @@ function loadDraft() {
   const current = revision.value;
   draft.value = current ? JSON.parse(JSON.stringify({ title: current.title, outline: current.outline, scenes: current.scenes, canon: current.canon, threads: current.threads })) : undefined;
   savedDraft.value = JSON.stringify(draft.value); rewriteSceneId.value = "";
+  resetManualReview();
+}
+function resetManualReview() {
+  manualReview.value = "";
+  for (const evidence of Object.values(manualQuality.value)) Object.assign(evidence, { sceneId: revision.value?.scenes[0]?.sceneId ?? "", quote: "", verdict: "unverified", basis: "" });
 }
 async function saveBrief() { if (JSON.stringify(brief.value) !== JSON.stringify(project.value.brief)) await apply({ type: "brief", value: brief.value }); }
 async function saveDraft() {
@@ -239,11 +263,12 @@ async function generate(type: "directions" | "draft" | "review" | "rewrite") {
   const instructions = {
     directions: "生成 2–3 个真正不同的方向。资料未读部分明确标未知，信息不足时给假设，不要求用户填写专业参数。",
     draft: `按照已选择的方向写完整可视听剧本和简洁大纲，按目标时长控制台词与场次；parentId=${id || "未指定"}。`,
-    review: `审阅版本 ${id} 的全部场次，精确引用正文。分别检查动机/因果、人物知情、设定/线索、表达/节奏、目标人群和制作可行性；未证实的判断用理解风险或审美建议，不捏造明确矛盾。`,
+    review: `审阅版本 ${id} 的全部场次，精确引用正文。分别检查动机/因果、人物知情、设定/线索、表达/节奏、目标人群和制作可行性；未证实的判断用理解风险或审美建议，不捏造明确矛盾。coverage覆盖全部场次，必须提供quality.causality和quality.payoff，每项给sceneId、正文精确quote、verdict及basis；逐次核对关键规则与行动条件，以及开头主要期待如何由结尾行动兑现，有缺口用revise、未核实用unverified，不为通过而自报pass。`,
     rewrite: `只改版本 ${id} 的场次 ${rewriteSceneId.value}，意图：${rewriteIntent.value}。before 必须是原文全文，after 保留同一个 sceneId。更新该场的 speech/knowledge/change 等，不修改其他场次。`,
   };
   await modelAction(type, instructions[type], undefined, action => {
     if (action.type === "review" && action.value.revisionId !== id || action.type === "rewrite" && action.revisionId !== id) throw new Error("只能处理指定故事版本");
+    if (action.type === "review" && (!action.value.quality || revision.value?.scenes.some(scene => !action.value.coverage.includes(scene.sceneId)))) throw new Error("完整审读须覆盖全部场次，并提供因果与结尾的正文依据和实际判断");
     if (action.type === "rewrite" && action.sceneId !== rewriteSceneId.value) throw new Error("只能改指定场次");
   });
   if (type === "draft" || type === "rewrite") { revisionId.value = project.value.revisions.at(-1)!.id; loadDraft(); section.value = "script"; }
@@ -262,8 +287,8 @@ async function importSceneList() {
 async function approve() { if (!revision.value) return; await apply({ type: "approve", id: revision.value.id, reason: "用户在故事工作台审阅后采用" }); }
 async function recordReview() {
   if (!revision.value) return;
-  await apply({ type: "review", value: { revisionId: revision.value.id, summary: `人工审阅：${manualReview.value}`, coverage: revision.value.scenes.map(scene => scene.sceneId), issues: [] } });
-  manualReview.value = "";
+  await apply({ type: "review", value: { revisionId: revision.value.id, summary: `人工审阅：${manualReview.value}`, coverage: revision.value.scenes.map(scene => scene.sceneId), issues: [], quality: manualQuality.value } });
+  resetManualReview();
 }
 async function prepareProduction() {
   await flushEdits();

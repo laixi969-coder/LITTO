@@ -95,17 +95,21 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const imagePrompt = explicitNames.includes("gavenDirectImagePrompts") || /(?:图片|图像|生图|文生图).*提示词|提示词.*(?:图片|图像|生图)/.test(intentText) && !/视频|短片|分镜/.test(intentText);
   const scriptPrompt = explicitNames.includes("gavenScriptToVideo") || /(?:剧本|分镜).*(?:转|改写成|整理成).*(?:视频)?提示词/.test(intentText);
   const standalonePrompt = explicitNames.includes("videoPromptDirector") || /五板块|视频提示词|视频节点|生成段/.test(intentText);
+  // ACT: 仅对明确的文字创作收窄上下文；按分句排除否定要求，复杂或不明意图仍沿用制作流程。
+  const taskIntent = task.split(/[，,。；;\n]/).filter(part => !/^(?:请)?(?:不要|不用|无需|不必|不|勿)/.test(part.trim())).join("\n");
+  const storyOnly = story && primary === "story" && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
+    && !/视频|分镜|关键帧|运镜|拍摄|预演|成片|制片/.test(taskIntent);
   // ACT: 文字/单图专项只加载自己的方法；正式制作不预读互斥的五板块输出协议。
   const focusedNames = explicitNames.filter(name => ["gavenDirectImagePrompts", "gavenScriptToVideo", "gavenQingluAllegory", "insight", "directorPalettes", "breakdown", "canvas"].includes(name));
   const names = focusedNames.length ? [...focusedNames] : imagePrompt ? ["gavenDirectImagePrompts"] : scriptPrompt ? ["gavenScriptToVideo"]
-    : ["workflow", primary, "cinema", "continuity", ...(standalonePrompt ? ["videoPromptDirector"] : [])];
-  if (!imagePrompt && !scriptPrompt && !focusedNames.length) {
+    : storyOnly ? ["story"] : ["workflow", primary, "cinema", "continuity", ...(standalonePrompt ? ["videoPromptDirector"] : [])];
+  if (!storyOnly && !imagePrompt && !scriptPrompt && !focusedNames.length) {
     if (/旅拍|婚礼|旅行|vlog/i.test(topicText)) names.push("travelWeddingDirector");
     if (/小清新|清透色彩|光感清新|lightFreshDirector/.test(topicText)) names.push("lightFreshDirector");
     if (/中式园林|月洞门|游廊/.test(topicText)) names.push("chineseGardenDirector");
     if (/东方奇境|巨物花木|云上天宫|东方梦境/.test(topicText)) names.push("orientalEpicDirector");
   }
-  const focused = focusedNames.length || imagePrompt || scriptPrompt;
+  const focused = storyOnly || focusedNames.length || imagePrompt || scriptPrompt;
   if (!focused) {
     for (const topic of selectedTopics) if (!names.includes(topic.name)) names.push(topic.name);
   }
@@ -120,7 +124,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     videoPromptDirector: ["references/segmentPlanning.md", ...(standalonePrompt ? ["references/fiveBlockWriting.md"] : [])],
     cinema: ["references/shotLanguage.md", "references/movementDirection.md", "references/referenceQuality.md"],
     workflow: [],
-    story: [],
+    story: storyOnly ? ["references/core-methodology.md", "references/evaluation.md", "references/dialogue-aesthetics.md", ...(/高概念|异常|规则|科幻|悬疑/.test(task) ? ["references/high-concept.md"] : [])] : [],
     adfilm: ["references/creativeTranslation.md"],
     musicfilm: ["references/musicVideoDirection.md"],
     continuity: ["references/shotChecklist.md"],

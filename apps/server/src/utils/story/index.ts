@@ -1,6 +1,6 @@
 import { readFile, stat, writeAtomic } from "@toonflow/file";
 import { createHash, randomUUID } from "node:crypto";
-import { storyActionSchema, storyDecisionSchema, storyProjectSchema, newStoryProject, storyStale, storyImpact, storyPreviewKey, storyBoard, validateStoryDraft, type StoryAction, type StoryProject, type StorySource } from "@toonflow/tool-scene-list/storyProject";
+import { storyActionSchema, storyDecisionSchema, storyProjectSchema, newStoryProject, storyStale, storyImpact, storyPreviewKey, storyBoard, validateStoryDraft, applyStoryTextEdits, type StoryAction, type StoryProject, type StorySource } from "@toonflow/tool-scene-list/storyProject";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
@@ -46,8 +46,14 @@ async function validateApproval(directory: string, project: StoryProject, revisi
   if (storyStale(project, revision)) fail("故事依据已更新，请产生新版本并重新审阅", 409);
   const reviews = project.reviews.filter(item => item.revisionId === revision.id);
   const coverage = new Set(reviews.flatMap(item => item.coverage));
+  const adopting = project.approvedId !== revision.id;
   if (revision.scenes.some(scene => !coverage.has(scene.sceneId))) fail("还有场次未审阅，请先完成审稿");
-  if (reviews.some(review => review.issues.some(issue => issue.category === "contradiction" && !review.decisions[issue.id]))) fail("存在未处置的明确矛盾，请修改或记录保留理由");
+  if (reviews.some(review => review.issues.some(issue => (issue.category === "contradiction" || adopting && issue.category === "comprehension") && !review.decisions[issue.id]))) fail("存在未处置的明确矛盾或理解缺口，请修改或展示依据并记录保留决定");
+  // ACT: 新采用执行完整审读，历史已采用版本不被新增字段追溯撤销；修改后的新版本须重新审读。
+  if (adopting) {
+    const quality = reviews.findLast(review => revision.scenes.every(scene => review.coverage.includes(scene.sceneId)) && review.quality)?.quality;
+    if (!quality || quality.causality.verdict !== "pass" || quality.payoff.verdict !== "pass") fail("尚未完成本版本的因果规则与结尾兑现审读：须覆盖全部场次，quality逐项引用正文依据；revise或unverified不能作为通过");
+  }
   if (project.sources.some(source => source.purpose === "fact" && !source.confirmed)) fail("作为事实使用的资料尚未确认");
   return revision;
 }
@@ -200,6 +206,20 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
         await addDraft({ title: revision.title, outline: revision.outline, scenes: revision.scenes.map(scene => scene.sceneId === action.sceneId ? action.after : scene), canon: revision.canon, threads: revision.threads }, revision.id);
         break;
       }
+      case "patch": {
+        const revision = getRevision(action.revisionId);
+        const scene = revision.scenes.find(scene => scene.sceneId === action.sceneId) ?? fail("场次不存在");
+        if (scene.text !== action.before) fail("改写依据已改变，请读取当前场次后重新提交", 409);
+        let text: string, speech: string;
+        try { text = applyStoryTextEdits(scene.text, action.edits); speech = applyStoryTextEdits(scene.speech, action.speechEdits ?? []); }
+        catch (cause) { fail(cause instanceof Error ? cause.message : "原句替换失败"); }
+        if (text !== text.trim() || speech !== speech.trim()) fail("场次正文与朗读字段不保留首尾空白，请调整替换范围；未修改原稿");
+        if (speech.split("\n").some(line => line.trim() && !text.includes(line.trim()))) fail("修改后的朗读原句未完整出现在正文；修改对白时请同时提供对应speechEdits，未修改原稿");
+        if (text === scene.text && speech === scene.speech) return project;
+        await addDraft({ title: revision.title, outline: revision.outline,
+          scenes: revision.scenes.map(item => item.sceneId === scene.sceneId ? { ...item, text, speech } : item), canon: revision.canon, threads: revision.threads }, revision.id);
+        break;
+      }
       case "review": {
         const revision = getRevision(action.value.revisionId);
         if (new Set(action.value.issues.map(issue => issue.id)).size !== action.value.issues.length) fail("审稿问题 ID 重复");
@@ -207,6 +227,11 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
         for (const issue of action.value.issues) {
           const scene = revision.scenes.find(scene => scene.sceneId === issue.sceneId);
           if (!scene || !action.value.coverage.includes(issue.sceneId) || !scene.text.includes(issue.quote)) fail("审稿引句必须精确来自本版本已审阅场次");
+        }
+        if (action.value.quality && revision.scenes.some(scene => !action.value.coverage.includes(scene.sceneId))) fail("因果与结尾质量审读须完整覆盖本版本全部场次，局部审稿请只记录对应issues");
+        for (const evidence of Object.values(action.value.quality ?? {})) {
+          const scene = revision.scenes.find(scene => scene.sceneId === evidence.sceneId);
+          if (!scene || !action.value.coverage.includes(evidence.sceneId) || !scene.text.includes(evidence.quote)) fail("质量审读的引句必须精确来自本版本已覆盖的正文场次");
         }
         project.reviews.push({ ...action.value, id: randomUUID(), createdAt: now, decisions: {} }); break;
       }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ToolDefinition, ToolFiles, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 import { breakdownSchema, sceneListSchema, validateBreakdown, validateSceneList, type SceneList } from "./schema";
-import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject } from "./storyProject";
+import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject, applyStoryTextEdits, storyTextEditsSchema } from "./storyProject";
 import { visualDirectors, visualFrames, resolveVisualBoard } from "./visualReference";
 
 const sceneListPath = "场次表.json";
@@ -9,6 +9,12 @@ const historyDirectory = "场次表历史";
 const breakdownPath = "拆解清单.json";
 const storyApprovalSchema = z.strictObject({ revisionId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/) });
 const storyDecisionParameters = z.strictObject({ decision: storyDecisionSchema });
+const storyTextSchema = z.strictObject({
+  text: z.string().min(1).max(120000).describe("待交付的正文原文；统计篇幅时不含标题或说明，精确改稿时传完整原稿"),
+  edits: storyTextEditsSchema.optional(),
+  minCharacters: z.number().int().positive().max(120000).optional(),
+  maxCharacters: z.number().int().positive().max(120000).optional(),
+}).refine(value => !value.minCharacters || !value.maxCharacters || value.minCharacters <= value.maxCharacters, "字数下限不能大于上限");
 
 type SavedSceneList = SceneList & { schemaVersion: 1; version: number; savedAt: string };
 
@@ -52,6 +58,18 @@ const plugin: ToolPlugin = {
       return { approved, visualReferences: resolveVisualBoard(project.visualBoard) };
     }
     const tools: ToolDefinition[] = [
+      {
+        name: "prepareStoryText", label: "核对文字稿",
+        description: "不写文件、不保存工作台。核对正文篇幅；characters为不含空白、包含标点的Unicode字符数，hanCharacters仅计汉字。明确字数范围时传minCharacters/maxCharacters，未达标须修稿再核对。精确局改时传完整原稿和edits，唯一匹配原句后由程序拼接，其他文字与标点逐字保留；直接使用返回text交稿，不重写全文。此工具只核验篇幅与替换范围，不评价文学质量。",
+        parameters: z.toJSONSchema(storyTextSchema, { io: "input", target: "draft-07" }),
+        async execute(_id, params) {
+          const input = storyTextSchema.parse(params);
+          const text = applyStoryTextEdits(input.text, input.edits ?? []);
+          const characters = [...text.replace(/\s/g, "")].length;
+          return json({ text, characters, hanCharacters: (text.match(/\p{Script=Han}/gu) ?? []).length,
+            withinRange: characters >= (input.minCharacters ?? 0) && characters <= (input.maxCharacters ?? Infinity) });
+        },
+      },
       {
         name: "readVisualReferences", label: "读取视觉参考",
         description: "读取精选电影视觉参考库或某导演的画面来源。画像用于构图、光线与色彩探索；文字检索不代表已看图，参考片剧情不能成为当前故事事实。收藏通过 updateStoryProject 的 visualBoard 保存 frameId、purpose 和具体采用方法。",
@@ -131,7 +149,7 @@ const plugin: ToolPlugin = {
       async execute() { const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read()); return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) }); },
     }, {
       name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
-      description: "按 readStoryProject 的 version 保存资料理解、创意方向、剧本候选、精确引句审稿或单场改写。采用故事版本请调用 requestStoryApproval，在聊天中显示确认卡片。不得代用户确认资料、采用方向/定稿、处置问题或录入观众反馈。旧版本保留。",
+      description: "按 readStoryProject 的 version 保存资料理解、方向、候选与审稿。完整审稿的quality须核对因果规则及结尾兑现，引用正文原句并给依据；缺失或未通过不能采用。整场改写用rewrite；只改指定词句用patch的edits（对白同步speechEdits），程序保留其余文字与字段并产生新版本，不重写锁定内容。采用用requestStoryApproval展示确认卡片。不得代用户确认资料、方向/定稿、问题保留或观众反馈。旧版保留。",
       parameters: z.toJSONSchema(z.object({ expectedVersion: z.number().int().nonnegative(), action: storyActionSchema }), { target: "draft-07", io: "input" }),
       async execute(_id, params) { const input = params as { expectedVersion: number; action: unknown }; return json(await story.apply(input.expectedVersion, input.action)); },
     });
