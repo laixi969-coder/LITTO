@@ -28,7 +28,7 @@ import { isMemoryEnabled } from "@/utils/personalization";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { t } from "@/lib/i18n";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { requiresStoryRuleValidation } from "@toonflow/tool-scene-list/storyLogic";
+import { requiresStoryRuleValidation, type StoryLogic } from "@toonflow/tool-scene-list/storyLogic";
 import { reviewStoryText } from "@/utils/story/review";
 
 type AgentOptions = {
@@ -172,30 +172,40 @@ export async function run(
     }));
     if (prepareTools) tools = prepareTools(tools);
     const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();
+    const storyReviewClaims = new Map<string, string>();
     const storyLengths = new Map<string, { countMode?: string; minCharacters?: number; maxCharacters?: number }>();
     let reviewAttempts = 0;
-    // ACT: 同轮最多审三版，防止付费自评无限循环；同稿复用结果。无作者历史的独立请求仍是模型审读，不是客观证明。
+    // ACT: 同轮最多审五次，为规则、决定与关系修改留出余量，同时限制付费自评；正文和规则记录均相同时复用结果。
     if (ruleTask) tools = tools.map(tool => tool.name !== "prepareStoryText" ? tool : {
       ...tool,
       async execute(id, params, ...rest) {
         const result = await tool.execute(id, { ...params as Record<string, unknown>, requireRuleValidation: true }, ...rest);
         const prepared = result.details as { text: string; ready: boolean; countMode?: string; minCharacters?: number; maxCharacters?: number };
         if (!prepared.ready) return result;
+        const ruleClaims = (params as { logic?: StoryLogic }).logic?.rules ?? [];
+        const claimsKey = JSON.stringify(ruleClaims);
+        if (storyReviewClaims.get(prepared.text) !== claimsKey) {
+          storyReviews.delete(prepared.text);
+          storyLengths.delete(prepared.text);
+        }
         let semanticReview = storyReviews.get(prepared.text);
         if (!semanticReview) {
-          if (reviewAttempts >= 3) semanticReview = { verdict: "unverified", issues: [], message: "本轮三次审读仍未通过，请如实交代未完成项，不再自报通过或无限重试" };
+          if (reviewAttempts >= 5) semanticReview = { verdict: "unverified", issues: [], message: "本轮五次审读仍未通过，请如实交代未完成项，不再自报通过或无限重试" };
           else {
             reviewAttempts++;
             try {
               // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限；同稿未核实时允许在预算内重试。
               const reviewer = await createAgentModel(providerId, modelId, "off");
-              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, prompt, prepared.text, signal!);
+              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, prompt, prepared.text, ruleClaims, signal!);
             } catch (error) {
               if (signal?.aborted) throw error;
               semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };
             }
           }
-          if (semanticReview.verdict !== "unverified") storyReviews.set(prepared.text, semanticReview);
+          if (semanticReview.verdict !== "unverified") {
+            storyReviews.set(prepared.text, semanticReview);
+            storyReviewClaims.set(prepared.text, claimsKey);
+          }
         }
         if (semanticReview.verdict === "pass") storyLengths.set(prepared.text, prepared);
         const details = { ...prepared, semanticReview, ready: semanticReview.verdict === "pass" };
