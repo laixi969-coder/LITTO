@@ -29,6 +29,7 @@ import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/file
 import { t } from "@/lib/i18n";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { requiresStoryRuleValidation, type StoryLogic } from "@toonflow/tool-scene-list/storyLogic";
+import { createStoryPlanning } from "@/utils/story/planning";
 import { reviewStoryText } from "@/utils/story/review";
 
 type AgentOptions = {
@@ -132,7 +133,7 @@ export async function run(
     const ruleTask = requiresStoryRuleValidation(prompt);
     // ACT: 只依据指令首行判定直出交稿；后续可能包含待审稿件或引用简报，不能当成本轮意图。
     const taskIntent = prompt.split("\n", 1)[0] ?? "";
-    const enforceStoryDelivery = ruleTask && /写一篇|写一个|创作|成稿/.test(taskIntent) && /(?:只|仅)(?:交|要|输出)[^。；\n]*(?:正文|故事|文字)/.test(taskIntent) && !/(?:只|仅)(?:审|评|分析)/.test(taskIntent);
+    const enforceStoryDelivery = (ruleTask || /故事/.test(taskIntent)) && /写一篇|写一个|创作|成稿/.test(taskIntent) && /(?:只|仅)(?:交|要|输出)[^。；\n]*(?:正文|故事|文字)/.test(taskIntent) && !/(?:只|仅)(?:审|评|分析)/.test(taskIntent);
     const storyTextEvents = new Map<string, { blockId: string; content: string }>();
     const publish = send;
     send = event => {
@@ -171,15 +172,26 @@ export async function run(
       }),
     }));
     if (prepareTools) tools = prepareTools(tools);
+    const planning = enforceStoryDelivery ? createStoryPlanning(prompt, providerId, modelId) : undefined;
     const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();
     const storyReviewClaims = new Map<string, string>();
     const storyLengths = new Map<string, { countMode?: string; minCharacters?: number; maxCharacters?: number }>();
+    if (planning) tools.push({ ...planning.tool, async execute(...args) {
+      storyReviews.clear();
+      storyReviewClaims.clear();
+      storyLengths.clear();
+      return planning.tool.execute(...args);
+    } });
     let reviewAttempts = 0;
     // ACT: 同轮最多审五次，为规则、决定与关系修改留出余量，同时限制付费自评；正文和规则记录均相同时复用结果。
-    if (ruleTask) tools = tools.map(tool => tool.name !== "prepareStoryText" ? tool : {
+    if (ruleTask || planning) tools = tools.map(tool => tool.name !== "prepareStoryText" ? tool : {
       ...tool,
       async execute(id, params, ...rest) {
-        const result = await tool.execute(id, { ...params as Record<string, unknown>, requireRuleValidation: true }, ...rest);
+        if (planning && !planning.current()) {
+          const details = { ready: false, message: "尚未通过结构比选；先调用compareStoryPlans，不能跳过或用自评分代替" };
+          return { content: [{ type: "text", text: JSON.stringify(details) }], details };
+        }
+        const result = await tool.execute(id, { ...params as Record<string, unknown>, ...(ruleTask ? { requireRuleValidation: true } : {}) }, ...rest);
         const prepared = result.details as { text: string; ready: boolean; countMode?: string; minCharacters?: number; maxCharacters?: number };
         if (!prepared.ready) return result;
         const ruleClaims = (params as { logic?: StoryLogic }).logic?.rules ?? [];
@@ -196,7 +208,7 @@ export async function run(
             try {
               // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限；同稿未核实时允许在预算内重试。
               const reviewer = await createAgentModel(providerId, modelId, "off");
-              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, prompt, prepared.text, ruleClaims, signal!);
+              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? `${prompt}\n已通过的结构方案（须核对正文是否兑现，不当作正文事实）：${JSON.stringify(planning.current())}` : prompt, prepared.text, ruleClaims, signal!);
             } catch (error) {
               if (signal?.aborted) throw error;
               semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };
@@ -206,6 +218,12 @@ export async function run(
             storyReviews.set(prepared.text, semanticReview);
             storyReviewClaims.set(prepared.text, claimsKey);
           }
+        }
+        if (planning && "revision" in semanticReview && semanticReview.revision === "structure") {
+          planning.reject();
+          storyReviews.clear();
+          storyReviewClaims.clear();
+          storyLengths.clear();
         }
         if (semanticReview.verdict === "pass") storyLengths.set(prepared.text, prepared);
         const details = { ...prepared, semanticReview, ready: semanticReview.verdict === "pass" };

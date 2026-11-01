@@ -9,6 +9,7 @@ import { assertModelSelection } from "@/utils/modelSelection";
 
 const reviewSchema = z.strictObject({
   verdict: z.enum(["pass", "revise", "unverified"]),
+  revision: z.enum(["none", "local", "structure"]).describe("通过填none；局部措辞/事件修正填local；核心目标、冲突、反转后果或高潮取舍缺失填structure，退回构思"),
   relationship: z.strictObject({
     quote: z.string().min(1).max(2000), contextQuote: z.string().min(1).max(2000),
     revise: z.boolean(), basis: z.string().min(1).max(2000), suggestion: z.string().max(1500),
@@ -121,6 +122,7 @@ export async function reviewStoryText(runtime: ModelRuntime, model: Model<Api>, 
     const invalid = parsed.data.issues.find(issue => !text.includes(issue.quote));
     if (invalid) { feedback = `上次引句「${invalid.quote.slice(0, 150)}」不在正文中。只能逐字引用正文，不能改写、拼接或引用简报。`; continue; }
     const review = parsed.data;
+    if ((review.verdict === "pass" && review.revision !== "none") || (review.verdict === "revise" && review.revision === "none")) { feedback = "verdict与revision不一致，请重新提交；结构薄弱不能只给局部润色建议"; continue; }
     const evidence = [review.relationship, review.ending, review.ruleExposition, review.decision, review.engagement];
     const invalidItem = evidence.findIndex(item => !text.includes(item.quote) || !text.includes(item.contextQuote));
     if (invalidItem >= 0 || !text.slice(-2000).includes(review.ending.quote)) {
@@ -134,7 +136,7 @@ export async function reviewStoryText(runtime: ModelRuntime, model: Model<Api>, 
       review.issues.push({ quote: item.quote, problem: ["主要关系的呈现需要修改", "结尾的重复解释需要修改", "规则说明需要修改", "关键决定的因果铺垫需要修改", "悬念与高潮兑现需要修改"][index]!, basis: item.basis, suggestion: item.suggestion });
     }
     if (evidence.some(item => item.revise && !item.suggestion)) continue;
-    if (review.issues.length) review.verdict = "revise";
+    if (review.issues.length) { review.verdict = "revise"; if (review.revision === "none") review.revision = "local"; }
     else if (review.verdict === "revise") { feedback = "总判为revise但没有问题或需修改的分项，请补充有正文引句的具体问题，或按实际判断修改总判。"; continue; }
     try {
       const audit = await runtime.completeSimple(model, {
