@@ -28,6 +28,8 @@ import { isMemoryEnabled } from "@/utils/personalization";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { t } from "@/lib/i18n";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { requiresStoryRuleValidation } from "@toonflow/tool-scene-list/storyLogic";
+import { reviewStoryText } from "@/utils/story/review";
 
 type AgentOptions = {
   prompt: string;
@@ -127,8 +129,18 @@ export async function run(
     const parentFile = getParentSessionFile(history);
     const child = getSubAgentInfo(history)?.data;
     const liveTools = new Map<string, AgentToolCall>();
+    const ruleTask = requiresStoryRuleValidation(prompt);
+    // ACT: 只依据指令首行判定直出交稿；后续可能包含待审稿件或引用简报，不能当成本轮意图。
+    const taskIntent = prompt.split("\n", 1)[0] ?? "";
+    const enforceStoryDelivery = ruleTask && /写一篇|写一个|创作|成稿/.test(taskIntent) && /(?:只|仅)(?:交|要|输出)[^。；\n]*(?:正文|故事|文字)/.test(taskIntent) && !/(?:只|仅)(?:审|评|分析)/.test(taskIntent);
+    const storyTextEvents = new Map<string, { blockId: string; content: string }>();
     const publish = send;
     send = event => {
+      // ACT: 纯文字直出先保留草稿事件，只有同一稿完成数量、证据和独立审读才交付；历史草稿仍保留。
+      if (enforceStoryDelivery && event.type === "text") {
+        if (event.done) storyTextEvents.set(event.blockId, { blockId: event.blockId, content: event.content ?? "" });
+        return;
+      }
       if (event.type === "tool") {
         const tool = { ...liveTools.get(event.tool.id), ...event.tool };
         if (tool.status !== "running") delete tool.question;
@@ -159,6 +171,37 @@ export async function run(
       }),
     }));
     if (prepareTools) tools = prepareTools(tools);
+    const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();
+    const storyLengths = new Map<string, { countMode?: string; minCharacters?: number; maxCharacters?: number }>();
+    let reviewAttempts = 0;
+    // ACT: 同轮最多审三版，防止付费自评无限循环；同稿复用结果。无作者历史的独立请求仍是模型审读，不是客观证明。
+    if (ruleTask) tools = tools.map(tool => tool.name !== "prepareStoryText" ? tool : {
+      ...tool,
+      async execute(id, params, ...rest) {
+        const result = await tool.execute(id, { ...params as Record<string, unknown>, requireRuleValidation: true }, ...rest);
+        const prepared = result.details as { text: string; ready: boolean; countMode?: string; minCharacters?: number; maxCharacters?: number };
+        if (!prepared.ready) return result;
+        let semanticReview = storyReviews.get(prepared.text);
+        if (!semanticReview) {
+          if (reviewAttempts >= 3) semanticReview = { verdict: "unverified", issues: [], message: "本轮三次审读仍未通过，请如实交代未完成项，不再自报通过或无限重试" };
+          else {
+            reviewAttempts++;
+            try {
+              // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限；同稿未核实时允许在预算内重试。
+              const reviewer = await createAgentModel(providerId, modelId, "off");
+              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, prompt, prepared.text, signal!);
+            } catch (error) {
+              if (signal?.aborted) throw error;
+              semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };
+            }
+          }
+          if (semanticReview.verdict !== "unverified") storyReviews.set(prepared.text, semanticReview);
+        }
+        if (semanticReview.verdict === "pass") storyLengths.set(prepared.text, prepared);
+        const details = { ...prepared, semanticReview, ready: semanticReview.verdict === "pass" };
+        return { ...result, details, content: [{ type: "text", text: JSON.stringify(details) }] };
+      },
+    });
     // ACT: 在最终工具权限确定后补回本轮新模型规则；切换成功不等于旧系统上下文自动刷新。
     tools = tools.map(tool => tool.name !== "requestProductionDecision" ? tool : {
       ...tool,
@@ -404,6 +447,40 @@ export async function run(
       await session.prompt(content.replace(/^(\/skill:\S+)\s+/, "$1 "));
       if (compactionError) throw new Error(compactionError);
       if (modelError) throw Object.assign(new Error(modelError), limited ? { code: "AGENT_LENGTH" } : {});
+      if (enforceStoryDelivery) for (let attempt = 0; attempt < 2; attempt++) {
+        const blocks = [...storyTextEvents.values()];
+        const messageId = blocks.at(-1)?.blockId.split(":")[0];
+        const finalBlocks = blocks.filter(block => block.blockId.split(":")[0] === messageId);
+        const text = finalBlocks.map(block => block.content).join("\n\n").trim();
+        const lines = text.split(/\r?\n/), heading = lines[0] ?? "";
+        const bodies = [text];
+        if (lines[1]?.trim() === "" && heading.length <= 80 && (/^(?:#|\*\*|《)/.test(heading) || !/[。！？]/.test(heading))) bodies.push(lines.slice(2).join("\n"));
+        const sameText = (value: string) => value.replace(/\s/g, "");
+        const approved = [...storyReviews].some(([draft, review]) => {
+          if (review.verdict !== "pass") return false;
+          const draftLines = draft.split(/\r?\n/);
+          const draftHeading = draftLines[0] ?? "";
+          const normalizeHeading = (value: string) => value.replace(/^\s*(?:#+\s*|\*\*)?《?/, "").replace(/》?(?:\*\*)?\s*$/, "").trim();
+          const matchingTitle = !draftLines[1]?.trim() && !lines[1]?.trim() && draftHeading.length <= 80 && heading.length <= 80
+            && /^(?:《|#|\*\*)/.test(heading) && !/[。！？]/.test(draftHeading)
+            && normalizeHeading(draftHeading) === normalizeHeading(heading);
+          const draftBody = matchingTitle ? draftLines.slice(2).join("\n") : draft;
+          const finalBody = matchingTitle ? lines.slice(2).join("\n") : undefined;
+          const matched = matchingTitle ? sameText(finalBody!) === sameText(draftBody) : bodies.some(body => sameText(body) === sameText(draft));
+          const length = storyLengths.get(draft);
+          const count = length?.countMode === "characters" ? [...draftBody.replace(/\s/g, "")].length : (draftBody.match(/[\p{Letter}\p{Number}]/gu) ?? []).length;
+          return matched && count >= (length?.minCharacters ?? 0) && count <= (length?.maxCharacters ?? Infinity);
+        });
+        if (approved) {
+          for (const block of finalBlocks) publish({ type: "text", ...block, done: true });
+          break;
+        }
+        if (attempt) throw new Error("本轮高概念交稿未通过审读，或交稿与已核对正文不一致；草稿及审读记录已保留，未作为合格正文交付");
+        storyTextEvents.clear();
+        await session.sendCustomMessage({ customType: "storyDeliveryCheck", content: "交付校验未通过：最终正文必须与本轮prepareStoryText返回ready:true的text一致（允许单独标题和换行排版）。先完成数量、规则证据与独立审读，再原样交付通过稿。不要另写未经核对的句子；没有通过时不得宣称完成。", display: false }, { triggerTurn: true });
+        if (compactionError) throw new Error(compactionError);
+        if (modelError) throw Object.assign(new Error(modelError), limited ? { code: "AGENT_LENGTH" } : {});
+      }
     } catch (error) {
       failure = error;
       throw error;

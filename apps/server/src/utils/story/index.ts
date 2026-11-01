@@ -5,6 +5,7 @@ import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/file
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
 import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
+import { inspectStoryLogic, requiresStoryRuleValidation } from "@toonflow/tool-scene-list/storyLogic";
 
 const fileName = "storyProject.json";
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -51,8 +52,11 @@ async function validateApproval(directory: string, project: StoryProject, revisi
   if (reviews.some(review => review.issues.some(issue => (issue.category === "contradiction" || adopting && issue.category === "comprehension") && !review.decisions[issue.id]))) fail("存在未处置的明确矛盾或理解缺口，请修改或展示依据并记录保留决定");
   // ACT: 新采用执行完整审读，历史已采用版本不被新增字段追溯撤销；修改后的新版本须重新审读。
   if (adopting) {
-    const quality = reviews.findLast(review => revision.scenes.every(scene => review.coverage.includes(scene.sceneId)) && review.quality)?.quality;
+    const complete = reviews.findLast(review => revision.scenes.every(scene => review.coverage.includes(scene.sceneId)) && review.quality);
+    const quality = complete?.quality;
     if (!quality || quality.causality.verdict !== "pass" || quality.payoff.verdict !== "pass") fail("尚未完成本版本的因果规则与结尾兑现审读：须覆盖全部场次，quality逐项引用正文依据；revise或unverified不能作为通过");
+    const logic = inspectStoryLogic(revision.scenes.map(scene => scene.text).join("\n\n"), complete?.logic, requiresStoryRuleValidation(`${revision.brief.idea}\n${revision.brief.genre}`));
+    if (!logic.ready) fail(`数量或规则验证尚未通过：${[...logic.invalidEvidence, ...logic.issues].join("；")}`);
   }
   if (project.sources.some(source => source.purpose === "fact" && !source.confirmed)) fail("作为事实使用的资料尚未确认");
   return revision;
@@ -232,6 +236,11 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
         for (const evidence of Object.values(action.value.quality ?? {})) {
           const scene = revision.scenes.find(scene => scene.sceneId === evidence.sceneId);
           if (!scene || !action.value.coverage.includes(evidence.sceneId) || !scene.text.includes(evidence.quote)) fail("质量审读的引句必须精确来自本版本已覆盖的正文场次");
+        }
+        if (action.value.logic) {
+          if (revision.scenes.some(scene => !action.value.coverage.includes(scene.sceneId))) fail("数量与规则审读须覆盖本版本全部场次");
+          const logic = inspectStoryLogic(revision.scenes.map(scene => scene.text).join("\n\n"), action.value.logic);
+          if (logic.invalidEvidence.length) fail(logic.invalidEvidence.join("；"));
         }
         project.reviews.push({ ...action.value, id: randomUUID(), createdAt: now, decisions: {} }); break;
       }

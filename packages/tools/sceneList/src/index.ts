@@ -3,6 +3,7 @@ import type { ToolDefinition, ToolFiles, ToolPlugin } from "@toonflow/tools-scaf
 import { breakdownSchema, sceneListSchema, validateBreakdown, validateSceneList, type SceneList } from "./schema";
 import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject, applyStoryTextEdits, storyTextEditsSchema } from "./storyProject";
 import { visualDirectors, visualFrames, resolveVisualBoard } from "./visualReference";
+import { inspectStoryLogic, storyLogicSchema } from "./storyLogic";
 
 const sceneListPath = "场次表.json";
 const historyDirectory = "场次表历史";
@@ -14,6 +15,9 @@ const storyTextSchema = z.strictObject({
   edits: storyTextEditsSchema.optional(),
   minCharacters: z.number().int().positive().max(120000).optional(),
   maxCharacters: z.number().int().positive().max(120000).optional(),
+  countMode: z.enum(["text", "characters"]).optional().describe("默认text：统计字母、汉字和数字，不计空白及标点；仅明确要求含标点的字符数时用characters"),
+  logic: storyLogicSchema.optional(),
+  requireRuleValidation: z.boolean().optional().describe("高概念或异常规则故事须为true；运行时可强制开启，不能通过省略字段跳过"),
 }).refine(value => !value.minCharacters || !value.maxCharacters || value.minCharacters <= value.maxCharacters, "字数下限不能大于上限");
 
 type SavedSceneList = SceneList & { schemaVersion: 1; version: number; savedAt: string };
@@ -60,14 +64,19 @@ const plugin: ToolPlugin = {
     const tools: ToolDefinition[] = [
       {
         name: "prepareStoryText", label: "核对文字稿",
-        description: "不写文件、不保存工作台。核对正文篇幅；characters为不含空白、包含标点的Unicode字符数，hanCharacters仅计汉字。明确字数范围时传minCharacters/maxCharacters，未达标须修稿再核对。精确局改时传完整原稿和edits，唯一匹配原句后由程序拼接，其他文字与标点逐字保留；直接使用返回text交稿，不重写全文。此工具只核验篇幅与替换范围，不评价文学质量。",
+        description: "不写文件。核对不含标题的正文篇幅、数量声明与关键规则。默认按汉字、字母和数字计数，不计空白、标点及符号；明确要求含标点字符数时用countMode=characters。高概念须requireRuleValidation:true并提供logic.rules：每个关键对象有触发及改变条件的边界证据，另有高潮应用，尝试和结果分别引用正文；不能以他人的试验代证。数量有歧义时先读取返回的quantities，再按claimId给logic.quantities的实际字串或全文未展示的依据。ready:false须修稿或补真实证据，不能把猜测填pass。精确局改传原稿和edits，其他文字由程序保留。核对后直接交付返回text，不重新生成；工具不代替语义审读或文学评价。",
         parameters: z.toJSONSchema(storyTextSchema, { io: "input", target: "draft-07" }),
         async execute(_id, params) {
           const input = storyTextSchema.parse(params);
           const text = applyStoryTextEdits(input.text, input.edits ?? []);
           const characters = [...text.replace(/\s/g, "")].length;
-          return json({ text, characters, hanCharacters: (text.match(/\p{Script=Han}/gu) ?? []).length,
-            withinRange: characters >= (input.minCharacters ?? 0) && characters <= (input.maxCharacters ?? Infinity) });
+          const textCharacters = (text.match(/[\p{Letter}\p{Number}]/gu) ?? []).length;
+          const countMode = input.countMode ?? "text";
+          const logic = inspectStoryLogic(text, input.logic, input.requireRuleValidation);
+          const count = countMode === "characters" ? characters : textCharacters;
+          const withinRange = count >= (input.minCharacters ?? 0) && count <= (input.maxCharacters ?? Infinity);
+          return json({ text, characters, textCharacters, countMode, count, minCharacters: input.minCharacters, maxCharacters: input.maxCharacters, hanCharacters: (text.match(/\p{Script=Han}/gu) ?? []).length,
+            withinRange, logic, ready: withinRange && logic.ready });
         },
       },
       {
@@ -149,7 +158,7 @@ const plugin: ToolPlugin = {
       async execute() { const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read()); return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) }); },
     }, {
       name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
-      description: "按 readStoryProject 的 version 保存资料理解、方向、候选与审稿。完整审稿的quality须核对因果规则及结尾兑现，引用正文原句并给依据；缺失或未通过不能采用。整场改写用rewrite；只改指定词句用patch的edits（对白同步speechEdits），程序保留其余文字与字段并产生新版本，不重写锁定内容。采用用requestStoryApproval展示确认卡片。不得代用户确认资料、方向/定稿、问题保留或观众反馈。旧版保留。",
+      description: "按 readStoryProject 的 version 保存资料、方向、候选与审稿。完整review须提供quality因果及结尾依据；规则故事另有logic.rules逐项记录关键对象的触发、边界变化、高潮尝试与结果，数量有歧义给logic.quantities。服务端复算，不能用空问题列表或pass总评绕过缺证据及计数错误。整场改写用rewrite；指定词句用patch并按需同步speechEdits，保留其余内容与旧版。采用用requestStoryApproval，不代用户确认资料、问题保留或观众反馈。",
       parameters: z.toJSONSchema(z.object({ expectedVersion: z.number().int().nonnegative(), action: storyActionSchema }), { target: "draft-07", io: "input" }),
       async execute(_id, params) { const input = params as { expectedVersion: number; action: unknown }; return json(await story.apply(input.expectedVersion, input.action)); },
     });

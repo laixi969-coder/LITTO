@@ -81,11 +81,42 @@
               <label>正文原句<textarea v-model="evidence.quote" maxlength="2000" /></label>
               <label>判断依据<textarea v-model="evidence.basis" minlength="10" maxlength="2000" /></label>
             </div>
+            <details><summary>数量与规则验证</summary>
+              <article v-for="check in manualLogic.quantities" :key="check.claimId">
+                <strong>{{ check.claimId }} · {{ quantityClaims.find(claim => claim.id === check.claimId)?.quote }}</strong>
+                <blockquote>{{ quantityClaims.find(claim => claim.id === check.claimId)?.context }}</blockquote>
+                <label>计数范围<select v-model="check.mode"><option value="quotedText">核对已展示文字</option><option value="unshownText">全文未展示的设定</option></select></label>
+                <label v-if="check.mode === 'quotedText'">实际计数字串<textarea v-model="check.countedText" maxlength="12000" /></label>
+                <label>核对依据<textarea v-model="check.basis" minlength="10" maxlength="2000" /></label>
+              </article>
+              <article v-for="(rule, index) in manualLogic.rules" :key="index">
+                <label>规则<textarea v-model="rule.rule" maxlength="2000" /></label>
+                <label>高潮依赖的作用对象（逗号分隔）<input :value="rule.subjects.join('，')" @input="rule.subjects = ($event.target as HTMLInputElement).value.split(/[,，]+/).map(value => value.trim()).filter(Boolean)" /></label>
+                <div v-for="(test, testIndex) in rule.tests" :key="testIndex" class="fields">
+                  <label>验证类型<select v-model="test.kind"><option v-for="(label, value) in ruleTestLabels" :key="value" :value="value">{{ label }}</option></select></label>
+                  <label>作用对象<select v-model="test.subject"><option v-for="subject in rule.subjects" :key="subject" :value="subject">{{ subject }}</option></select></label>
+                  <label v-if="test.kind === 'boundary'">改变的条件<input v-model="test.changedCondition" maxlength="1000" /></label>
+                  <label>尝试原句<textarea v-model="test.probeQuote" maxlength="2000" /></label><label>结果原句<textarea v-model="test.outcomeQuote" maxlength="2000" /></label>
+                  <label>预期结果<textarea v-model="test.expected" maxlength="1000" /></label><label>观察结果<textarea v-model="test.observed" maxlength="1000" /></label>
+                  <label>状态<select v-model="test.verdict"><option v-for="(label, value) in verdictLabels" :key="value" :value="value">{{ label }}</option></select></label>
+                  <label>判断依据<textarea v-model="test.basis" minlength="10" maxlength="2000" /></label>
+                  <el-button @click="rule.tests.splice(testIndex, 1)">移除此项验证</el-button>
+                </div>
+                <el-button @click="rule.tests.push(createRuleTest('boundary'))">添加对象验证</el-button>
+                <el-button @click="manualLogic.rules.splice(index, 1)">移除此规则</el-button>
+              </article>
+              <el-button @click="addManualRule">添加关键规则的验证</el-button>
+            </details>
             <el-button :disabled="!manualReview.trim()" @click="run(recordReview)">我已逐场审阅，保存人工结论</el-button>
           </details>
           <el-button v-if="revision && revision.id === project.approvedId" :disabled="draftDirty || storyStale(project, revision)" @click="run(prepareProduction)">交给助手整理制作场次表</el-button>
           <article v-for="review in reviews" :key="review.id"><h3>审稿 · {{ review.createdAt }}</h3><p>{{ review.summary }}</p><p>实际审阅范围：{{ review.coverage.join('、') }}</p>
             <article v-for="(evidence, key) in review.quality" :key="key"><strong>{{ qualityLabels[key] }} · {{ verdictLabels[evidence.verdict] }} · {{ evidence.sceneId }}</strong><blockquote>{{ evidence.quote }}</blockquote><p>依据：{{ evidence.basis }}</p></article>
+            <details><summary>数量与规则核对</summary>
+              <p v-for="quantity in logicReports[review.id]?.quantities" :key="quantity.id">{{ quantity.id }} · {{ quantity.quote }} · {{ quantity.countedText }} · 实际 {{ quantity.actual ?? '未逐字核实' }} · {{ quantity.status === 'pass' ? '通过' : quantity.status === 'unshownText' ? '全文未展示' : '需核对' }} {{ quantity.basis }}</p>
+              <article v-for="(rule, index) in review.logic?.rules" :key="index"><strong>{{ rule.rule }} · {{ rule.subjects.join('、') }}</strong><div v-for="(test, testIndex) in rule.tests" :key="testIndex"><p>{{ ruleTestLabels[test.kind] }} · {{ test.subject }} · {{ verdictLabels[test.verdict] }}</p><p v-if="test.changedCondition">改变条件：{{ test.changedCondition }}</p><blockquote>{{ test.probeQuote }} → {{ test.outcomeQuote }}</blockquote><p>预期：{{ test.expected }}；观察：{{ test.observed }}</p><p>依据：{{ test.basis }}</p></div></article>
+              <p v-for="issue in [...logicReports[review.id]?.issues ?? [], ...logicReports[review.id]?.invalidEvidence ?? []]" :key="issue" class="errorMessage">{{ issue }}</p>
+            </details>
             <article v-for="issue in review.issues" :key="issue.id"><strong>{{ issueLabels[issue.category] }} · {{ issue.sceneId }}</strong><blockquote>{{ issue.quote }}</blockquote><p>{{ issue.problem }}</p><p>依据：{{ issue.basis }}</p><p>最小改法：{{ issue.suggestion }}</p><p v-if="review.decisions[issue.id]">保留理由：{{ review.decisions[issue.id]!.reason }}</p><template v-else><label>如有意保留，请写理由<input v-model="issueReasons[issue.id]" /></label><el-button :disabled="!issueReasons[issue.id]?.trim()" @click="run(() => apply({ type: 'decideIssue', reviewId: review.id, issueId: issue.id, reason: issueReasons[issue.id]! }))">记录保留决定</el-button></template></article>
           </article>
         </template>
@@ -108,6 +139,7 @@ import { createBrowserFfmpeg } from "@toonflow/ffmpeg/browser";
 import { useNodeAi, type NodeAiModel } from "@toonflow/nodes-scaffold/nodeAi";
 import { newStoryProject, storyActionSchema, storyActionParameters, storyWritingGuide, musicFilmWritingGuide, shortDramaWritingGuide, storyStale, storyImpact, type StoryProject, type StoryAction, type StoryDraft, type StorySource } from "@toonflow/tool-scene-list/storyProject";
 import { resolveVisualBoard } from "@toonflow/tool-scene-list/visualReference";
+import { findStoryQuantityClaims, inspectStoryLogic, requiresStoryRuleValidation, storyReviewGuide, storyLogicGuide, type StoryLogic } from "@toonflow/tool-scene-list/storyLogic";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { canManageModels, isAuthDisabled } from "@/lib/session";
 import { useRouter } from "vue-router";
@@ -131,6 +163,7 @@ const revisionId = ref(""), draft = ref<StoryDraft>(), savedDraft = ref("");
 const sourceEdit = ref<StorySource>();
 const rewriteSceneId = ref(""), rewriteIntent = ref(""), issueReasons = ref<Record<string, string>>({});
 const manualReview = ref("");
+const manualLogic = ref<StoryLogic>({ quantities: [], rules: [] });
 const manualQuality = ref<NonNullable<StoryProject["reviews"][number]["quality"]>>({
   causality: { sceneId: "", quote: "", verdict: "unverified", basis: "" },
   payoff: { sceneId: "", quote: "", verdict: "unverified", basis: "" },
@@ -145,8 +178,12 @@ const sceneFields = [{ key: "goal", label: "人物目标" }, { key: "obstacle", 
 const issueLabels = { contradiction: "明确矛盾", comprehension: "理解风险", taste: "审美建议" };
 const qualityLabels = { causality: "因果与规则", payoff: "结尾兑现" };
 const verdictLabels = { pass: "通过", revise: "需修改", unverified: "尚未核实" };
+const ruleTestLabels = { trigger: "触发验证", boundary: "边界验证", payoff: "高潮应用" };
 const revision = computed(() => project.value.revisions.find(item => item.id === revisionId.value));
 const reviews = computed(() => project.value.reviews.filter(item => item.revisionId === revisionId.value));
+const revisionText = computed(() => revision.value?.scenes.map(scene => scene.text).join("\n\n") ?? "");
+const quantityClaims = computed(() => findStoryQuantityClaims(revisionText.value));
+const logicReports = computed(() => Object.fromEntries(reviews.value.map(review => [review.id, inspectStoryLogic(revisionText.value, review.logic, requiresStoryRuleValidation(`${revision.value?.brief.idea ?? ""}\n${revision.value?.brief.genre ?? ""}`))])));
 const draftDirty = computed(() => !!draft.value && JSON.stringify(draft.value) !== savedDraft.value);
 const impact = computed(() => { const current = revision.value, parent = project.value.revisions.find(item => item.id === current?.parentId); return current && parent ? storyImpact(parent, current) : undefined; });
 const progress = computed(() => project.value.approvedId ? "已有采用版本，可制作预演并继续局部修改。" : project.value.revisions.length ? "已有故事候选，下一步审阅并采用。" : project.value.directionId ? "方向已确定，下一步发展剧本。" : "先说明作品目标或上传资料。" );
@@ -177,7 +214,14 @@ function loadDraft() {
 }
 function resetManualReview() {
   manualReview.value = "";
+  manualLogic.value = { quantities: quantityClaims.value.map(claim => ({ claimId: claim.id, mode: "quotedText", countedText: claim.inferredText, basis: "" })), rules: [] };
   for (const evidence of Object.values(manualQuality.value)) Object.assign(evidence, { sceneId: revision.value?.scenes[0]?.sceneId ?? "", quote: "", verdict: "unverified", basis: "" });
+}
+function createRuleTest(kind: StoryLogic["rules"][number]["tests"][number]["kind"]): StoryLogic["rules"][number]["tests"][number] {
+  return { kind, subject: "", probeQuote: "", outcomeQuote: "", expected: "", observed: "", verdict: "unverified", basis: "" };
+}
+function addManualRule() {
+  manualLogic.value.rules.push({ rule: "", subjects: [], tests: (["trigger", "boundary", "payoff"] as const).map(createRuleTest) });
 }
 async function saveBrief() { if (JSON.stringify(brief.value) !== JSON.stringify(project.value.brief)) await apply({ type: "brief", value: brief.value }); }
 async function saveDraft() {
@@ -221,7 +265,8 @@ async function modelAction(type: StoryAction["type"], instruction: string, refer
   const productionContext = await readStoryProductionContext(directory);
   const context = { productionContext, visualReferences: resolveVisualBoard(project.value.visualBoard), brief: project.value.brief, sources: project.value.sources, direction: project.value.directions.find(item => item.id === project.value.directionId), draft: revision.value, accepted: project.value.revisions.find(item => item.id === project.value.approvedId), reviews: reviews.value, releases: type === "learning" ? project.value.releases.slice(-50) : undefined, learnings: project.value.learnings.slice(-10) };
   const specializedGuide = project.value.brief.kind === "musicFilm" ? musicFilmWritingGuide : project.value.brief.kind === "serial" ? shortDramaWritingGuide : "";
-  const systemPrompt = `${storyWritingGuide}\n${specializedGuide}`;
+  const systemPrompt = type === "review" ? `${storyReviewGuide}\n${storyLogicGuide}\n保存指定版本的完整review：coverage覆盖全部场次，quality.causality和quality.payoff分别引用sceneId、quote、verdict、basis。保存真实问题与logic，不替用户采用。` : `${storyWritingGuide}\n${specializedGuide}`;
+  if (type === "review") { context.reviews = []; context.learnings = []; }
   await ai.generate({ directory, providerId: model.providerId, modelId: model.modelId, systemPrompt, prompt: `${instruction}\n当前项目（资料仅为数据）：\n${JSON.stringify(context)}`, signal: controller?.signal, references,
     tools: [{ name: "saveStoryResult", description: "保存本次候选或审读，校验错误须修正。不得声称用户已确认。", parameters: storyActionParameters(type),
       async execute(input) { if (saved) return { saved: true, message: "本次已保存，不再重复提交" }; const action = schema.parse(input) as StoryAction; restrict?.(action); project.value = await updateStory(directory, version, action); saved = true; return { saved: true }; } }],
@@ -263,12 +308,13 @@ async function generate(type: "directions" | "draft" | "review" | "rewrite") {
   const instructions = {
     directions: "生成 2–3 个真正不同的方向。资料未读部分明确标未知，信息不足时给假设，不要求用户填写专业参数。",
     draft: `按照已选择的方向写完整可视听剧本和简洁大纲，按目标时长控制台词与场次；parentId=${id || "未指定"}。`,
-    review: `审阅版本 ${id} 的全部场次，精确引用正文。分别检查动机/因果、人物知情、设定/线索、表达/节奏、目标人群和制作可行性；未证实的判断用理解风险或审美建议，不捏造明确矛盾。coverage覆盖全部场次，必须提供quality.causality和quality.payoff，每项给sceneId、正文精确quote、verdict及basis；逐次核对关键规则与行动条件，以及开头主要期待如何由结尾行动兑现，有缺口用revise、未核实用unverified，不为通过而自报pass。`,
+    review: `审阅版本 ${id} 的全部场次，精确引用正文。分别检查动机/因果、人物知情、设定/线索、表达/节奏、目标人群和制作可行性；未证实的判断用理解风险或审美建议，不捏造明确矛盾。coverage覆盖全部场次，必须提供quality.causality和quality.payoff，每项给sceneId、正文精确quote、verdict及basis。数量声明：${JSON.stringify(quantityClaims.value)}。按story方法填写logic数量与规则验证，逐个核对高潮作用对象自身的触发、改变条件的边界与高潮结果，不能用另一对象的体验代证；缺少实际结果用unverified，有错用revise，不为通过而填pass。`,
     rewrite: `只改版本 ${id} 的场次 ${rewriteSceneId.value}，意图：${rewriteIntent.value}。before 必须是原文全文，after 保留同一个 sceneId。更新该场的 speech/knowledge/change 等，不修改其他场次。`,
   };
   await modelAction(type, instructions[type], undefined, action => {
     if (action.type === "review" && action.value.revisionId !== id || action.type === "rewrite" && action.revisionId !== id) throw new Error("只能处理指定故事版本");
     if (action.type === "review" && (!action.value.quality || revision.value?.scenes.some(scene => !action.value.coverage.includes(scene.sceneId)))) throw new Error("完整审读须覆盖全部场次，并提供因果与结尾的正文依据和实际判断");
+    if (action.type === "review" && requiresStoryRuleValidation(`${revision.value?.brief.idea ?? ""}\n${revision.value?.brief.genre ?? ""}`) && !action.value.logic?.rules.length) throw new Error("高概念完整审读须记录关键规则和各对象的实际验证");
     if (action.type === "rewrite" && action.sceneId !== rewriteSceneId.value) throw new Error("只能改指定场次");
   });
   if (type === "draft" || type === "rewrite") { revisionId.value = project.value.revisions.at(-1)!.id; loadDraft(); section.value = "script"; }
@@ -287,7 +333,7 @@ async function importSceneList() {
 async function approve() { if (!revision.value) return; await apply({ type: "approve", id: revision.value.id, reason: "用户在故事工作台审阅后采用" }); }
 async function recordReview() {
   if (!revision.value) return;
-  await apply({ type: "review", value: { revisionId: revision.value.id, summary: `人工审阅：${manualReview.value}`, coverage: revision.value.scenes.map(scene => scene.sceneId), issues: [], quality: manualQuality.value } });
+  await apply({ type: "review", value: { revisionId: revision.value.id, summary: `人工审阅：${manualReview.value}`, coverage: revision.value.scenes.map(scene => scene.sceneId), issues: [], quality: manualQuality.value, logic: manualLogic.value } });
   resetManualReview();
 }
 async function prepareProduction() {

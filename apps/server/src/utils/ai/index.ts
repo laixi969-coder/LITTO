@@ -103,6 +103,9 @@ export function prepareModelPayload(configured: Pick<ReturnType<typeof getConfig
   if (!payload || typeof payload !== "object") return payload;
   const body = payload as Record<string, unknown>;
   const url = new URL(configured.baseUrl);
+  // DeepSeek V4 默认开启思考；应用选择关闭时必须显式传递，否则审读可能耗尽输出额度。
+  if (url.origin === "https://api.deepseek.com" && /^(?:deepseek-flash|deepseek-v4-pro)$/.test(configured.model.id) && thinkingLevel === "off")
+    return { ...body, thinking: { type: "disabled" } };
   // Omni 默认开启思考；工作区专属域名也须显式传递应用选择的关闭状态。
   if (thinkingLevel === "off" && configured.model.id === "qwen3.8-omni-flash"
     && (/(?:^|\.)maas\.(?:aliyuncs|qwencloudapi)\.com$/.test(url.hostname) || ["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com"].includes(url.hostname)))

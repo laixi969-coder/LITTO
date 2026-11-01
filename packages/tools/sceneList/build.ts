@@ -1,5 +1,6 @@
 import { createToolConfig } from "@toonflow/tools-scaffold";
 import { musicFilmWritingGuide, shortDramaWritingGuide } from "./src/storyProject";
+import { storyLogicGuide } from "./src/storyLogic";
 
 await createToolConfig({
   name: "sceneList",
@@ -13,6 +14,7 @@ saveSceneList 必须引用正式采用的 storyRevisionId，保留其 sceneId �
 纯文字交付且指定篇幅范围时用prepareStoryText核对不含标题的正文，withinRange为false须修改再核对；此工具不保存文件，不违反只交文字的要求。精确局改传原稿与edits后直接使用返回text，不能重新生成整篇。程序计数和精确替换不代表因果或文学质量已经通过。
 ${musicFilmWritingGuide}
 ${shortDramaWritingGuide}
+${storyLogicGuide}
 剧情创作逐场写清目标、阻力、行动与可见变化，并给完整对白、说话对象、语气、身体任务、相对站位与触发后的反应。对白应改变对方的选择或关系，不让人物轮流讲设定；先用行动和镜头证据表达，旁白只用于已定的叙事功能，不能解释掉应演出的过程。慢戏、空镜与沉默写明带来的信息或关系变化，合并重复信息，不靠增加切镜数假装紧凑。场次 text 保留表演和声音通道，speech 只存实际朗读文字。审稿对照这些内容给原文依据，定稿后逐句追踪到镜头对白计划，不能以字幕存在代替真实发声。无声、旁白体和非剧情作品沿用用户目标。
 探索视觉方向用 readVisualReferences。readStoryProject 和 readSceneList 的 visualReferences 提供本项目收藏的构图、光线或色彩方法；依照具体用途落实到当前 Look 和镜头，不自动复制参考片剧情、人物或场景。文字画像匹配不代表看过图片，电影画面收藏不等于生成素材授权。用户明确选定后通过 updateStoryProject 的 visualBoard 保存 frameId、purpose、note，不能编造 ID 或替用户采用。
 场次表和拆解清单必须通过 saveSceneList、saveBreakdown 保存，不要在回复里写 JSON 代码块代替保存。
