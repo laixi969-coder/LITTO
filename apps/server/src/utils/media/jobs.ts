@@ -8,7 +8,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline } from "@/utils/media/generation";
+import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline, withHumanPerformance } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { assertMultiShotCapability } from "@/utils/media/shotCapabilities";
@@ -49,6 +49,7 @@ async function optimizeCompiledPrompt(directory: string, sections: Record<string
   const suffix = negativePrompt ? `\n画面中不得出现：${negativePrompt}。` : "";
   if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
   const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotConnection", "continuityContext", "shotExecution", "startingFrame", "staging", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding", "Objective", "Immutable locks", "Target duration", "Timeline", "Audio direction", "Shot execution", "Avoid"]);
+  protectedKeys.add("humanPerformance");
   const essential = Object.entries(sections).filter(([key, value]) => value && protectedKeys.has(key)).map(([key, value]) => `${key.toUpperCase()}: ${value}`).join("\n");
   const baseline = "PHOTOGRAPHICBASELINE: 保持已定媒介、身份、年龄、造型、干净完整状态及自然肤质；明确的剧情和视觉设计优先。";
   const budget = limit - [baseline, essential, suffix].join("\n").length - 32;
@@ -131,7 +132,8 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     if (kind === "video" && model.lipSync) speechSyncInputs = await validateSpeechInputs(directory, request);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
     const spec = isDirectorPrompt(request.prompt) ? "" : compileShotSpec(request.shotSpec);
-    request = { ...request, prompt: withPhotographicBaseline(spec ? `${spec}\n\n${request.prompt}` : request.prompt) };
+    const prompt = spec ? `${spec}\n\n${request.prompt}` : request.prompt;
+    request = { ...request, prompt: withPhotographicBaseline(kind === "video" ? withHumanPerformance(prompt) : prompt) };
   }
   const projectId = workspaceProject(directory)!;
   // 正式镜头的 request 由 compile 产物覆盖，参考图分流要在这之后执行，保证落库模型与实际调用一致。
@@ -327,6 +329,11 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
       result.compiled.prompt = `${blocking}\n\n${result.compiled.prompt}`;
       result.compiled.sections.blocking = [blocking.replace(/^BLOCKING:\s*/, ""), result.compiled.sections.blocking].filter(Boolean).join("; ");
     }
+  }
+  if (kind === "video") {
+    result.compiled.prompt = withHumanPerformance(result.compiled.prompt);
+    const direction = /^HUMANPERFORMANCE: (.+)$/m.exec(result.compiled.prompt)?.[1];
+    if (direction) result.compiled.sections.humanPerformance = direction;
   }
   const limit = promptLimit(kind, request.providerId, request.modelId, request.mode, request.generateAudio);
   if (limit) {
