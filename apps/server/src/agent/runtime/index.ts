@@ -130,10 +130,20 @@ export async function run(
     const parentFile = getParentSessionFile(history);
     const child = getSubAgentInfo(history)?.data;
     const liveTools = new Map<string, AgentToolCall>();
-    const ruleTask = requiresStoryRuleValidation(prompt);
     // ACT: 只依据指令首行判定直出交稿；后续可能包含待审稿件或引用简报，不能当成本轮意图。
-    const taskIntent = prompt.split("\n", 1)[0] ?? "";
-    const enforceStoryDelivery = (ruleTask || /故事/.test(taskIntent)) && /写一篇|写一个|创作|成稿/.test(taskIntent) && /(?:只|仅)(?:交|要|输出)[^。；\n]*(?:正文|故事|文字)/.test(taskIntent) && !/(?:只|仅)(?:审|评|分析)/.test(taskIntent);
+    let taskIntent = prompt.split("\n", 1)[0] ?? "";
+    if (/^(?:继续|接着|重写|续写|改写|再写|完成)/.test(taskIntent) && !/分析|点评|审稿|评分|停止|暂停/.test(taskIntent)) {
+      const previous = history.getBranch().flatMap(entry => {
+        if (entry.type !== "message" || entry.message.role !== "user") return [];
+        const content = entry.message.content;
+        return [typeof content === "string" ? content : content.filter(part => part.type === "text").map(part => part.text).join("\n")];
+      }).findLast(content => /故事|剧本|短剧/.test(content.split("\n", 1)[0] ?? "") && /写|创作|生成|成稿/.test(content.split("\n", 1)[0] ?? ""));
+      if (previous) taskIntent = `${previous.split("\n", 1)[0]}\n本轮要求：${taskIntent}`;
+    }
+    const storyTask = `${taskIntent}\n${prompt.split("\n").slice(1).join("\n")}`;
+    const ruleTask = requiresStoryRuleValidation(storyTask);
+    const directStoryTask = /故事|剧本|短剧/.test(taskIntent) && /写|创作|生成|成稿/.test(taskIntent) && !/工作台|场次表|分镜|保存|审稿|点评|评分|分析|只改|局部/.test(taskIntent);
+    const enforceStoryDelivery = directStoryTask || (ruleTask || /故事/.test(taskIntent)) && /写一篇|写一个|创作|成稿/.test(taskIntent) && /(?:只|仅)(?:交|要|输出)[^。；\n]*(?:正文|故事|文字)/.test(taskIntent) && !/(?:只|仅)(?:审|评|分析)/.test(taskIntent);
     const storyTextEvents = new Map<string, { blockId: string; content: string }>();
     const publish = send;
     send = event => {
@@ -172,7 +182,7 @@ export async function run(
       }),
     }));
     if (prepareTools) tools = prepareTools(tools);
-    const planning = enforceStoryDelivery ? createStoryPlanning(prompt, providerId, modelId) : undefined;
+    const planning = enforceStoryDelivery ? createStoryPlanning(storyTask, providerId, modelId) : undefined;
     const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();
     const storyReviewClaims = new Map<string, string>();
     const storyLengths = new Map<string, { countMode?: string; minCharacters?: number; maxCharacters?: number }>();
@@ -208,7 +218,7 @@ export async function run(
             try {
               // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限；同稿未核实时允许在预算内重试。
               const reviewer = await createAgentModel(providerId, modelId, "off");
-              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? `${prompt}\n已通过的结构方案（须核对正文是否兑现，不当作正文事实）：${JSON.stringify(planning.current())}` : prompt, prepared.text, ruleClaims, signal!);
+              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? `${storyTask}\n已通过的结构方案（须核对正文是否兑现，不当作正文事实）：${JSON.stringify(planning.current())}` : prompt, prepared.text, ruleClaims, signal!);
             } catch (error) {
               if (signal?.aborted) throw error;
               semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };
@@ -503,7 +513,7 @@ export async function run(
           for (const block of finalBlocks) publish({ type: "text", ...block, done: true });
           break;
         }
-        if (attempt) throw new Error("本轮高概念交稿未通过审读，或交稿与已核对正文不一致；草稿及审读记录已保留，未作为合格正文交付");
+        if (attempt) throw new Error("本轮故事交稿未通过审读，或交稿与已核对正文不一致；草稿及审读记录已保留，未作为合格正文交付");
         storyTextEvents.clear();
         await session.sendCustomMessage({ customType: "storyDeliveryCheck", content: "交付校验未通过：最终正文必须与本轮prepareStoryText返回ready:true的text一致（允许单独标题和换行排版）。先完成数量、规则证据与独立审读，再原样交付通过稿。不要另写未经核对的句子；没有通过时不得宣称完成。", display: false }, { triggerTurn: true });
         if (compactionError) throw new Error(compactionError);

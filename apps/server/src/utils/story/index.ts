@@ -6,6 +6,32 @@ import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
 import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
 import { inspectStoryLogic, requiresStoryRuleValidation } from "@toonflow/tool-scene-list/storyLogic";
+import { compareStoryPlans } from "@/utils/story/planning";
+import { reviewStoryText } from "@/utils/story/review";
+import { createAgentModel } from "@/agent/runtime/model";
+import { selectedModel } from "@/utils/modelSelection";
+
+// ACT: 服务端进程内最多缓存200个内容指纹，不信任客户端审稿字段；重启或淘汰后重新审读。
+const gateResults = new Map<string, boolean>();
+function rememberGate(key: string, passed: boolean) {
+  if (gateResults.size >= 200) gateResults.delete(gateResults.keys().next().value!);
+  gateResults.set(key, passed);
+}
+async function validateStructure(directory: string, project: StoryProject) {
+  if (!["story", "serial"].includes(project.brief.kind)) return;
+  const model = selectedModel("text") ?? fail("请先配置默认文本模型，不能跳过故事比选");
+  const key = createHash("sha256").update(JSON.stringify([directory, model, project.brief, project.directions, project.directionId, project.sources])).digest("hex");
+  if (gateResults.get(key) === false) fail("本方向结构评阅未通过，请修改候选方向后重新比选");
+  if (gateResults.get(key)) return key;
+  const index = project.directions.findIndex(item => item.id === project.directionId);
+  if (index < 0) fail("请先保存候选方向并选择故事方向，再生成版本");
+  const result = await compareStoryPlans(JSON.stringify(project.brief), project.directions, model.providerId, model.modelId);
+  // 已经选定的用户方向不得被模型自动换成另一方向，但仍须通过独立结构评阅。
+  const passed = !!result.selected && result.comparisons.find(item => item.id === index + 1)?.viable === true;
+  rememberGate(key, passed);
+  if (!passed) fail(`所选方向未通过结构比选：${JSON.stringify(result)}`);
+  return key;
+}
 
 const fileName = "storyProject.json";
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -52,11 +78,23 @@ async function validateApproval(directory: string, project: StoryProject, revisi
   if (reviews.some(review => review.issues.some(issue => (issue.category === "contradiction" || adopting && issue.category === "comprehension") && !review.decisions[issue.id]))) fail("存在未处置的明确矛盾或理解缺口，请修改或展示依据并记录保留决定");
   // ACT: 新采用执行完整审读，历史已采用版本不被新增字段追溯撤销；修改后的新版本须重新审读。
   if (adopting) {
+    const structureKey = await validateStructure(directory, project);
     const complete = reviews.findLast(review => revision.scenes.every(scene => review.coverage.includes(scene.sceneId)) && review.quality);
     const quality = complete?.quality;
     if (!quality || quality.causality.verdict !== "pass" || quality.payoff.verdict !== "pass") fail("尚未完成本版本的因果规则与结尾兑现审读：须覆盖全部场次，quality逐项引用正文依据；revise或unverified不能作为通过");
     const logic = inspectStoryLogic(revision.scenes.map(scene => scene.text).join("\n\n"), complete?.logic, requiresStoryRuleValidation(`${revision.brief.idea}\n${revision.brief.genre}`));
     if (!logic.ready) fail(`数量或规则验证尚未通过：${[...logic.invalidEvidence, ...logic.issues].join("；")}`);
+    if (structureKey) {
+      const model = selectedModel("text")!;
+      const key = createHash("sha256").update(JSON.stringify([structureKey, revision, complete?.logic])).digest("hex");
+      if (!gateResults.get(key)) {
+        const { runtime } = await createAgentModel(model.providerId, model.modelId, "off");
+        const result = await reviewStoryText(runtime, runtime.getModel(model.providerId, model.modelId)!, JSON.stringify({ brief: revision.brief, direction: revision.direction }), revision.scenes.map(scene => scene.text).join("\n\n"), complete?.logic?.rules ?? [], AbortSignal.timeout(190000));
+        if ("revision" in result && result.revision === "structure") rememberGate(structureKey, false);
+        if (result.verdict !== "pass") fail(`本版本独立审稿未通过，不能采用：${JSON.stringify(result)}`);
+        rememberGate(key, true);
+      }
+    }
   }
   if (project.sources.some(source => source.purpose === "fact" && !source.confirmed)) fail("作为事实使用的资料尚未确认");
   return revision;
@@ -165,6 +203,7 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
       catch (cause) { fail(cause instanceof Error ? cause.message : "剧本结构无效"); }
       await checkSources(directory, project.sources);
       const parent = parentId ? getRevision(parentId) : undefined;
+      await validateStructure(directory, project);
       const revision = { ...value, id: randomUUID(), createdAt: now, parentId, brief: structuredClone(project.brief), directionId: project.directionId, direction: structuredClone(project.directions.find(item => item.id === project.directionId)), sourceFingerprints: Object.fromEntries(project.sources.map(source => [source.id, source.fingerprint])) };
       project.revisions.push(revision);
       const impact = parent ? storyImpact(parent, revision) : undefined;
