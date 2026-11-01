@@ -13,7 +13,7 @@ export type SkinFinish = "clean" | "natural";
 
 export const skinFinishes: Record<SkinFinish, string> = {
   clean:
-    "人物肤色干净均匀，保留既定肤色、年龄与身份特征，以及符合景别的细微纹理和自然血色。肤面呈缎面哑光：额头、鼻梁、鼻尖与两颊同为漫反射，不出现竖直高光带、整片反光区或 T 区油亮；高光只允许在颧骨侧上方留一小块柔和光斑，嘴唇高光柔和不成膜。已指定的妆容与润泽程度优先。底妆与颈部自然衔接，眉毛和睫毛根根可辨，发根清爽蓬松。不要刻意放大毛孔、绒毛、色斑或皱纹，不加粉底分界、疲态、满脸油光或蜡状磨皮，也不把皮肤做成无高光的死哑光塑料面。雨水、汗水与潮湿只作用于头发和衣物；面部皮肤不随场景变湿，雨中人像面部至多零星水珠挂在局部，不做整脸水膜，不给额头、鼻梁、颧骨镜面高光。",
+    "人物妆面干净自然，保留既定肤色、年龄、身份、符合景别的细微纹理与自然血色差异。额头、鼻侧、两颊和嘴唇按实际光源、转向与材质呈现适度不同的光泽；轻薄底妆与颈部衔接，不把整张脸处理成统一颜色、统一粗糙度或无高光的哑光面。皮肤高光保持柔和层次，不以磨皮、锐化或额外腮红色块替代纹理和光照。眉毛、睫毛、发根与衣料保持自然细节；妆容、湿润状态和特殊妆效服从当前明确设计。不要新增伤斑、疲态、粗大毛孔、蜡质皮肤或无来源的局部色光。",
   natural:
     "人物保留既定肤色、年龄特征及符合景别的细微纹理；生活或纪实镜头允许少量自然皮脂反光和局部肤色变化，强度服从当时活动状态。眉毛、睫毛和唇纹自然可辨，不刻意添加粗大毛孔、粉底分界、厚重油膜或疲态，不以磨皮改变人物身份。雨水、汗水与潮湿只作用于头发和衣物；面部皮肤不随场景变湿，雨中人像面部至多零星水珠挂在局部，不做整脸水膜，不给额头、鼻梁、颧骨镜面高光。",
 };
@@ -128,6 +128,10 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   const techniqueMotion = techniques.some(item => item.stages.includes("video") && !item.stages.includes("image"));
   const motionBeats = type === "take" ? shot.camera?.design?.timeline ?? shot.musicVideo?.timeline ?? [] : [];
   const cameraDesign = shot.camera?.design;
+  const startingFrame = type === "keyframe" && cameraDesign?.start ? {
+    state: cameraDesign.start,
+    criterion: "逐人核对实际首帧的视线对象、手部任务、姿势、持物与受光，只表现触发前起点；不能提前画出抬眼、停手、微笑等后续反应。起态冲突先修关键帧或修订本镜设计，不把文字计划当图像已执行。",
+  } : undefined;
   // ACT: 检查点从同一执行规格生成，不推断动作是否合格；每项仍须真实播放观察，未观察不填通过。
   const checkpoints: { id: string; start: number; end: number; criterion: string }[] = type === "take" ? [
     ...(shot.continuity && Number.isFinite(duration) && duration > 0 ? [
@@ -139,6 +143,10 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
       { id: "cameraPath", start: 0, end: duration, criterion: `相机路线：${cameraDesign.cameraPath}；技法：${cameraDesign.technique}。对照唯一执行时间线检查触发、方向与停止点，区分主体移动与相机移动；固定镜头检查是否漂移。` },
       { id: "cameraEnd", start: Math.max(0, duration - 0.5), end: duration, criterion: `结束构图：${cameraDesign.end}。检查目标主体及部位是否完整可见、是否到达并停在预定落点；${(cameraDesign.acceptance ?? []).join("；")}` },
     ] : []),
+    ...(lines.length && Number.isFinite(duration) && duration > 0 ? [{
+      id: "dialoguePerformance", start: 0, end: duration,
+      criterion: `逐句对照当前 creativeBrief.dialogue.lines 的 ${lines.length} 句原文、说话人和发声窗口，记录实际时间。检查说话者身体任务是否抢台词；画内听者按实际获得的信息回应，记录关键词与反应的真实时间点、视线及手部或姿态证据。核对镜尾余波；不以嘴动、动作数量或抽帧判完整表演通过。对白时段是窗口，不要求拖长发音填满；有意停顿按设计判断。`,
+    }] : []),
     ...motionBeats.map((beat: any, index: number) => ({ id: `beat${index}`, start: beat.start, end: beat.end,
       criterion: `${beat.description}；${beat.transition === "cut" ? "检查切点前后姿态、持物、视线和运动方向" : "检查动作持续推进，无无故停顿、复位或隐藏切镜"}` })),
     ...(shot.interactions ?? []).map((event: any, index: number) => ({ id: `contact${index}`, start: event.start, end: event.end,
@@ -153,7 +161,7 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   // ACT: 分级只安排检查投入，不据此宣称质量通过；未知景别进入重点档。明确的演唱无逐句时间时覆盖整段。
   const tier = speech ? "speech" : visual || !shot.camera?.shotSize ? "visual" : "basic";
   const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
-  return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take", techniques,
+  return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take", techniques, startingFrame,
     checks: type === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"], speechRanges, interaction,
     motionPlan: type === "take" ? { mode: shot.camera?.design?.mode, beats: motionBeats, checkpoints, note: "逐段对照实际身体任务、接触结果、位移与接点；singleTake的节拍边界不能跳切或复位。完整播放后用 motionReview 逐项记录实际时间点、观察与 pass/revise；计划不是观察证据，未检查保持未验证。" } : undefined };
 }
@@ -196,8 +204,8 @@ export const agentReviewSchema = z.strictObject({
   observedStateDelta: z.record(z.string(), z.json()).optional().describe("实际观察到的镜尾状态变化，沿用 intendedStateDelta 分组但不得照抄计划；无变化传 {}。完整视频检查通过且提供实际末态时采用为正式镜头，并传递给后镜"),
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
   techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
-  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(149).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
-  creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字，写实际妆造与调度依据。"),
+  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(150).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
+  creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字；关键帧对照plan.startingFrame写实际视线、手部任务、姿态与触发前起点，不能仅复述计划。肤面核对无来源色块及磨皮；视频按motionPlan检查对白和听者反应。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),
     note: z.string().min(1),

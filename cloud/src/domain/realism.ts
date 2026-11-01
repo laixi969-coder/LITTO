@@ -20,7 +20,7 @@ export const audioReviewSchema = z.object({
 
 export const reviewedSegmentsSchema = z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).strict().refine(range => range.end > range.start)).max(80).default([]);
 export const techniqueReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(8);
-export const motionReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(149);
+export const motionReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(150);
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
@@ -61,13 +61,15 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
   const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
   const advertising = adContext(s, shot);
   const data = {
+    ...(creativeBrief?.dialogue.lines.length ? { performanceReviewVersion: 1 } : {}),
     ...(shot.continuity?.mode === "continuous" && previous ? { continuationCut: getEdit(s, previous.sequenceId, false).clips
       .filter(clip => clip.shotId === previous.id).map(clip => ({ mediaId: resolveClip(s, clip).mediaId, in: clip.in, out: clip.in + clip.duration * clip.speed, speed: clip.speed })) } : {}),
     ...(shot.techniques?.length ? { techniqueVersion } : {}),
     ...(advertising ? { advertising } : {}),
     musicSource: type === "take" && shot.musicVideo?.sourceMediaId ? s.get("media", shot.musicVideo.sourceMediaId) : null,
     shot: { ...shotData, ...(creativeBrief ? { creativeBrief: type === "keyframe"
-      ? { kind: creativeBrief.kind, intent: creativeBrief.intent, visualPayoff: creativeBrief.visualPayoff }
+      ? { kind: creativeBrief.kind, intent: creativeBrief.intent, visualPayoff: creativeBrief.visualPayoff,
+          dialogue: { lines: creativeBrief.dialogue.lines.map(line => ({ speakerId: line.speakerId, text: line.text, start: line.start })) } }
       : creativeBrief } : {}) },
     world: s.list("worlds", { projectId: shot.projectId }),
     looks: s.list("looks", { projectId: shot.projectId }).filter(look => look.scope === "project" || look.scope === "sequence" && look.scopeId === shot.sequenceId || look.scope === "shot" && look.scopeId === shotId),

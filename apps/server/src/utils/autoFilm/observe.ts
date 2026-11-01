@@ -53,7 +53,9 @@ export function validateDialogueObservation(plan: { id: string; speakerId: strin
     const review = reviews.find(review => review.id === line.id)!;
     if (review.verdict !== "pass") return [`${line.id}：${review.note}`];
     if (review.speakerId !== line.speakerId || spokenText(review.transcript) !== spokenText(line.text)
-      || review.start === null || review.end === null || review.end <= review.start || review.start < line.start - 0.25 || review.end > line.end + 0.25)
+      || review.start === null || review.end === null || !Number.isFinite(review.start) || !Number.isFinite(review.end)
+      || !Number.isFinite(line.start) || !Number.isFinite(line.end) || line.end <= line.start
+      || review.end <= review.start || review.start < line.start - 0.25 || review.end > line.end + 0.25)
       return [`${line.id} 实际转写、说话人或发声时间与规划不符，不能记为通过`];
     return [];
   });
@@ -88,7 +90,7 @@ export function videoObservationModel() {
   const model = selectedModel("videoReview");
   if (!model) throw new Error("请先配置支持视频与声音理解的视频审阅模型");
   const configured = getConfiguredModel(model.providerId, model.modelId, "videoReview");
-  const key = createHash("sha256").update(JSON.stringify([model, configured.provider.apiUrl, configured.provider.protocol, configured.provider.apiKey])).digest("hex");
+  const key = createHash("sha256").update(JSON.stringify(["dialoguePerformance1", model, configured.provider.apiUrl, configured.provider.protocol, configured.provider.apiKey])).digest("hex");
   return { configured, key };
 }
 
