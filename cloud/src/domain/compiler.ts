@@ -84,7 +84,7 @@ function effectiveLook(s: Scope, projectId: string, sequenceId?: string, shotId?
   return lookSchema.parse(result);
 }
 
-export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: string, purpose?: unknown) {
+export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: string, purpose?: unknown, kind?: "image" | "video") {
   if (!s.get("projects", projectId)) throw bad("生成项目不存在");
   const world = s.list("worlds", { projectId })[0];
   const look = effectiveLook(s, projectId);
@@ -93,9 +93,9 @@ export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: stri
     projectVisualContext: purpose === "asset"
       ? `Reusable identity reference. Use a simple background and neutral readable light unless explicitly requested otherwise. Preserve only the chosen medium: ${world?.realism ?? "photographic"}. Do not inherit scene lighting, time of day, dramatic grading or story action.`
       : `Inherit these project defaults unless the request explicitly changes the medium or scene. Do not relocate the requested scene or change its time of day to match a style reference. ${JSON.stringify({ medium: world?.realism, materials: world?.material, look })}`,
-    renderingStandard: photographicRendering,
-    visualDefaults: cleanVisualDefaults,
-    referenceUse: characterReferenceUse,
+    renderingStandard: kind === "video" ? "保持既定媒介、光源与材质，人物肤面继承参考与本镜明确设计。" : photographicRendering,
+    visualDefaults: kind === "video" ? "保持既定身份、造型和场景维护状态；表情与身体反应服从当前动作和触发，不冻结参考表情。" : cleanVisualDefaults,
+    referenceUse: kind === "video" ? "实际输入只用于指定的身份、首尾帧或动作参考；不复制设定板背景，镜内表演按本镜时序执行。" : characterReferenceUse,
   });
 }
 

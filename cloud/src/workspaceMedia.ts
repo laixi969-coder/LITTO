@@ -95,7 +95,7 @@ export function enqueueWorkspaceMedia(input: {
     price: {},
     capabilities: input.production?.capabilities ?? {},
   });
-  const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt, input.request.purpose);
+  const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt, input.request.purpose, input.kind);
   if (input.production || input.request.purpose === "asset") {
     const scope = scoped(input.workspaceId);
     const negativePrompt = input.negativePrompt ?? input.request.negativePrompt;
