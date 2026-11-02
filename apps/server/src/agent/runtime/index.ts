@@ -12,7 +12,7 @@ import { agentMentionsSchema, mentionPrompt, snapshotMentions, validateMentionTo
 import { describeModelError, readAiReferences, referenceContent } from "@/utils/ai";
 import { createAgentTools } from "@/agent/tools";
 import { createAgentResources } from "@/agent/runtime/resources";
-import { loadModelSkillContext } from "@/agent/skills/production";
+import { loadModelSkillContext, loadStoryWritingContext } from "@/agent/skills/production";
 import { createAgentModel } from "@/agent/runtime/model";
 import { installRequestBudget } from "@/agent/runtime/requestBudget";
 import { createSubAgentTool } from "@/agent/tools/subAgent";
@@ -31,6 +31,7 @@ import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { requiresStoryRuleValidation, type StoryLogic } from "@toonflow/tool-scene-list/storyLogic";
 import { createStoryPlanning } from "@/utils/story/planning";
 import { reviewStoryText } from "@/utils/story/review";
+import { createStoryWriter } from "@/utils/story/writing";
 
 type AgentOptions = {
   prompt: string;
@@ -181,6 +182,7 @@ export async function run(
         cwd, parentFile: file, name, task, providerId, modelId, thinkingLevel, canvas, signal: taskSignal, autonomousDecisions: question?.autonomousDecisions, send, onProgress,
       }),
     }));
+    if (/故事|剧本|剧情|短剧|爽剧|悬疑剧|剧集|story/i.test(taskIntent)) tools.push(createStoryWriter(providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal)));
     if (prepareTools) tools = prepareTools(tools);
     const planning = enforceStoryDelivery ? createStoryPlanning(storyTask, providerId, modelId) : undefined;
     const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();
@@ -218,7 +220,7 @@ export async function run(
             try {
               // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限；同稿未核实时允许在预算内重试。
               const reviewer = await createAgentModel(providerId, modelId, "off");
-              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? `${storyTask}\n已通过的结构方案（须核对正文是否兑现，不当作正文事实）：${JSON.stringify(planning.current())}` : prompt, prepared.text, ruleClaims, signal!);
+              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? storyTask : prompt, prepared.text, ruleClaims, signal!);
             } catch (error) {
               if (signal?.aborted) throw error;
               semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };

@@ -19,6 +19,17 @@ function explicitlyNamesSkill(task: string, name: string) {
   return task.split(/[^a-zA-Z0-9_-]+/).includes(name);
 }
 
+export async function loadStoryWritingContext(cwd: string, tools: SkillTools, task: string, signal?: AbortSignal) {
+  if (!canReadSkills(tools)) return "";
+  const skill = loadAgentSkills(cwd).skills.find(item => item.name === "story");
+  if (!skill || skill.disableModelInvocation && !explicitlyNamesSkill(task, skill.name)) return "";
+  const context = createSkillContext(cwd);
+  const manifest = await context.read({ name: "story" }, signal);
+  // ACT: 工作区自定义旧技能未引用新资料时沿用自身正文，不越过覆盖关系读取内置方法。
+  if (!manifest.content.includes("references/storyCreation.md")) return manifest.content;
+  return (await context.read({ name: "story", path: "references/storyCreation.md" }, signal)).content;
+}
+
 async function selectedVideoSkillModel() {
   const model = selectedModel("video");
   if (!model) return undefined;
@@ -124,7 +135,13 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     videoPromptDirector: ["references/segmentPlanning.md", ...(standalonePrompt ? ["references/fiveBlockWriting.md"] : [])],
     cinema: ["references/shotLanguage.md", "references/movementDirection.md", "references/referenceQuality.md"],
     workflow: [],
-    story: storyOnly ? ["references/core-methodology.md", "references/evaluation.md", "references/dialogue-aesthetics.md", ...(/高概念|异常|规则|科幻|悬疑/.test(task) ? ["references/high-concept.md"] : [])] : [],
+    // ACT: 创作默认只预读共同工作法；案例研究和专项审稿按任务读取，避免方法重复挤占正文上下文。
+    story: ["references/storyCreation.md", ...(storyOnly ? [
+      ...(/分析|研究|借鉴|参照/.test(task) ? ["references/storyMechanisms.md"] : []),
+      ...(/评分|审稿|审读|评估/.test(task) ? ["references/evaluation.md"] : []),
+      ...(/对白|台词/.test(task) ? ["references/dialogue-aesthetics.md"] : []),
+      ...(/高概念|异常规则|世界规则/.test(task) ? ["references/high-concept.md"] : []),
+    ] : [])],
     adfilm: ["references/creativeTranslation.md"],
     musicfilm: ["references/musicVideoDirection.md"],
     continuity: ["references/shotChecklist.md"],
