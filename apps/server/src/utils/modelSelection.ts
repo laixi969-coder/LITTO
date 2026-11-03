@@ -68,8 +68,8 @@ export async function assertMediaModelSelection(kind: "image" | "video" | "audio
     // 口型选择属于配音方案；仅允许选定声音和原视频的配对请求，不改变正式镜头的默认模型。
     if (await isVoiceSyncRequest(directory, request)) return request;
   }
-  if (kind === "image") request = routeImageEditModel(request);
-  const selectionKind: ModelKind = kind === "image" && request.images?.length && selectedModel("imageEdit") ? "imageEdit" : kind;
+  if (kind === "image" && !request.shotId) request = routeImageEditModel(request);
+  const selectionKind: ModelKind = kind === "image" && selectedModel("imageEdit") && (request.shotId ? isSelectedModel("imageEdit", request.providerId, request.modelId) : !!request.images?.length) ? "imageEdit" : kind;
   assertModelSelection(selectionKind, request.providerId, request.modelId);
   return request;
 }

@@ -9,7 +9,7 @@ import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline, withHumanPerformance } from "@/utils/media/generation";
-import { assertMediaModelSelection, assertModelSelection, routeImageEditModel } from "@/utils/modelSelection";
+import { assertMediaModelSelection, assertModelSelection, isSelectedModel, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { assertMultiShotCapability } from "@/utils/media/shotCapabilities";
 import { matchesAspect, mediaRatios } from "@toonflow/providers/aspect";
@@ -136,9 +136,6 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     request = { ...request, prompt: withPhotographicBaseline(kind === "video" ? withHumanPerformance(prompt) : prompt) };
   }
   const projectId = workspaceProject(directory)!;
-  // 正式镜头的 request 由 compile 产物覆盖，参考图分流要在这之后执行，保证落库模型与实际调用一致。
-  // 镜头参考在 compile 的 inputs 里（执行时才落成 images），独立素材直接看 request.images。
-  if (kind === "image") request = routeImageEditModel(request, !!request.images?.length || !!production?.compiled.inputs?.some(input => input.sent && input.mediaId));
   // 负面词与种子走独立字段，不拼进提示词正文：拼接后模型只会当作要绘制的文字内容。
   const compiled = production?.compiled;
   const merged = {
@@ -240,7 +237,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
         ...request,
         // 不支持种子的供应商保留原始请求，不能传入任务自动生成的内部种子。
         ...(input.negativePrompt ? { negativePrompt: input.negativePrompt } : {}),
-        ...(providerId !== "tencentWand" && !(providerId === "token01" && input.kind === "video") && input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
+        ...(providerId !== "tencentWand" && providerId !== "token01" && input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
       }, input.signal, async task => {
         // 先持久化回执与交付检查点；恢复只收取原结果，不创建子任务或重新生成。
         const previous = api.scoped(context.workspaceId).get("generation_jobs", context.jobId)?.parameters?.remoteTask;
@@ -263,16 +260,27 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
 }
 
 export async function prepareShot(directory: string, kind: "image" | "video", shotId: string, request: MediaGenerationRequest, previewOnly = false) {
+  if (request.images?.length || request.videos?.length || request.audios?.length || request.firstFrame || request.lastFrame) {
+    throw Object.assign(new Error("正式镜头的参考素材须先绑定到镜头或资产，首帧须采用为主关键帧；不能在生成请求中直接传入参考文件，否则不会进入编译结果"), { status: 400 });
+  }
   if (kind === "video") {
     const blocked = await coverageGate(directory);
     if (blocked) throw Object.assign(new Error(`对白覆盖未通过：${blocked}`), { status: 400, retryable: false });
   }
-  assertModelSelection(kind, request.providerId, request.modelId);
+  assertModelSelection(kind === "image" && isSelectedModel("imageEdit", request.providerId, request.modelId) ? "imageEdit" : kind, request.providerId, request.modelId);
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权制作镜头"), { status: 403 });
-  const model = (await listMediaModels()).find(item => item.providerId === request.providerId && item.modelId === request.modelId && item.type === kind);
+  const model = (await listMediaModels(true)).find(item => item.providerId === request.providerId && item.modelId === request.modelId && item.type === kind);
   if (!model) throw Object.assign(new Error("模型不存在"), { status: 400 });
+  if (kind === "image") {
+    const routed = routeImageEditModel(request, true);
+    if (routed.providerId !== request.providerId || routed.modelId !== request.modelId) {
+      const hasReferences = request.localRepair || api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
+        providerId: request.providerId, modelId: request.modelId, mode: model.mode, inspectReferences: true }).compiled.inputs.some(input => !!input.mediaId);
+      if (hasReferences) return prepareShot(directory, kind, shotId, routed, previewOnly);
+    }
+  }
   if (request.localRepair) {
     const scope = api.scoped(tenant.workspaceId);
     const frame = scope.get("keyframes", request.localRepair.keyframeId);
@@ -299,6 +307,9 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, nativeDialogue: model.nativeDialogue === true, audio: model.audio, localRepair: request.localRepair, ...(previewOnly ? { previewOnly: true } : {}) });
+  if (kind === "image" && request.providerId === "token01" && (result.compiled.negativePrompt || request.negativePrompt)) {
+    result.compiled.warnings.push("Token01 图片接口没有独立负向提示词字段；排除项会作为自然语言附加到提示词，效果须在实际结果中核验。");
+  }
   if (kind === "video" && !request.ratio && result.keyframeId) {
     const scope = api.scoped(tenant.workspaceId);
     const frame = scope.get("keyframes", result.keyframeId);

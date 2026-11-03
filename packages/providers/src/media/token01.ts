@@ -107,7 +107,7 @@ export default {
     const model = this.models?.find(item => item.id === input.model && item.type === "image");
     if (!model) throw new Error("此 Token01 图片模型尚未适配");
     if (!input.prompt.trim()) throw new Error("请填写提示词");
-    if ((input.images?.length ?? 0) > 1 || input.mask || input.negativePrompt || input.seed !== undefined || input.quality || input.outputFormat || input.other && Object.keys(input.other).length || input.n !== undefined && input.n !== 1) throw new Error("图片接口每次生成一张，最多支持一张参考图；不支持蒙版和其他参数");
+    if ((input.images?.length ?? 0) > 1 || input.mask || input.seed !== undefined || input.quality || input.outputFormat || input.other && Object.keys(input.other).length || input.n !== undefined && input.n !== 1) throw new Error("图片接口每次生成一张，最多支持一张参考图；不支持蒙版和其他参数");
     const sizes: Record<string, [string, string]> = {
       "1:1": ["1024x1024", "2048x2048"], "16:9": ["1360x768", "2848x1600"], "9:16": ["768x1360", "1600x2848"],
       "4:3": ["1184x896", "2304x1728"], "3:4": ["896x1184", "1728x2304"], "3:2": ["1248x832", "2496x1664"], "2:3": ["832x1248", "1664x2496"],
@@ -117,7 +117,8 @@ export default {
     if (!size || !model.imageSizes?.includes(tier) || !model.imageRatios?.includes(input.ratio || "1:1")) throw new Error("不支持此图片尺寸或画幅");
     const signal = AbortSignal.any([AbortSignal.timeout(10 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const image = input.images?.[0] ? await this.tool.relayMedia(input.images[0]) : undefined;
-    const result = await json(this, "/images/generations", signal, { model: input.model, prompt: input.prompt, size, n: 1, ...(image ? { image } : {}) });
+    const prompt = [input.prompt, input.negativePrompt ? `画面中不得出现：${input.negativePrompt}` : ""].filter(Boolean).join("\n");
+    const result = await json(this, "/images/generations", signal, { model: input.model, prompt, size, n: 1, ...(image ? { image } : {}) });
     if (!Array.isArray(result.data) || !result.data.length) throw new Error("Token01 未返回图片");
     return result.data.map((item: any): MediaAsset => {
       if (typeof item?.url === "string" && /^https?:\/\//i.test(item.url)) return { mediaType: "image", type: "url", url: item.url };

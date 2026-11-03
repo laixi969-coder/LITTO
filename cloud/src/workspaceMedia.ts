@@ -143,9 +143,10 @@ function generationSignature(request: Record<string, unknown>, prompt: string, n
 
 export function prepareWorkspaceShot(input: {
   workspaceId: string; projectId: string; shotId: string; kind: "image" | "video";
-  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean; nativeDialogue?: boolean; audio?: boolean | "optional"; localRepair?: unknown; previewOnly?: boolean;
+  providerId: string; modelId: string; mode?: unknown; cameraTrajectory?: boolean; nativeDialogue?: boolean; audio?: boolean | "optional"; localRepair?: unknown; previewOnly?: boolean; inspectReferences?: boolean;
 }) {
-  const { previewOnly = false, ...generationInput } = input;
+  const { previewOnly = false, inspectReferences = false, ...generationInput } = input;
+  if (inspectReferences && input.kind !== "image") throw bad("参考探查仅支持图像镜头");
   const previewWarnings: string[] = [];
   const s = scoped(input.workspaceId);
   const shot = s.get("shots", input.shotId);
@@ -186,7 +187,7 @@ export function prepareWorkspaceShot(input: {
   // ACT: 主帧必占一个输入槽；不得为了多参考丢掉已批准主帧。
   if (compiled.inputs.filter(ref => ref.sent).length > capabilities.maxInputs) throw bad("参考数量超出当前模式容量，请减少参考或更换模式");
   if (mode === "startEndRequired" && !compiled.inputs.some(ref => ref.role === "END_FRAME" && ref.sent)) throw bad("此模式须绑定尾帧");
-  requireCompiledInputs(compiled);
+  if (!inspectReferences) requireCompiledInputs(compiled);
   const counts = { image: 0, video: 0, audio: 0 };
   const importedAssets = s.list("assets", { projectId: input.projectId }).filter(asset => asset.attributes?.importedFrom);
   for (const ref of compiled.inputs.filter(ref => ref.sent)) {
@@ -219,5 +220,5 @@ export function prepareWorkspaceShot(input: {
   const repairParameters = repair ? { localRepairOf: repair.keyframe.id, localRepairKind: repair.kind, localRepairTarget: repair.target } : undefined;
   const fingerprint = createHash("sha256").update(JSON.stringify([shotFingerprint(s, shot.id), generationInput, keyframe?.id, compiled])).digest("hex");
   compiled.warnings.push(...previewWarnings);
-  return { shotId: shot.id, keyframeId: keyframe?.id, repairParameters, fingerprint, specFingerprint: shotFingerprint(s, shot.id), previewOnly, compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
+  return { shotId: shot.id, keyframeId: keyframe?.id, repairParameters, fingerprint, specFingerprint: shotFingerprint(s, shot.id), previewOnly: previewOnly || inspectReferences, compiled, capabilities, duration: shot.generationDuration ?? shot.duration, audioMode: nativeDialogue ? "generated" : shot.musicVideo?.audioMode as string | undefined };
 }
