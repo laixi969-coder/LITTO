@@ -638,9 +638,13 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
   const tenant = currentTenant(), api = cloud();
   const receipt = request.speechSegment && tenant && api?.dbGet("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", tenant.workspaceId, `workspaceMedia:${requestId}`);
   const automatic = autoFilmScope.getStore();
+  let countedAutomatic = false;
   if (automatic) {
     if (automatic.directory !== cwd) throw new Error("自动成片任务不能跨工作目录生成素材");
-    if (api && tenant && mediaType !== "audio" && !receipt) await automatic.beforeGeneration(mediaType, request);
+    if (api && tenant && mediaType !== "audio" && !receipt) {
+      await automatic.beforeGeneration(mediaType, request);
+      countedAutomatic = true;
+    }
   }
   if (request.localRepair && (!api || !currentTenant() || mediaType !== "image" || !request.shotId)) invalid("关键帧精修须使用已连接项目的图像镜头，不能退化成独立文生图");
   if (!api || !currentTenant() || mediaType === "audio") {
@@ -657,6 +661,7 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
   onProgress?.("正在校验编译规格与参考素材，尚未提交生成");
   const { enqueueMedia } = await import("@/utils/media/jobs");
   const job = await enqueueMedia(cwd, mediaType, request, requestId);
+  if (countedAutomatic && job.reused) await automatic!.reuseGeneration(mediaType, request);
   const started = Date.now();
   let reported = "";
   let reportedAt = 0;

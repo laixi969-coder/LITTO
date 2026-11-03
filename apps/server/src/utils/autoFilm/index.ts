@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { mkdir, readFile, stat, writeAtomic } from "@toonflow/file";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { QuestionAnswer, QuestionContext } from "@toonflow/tools-scaffold/runtime";
 import { z } from "zod";
@@ -13,6 +14,8 @@ import { getConfiguredModel } from "@/utils/ai";
 import { listMediaModels } from "@/utils/media/generation";
 import { workspaceProject } from "@/utils/media/jobs";
 import { readStoryProject } from "@/utils/story";
+import { storyStale } from "@toonflow/tool-scene-list/storyProject";
+import { getActiveAgentSession } from "@/agent/runtime/sessions";
 import { getStatus } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { autoFilmScope } from "./scope";
@@ -25,9 +28,10 @@ import { assertNarrativeReady, autoFilmProgress, narrativeFailures, narrativePla
 
 const relativePath = z.string().min(1).max(2048).refine(value => !/^[\\/]|[:\u0000-\u001f]/.test(value) && value.split(/[\\/]/).every(part => part && part !== "." && part !== ".."), "须为工作区相对路径");
 export const inputSchema = z.strictObject({
-  script: z.string().trim().min(1).max(100000),
-  references: z.array(z.strictObject({ name: z.string().trim().min(1).max(200), path: relativePath })).max(20),
-});
+  script: z.string().trim().min(1).max(100000).optional(),
+  references: z.array(z.strictObject({ name: z.string().trim().min(1).max(200), path: relativePath })).max(20).optional(),
+  handoff: z.strictObject({ sessionFile: z.string().regex(/^[\w-]+\.jsonl$/), sequenceId: z.string().min(1).max(128) }).optional(),
+}).refine(value => value.handoff ? value.script === undefined && value.references === undefined : !!value.script && !!value.references, "请选择新建任务或交接当前制作");
 const choiceSchema = z.strictObject({
   answer: z.string().trim().min(1).max(8000),
   values: z.record(z.string(), z.union([z.string().max(8000), z.number().finite(), z.boolean(), z.array(z.string())])).optional(),
@@ -39,6 +43,7 @@ const stateSchema = z.object({
   createdAt: z.string(), updatedAt: z.string(), script: z.string(),
   references: z.array(z.object({ name: z.string(), path: relativePath, mimeType: z.string(), mediaId: z.string() })),
   sessionFile: z.string().regex(/^[\w-]+\.jsonl$/).optional(), sequenceIds: z.array(z.string()),
+  handoffSessionFile: z.string().regex(/^[\w-]+\.jsonl$/).optional(),
   storyRevisionId: z.string().optional(),
   narrativeReviews: z.array(narrativeReviewSchema).default([]),
   generationCount: z.number().int().nonnegative(), attempts: z.record(z.string(), z.number().int().nonnegative()),
@@ -103,6 +108,21 @@ export async function get(directory: string): Promise<AutoFilmTask | null> {
     ? { ...task, status: "interrupted", progress: "服务已重启，制作进度已保留，点击继续制作可恢复" } : task;
 }
 
+export async function handoffOptions(directory: string) {
+  const context = identity(directory);
+  if (!context.projectId) throw new Error("当前工作区尚未建立制作项目，请先创建制作序列");
+  const story = await readStoryProject(directory);
+  const revision = story.revisions.find(item => item.id === story.approvedId);
+  if (!revision || storyStale(story, revision)) throw new Error("请先在故事工作台采用当前有效剧本，再交接自动续做");
+  if (new Set(revision.scenes.map(scene => scene.episodeNumber).filter(value => value !== undefined)).size > 1) throw new Error("当前剧本包含多集，自动续做暂不支持一次交接多个序列");
+  const scope = context.api.scoped(context.tenant.workspaceId);
+  return {
+    story: revision.title,
+    sequences: scope.list("sequences", { projectId: context.projectId }).filter(item => item.storyRevisionId === revision.id)
+      .map(item => ({ id: item.id, name: item.name, shots: scope.list("shots", { sequenceId: item.id }).length })),
+  };
+}
+
 function validateChoice(request: Parameters<QuestionContext["ask"]>[1], choice: z.infer<typeof choiceSchema>): QuestionAnswer {
   if (request.fields?.length) {
     const values = choice.values ?? {};
@@ -133,6 +153,9 @@ function launch(task: AutoFilmTask, folder: string) {
   };
   const choiceScope = new AsyncLocalStorage<{ tool: string; choice?: z.infer<typeof choiceSchema> }>();
   const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(6 * 3600_000)]);
+  const taskInstructions = task.handoffSessionFile
+    ? instructions.replace("先在故事工作台保存、审阅并自动采用本任务剧本，记录稳定sceneId。创建本任务专属的新序列，sequence的storyRevisionId引用这版剧本，镜头source.sceneId关联对应场次。所有新镜头和导出归入该序列；复用适用资产，不修改其他序列与旧成片。", "这是从手动对话交接的任务。沿用已采用剧本、指定序列、已有镜头和素材，先读取真实状态和原对话约束；仅补齐缺项，不新建序列、不重写或重新采用剧本，不重复生成已有有效素材。所有新增镜头和导出归入指定序列，不修改其他序列与旧成片。")
+    : instructions;
   const assertActive = () => {
     signal.throwIfAborted();
     const context = identity(task.directory);
@@ -175,6 +198,7 @@ function launch(task: AutoFilmTask, folder: string) {
           if (tool.name === "requestProductionDecision" && (["reviewFinal", "reviewOutput", "approveTake", "publishAsset", "libraryReference"].includes(input.operation) || input.operation === "selectCandidate" && input.data?.asHero))
             throw new Error("自动模式不代填用户满意度或修改跨项目角色库；关键帧和视频请用 reviewProduction，成片用 productionSpec(agentReviewFinal)");
           if (tool.name === "requestStoryDecision" && input.decision?.type === "release") throw new Error("自动成片不执行发布或填写发布反馈");
+          if (task.handoffSessionFile && (["updateStoryProject", "requestStoryApproval", "requestStoryDecision"].includes(tool.name) || tool.name === "productionSpec" && input.operation === "sequence")) throw new Error("交接任务沿用原有剧本和指定序列，不能重写剧本、重新采用或创建新序列");
           if (tool.name === "productionSpec" && ["publishAsset", "favoriteAsset"].includes(input.operation)) throw new Error("本任务只制作当前项目，不修改跨项目角色库");
           const { api, tenant } = identity(task.directory), scope = api.scoped(tenant.workspaceId);
           const operationData = input.data ?? {};
@@ -206,7 +230,7 @@ function launch(task: AutoFilmTask, folder: string) {
               const binding = scope.get("reference_bindings", operationData.bindingId);
               if (binding?.targetType === "shot") sequenceIds.push(scope.get("shots", binding.targetId)?.sequenceId ?? "");
             }
-            if (sequenceIds.some(sequenceId => !task.sequenceIds.includes(sequenceId))) throw new Error("自动成片只修改和导出本任务新建的序列，不能修改手动制作序列");
+            if (sequenceIds.some(sequenceId => !task.sequenceIds.includes(sequenceId))) throw new Error("自动成片只能修改和导出本任务指定的序列");
           }
           if (tool.name === "productionSpec" && input.operation === "importSpeech") {
             const { path } = await resolveWorkspacePath(task.directory, z.string().min(1).parse(operationData.videoPath));
@@ -217,7 +241,7 @@ function launch(task: AutoFilmTask, folder: string) {
           const reviews = tool.name === "reviewProductions" ? input.reviews : tool.name === "reviewProduction" ? [input] : tool.name === "productionSpec" && input.operation === "agentReview" ? [input.data] : [];
           for (const review of reviews) {
             const target = scope.get(review.targetType === "take" ? "takes" : "keyframes", review.targetId);
-            if (!target || !task.sequenceIds.includes(scope.get("shots", target.shotId)?.sequenceId)) throw new Error("只能审阅和采用本任务新建序列的素材");
+            if (!target || !task.sequenceIds.includes(scope.get("shots", target.shotId)?.sequenceId)) throw new Error("只能审阅和采用本任务指定序列的素材");
             if (review.targetType !== "take" || !review.fullPlayback) continue;
             const take = scope.get("takes", review.targetId), media = take && scope.get("media", take.mediaId);
             const fingerprint = api.shotFingerprint(scope, take!.shotId);
@@ -349,7 +373,7 @@ function launch(task: AutoFilmTask, folder: string) {
       if (request.shotId) {
         const { api, tenant } = identity(task.directory);
         const scope = api.scoped(tenant.workspaceId), shot = scope.get("shots", request.shotId);
-        if (!shot || !task.sequenceIds.includes(shot.sequenceId)) throw new Error("自动成片不能生成或重做手动制作序列的镜头");
+        if (!shot || !task.sequenceIds.includes(shot.sequenceId)) throw new Error("自动成片只能生成本任务指定序列的镜头");
         if (kind !== "audio") api.assertSpeechPlan(scope, shot);
       }
       const key = createHash("sha256").update(JSON.stringify([kind, request.shotId ?? request.voiceLineId ?? request.outputName ?? request.prompt])).digest("hex");
@@ -357,6 +381,12 @@ function launch(task: AutoFilmTask, folder: string) {
       if ((task.attempts[key] ?? 0) >= 3) throw new Error("此目标已达到3次尝试上限，已有素材和进度已保留");
       task.generationCount++;
       task.attempts[key] = (task.attempts[key] ?? 0) + 1;
+      await save();
+    },
+    async reuseGeneration(kind, request) {
+      const key = createHash("sha256").update(JSON.stringify([kind, request.shotId ?? request.voiceLineId ?? request.outputName ?? request.prompt])).digest("hex");
+      task.generationCount--;
+      if (--task.attempts[key]! === 0) delete task.attempts[key];
       await save();
     },
   }, async () => {
@@ -375,10 +405,12 @@ function launch(task: AutoFilmTask, folder: string) {
         const progress = await autoFilmProgress(task);
         task.progress = `${progress.stage}：${progress.nextAction}`;
         await save();
-        await run({ cwd: task.directory, ...model, thinkingLevel: "medium", sessionFile: task.sessionFile, signal, question, instructions, prepareTools,
-          prompt: turn === 0 && !task.sessionFile
+        await run({ cwd: task.directory, ...model, thinkingLevel: "medium", sessionFile: task.sessionFile, signal, question, instructions: taskInstructions, prepareTools,
+          prompt: turn === 0 && task.handoffSessionFile
+            ? `用户从手动对话启动自动续做。请沿用当前已采用剧本、指定序列和已有成果，不重写或重新采用剧本，不重复生成可用素材。任务 ${task.id}，剧本版本 ${task.storyRevisionId}，序列 ${JSON.stringify(task.sequenceIds)}。系统计算的当前阶段与缺项：${JSON.stringify(progress)}。\n已采用剧本正文：\n${task.script}\n当前执行规则：\n${taskInstructions}`
+            : turn === 0 && !task.sessionFile
             ? `用户点击启动一键自动成片。任务 ${task.id}。请把以下剧本与角色参考完整制作成片，由你决定全部制作选项。已有任务序列：${JSON.stringify(task.sequenceIds)}；已有采用版本：${task.storyRevisionId ?? "无"}。有已有成果时先读取并复用，不重复创建。\n剧本：\n${task.script}\n参考图片（实际读取后使用）：\n${JSON.stringify(task.references)}\n执行规则：\n${instructions}`
-            : `继续自动成片任务 ${task.id}，用户已授权全部制作选择。系统从真实数据计算的当前阶段与缺项：${JSON.stringify(progress)}。先核对已有媒体和原任务状态，不重复生成。任务序列：${JSON.stringify(task.sequenceIds)}。剩余生成次数：${120 - task.generationCount}。完成正式导出及代理验收后调用 completeAutoFilm；不得用文本总结结束未完成任务。以本次执行规则重新核对历史阻塞，不能直接重复旧结论。\n当前执行规则：\n${instructions}`,
+            : `继续自动成片任务 ${task.id}，用户已授权全部制作选择。系统从真实数据计算的当前阶段与缺项：${JSON.stringify(progress)}。先核对已有媒体和原任务状态，不重复生成。任务序列：${JSON.stringify(task.sequenceIds)}。剩余生成次数：${120 - task.generationCount}。完成正式导出及代理验收后调用 completeAutoFilm；不得用文本总结结束未完成任务。以本次执行规则重新核对历史阻塞，不能直接重复旧结论。\n当前执行规则：\n${taskInstructions}`,
         }, event => {
           if (event.type === "session") { task.sessionFile = event.file; void save().catch(() => controller.abort()); }
           if (event.type === "error") task.error = event.message;
@@ -419,10 +451,32 @@ export async function start(directory: string, input: unknown) {
     if (!["image", "video"].every(kind => models.some(item => item.type === kind && !item.lipSync))) throw new Error("请先配置可用的默认图片和视频模型");
     const { tools } = await getStatus();
     if (!tools.ffmpeg.path || tools.ffmpeg.error || !tools.ffprobe.path || tools.ffprobe.error) throw Object.assign(new Error("自动成片需要可用的FFmpeg和FFprobe，请先在设置中配置"), { status: 424 });
+    let script = parsed.script ?? "", sessionFile: string | undefined, storyRevisionId: string | undefined;
+    let sequenceIds: string[] = [];
+    if (parsed.handoff) {
+      const story = await readStoryProject(directory);
+      const revision = story.revisions.find(item => item.id === story.approvedId);
+      if (!revision || storyStale(story, revision)) throw new Error("请先采用当前有效剧本，再交接自动续做");
+      if (new Set(revision.scenes.map(scene => scene.episodeNumber).filter(value => value !== undefined)).size > 1) throw new Error("当前剧本包含多集，自动续做暂不支持一次交接多个序列");
+      const sequence = context.api.scoped(context.tenant.workspaceId).get("sequences", parsed.handoff.sequenceId);
+      if (!sequence || sequence.projectId !== context.projectId || sequence.storyRevisionId !== revision.id) throw new Error("所选序列不属于当前项目或未关联当前采用剧本");
+      script = revision.scenes.map(scene => scene.text).join("\n\n");
+      if (!script || script.length > 100000) throw new Error("已采用剧本为空或超过自动成片字数上限");
+      const { path: source } = await resolveWorkspacePath(directory, `.agent/sessions/${parsed.handoff.sessionFile}`);
+      const releaseSession = lockWorkspaceFiles([source]);
+      try {
+        if (getActiveAgentSession(source)) throw new Error("当前对话正在运行，请等待本轮结束后交接");
+        if (!(await stat(source)).isFile()) throw new Error("当前对话不存在");
+        const { path: sessionsDir } = await resolveWorkspacePath(directory, ".agent/sessions");
+        sessionFile = basename(SessionManager.forkFrom(source, directory, sessionsDir).getSessionFile()!);
+      } finally { releaseSession(); }
+      storyRevisionId = revision.id;
+      sequenceIds = [sequence.id];
+    }
     const id = randomUUID(), references: AutoFilmTask["references"] = [];
     const inputs = `.agent/autoFilms/task${id.replaceAll("-", "")}`;
     await mkdir((await resolveWorkspacePath(directory, inputs, true)).path, { recursive: true });
-    for (const [index, reference] of parsed.references.entries()) {
+    for (const [index, reference] of (parsed.references ?? []).entries()) {
       const source = await resolveWorkspacePath(directory, reference.path);
       const info = await stat(source.path);
       if (!info.isFile() || !info.size || info.size > 20 * 1024 * 1024) throw new Error("角色图须为非空且不超过20MB的图片文件");
@@ -439,7 +493,7 @@ export async function start(directory: string, input: unknown) {
     }
     const timestamp = new Date().toISOString();
     const task: AutoFilmTask = { id, directory, projectId: context.projectId, userId: context.tenant.userId, workspaceId: context.tenant.workspaceId,
-      status: "running", createdAt: timestamp, updatedAt: timestamp, script: parsed.script, references, sequenceIds: [], generationCount: 0, attempts: {}, toolCalls: 0, playbacks: [], progress: "正在准备自动制作", decisions: [] };
+      status: "running", createdAt: timestamp, updatedAt: timestamp, script, references, sessionFile, handoffSessionFile: parsed.handoff?.sessionFile, storyRevisionId, sequenceIds, generationCount: 0, attempts: {}, toolCalls: 0, playbacks: [], progress: "正在准备自动制作", decisions: [] };
     await mkdir(context.folder, { recursive: true });
     await writeAtomic(join(context.folder, `task${id.replaceAll("-", "")}.json`), JSON.stringify(task, null, 2), { exclusive: true });
     await writeAtomic(context.currentPath, JSON.stringify({ id }));

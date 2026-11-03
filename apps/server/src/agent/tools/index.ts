@@ -60,7 +60,15 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
     }
     const result = await generateMedia(cwd, kind, request, mediaSignal(signal), onProgress);
     onProgress?.("结果已保存，正在补充画布节点与连线");
-    for (const asset of result) await publishFile(asset.path, signal, request.outputName);
+    const failures: string[] = [];
+    for (const asset of result) {
+      try { await publishFile(asset.path, signal, request.outputName); }
+      catch (error) {
+        mediaSignal(signal)?.throwIfAborted();
+        failures.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    if (failures.length) throw new Error(`生成结果均已保存：${result.map(asset => asset.path).join("、")}。${failures.join("；")}`);
     return result;
   }
   const files: ToolFiles = {

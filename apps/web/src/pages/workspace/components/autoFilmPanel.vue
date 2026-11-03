@@ -15,8 +15,8 @@
       </div>
     </header>
     <div v-show="!collapsed" id="autoFilmContent" class="autoFilmPanel">
-      <p class="intro">提供剧本和可选角色图，启动后由 AI 完成制作选择、生成、剪辑与成片导出。关闭此面板后任务继续运行。</p>
-      <p v-if="error" class="errorMessage" role="alert">{{ error }} <el-button text @click="refresh">刷新状态</el-button></p>
+      <p class="intro">{{ handoffSession ? '从当前对话接续已采用剧本和所选制作序列，AI 将继续制作并自动决定本任务内的制作选择。' : '提供剧本和可选角色图，启动后由 AI 完成制作选择、生成、剪辑与成片导出。关闭此面板后任务继续运行。' }}</p>
+      <p v-if="error" class="errorMessage" role="alert">{{ error }} <el-button text @click="loadPanel">刷新状态</el-button></p>
       <section v-if="task" class="taskState" aria-label="自动制作进度">
         <div class="taskHeader"><strong>{{ statusLabels[task.status] }}</strong><span>媒体生成 {{ task.generationCount }} / 120 次</span></div>
         <p class="progressText" role="status" aria-live="polite">{{ task.progress }}</p>
@@ -32,7 +32,18 @@
           <el-button v-else-if="task.status !== 'completed'" :loading="busy" @click="changeTask('resume')">继续制作</el-button>
         </div>
       </section>
-      <form v-if="task?.status !== 'running'" class="inputForm" @submit.prevent="start">
+      <form v-if="handoffSession && task?.status !== 'running'" class="inputForm" @submit.prevent="startHandoff">
+        <p v-if="handoffStory">已采用剧本：{{ handoffStory }}</p>
+        <label for="handoffSequence">继续制作的序列</label>
+        <select id="handoffSequence" v-model="handoffSequence" :disabled="loading || busy">
+          <option value="">请选择序列</option>
+          <option v-for="item in handoffSequences" :key="item.id" :value="item.id">{{ item.name }}（{{ item.shots }} 个镜头）</option>
+        </select>
+        <p v-if="!loading && !error && !handoffSequences.length">当前采用剧本没有关联的制作序列。</p>
+        <p class="limits">启动后按已配置模型计费，AI 将自动处理制作选择；最多 120 次媒体生成，每个目标最多尝试 3 次。已有素材保留并优先复用。</p>
+        <el-button type="primary" nativeType="submit" :disabled="!handoffSequence || loading" :loading="busy">启动自动续做</el-button>
+      </form>
+      <form v-else-if="!handoffSession && task?.status !== 'running'" class="inputForm" @submit.prevent="start">
         <label for="autoFilmScript">故事 / 剧本</label>
         <el-input id="autoFilmScript" v-model="script" type="textarea" :rows="10" :maxlength="100000" :disabled="busy || loading" aria-label="故事或剧本正文" />
         <div class="inputActions">
@@ -57,7 +68,7 @@ import type { AutoFilmTask } from "@toonflow/server/autoFilm";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { registerApiLanguage } from "@/lib/i18n";
 
-const props = defineProps<{ directory: string }>();
+const props = defineProps<{ directory: string; handoffSession?: string }>();
 const visible = defineModel<boolean>({ default: false });
 const collapsed = ref(false);
 const panel = ref<HTMLElement>();
@@ -77,6 +88,9 @@ const client = axios.create({ baseURL: "/api/autoFilm", headers: { "x-toonflow-w
 registerApiLanguage(client);
 const script = ref("");
 const images = ref<File[]>([]);
+const handoffStory = ref("");
+const handoffSequence = ref("");
+const handoffSequences = ref<{ id: string; name: string; shots: number }[]>([]);
 const scriptInput = ref<HTMLInputElement>();
 const imageInput = ref<HTMLInputElement>();
 const task = ref<AutoFilmTask | null>(null);
@@ -89,6 +103,7 @@ const resizeObserver = new ResizeObserver(([entry]) => { if (entry && visible.va
 let timer: ReturnType<typeof setTimeout> | undefined;
 let disposed = false;
 let revision = 0;
+let panelRevision = 0;
 
 function boundPosition(left: number, top: number) {
   return { left: Math.max(16, Math.min(left, viewport.width - windowWidth.value - 16)), top: Math.max(16, Math.min(top, viewport.height - Math.min(windowHeight.value, maxHeight.value) - 16)) };
@@ -147,23 +162,44 @@ function schedule() {
 async function refresh() {
   const current = ++revision;
   const directory = props.directory;
+  const wasRunning = task.value?.status === "running";
   try {
     const { data } = await client.get<{ data: AutoFilmTask | null }>("/get", { params: { directory } });
     if (disposed || current !== revision || directory !== props.directory) return;
     task.value = data.data;
     error.value = "";
+    if (wasRunning && data.data?.status !== "running" && props.handoffSession && visible.value) void loadPanel();
   } catch (cause) {
     if (!disposed && current === revision) error.value = message(cause);
   } finally { schedule(); }
 }
 
-watch(visible, async open => {
-  clearTimeout(timer);
-  if (!open) { revision++; stopMove(); return; }
-  collapsed.value = false;
+async function loadPanel() {
+  const current = ++panelRevision, session = props.handoffSession;
   loading.value = true;
+  handoffStory.value = "";
+  handoffSequences.value = [];
+  handoffSequence.value = "";
   await refresh();
-  loading.value = false;
+  if (disposed || current !== panelRevision || !visible.value) return;
+  if (!error.value && session && task.value?.status !== "running") {
+    try {
+      const { data } = await client.get<{ data: { story: string; sequences: typeof handoffSequences.value } }>("/handoff", { params: { directory: props.directory } });
+      if (!disposed && current === panelRevision && visible.value) {
+        handoffStory.value = data.data.story;
+        handoffSequences.value = data.data.sequences;
+        if (data.data.sequences.length === 1) handoffSequence.value = data.data.sequences[0]!.id;
+      }
+    } catch (cause) { if (!disposed && current === panelRevision) error.value = message(cause); }
+  }
+  if (!disposed && current === panelRevision) loading.value = false;
+}
+
+watch(() => [visible.value, props.handoffSession] as const, ([open]) => {
+  clearTimeout(timer);
+  if (!open) { revision++; panelRevision++; stopMove(); return; }
+  collapsed.value = false;
+  void loadPanel();
 }, { immediate: true });
 
 async function loadScript(event: Event) {
@@ -214,6 +250,20 @@ async function start() {
   } finally { busy.value = false; schedule(); }
 }
 
+async function startHandoff() {
+  if (busy.value || loading.value || !props.handoffSession || !handoffSequence.value) return;
+  busy.value = true;
+  error.value = "";
+  const directory = props.directory, sessionFile = props.handoffSession, sequenceId = handoffSequence.value;
+  try {
+    const { data } = await client.post<{ data: AutoFilmTask }>("/start", { directory, handoff: { sessionFile, sequenceId } });
+    if (!disposed && directory === props.directory) { task.value = data.data; collapsed.value = true; }
+  } catch (cause) {
+    await refresh();
+    error.value = message(cause);
+  } finally { busy.value = false; schedule(); }
+}
+
 async function changeTask(operation: "stop" | "resume") {
   if (busy.value || !task.value) return;
   busy.value = true;
@@ -226,12 +276,13 @@ async function changeTask(operation: "stop" | "resume") {
     if (!disposed && directory === props.directory) {
       task.value = data.data;
       if (operation === "resume" && data.data?.status === "running") collapsed.value = true;
+      if (operation === "stop" && props.handoffSession && data.data?.status !== "running") void loadPanel();
     }
   } catch (cause) { error.value = message(cause); }
   finally { busy.value = false; schedule(); }
 }
 
-onScopeDispose(() => { disposed = true; revision++; clearTimeout(timer); stopMove(); resizeObserver.disconnect(); window.removeEventListener("resize", resizeViewport); });
+onScopeDispose(() => { disposed = true; revision++; panelRevision++; clearTimeout(timer); stopMove(); resizeObserver.disconnect(); window.removeEventListener("resize", resizeViewport); });
 </script>
 
 <style scoped lang="scss">

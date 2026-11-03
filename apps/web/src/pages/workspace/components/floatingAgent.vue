@@ -26,7 +26,7 @@
         tabindex="0"
         @pointerdown.stop="startInteraction($event, handle.edge)"
         @keydown="resizeWithKeyboard($event, handle.edge)" />
-      <agent v-model="visible" :historyTarget="historyTarget">
+      <agent v-model="visible" :historyTarget="historyTarget" @autoFilm="emit('autoFilm', $event)">
         <template #menuActions>
           <el-button
             text
@@ -50,7 +50,7 @@ import agent from "@/components/agent/index.vue";
 
 const visible = defineModel<boolean>({ default: false });
 defineProps<{ historyTarget?: HTMLElement }>();
-const emit = defineEmits<{ resize: [width: number] }>();
+const emit = defineEmits<{ resize: [width: number]; autoFilm: [sessionFile: string] }>();
 const docked = ref(true);
 const viewport = reactive({ width: window.innerWidth, height: window.innerHeight });
 const gap = computed(() => Math.min(15, viewport.width / 2, viewport.height / 2));

@@ -41,6 +41,7 @@ export interface AutoFilmTask {
   script: string;
   references: { name: string; path: string; mimeType: string; mediaId: string }[];
   sessionFile?: string;
+  handoffSessionFile?: string;
   sequenceIds: string[];
   storyRevisionId?: string;
   narrativeReviews?: AutoFilmNarrativeReview[];

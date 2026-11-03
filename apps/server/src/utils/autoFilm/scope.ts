@@ -5,4 +5,5 @@ import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 export const autoFilmScope = new AsyncLocalStorage<{
   directory: string;
   beforeGeneration(kind: "image" | "video" | "audio", request: MediaGenerationRequest): Promise<void>;
+  reuseGeneration(kind: "image" | "video", request: MediaGenerationRequest): Promise<void>;
 }>();

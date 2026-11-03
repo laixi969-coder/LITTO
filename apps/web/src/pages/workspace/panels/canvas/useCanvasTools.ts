@@ -139,7 +139,7 @@ export function useCanvasTools(options: {
         const existing = flow.nodes.value.find(node => node.type === type && (node.data.sourcePath === path || node.data.outputs?.[kind]?.value?.url === path));
         if (existing) {
           if (text !== undefined) await getNodeTools().call({ nodeId: existing.id, name: "node:setText", args: { text } }, signal);
-          await flow.fitView({ nodes: [existing.id], padding: 0.2, duration: 0 });
+          void flow.fitView({ nodes: [existing.id], padding: 0.2, duration: 0 }).catch(() => {});
           return nodeInfo(existing.id);
         }
         if (!options.availableNodes.value.some(node => node.type === type)) throw new Error("请先启用对应的素材节点");
@@ -148,7 +148,7 @@ export function useCanvasTools(options: {
         flow.addNodes({ id, type, position, data: { label: args.label ?? path.split("/").at(-1), sourcePath: path, ...(["image", "video"].includes(kind) ? { pendingResultPlacement: true } : {}), ...(text !== undefined ? { textSnapshot: text } : { outputs: { [kind]: { dataType: kind.toUpperCase(), value: { url: path, mimeType } } } }) } });
         await nextTick();
         signal.throwIfAborted();
-        await flow.fitView({ nodes: [id], padding: 0.2, duration: 0 });
+        void flow.fitView({ nodes: [id], padding: 0.2, duration: 0 }).catch(() => {});
         return nodeInfo(id);
       }
       case "addCanvas": {

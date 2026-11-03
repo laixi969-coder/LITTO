@@ -218,7 +218,7 @@ export async function run(
           else {
             reviewAttempts++;
             try {
-              // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限；同稿未核实时允许在预算内重试。
+              // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限。
               const reviewer = await createAgentModel(providerId, modelId, "off");
               semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? storyTask : prompt, prepared.text, ruleClaims, signal!);
             } catch (error) {
@@ -226,10 +226,8 @@ export async function run(
               semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };
             }
           }
-          if (semanticReview.verdict !== "unverified") {
-            storyReviews.set(prepared.text, semanticReview);
-            storyReviewClaims.set(prepared.text, claimsKey);
-          }
+          storyReviews.set(prepared.text, semanticReview);
+          storyReviewClaims.set(prepared.text, claimsKey);
         }
         if (planning && "revision" in semanticReview && semanticReview.revision === "structure") {
           planning.reject();

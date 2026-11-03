@@ -26,7 +26,7 @@
       @rename="renameConversation"
       @remove="removeConversation"
       @close="visible = false">
-      <template #actions><slot name="menuActions" /></template>
+      <template #actions><el-button v-if="sessionFile && !selectedConversation?.parentFile" text :disabled="['running', 'attention'].includes(selectedConversation?.activity ?? '')" title="将当前对话和已有制作交给自动成片" @click="emit('autoFilm', sessionFile)">自动续做</el-button><slot name="menuActions" /></template>
     </agentMenu>
     <conversation
       v-for="item in conversations"
@@ -63,6 +63,7 @@ import conversation from "./conversation.vue";
 
 const visible = defineModel<boolean>({ default: false });
 defineProps<{ historyTarget?: HTMLElement }>();
+const emit = defineEmits<{ autoFilm: [sessionFile: string] }>();
 type OpenConversation = { key: number; name: string; file?: string; parentFile?: string; activity: string; subAgents: AgentSubAgent[]; session: AgentConversation | null };
 // ACT: 会话实例保留到工作区关闭，让切换后的回复继续接收流式内容。
 const conversations = ref<OpenConversation[]>([]);
