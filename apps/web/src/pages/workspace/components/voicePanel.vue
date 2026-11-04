@@ -62,7 +62,9 @@
               <attachmentPreview v-if="line.video" :attachment="{ ...line.video, name: '人物原视频' }" :directory="directory" />
               <el-button v-if="line.video" @click="line.video = undefined">移除人物视频</el-button>
               <el-button :disabled="!line.video || !selectedTake(line) || stale(line) || !lipSyncModel" @click="run(() => syncLine(line), true)">为此句对口型</el-button>
+              <el-button v-if="selectedTake(line)?.videos.length" :disabled="!line.video || stale(line) || !lipSyncModel" @click="run(() => syncLine(line, true), true)">重新生成口型</el-button>
             </div>
+            <p v-if="selectedTake(line)?.videos.length" class="hint">口型不准确时可重新生成，保留已有版本；重新生成可能产生费用。尽量使用嘴部清晰、单人说话的镜头。</p>
             <div v-if="selectedTake(line)?.videos.length" class="toolbar">
               <span>口型视频：</span>
               <attachmentPreview v-for="(result, resultIndex) in selectedTake(line)?.videos" :key="result.id" :attachment="{ ...result.video, name: `口型版本 ${resultIndex + 1}${result.sourceVideo.path === line.video?.path ? '' : '（旧原片）'}` }" :directory="directory" />
@@ -290,21 +292,21 @@ async function uploadVideo(line: VoiceLine, event: Event) {
   });
 }
 
-async function syncLine(line: VoiceLine) {
+async function syncLine(line: VoiceLine, retry = false) {
   await refreshStory();
   const take = selectedTake(line);
   const model = lipSyncModel.value;
   if (line.kind === "narration" || !take || stale(line) || !line.video || !model) throw new Error("请先确定当前对白或演唱声音、人物视频和对口型模型");
   const existing = take.videos.find(result => result.sourceVideo.path === line.video!.path && result.providerId === model.providerId && result.modelId === model.modelId);
-  if (existing) { await inspectSync(line, existing); message.value = "已复用现有口型结果，请检查并确认当前版本"; return; }
+  if (existing && !retry) { await inspectSync(line, existing); message.value = "已复用现有口型结果，请检查并确认当前版本"; return; }
   if (take.videos.length >= 100) throw new Error("此配音最多保留 100 个口型版本");
   await save();
   const sourceVideo = { ...line.video };
   const input: NodeVideoRequest = { directory, providerId: model.providerId, modelId: model.modelId, prompt: `以视频参考1为画面依据，以音频参考1为唯一声音和节奏依据。保留原人物身份、衣着、场景、机位、动作与镜头运动，${line.kind === "singing" ? "人物演唱" : "人物说话"}的逐字嘴型严格对应音频参考1，声音从第0秒开始。不得改写、重新配音、改变音高或语速，不添加旁白、对白、音乐。${line.text ? `词句：${line.text}` : ""}`, videos: [sourceVideo], audios: [take.audio], mode: syncMode(model), generateAudio: true, outputDirectory: "assets/speech" };
-  let request = take.syncRequests.find(request => request.sourceVideo.path === sourceVideo.path && request.providerId === model.providerId && request.modelId === model.modelId);
+  let request = take.syncRequests.find(request => request.sourceVideo.path === sourceVideo.path && request.providerId === model.providerId && request.modelId === model.modelId && (retry ? request.retry && !take.videos.some(video => video.requestId === request.requestId) : !request.retry));
   if (!request) {
     if (take.syncRequests.length >= 100) throw new Error("此配音的同步请求已达上限，请查看已有任务");
-    request = { requestId: crypto.randomUUID(), sourceVideo, providerId: model.providerId, modelId: model.modelId };
+    request = { requestId: crypto.randomUUID(), sourceVideo, providerId: model.providerId, modelId: model.modelId, ...(retry ? { retry: true } : {}) };
     take.syncRequests.push(request);
     // 提交前持久化幂等ID；关页面、响应丢失或失败后都恢复原任务，不另发付费请求。
     await save();
@@ -312,7 +314,7 @@ async function syncLine(line: VoiceLine) {
   pendingVideo = { requestId: request.requestId, input };
   const [video] = await ai.generateVideo(pendingVideo.input, signal(), id => { activeJob = id; }, pendingVideo.requestId);
   if (!video || video.mediaType !== "video") throw new Error("供应商没有返回口型视频");
-  const result = { id: crypto.randomUUID(), video: { path: video.path, mimeType: video.mimeType }, sourceVideo, providerId: model.providerId, modelId: model.modelId };
+  const result = { id: crypto.randomUUID(), video: { path: video.path, mimeType: video.mimeType }, sourceVideo, providerId: model.providerId, modelId: model.modelId, requestId: request.requestId };
   take.videos.push(result);
   await save();
   await inspectSync(line, result);

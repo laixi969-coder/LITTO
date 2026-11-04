@@ -35,8 +35,8 @@ const roleSchema = z.strictObject({
 });
 const takeSchema = z.strictObject({
   id: z.string().uuid(), audio: audioSchema, sourceKey: z.string().max(30000),
-  syncRequests: z.array(z.strictObject({ requestId: z.string().uuid(), sourceVideo: videoSchema, providerId: z.string().max(96), modelId: z.string().max(256) })).max(100).default([]),
-  videos: z.array(z.strictObject({ id: z.string().uuid(), video: videoSchema, sourceVideo: videoSchema, providerId: z.string().max(96), modelId: z.string().max(256),
+  syncRequests: z.array(z.strictObject({ requestId: z.string().uuid(), sourceVideo: videoSchema, providerId: z.string().max(96), modelId: z.string().max(256), retry: z.boolean().optional() })).max(100).default([]),
+  videos: z.array(z.strictObject({ id: z.string().uuid(), video: videoSchema, sourceVideo: videoSchema, providerId: z.string().max(96), modelId: z.string().max(256), requestId: z.string().uuid().optional(),
     inspection: speechInspectionSchema.optional(),
     review: z.strictObject({ inspectionKey: z.string().length(64), fullPlayback: z.boolean(), speech: z.enum(["pass", "fail", "uncertain"]), lipSync: z.enum(["pass", "fail", "uncertain"]), note: z.string().trim().min(10).max(2000) }).optional(),
   })).max(100),
