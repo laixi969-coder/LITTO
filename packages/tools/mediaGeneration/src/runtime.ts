@@ -232,7 +232,7 @@ export const videoGenerationSchema = z.strictObject({
   lastFrame: imageReference.optional(),
   resolution: z.string().trim().min(1).max(64).optional(),
   duration: z.number().finite().positive().max(3600).optional(),
-  generateAudio: z.boolean().optional(),
+  generateAudio: z.boolean().optional().describe("需要视频模型原生生成对白、口型或环境声时明确传 true；使用独立配音或需要静音时传 false。原生声音须实际检查，音频参考不保证复用原句或固定音色。"),
   mode: z.union([
     z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text"]),
     z.array(referenceMode).min(1).max(3),

@@ -42,7 +42,7 @@
             <label v-if="shots.length">对应镜头<select v-model="line.shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.id" :value="shot.id">{{ shot.title }}</option></select></label>
             <label v-if="line.shotId">对应台词<select v-model.number="line.dialogueLineIndex"><option :value="undefined">按原文与说话人匹配</option><option v-for="(planned, lineIndex) in shots.find(shot => shot.id === line.shotId)?.creativeBrief?.dialogue.lines ?? []" :key="lineIndex" :value="lineIndex">{{ lineIndex + 1 }} · {{ planned.text }}</option></select></label>
           </div>
-          <p v-if="lineModel(line) && !lineModel(line)?.speechInstructions" class="hint">此模型未声明支持情绪指令，可生成自然语音；需要表演语气时请选择 Qwen3-TTS 1.7B。</p>
+          <p v-if="lineModel(line) && !lineModel(line)?.speechInstructions" class="hint">此模型未声明支持情绪指令，可生成自然语音；需要表演语气时请选择支持表演指令的模型，例如百炼 Qwen Audio TTS。</p>
           <div class="toolbar">
             <el-button :disabled="line.kind === 'singing' || !!line.sourceAudio || !line.text.trim() || !line.roleId || line.takes.length >= 100" @click="run(() => generateSpeech(line), true)">生成此句配音</el-button>
             <label class="fileLabel">使用已有配音 / 原曲<input type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" @change="uploadAudio(line, $event)" /></label>

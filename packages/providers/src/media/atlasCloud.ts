@@ -158,7 +158,7 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 
 export default {
   resumeMedia,
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.8", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.9", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
@@ -207,7 +207,7 @@ export default {
       model.inputSchema = { properties, required: input.required };
       if (model.type === "audio") {
         if (!properties.text && !properties.prompt) throw new Error(`模型 ${model.id} 不是已适配的文字生成音频模型`);
-        model.audioTask = properties.text ? "speech" : /sound|effect|sfx/i.test(model.id) ? "soundEffect" : "music";
+        model.audioTask = /sound|effect|sfx/i.test(model.id) ? "soundEffect" : /music|suno/i.test(model.id) ? "music" : properties.text ? "speech" : "music";
         model.speechInstructions = !!properties.instructions;
         const voices = (properties.voice ?? properties.voice_id)?.enum?.filter((voice): voice is string => typeof voice === "string").map(voice => ({ title: voice, voice }));
         if (voices?.length) model.voices = voices;

@@ -10,12 +10,13 @@ import { modelSelectionSchema, selectedModel, usesPlatformDefaults } from "@/uti
 import { requestMediaQuality } from "@/utils/media/quality";
 
 async function requestModelDecision(toolCallId: string, input: { data: Record<string, unknown>; reconsider?: boolean }, question: QuestionContext, signal?: AbortSignal) {
-  const data = z.strictObject({ kind: z.enum(["image", "video", "audio"]), providerId: z.string().min(1).optional(), modelId: z.string().min(1).optional() })
+  const data = z.strictObject({ kind: z.enum(["image", "video", "audio", "music", "soundEffect"]), providerId: z.string().min(1).optional(), modelId: z.string().min(1).optional() })
     .refine(value => !!value.providerId === !!value.modelId, "providerId 和 modelId 须同时提供").parse(input.data);
   const tenant = currentTenant();
   if (tenant) cloud()!.requireModelAccess(tenant.userId);
   const available = await listMediaModels(true);
-  const requested = available.find(model => model.type === data.kind && model.providerId === data.providerId && model.modelId === data.modelId);
+  const matchesKind = (model: (typeof available)[number]) => data.kind === "music" || data.kind === "soundEffect" ? model.type === "audio" && model.audioTask === data.kind : model.type === data.kind && (data.kind !== "audio" || !model.audioTask || model.audioTask === "speech");
+  const requested = available.find(model => matchesKind(model) && model.providerId === data.providerId && model.modelId === data.modelId);
   if (requested?.lipSync) return {
     title: "口型模型使用独立配音方案", applied: false,
     selection: selectedModel(data.kind) ?? null,
@@ -25,7 +26,7 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
   if (usesPlatformDefaults()) {
     const selection = selectedModel(data.kind);
     if (!selection) throw new Error("该类平台默认模型尚未设置，请由超级管理员在管理后台 → 默认模型中配置");
-    if (!available.some(model => model.type === data.kind && model.providerId === selection.providerId && model.modelId === selection.modelId))
+    if (!available.some(model => matchesKind(model) && model.providerId === selection.providerId && model.modelId === selection.modelId))
       throw new Error("平台默认模型当前不可用，请联系超级管理员检查配置与额度");
     if (data.providerId && (data.providerId !== selection.providerId || data.modelId !== selection.modelId)) return {
       title: "未更改平台默认模型", applied: false, selection,
@@ -33,12 +34,12 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
     };
     return { title: "沿用平台默认模型", applied: true, selection, answer: "直接使用超级管理员设置的默认模型，无需用户选择或配置" };
   }
-  const models = available.filter(model => model.type === data.kind && !model.lipSync && (!data.providerId || model.providerId === data.providerId && model.modelId === data.modelId));
+  const models = available.filter(model => matchesKind(model) && !model.lipSync && (!data.providerId || model.providerId === data.providerId && model.modelId === data.modelId));
   if (!models.length) throw new Error("没有匹配的可用模型，请先配置供应商或恢复连接与额度");
   const previous = selectedModel(data.kind);
   if (!input.reconsider && previous && models.some(model => model.providerId === previous.providerId && model.modelId === previous.modelId))
     return { title: "模型已选定", applied: true, selection: previous, answer: "沿用已选模型，后续同类任务无需重复选择或确认" };
-  const label = { image: "图片", video: "视频", audio: "配音与音频" }[data.kind];
+  const label = { image: "图片", video: "视频", audio: "配音", music: "配乐", soundEffect: "音效" }[data.kind];
   const request = {
     title: `选择${label}模型`,
     question: `请选择后续${label}任务使用的模型。选择后直接保存为当前工作区默认值，节点和助手共用。`,
@@ -49,7 +50,7 @@ async function requestModelDecision(toolCallId: string, input: { data: Record<st
   const index = request.options.indexOf(response.answer);
   if (response.requestedChanges || response.skipped || index < 0 || index >= models.length) return { ...request, ...response, applied: false };
   const chosen = models[index]!;
-  if (!(await listMediaModels(true)).some(model => model.type === data.kind && model.providerId === chosen.providerId && model.modelId === chosen.modelId)) throw new Error("所选模型已不可用，本次未更改设置");
+  if (!(await listMediaModels(true)).some(model => matchesKind(model) && model.providerId === chosen.providerId && model.modelId === chosen.modelId)) throw new Error("所选模型已不可用，本次未更改设置");
   signal?.throwIfAborted();
   const current = selectedModel(data.kind);
   if (current?.providerId === chosen.providerId && current.modelId === chosen.modelId) return { ...request, applied: true, answer: "该模型已选定，无需重复保存" };

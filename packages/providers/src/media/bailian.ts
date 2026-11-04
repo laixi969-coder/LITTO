@@ -58,9 +58,10 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 
 export default {
   resumeMedia,
-  id: "bailian", label: "阿里百炼", version: "1.1.3", rules,
+  id: "bailian", label: "阿里百炼", version: "1.1.4", rules,
   readme: "支持分页同步工作空间模型目录，接入已适配的图片、视频及 Qwen-Audio-TTS、CosyVoice、Qwen-TTS 非实时配音。请填写同地域 API Key 和以 /api/v1 结尾的工作空间地址。Qwen-TTS 使用单独的 DashScope 地址，请在 qwenTtsBaseUrl 配置同地域端点；不将工作空间端点与其混用。CosyVoice 3.5 需要已创建的复刻或设计音色 ID。目录存在不代表账户已开通权限。\n\n[模型目录](https://help.aliyun.com/zh/model-studio/list-models) · [语音文档](https://help.aliyun.com/zh/model-studio/non-realtime-tts-user-guide)",
   models: [
+    { id: "qwen-audio-3.1-tts-plus", label: "Qwen Audio 3.1 TTS Plus · 表演配音", type: "audio", speechInstructions: true },
     { id: "qwen-audio-3.1-tts-flash", label: "Qwen Audio 3.1 TTS Flash · 配音", type: "audio", speechInstructions: true, voices: [{ title: "龙安欢", voice: "longanhuan_v3.1" }] },
     { id: "cosyvoice-v3.5-plus", label: "CosyVoice 3.5 Plus · 配音", type: "audio", speechInstructions: true },
     { id: "MiniMax/speech-2.8-hd", label: "MiniMax Speech 2.8 HD · 配音", type: "audio", voices: [{ title: "青涩男声", voice: "male-qn-qingse" }] },

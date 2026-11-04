@@ -14,7 +14,7 @@ function knownModel(id: string): ProviderModel | undefined {
     const start = wan ? 2 : kling ? 3 : max ? 5 : 4;
     const end = wan || kling ? 30 : 15;
     return { id, label: id, type: "video", mode: ["text", "singleImage", "endFrameOptional", ...(!max ? [kling ? ["imageReference:10", "videoReference:5"] : wan ? ["imageReference:10", "videoReference:5", "audioReference:5"] : ["imageReference:9", "videoReference:3", "audioReference:3"]] as VideoMode[] : [])],
-      audio: wan ? "optional" : false, durationResolutionMap: [{ duration: Array.from({ length: end - start + 1 }, (_, index) => start + index), resolution: wan ? ["480P", "720P", "1080P"] : kling ? ["720P", "1080P"] : max ? ["480P", "768P"] : ["768P", "2K"] }] };
+      audio: wan ? "optional" : kling, nativeDialogue: wan || kling, durationResolutionMap: [{ duration: Array.from({ length: end - start + 1 }, (_, index) => start + index), resolution: wan ? ["480P", "720P", "1080P"] : kling ? ["720P", "1080P"] : max ? ["480P", "768P"] : ["768P", "2K"] }] };
   }
   if (["doubao-seedance-1-0-pro-250528", "doubao-seedance-1-0-pro-fast-251015", "doubao-seedance-1-5-pro-251215"].includes(id)) {
     const is15 = id.includes("1-5");
@@ -137,7 +137,7 @@ async function generateOtherVideo(this: ProviderContext, request: VideoRequest):
   const ratio = request.ratio ?? "16:9";
   if (!(kling ? ["16:9", "9:16", "1:1", "21:9"] : wan ? ["16:9", "9:16", "1:1", "4:3", "3:4", "adaptive"] : ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]).includes(ratio)) throw new Error("不支持此画幅");
   if (kling && images.length + videos.length > 15) throw new Error("可灵参考素材总数不能超过 15");
-  if (!wan && request.generateAudio) throw new Error("当前模型未提供音频生成开关");
+  if (!wan && !kling && request.generateAudio) throw new Error("当前模型未提供音频生成开关");
   const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
   const toUrl = async (input: MediaInput, video = false) => wan || (kling && video) ? this.tool.relayMedia(input) : imageUrl(input);
   const firstUrl = first ? await toUrl(first) : undefined;
@@ -174,7 +174,7 @@ async function generateOtherVideo(this: ProviderContext, request: VideoRequest):
 
 export default {
   resumeMedia,
-  id: "xingsuan", label: "星算云", version: "1.1.0", rules,
+  id: "xingsuan", label: "星算云", version: "1.1.1", rules,
   readme: "星算云 Seedance 火山兼容接口。使用 xsk_ 开头的 API Key；模型权限以星算云控制台为准。\n\n[接口文档](https://docs.xingsuan.cloud/video/seedance)",
   models: [
     { id: "doubao-seedance-2-0-260128", label: "Seedance 2.0", type: "video", mode: ["text", "singleImage", "endFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]], audio: "optional", nativeDialogue: true, durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480P", "720P", "1080P", "4K"] }] },

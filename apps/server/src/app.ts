@@ -18,7 +18,7 @@ import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 import { readRelayImage } from "@/utils/media/relay";
 
-const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "xingsuan.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
+const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "xingsuan.ts", "elevenLabs.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
 
 export async function createApp({
   webRoot,
@@ -60,8 +60,8 @@ export async function createApp({
     if (info?.isFile() && !info.isSymbolicLink()) {
       const source = await readFile(target);
       const previous = createHash("sha256").update(source).digest("hex");
-      // ACT: 只修复之前发布的两个错误内置版本；用户修改过的供应商文件保留原样。
-      if (["599660ab4dc4a8fe926fa9ededde7963c84a6052c2019c5eea4e7ebe4010411c", "306fdafef99723d9f047b9c8beecbcaf835d2f4f29078ebb9d7b7f15579bcf02"].includes(previous)) {
+      // ACT: 只升级已知的旧版内置文件；用户修改过的供应商文件保留原样。
+      if (["599660ab4dc4a8fe926fa9ededde7963c84a6052c2019c5eea4e7ebe4010411c", "1f5578360ddc77f8f125aa1e1e72f3c84080b666de6ec402c59e21f482c25ef0", "306fdafef99723d9f047b9c8beecbcaf835d2f4f29078ebb9d7b7f15579bcf02"].includes(previous)) {
         await writeAtomic(target, await readFile(resolve(providersRoot, "media/xingsuan.ts")));
       }
     }

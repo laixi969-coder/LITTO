@@ -5,7 +5,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 
 const choice = z.strictObject({ providerId: z.string().trim().min(1).max(200), modelId: z.string().trim().min(1).max(300) }).nullable().optional();
-export const modelSelectionSchema = z.strictObject({ text: choice, videoReview: choice, image: choice, imageEdit: choice, video: choice, audio: choice });
+export const modelSelectionSchema = z.strictObject({ text: choice, videoReview: choice, image: choice, imageEdit: choice, video: choice, audio: choice, music: choice, soundEffect: choice });
 export type ModelKind = keyof z.infer<typeof modelSelectionSchema>;
 
 export function usesPlatformDefaults() {
@@ -30,7 +30,7 @@ export function isSelectedModel(kind: ModelKind, providerId: string, modelId: st
 export function assertModelSelection(kind: ModelKind, providerId: string, modelId: string) {
   const tenant = currentTenant();
   if (tenant) cloud()?.requireModelAccess(tenant.userId);
-  const label = { text: "对话", videoReview: "视频审阅", image: "图片", imageEdit: "图片编辑", video: "视频", audio: "配音" }[kind];
+  const label = { text: "对话", videoReview: "视频审阅", image: "图片", imageEdit: "图片编辑", video: "视频", audio: "配音", music: "配乐", soundEffect: "音效" }[kind];
   const selected = selectedModel(kind);
   if (usesPlatformDefaults()) {
     if (!selected) throw Object.assign(new Error(`超级管理员尚未设置${label}默认模型，请联系超级管理员配置。`), { status: 400, retryable: false });
@@ -62,6 +62,15 @@ export async function assertMediaModelSelection(kind: "image" | "video" | "audio
   if (kind === "audio" && request.voiceLineId) {
     const { assertVoiceSpeechRequest } = await import("@/utils/media/voiceDecision");
     return (await assertVoiceSpeechRequest(directory, request)).request;
+  }
+  if (kind === "audio") {
+    const { listMediaModels } = await import("@/utils/media/generation");
+    const model = (await listMediaModels(true)).find(item => item.type === "audio" && item.providerId === request.providerId && item.modelId === request.modelId);
+    const audioKind = model?.audioTask === "music" ? "music" : model?.audioTask === "soundEffect" ? "soundEffect" : "audio";
+    // 旧项目只有 audio 默认项时保留原模型的行为，不将其他任务自动切换到它。
+    const selectionKind = audioKind !== "audio" && !selectedModel(audioKind) && isSelectedModel("audio", request.providerId, request.modelId) ? "audio" : audioKind;
+    assertModelSelection(selectionKind, request.providerId, request.modelId);
+    return request;
   }
   if (kind === "video") {
     const { isVoiceSyncRequest } = await import("@/utils/media/voiceDecision");

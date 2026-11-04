@@ -122,6 +122,7 @@ import apiMartSource from "@toonflow/providers/media/apiMart?raw";
 import metaSource from "@toonflow/providers/media/meta?raw";
 import agnesSource from "@toonflow/providers/media/agnes?raw";
 import volcengineSource from "@toonflow/providers/media/volcengine?raw";
+import elevenLabsSource from "@toonflow/providers/media/elevenLabs?raw";
 import volcSpeechSource from "@toonflow/providers/media/volcSpeech?raw";
 import bailianSource from "@toonflow/providers/media/bailian?raw";
 import klingSource from "@toonflow/providers/media/kling?raw";
@@ -139,7 +140,7 @@ import { writeClipboardText } from "@/lib/clipboard";
 const { mode = "connection" } = defineProps<{ mode?: "connection" | "builtin" | "custom" }>();
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ added: [provider: MediaProvider] }>();
-const providerSources: Record<string, string> = { apiMart: apiMartSource, meta: metaSource, agnes: agnesSource, volcengine: volcengineSource, volcSpeech: volcSpeechSource, bailian: bailianSource, kling: klingSource, vidu: viduSource, atlasCloud: atlasCloudSource, easyRouter: easyRouterSource, qwenSpeech: qwenSpeechSource, museTalk: museTalkSource, tencentWand: tencentWandSource };
+const providerSources: Record<string, string> = { apiMart: apiMartSource, meta: metaSource, agnes: agnesSource, volcengine: volcengineSource, elevenLabs: elevenLabsSource, volcSpeech: volcSpeechSource, bailian: bailianSource, kling: klingSource, vidu: viduSource, atlasCloud: atlasCloudSource, easyRouter: easyRouterSource, qwenSpeech: qwenSpeechSource, museTalk: museTalkSource, tencentWand: tencentWandSource };
 const selectedProvider = ref<string>(mediaProviders[0]?.id ?? "");
 const activeProvider = computed(() => mediaProviders.find(provider => provider.id === selectedProvider.value));
 const hasSavedKey = computed(() => {

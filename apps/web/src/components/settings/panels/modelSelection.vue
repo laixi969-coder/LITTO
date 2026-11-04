@@ -2,7 +2,7 @@
   <div class="modelSelection">
     <p>{{ isAuthDisabled() ? "分别选择当前工作区使用的平台和模型。用户、节点和 Agent 共用这些选择。" : "由超级管理员统一设置平台默认模型，白名单账号、节点和 Agent 直接使用，无需各自选择或配置。" }}未设置或调用失败时停止，不会自动切换到其他平台。</p>
     <p>带参考图的图像任务（溶图、局部编辑、多图参考）自动使用「图片编辑 / 溶图」模型，纯文字生图使用「图片」模型；编辑模型留空则跟随图片模型，无需在节点上手动切换。</p>
-    <p>视频审阅可单独选择支持视频与声音理解的模型，留空则跟随对话模型。一键自动成片启动和续跑时先用短片检查声画读取能力，通过后才开始制作。</p>
+    <p>视频审阅可单独选择支持视频与声音理解的模型，留空则跟随对话模型。可在需要时检查实际声画读取能力。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-form labelPosition="top" @submit.prevent="save()">
       <el-form-item v-for="kind in kinds" :key="kind.id" :label="kind.label">
@@ -27,11 +27,11 @@ import { ElMessage } from "element-plus";
 import { settings, saveSettings } from "@/stores/settings";
 import { isAuthDisabled } from "@/lib/session";
 
-type Kind = "text" | "videoReview" | "image" | "imageEdit" | "video" | "audio";
-type Choice = { providerId: string; modelId: string; providerLabel: string; label: string; type: "text" | "image" | "video" | "audio"; purpose?: "text" | "videoReview"; mode?: unknown };
-const kinds: { id: Kind; label: string }[] = [{ id: "text", label: "对话与文本" }, { id: "videoReview", label: "视频审阅（视频与声音理解）" }, { id: "image", label: "图片" }, { id: "imageEdit", label: "图片编辑 / 溶图（带参考图）" }, { id: "video", label: "视频" }, { id: "audio", label: "配音与音频" }];
+type Kind = "text" | "videoReview" | "image" | "imageEdit" | "video" | "audio" | "music" | "soundEffect";
+type Choice = { providerId: string; modelId: string; providerLabel: string; label: string; type: "text" | "image" | "video" | "audio"; purpose?: "text" | "videoReview"; mode?: unknown; audioTask?: "speech" | "music" | "soundEffect" };
+const kinds: { id: Kind; label: string }[] = [{ id: "text", label: "对话与文本" }, { id: "videoReview", label: "视频审阅（视频与声音理解）" }, { id: "image", label: "图片" }, { id: "imageEdit", label: "图片编辑 / 溶图（带参考图）" }, { id: "video", label: "视频" }, { id: "audio", label: "角色配音" }, { id: "music", label: "配乐" }, { id: "soundEffect", label: "音效" }];
 const models = ref<Choice[]>([]);
-const draft = ref<Record<Kind, string>>({ text: "", videoReview: "", image: "", imageEdit: "", video: "", audio: "" });
+const draft = ref<Record<Kind, string>>({ text: "", videoReview: "", image: "", imageEdit: "", video: "", audio: "", music: "", soundEffect: "" });
 const loading = ref(false);
 const modelsReady = ref(false);
 const saving = ref(false);
@@ -44,7 +44,7 @@ function supportsImageEdit(model: Choice) {
   const modes = Array.isArray(model.mode) ? model.mode : [];
   return modes.some(mode => mode !== "text") || /\/edit$|image-to-image/i.test(model.modelId);
 }
-const choices = (kind: Kind) => models.value.filter(model => kind === "imageEdit" ? model.type === "image" && supportsImageEdit(model) : model.type === (kind === "videoReview" ? "text" : kind) && (kind !== "text" || model.purpose !== "videoReview"));
+const choices = (kind: Kind) => models.value.filter(model => kind === "imageEdit" ? model.type === "image" && supportsImageEdit(model) : kind === "audio" || kind === "music" || kind === "soundEffect" ? model.type === "audio" && (kind === "audio" ? !model.audioTask || model.audioTask === "speech" : model.audioTask === kind) : model.type === (kind === "videoReview" ? "text" : kind) && (kind !== "text" || model.purpose !== "videoReview"));
 function unavailableLabel(value: string) { try { return JSON.parse(value).join(" / "); } catch { return "请重新选择"; } }
 function currentSelection() { return settings.value.modelSelection as Partial<Record<Kind, { providerId: string; modelId: string }>> | undefined; }
 

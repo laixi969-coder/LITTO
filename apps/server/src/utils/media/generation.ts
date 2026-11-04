@@ -75,7 +75,8 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
   return installedProviders.flatMap(provider => provider.models.flatMap(model => {
     if (provider.loadError || modelAccess("media", provider.id, model.id).reason()) return [];
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
-    if (!all && !isSelectedModel(model.type, provider.id, model.id)) return [];
+    const selectionKind = model.type === "audio" && model.audioTask === "music" ? "music" : model.type === "audio" && model.audioTask === "soundEffect" ? "soundEffect" : model.type;
+    if (!all && !isSelectedModel(selectionKind, provider.id, model.id) && !(model.type === "audio" && isSelectedModel("audio", provider.id, model.id))) return [];
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
     return [{
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,

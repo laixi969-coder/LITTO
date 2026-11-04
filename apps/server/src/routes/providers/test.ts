@@ -27,6 +27,7 @@ const mediaProviders: Record<string, { label: string; customUrl?: boolean; verif
   } },
   volcSpeech: { label: "火山引擎 · 豆包语音" },
   bailian: { label: "阿里百炼" },
+  elevenLabs: { label: "ElevenLabs" },
   kling: { label: "可灵" },
   vidu: { label: "Vidu", customUrl: true },
   atlasCloud: { label: "Atlas Cloud" },
@@ -96,6 +97,13 @@ async function mediaTest({ providerId, apiKey, region, baseUrl, secret }: { prov
   if (secret && providerId !== "kling") return failure("此服务商不使用 Secret Key");
   try {
     if (baseUrl?.trim()) await assertPublicHttpUrl(baseUrl.trim(), { strictDns: false });
+    if (providerId === "elevenLabs") {
+      const response = await guardedFetch("https://api.elevenlabs.io/v1/user", { headers: { "xi-api-key": apiKey.trim() }, signal: AbortSignal.timeout(20000) });
+      await response.body?.cancel();
+      if (response.ok) return { ok: true, verified: true, message: "ElevenLabs 密钥验证成功；音乐、音效权限及额度以实际调用为准。" };
+      if (response.status === 403) return failure("密钥可能没有账户信息读取权限，或访问被拒绝；请检查密钥权限和 IP 限制");
+      return failure(explain(response.status));
+    }
     if (!provider.verifyUrl) return { ok: true, verified: false, message: `配置格式检查通过，尚未验证 ${provider.label} 的密钥和模型权限；首次生成时确认。` };
     if (baseUrl?.trim() && !provider.customUrl) return failure("此服务商暂不支持自定义地址");
     const response = await guardedFetch(provider.verifyUrl(region, baseUrl), { headers: { Accept: "application/json", Authorization: `Bearer ${apiKey.trim().replace(/^Bearer\s+/i, "")}` }, signal: AbortSignal.timeout(20000) });

@@ -26,6 +26,7 @@ export const mediaPresets: MediaPreset[] = [
   { id: "xingsuan", label: "星算云", desc: "通过星算云 Seedance 火山兼容接口生成视频。", baseUrl: "https://xingsuan.cloud/api/v3", keyHelp: "在星算云控制台创建 xsk_ 开头的 API Key，并确认模型权限。" },
   { id: "volcengine", label: "火山方舟", desc: "支持同步方舟模型目录，使用已适配的 Seedream 图片和 Seedance 视频。独立配音请选择「火山引擎 · 豆包语音」。", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", keyHelp: "在火山方舟控制台创建 API Key，并开通对应模型；接入点 ID 可在高级模型配置中修改。" },
   { id: "volcSpeech", label: "火山引擎 · 豆包语音", desc: "独立语音合成与已创建复刻音色，支持语速、格式和采样率；凭证与方舟独立。", baseUrl: "https://openspeech.bytedance.com", keyHelp: "在豆包语音控制台创建语音 API Key，并开通相应语音资源；不能使用方舟 Key。" },
+  { id: "elevenLabs", label: "ElevenLabs · 配乐与音效", desc: "独立生成配乐和音效，分别选择默认模型。", keyHelp: "在 ElevenLabs 创建 API Key，并确认音乐或音效接口权限和额度。" },
   { id: "bailian", label: "阿里百炼", desc: "同步工作空间模型目录，支持图片、视频及 Qwen-Audio-TTS、CosyVoice、Qwen-TTS 配音。", baseUrl: "", urlRequired: true, keyHelp: "创建同地域 API Key，填写以 /api/v1 结尾的工作空间地址；Qwen-TTS 的独立 DashScope 地址在供应商配置中设置。" },
   { id: "kling", label: "可灵", desc: "Kling Image 2.1 和 Video 2.6，支持本地图片参考及视频首帧。API Key 或旧 AK/SK 认证均可使用，也支持可灵协议中转。", baseUrl: "https://api-singapore.klingai.com/v1", secret: true, keyHelp: "在可灵开放平台创建 API Key；使用旧认证时在 Key 中填 Access Key，并填写 Secret Key。" },
   { id: "atlasCloud", label: "Atlas Cloud", desc: "同步图片、视频和音频目录，按官方参数定义接入语音、音乐与音效生成；异步任务自动轮询。", baseUrl: "https://api.atlascloud.ai/api/v1", keyHelp: "在 Atlas Cloud 控制台创建 API Key；图片、视频、音频共用。支持根地址、/v1 或 /api/v1，系统自动识别。" },

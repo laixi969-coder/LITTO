@@ -26,11 +26,11 @@ export default router.put("/", validateFields({ settings: z.record(z.string(), z
   const settings = restoreSecrets(req.body.settings, u.conf.get("settings", {}));
   const selection = modelSelectionSchema.parse(settings.modelSelection ?? {});
   const previous = modelSelectionSchema.safeParse(u.conf.get("settings", {}).modelSelection ?? {});
-  for (const kind of ["text", "videoReview", "image", "imageEdit", "video", "audio"] as const) {
+  for (const kind of ["text", "videoReview", "image", "imageEdit", "video", "audio", "music", "soundEffect"] as const) {
     const selected = selection[kind];
     if (!selected || previous.success && JSON.stringify(selected) === JSON.stringify(previous.data[kind])) continue;
-    const models = kind === "text" || kind === "videoReview" ? u.ai.listAiModels(true) : (await u.mediaGeneration.listMediaModels(true)).filter(model => model.type === (kind === "imageEdit" ? "image" : kind));
-    if (!models.some(model => model.providerId === selected.providerId && model.modelId === selected.modelId))
+    const models = kind === "text" || kind === "videoReview" ? u.ai.listAiModels(true) : (await u.mediaGeneration.listMediaModels(true)).filter(model => model.type === (kind === "imageEdit" ? "image" : kind === "music" || kind === "soundEffect" ? "audio" : kind));
+    if (!models.some(model => model.providerId === selected.providerId && model.modelId === selected.modelId && (kind === "music" || kind === "soundEffect" ? "audioTask" in model && model.audioTask === kind : kind === "audio" ? !("audioTask" in model) || !model.audioTask || model.audioTask === "speech" : true)))
       throw Object.assign(new Error("所选模型当前不可用，请先保存有效的供应商配置，再选择默认模型"), { status: 400 });
   }
   // Tenants choose these addresses, so refuse internal ones up front with a clear message.
