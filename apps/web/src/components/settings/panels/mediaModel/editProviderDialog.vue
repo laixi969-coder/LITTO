@@ -12,7 +12,7 @@
     <div class="providerEditor">
       <messageMarkdown v-if="provider?.readme" class="providerReadme" :content="provider.readme" />
       <form-create-form v-model="configValues" :rule="configRules" :option="formOptions" />
-      <el-button v-if="provider?.id === 'tencentWand'" :loading="testingConnection" :disabled="saving || fetching" @click="testConnection">测试连接</el-button>
+      <el-button v-if="['tencentWand', 'xingsuan'].includes(provider?.id ?? '')" :loading="testingConnection" :disabled="saving || fetching" @click="testConnection">测试连接</el-button>
       <el-alert v-if="connectionResult" :title="connectionResult.message" :type="connectionResult.ok ? 'success' : 'error'" :closable="false" showIcon />
       <div class="modelHeader">
         <h4>模型配置 <el-text type="info">{{ models.length }}</el-text></h4>
@@ -197,11 +197,11 @@ async function testConnection() {
   if (testingConnection.value) return;
   const apiKey = typeof configValues.value.apiKey === "string" ? configValues.value.apiKey.trim() : "";
   const baseUrl = typeof configValues.value.baseUrl === "string" ? configValues.value.baseUrl.trim() : "";
-  if (!apiKey) { connectionResult.value = { ok: false, message: "请填写 TokenHub API Key" }; return; }
+  if (!apiKey) { connectionResult.value = { ok: false, message: "请填写 API Key" }; return; }
   testingConnection.value = true;
   connectionResult.value = undefined;
   try {
-    const { data } = await axios.post<{ data: { ok: boolean; message: string } }>("/api/providers/test", { kind: "media", providerId: "tencentWand", apiKey, baseUrl }, { timeout: 30000 });
+    const { data } = await axios.post<{ data: { ok: boolean; message: string } }>("/api/providers/test", { kind: "media", providerId: provider?.id, apiKey, baseUrl }, { timeout: 30000 });
     connectionResult.value = data.data;
   } catch (error) {
     connectionResult.value = { ok: false, message: axios.isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "连接测试失败" };

@@ -23,6 +23,7 @@ export const mediaPresets: MediaPreset[] = [
   { id: "apiMart", label: "APIMart / 中转", desc: "一个 Key 同时用 Seedance 视频，以及 Seedream、GPT-Image、Nano Banana 出图、Wan 视频", regions: true, keyHelp: "在 APIMart 控制台创建 API Key；国内用户选「国内」，海外用户选「海外」。" },
   { id: "meta", label: "秘塔 MiniMax", desc: "MiniMax 视频模型，通过秘塔接入", keyHelp: "在秘塔 MiniMax 页面创建 API Key。" },
   { id: "agnes", label: "Agnes AI", desc: "同一个 Key 使用 Agnes Image 2.5 Flash 出图和参考图编辑（1K–4K），以及 Video 2.5 Flash 文生视频（720P、4–12 秒）。视频本地参考素材上传尚未接通。", keyHelp: "在 Agnes AI 开放平台创建 API Key，图片与视频共用。" },
+  { id: "xingsuan", label: "星算云", desc: "通过星算云 Seedance 火山兼容接口生成视频。", baseUrl: "https://xingsuan.cloud/api/v3", keyHelp: "在星算云控制台创建 xsk_ 开头的 API Key，并确认模型权限。" },
   { id: "volcengine", label: "火山方舟", desc: "支持同步方舟模型目录，使用已适配的 Seedream 图片和 Seedance 视频。独立配音请选择「火山引擎 · 豆包语音」。", baseUrl: "https://ark.cn-beijing.volces.com/api/v3", keyHelp: "在火山方舟控制台创建 API Key，并开通对应模型；接入点 ID 可在高级模型配置中修改。" },
   { id: "volcSpeech", label: "火山引擎 · 豆包语音", desc: "独立语音合成与已创建复刻音色，支持语速、格式和采样率；凭证与方舟独立。", baseUrl: "https://openspeech.bytedance.com", keyHelp: "在豆包语音控制台创建语音 API Key，并开通相应语音资源；不能使用方舟 Key。" },
   { id: "bailian", label: "阿里百炼", desc: "同步工作空间模型目录，支持图片、视频及 Qwen-Audio-TTS、CosyVoice、Qwen-TTS 配音。", baseUrl: "", urlRequired: true, keyHelp: "创建同地域 API Key，填写以 /api/v1 结尾的工作空间地址；Qwen-TTS 的独立 DashScope 地址在供应商配置中设置。" },

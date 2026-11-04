@@ -2,6 +2,7 @@
   <el-card v-if="visible" class="assetLibrary" shadow="never" :bodyStyle="{ padding: '8px' }" role="region" aria-label="素材库" @dblclick.stop>
     <div class="libraryToolbar">
       <el-input v-model="searchQuery" class="searchInput" :prefixIcon="IconSearch" placeholder="搜索素材" aria-label="搜索素材" clearable @keydown.esc.stop="searchQuery = ''" />
+      <el-button class="toolbarButton" text title="星算云素材库" aria-label="星算云素材库" @click="xingsuanVisible = true">云</el-button>
       <el-button class="toolbarButton" text :icon="IconFolderPlus" title="新建文件夹" aria-label="新建文件夹" :disabled="newFolderParent !== undefined" @click="startFolder" />
       <el-button class="toolbarButton" text :icon="IconX" title="关闭素材库" aria-label="关闭素材库" @click="visible = false" />
     </div>
@@ -36,6 +37,7 @@
     </div>
   </el-card>
 
+  <xingsuanLibrary v-model="xingsuanVisible" />
   <assetMenu v-if="visible" ref="assetMenuRef" :entries="entries" @changed="refreshAssets" />
 
   <el-image-viewer v-if="previewAsset?.kind === 'image'" :urlList="[previewAsset.url]" teleported @close="previewAsset = undefined" />
@@ -93,6 +95,7 @@ import type { NodeOutput } from "@toonflow/nodes-scaffold/values";
 import { startAssetDrag } from "../canvasDrop";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import assetMenu from "./assetMenu.vue";
+import xingsuanLibrary from "./xingsuanLibrary.vue";
 
 type AssetEntry = { name: string; path: string; type: "file" | "directory"; children?: AssetEntry[]; draft?: boolean };
 type AssetOutput = { label: string; output: NodeOutput };
@@ -100,6 +103,7 @@ type AssetOutput = { label: string; output: NodeOutput };
 const props = defineProps<{ directory?: string }>();
 const visible = defineModel<boolean>({ default: false });
 const saveVisible = ref(false);
+const xingsuanVisible = ref(false);
 const saving = ref(false);
 const entries = ref<AssetEntry[]>([]);
 const folder = ref(".");

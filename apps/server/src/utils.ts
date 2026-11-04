@@ -1,4 +1,5 @@
 import * as assets from "@/utils/assets";
+import * as xingsuan from "@/utils/xingsuan";
 import * as desktop from "@/utils/desktop";
 import * as providerDebug from "@/utils/media/debug";
 import * as mediaJobs from "@/utils/media/jobs";
@@ -36,6 +37,7 @@ export default {
   autoFilm,
   story,
   assets,
+  xingsuan,
   desktop,
   providerDebug,
   mediaGeneration,

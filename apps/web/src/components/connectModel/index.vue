@@ -235,8 +235,20 @@ async function saveMedia() {
       return { mediaProviderConfigs: { ...configs, [preset.id]: { ...(configs[preset.id] ?? {}), apiKey, ...(preset.secret ? { secret } : {}), ...(baseUrl !== undefined ? { baseUrl } : {}), ...(preset.regions ? { isOverseas: mediaRegion.value } : {}) } } };
     });
     await saveSettings(() => ({ mediaProviderConfigs: { ...mediaConfigs(), [preset.id]: { ...(mediaConfigs()[preset.id] ?? {}), apiKey: maskKey(apiKey), ...(preset.secret ? { secret: maskKey(secret) } : {}) } } }));
-    invalidateNodeModels("media");
     mediaKey.value = mediaSecret.value = ""; mediaReplacing.value = false;
+    if (preset.id === "xingsuan") {
+      try {
+        const { data: list } = await axios.get<{ data: { id: string; fileName: string; revision: string; loadError?: string }[] }>("/api/providers/media/list");
+        const provider = list.data.find(item => item.id === "xingsuan");
+        if (!provider || provider.loadError) throw new Error("星算云适配器未加载，请重启应用后重试");
+        const { data: catalogue } = await axios.post<{ data: { models: { id: string }[] } }>("/api/providers/media/models", { fileName: provider.fileName, revision: provider.revision, apply: false }, { timeout: 65000 });
+        await axios.post("/api/providers/media/models", { fileName: provider.fileName, revision: provider.revision, modelIds: catalogue.data.models.map(model => model.id) }, { timeout: 65000 });
+        mediaResult.value = { ok: true, verified: true, message: `星算云密钥验证成功，已同步 ${catalogue.data.models.length} 个已适配模型；原有模型配置保留，调用权限以实际请求为准。` };
+      } catch (error) {
+        mediaResult.value = { ok: true, verified: false, message: `密钥已保存，但模型同步失败：${errorText(error)}。可在媒体模型设置中重新同步。` };
+      }
+    }
+    invalidateNodeModels("media");
     ElMessage.success(`${preset.label} 已连接`);
   } catch (error) {
     mediaResult.value = { ok: false, message: errorText(error) };

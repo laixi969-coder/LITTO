@@ -18,6 +18,13 @@ const mediaProviders: Record<string, { label: string; customUrl?: boolean; verif
   meta: { label: "秘塔 MiniMax" },
   agnes: { label: "Agnes AI", verifyUrl: () => "https://apihub.agnes-ai.com/v1/models" },
   volcengine: { label: "火山方舟" },
+  xingsuan: { label: "星算云", customUrl: true, verifyUrl: (_region, baseUrl) => {
+    const url = new URL(baseUrl?.trim() || "https://xingsuan.cloud/api/v3");
+    const path = url.pathname.replace(/\/+$/, "");
+    if (!path.endsWith("/api/v3")) throw new Error("星算云 API 地址须以 /api/v3 结尾");
+    url.pathname = path.slice(0, -7) + "/v1/models";
+    return url.toString();
+  } },
   volcSpeech: { label: "火山引擎 · 豆包语音" },
   bailian: { label: "阿里百炼" },
   kling: { label: "可灵" },
@@ -92,6 +99,11 @@ async function mediaTest({ providerId, apiKey, region, baseUrl, secret }: { prov
     if (!provider.verifyUrl) return { ok: true, verified: false, message: `配置格式检查通过，尚未验证 ${provider.label} 的密钥和模型权限；首次生成时确认。` };
     if (baseUrl?.trim() && !provider.customUrl) return failure("此服务商暂不支持自定义地址");
     const response = await guardedFetch(provider.verifyUrl(region, baseUrl), { headers: { Accept: "application/json", Authorization: `Bearer ${apiKey.trim().replace(/^Bearer\s+/i, "")}` }, signal: AbortSignal.timeout(20000) });
+    if (response.ok && providerId === "xingsuan") {
+      const result = await response.json() as { data?: unknown };
+      if (!Array.isArray(result?.data)) return failure("星算云返回的模型目录格式无效");
+      return { ok: true, verified: true, message: `星算云密钥验证成功，目录中有 ${result.data.length} 个可见模型；具体调用权限以实际请求为准。` };
+    }
     if (response.ok && providerId === "tencentWand") {
       const result = await response.json() as { data?: unknown };
       if (!Array.isArray(result?.data)) return failure("腾讯 TokenHub 返回的模型目录格式无效");
@@ -100,10 +112,11 @@ async function mediaTest({ providerId, apiKey, region, baseUrl, secret }: { prov
     await response.body?.cancel();
     if (response.ok) return { ok: true, verified: true, message: `${provider.label} 连接成功` };
     if (response.status === 401 || response.status === 403) return failure(explain(response.status));
-    if (providerId === "tencentWand") return failure(explain(response.status));
+    if (providerId === "tencentWand" || providerId === "xingsuan") return failure(explain(response.status));
     // Any other answer means the key was not rejected, but we cannot prove it works either.
     return { ok: true, verified: false, message: `${provider.label} 没有拒绝这个 Key，但无法提前验证；生成第一张图时会确认。` };
   } catch (error) {
+    if (providerId === "xingsuan" && error instanceof Error && error.message === "星算云 API 地址须以 /api/v3 结尾") return failure(error.message);
     return failure(describeError(error));
   }
 }
@@ -122,9 +135,9 @@ export default Router().post("/", validateFields({
   const body = req.body as { kind: "text" | "media"; apiUrl?: string; apiKey: string; secret?: string; baseUrl?: string; protocol?: string; providerId?: string; region?: "1" | "2"; probeModel?: string };
   if (body.kind === "media") {
     let apiKey = body.apiKey;
-    if (body.providerId === "tencentWand" && isMasked(apiKey)) {
-      const stored = u.conf.get("settings.mediaProviderConfigs.tencentWand") as Record<string, unknown> | undefined;
-      if (!stored || typeof stored.apiKey !== "string" || (body.baseUrl?.trim() || "https://tokenhub.tencentmaas.com") !== (typeof stored.baseUrl === "string" && stored.baseUrl.trim() || "https://tokenhub.tencentmaas.com")) return void res.json(success(failure("API 地址已变化或未保存密钥，请重新填写 API Key")));
+    if ((body.providerId === "tencentWand" || body.providerId === "xingsuan") && isMasked(apiKey)) {
+      const stored = u.conf.get(`settings.mediaProviderConfigs.${body.providerId}`) as Record<string, unknown> | undefined;
+      if (!stored || typeof stored.apiKey !== "string" || (body.baseUrl?.trim() || (body.providerId === "xingsuan" ? "https://xingsuan.cloud/api/v3" : "https://tokenhub.tencentmaas.com")) !== (typeof stored.baseUrl === "string" && stored.baseUrl.trim() || (body.providerId === "xingsuan" ? "https://xingsuan.cloud/api/v3" : "https://tokenhub.tencentmaas.com"))) return void res.json(success(failure("API 地址已变化或未保存密钥，请重新填写 API Key")));
       apiKey = stored.apiKey;
     }
     return void res.json(success(await mediaTest({ providerId: body.providerId ?? "", apiKey, region: body.region ?? "1", baseUrl: body.baseUrl, secret: body.secret })));

@@ -134,6 +134,10 @@ import route131 from "./routes/workspaces/files/rename";
 import route132 from "./routes/workspaces/files/write";
 import route133 from "./routes/workspaces/list";
 import route134 from "./routes/workspaces/selectDirectory";
+import route135 from "./routes/xingsuan/createAsset";
+import route136 from "./routes/xingsuan/createGroup";
+import route137 from "./routes/xingsuan/getAsset";
+import route138 from "./routes/xingsuan/list";
 
 export default (app: Express) => {
   app.use("/api/agent", route1);
@@ -270,4 +274,8 @@ export default (app: Express) => {
   app.use("/api/workspaces/files/write", route132);
   app.use("/api/workspaces/list", route133);
   app.use("/api/workspaces/selectDirectory", route134);
+  app.use("/api/xingsuan/createAsset", route135);
+  app.use("/api/xingsuan/createGroup", route136);
+  app.use("/api/xingsuan/getAsset", route137);
+  app.use("/api/xingsuan/list", route138);
 }

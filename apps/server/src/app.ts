@@ -2,7 +2,8 @@ import logger from "morgan";
 import express from "express";
 import cors from "cors";
 import { dirname, resolve } from "node:path";
-import { unlink } from "@toonflow/file";
+import { lstat, readFile, unlink, writeAtomic } from "@toonflow/file";
+import { createHash } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 import buildRoute from "@/core";
 import { error } from "@/lib/responseFormat";
@@ -17,7 +18,7 @@ import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 import { readRelayImage } from "@/utils/media/relay";
 
-const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
+const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "xingsuan.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
 
 export async function createApp({
   webRoot,
@@ -53,8 +54,19 @@ export async function createApp({
     await initializePlugins(resolve(dataDirectory, "tools"), toolsRoot, /^[a-z][a-zA-Z0-9]*\.tool\.js$/, pluginRevision ?? true);
   if (dataDirectory && nodesRoot) await initializePlugins(resolve(dataDirectory, "nodes"), nodesRoot, /^[a-z][a-zA-Z0-9]*\.umd\.js$/, pluginRevision ?? true);
   // ACT: 供应商只补缺失文件；技能/团队按内容指纹升级，保留用户编辑。
-  if (dataDirectory && providersRoot)
+  if (dataDirectory && providersRoot) {
+    const target = resolve(dataDirectory, "providers/xingsuan.ts");
+    const info = await lstat(target).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
+    if (info?.isFile() && !info.isSymbolicLink()) {
+      const source = await readFile(target);
+      const previous = createHash("sha256").update(source).digest("hex");
+      // ACT: 只修复之前发布的两个错误内置版本；用户修改过的供应商文件保留原样。
+      if (["599660ab4dc4a8fe926fa9ededde7963c84a6052c2019c5eea4e7ebe4010411c", "306fdafef99723d9f047b9c8beecbcaf835d2f4f29078ebb9d7b7f15579bcf02"].includes(previous)) {
+        await writeAtomic(target, await readFile(resolve(providersRoot, "media/xingsuan.ts")));
+      }
+    }
     await initializePlugins(resolve(dataDirectory, "providers"), resolve(providersRoot, "media"), autoInstallProviders);
+  }
   if (dataDirectory && skillsRoot) await syncBuiltins(resolve(dataDirectory, "skills"), skillsRoot, "skills");
   if (dataDirectory && agentsRoot) await syncBuiltins(resolve(dataDirectory, "agents"), agentsRoot, "agents");
   const app = express();
