@@ -158,10 +158,11 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 
 export default {
   resumeMedia,
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.10", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.11", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
+    { id: "bytedance/seed-audio-1.0-sfx", label: "Seed Audio 1.0 · 音效", type: "audio", audioTask: "soundEffect", inputSchema: { properties: { text: { type: "string" } }, required: ["text"] } },
     { id: "suno/chirp-v6", label: "Suno Chirp v6 · 音乐", type: "audio", audioTask: "music", inputSchema: { properties: { prompt: { type: "string" } }, required: ["prompt"] } },
     { id: "sync/lipsync-v3", label: "Sync Lipsync v3 · 已有视频对口型", type: "video", lipSync: true, audio: true, mode: [["videoReference:1", "audioReference:1"]] },
     { id: "bytedance/seedream-v4.5", label: "Seedream 4.5 文生图", type: "image", mode: ["text"], imageSizes: ["2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"] },
@@ -185,6 +186,8 @@ export default {
     )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(),
       ...(item.price && (item.price.actual?.base_price != null || item.price.origin?.base_price != null) ? { price: JSON.stringify({ actual: item.price.actual?.base_price, origin: item.price.origin?.base_price }) } : {}),
       schemaUrl: item.schema }));
+    const seedAudio = catalogue.find(model => model.id === "bytedance/seed-audio-1.0");
+    if (seedAudio) catalogue.push({ ...seedAudio, id: "bytedance/seed-audio-1.0-sfx", label: "Seed Audio 1.0 · 音效" });
     if (!modelIds) return catalogue;
     const models: AtlasModel[] = [];
     for (const model of catalogue.filter(item => modelIds.includes(item.id))) {
@@ -247,7 +250,9 @@ export default {
     if (!request.text.trim()) throw new Error("请填写配音文本或音乐、音效描述");
     if (request.audios?.length || (request.volume !== undefined && request.volume !== 0)) throw new Error("当前音频适配不支持参考音频或音量增益");
     const fields = model.inputSchema.properties;
-    const body: Record<string, unknown> = { model: request.model, [fields.text ? "text" : "prompt"]: request.text };
+    // 音效入口与语音入口使用同一上游模型，但分别保存用途和默认选择。
+    const modelId = request.model === "bytedance/seed-audio-1.0-sfx" ? "bytedance/seed-audio-1.0" : request.model;
+    const body: Record<string, unknown> = { model: modelId, [fields.text ? "text" : "prompt"]: request.text };
     const set = (field: string, value: unknown) => {
       if (value === undefined) return;
       const rule = fields[field];
