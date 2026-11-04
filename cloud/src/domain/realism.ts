@@ -19,8 +19,8 @@ export const audioReviewSchema = z.object({
 }).strict();
 
 export const reviewedSegmentsSchema = z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive() }).strict().refine(range => range.end > range.start)).max(80).default([]);
-export const techniqueReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(8);
-export const motionReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) }).strict()).max(150);
+export const techniqueReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().min(10).max(2000) }).strict()).max(8);
+export const motionReviewSchema = z.array(z.object({ id: z.string().min(1), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().min(10).max(2000) }).strict()).max(150);
 
 export const realismChecks = ["surface", "imaging", "world", "motion", "cinematic"] as const;
 
@@ -130,13 +130,13 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     const coverageIssue = motionCoverageIssue(s, shot!, item);
     if (coverageIssue) throw conflict(coverageIssue, "motion_media_coverage_required");
     if (plan.motionPlan?.checkpoints.length && (!evidence?.fullPlayback || !plan.motionPlan.checkpoints.every(checkpoint =>
-      evidence.motionReview?.some((review: { id: string; verdict: string; note: string }) => review.id === checkpoint.id && review.verdict === "pass" && review.note?.trim().length >= 10)))) {
-      throw conflict("须按当前 motionPlan.checkpoints 记录动作阶段、接触及空间关系的实际检查 motionReview；未看或未达标不能正式采用。由助手批量记录已授权审阅，不重复询问用户", "motion_review_required");
+      evidence.motionReview?.some((review: { id: string; verdict: string; note: string }) => review.id === checkpoint.id && review.verdict !== "revise" && review.note?.trim().length >= 10)))) {
+      throw conflict("须按当前 motionPlan.checkpoints 记录动作阶段、接触及空间关系的实际检查 motionReview；未观察项应如实标为 unverified，明确缺陷需先处理。由助手批量记录已授权审阅，不重复询问用户", "motion_review_required");
     }
   }
   if (type === "take" && plan.techniques.length && (!evidence?.fullPlayback || !plan.techniques.every(item =>
-    evidence.techniqueReview?.some((review: { id: string; verdict: string }) => review.id === item.id && review.verdict === "pass")))) {
-    throw conflict("选用镜头技法的视频须完整播放并逐项记录真实检查依据，检索或编译成功不能代替通过", "technique_review_required");
+    evidence.techniqueReview?.some((review: { id: string; verdict: string }) => review.id === item.id && review.verdict !== "revise")))) {
+    throw conflict("选用镜头技法的视频须完整播放并逐项记录真实检查依据；未验证保留 unverified，明确缺陷需先处理", "technique_review_required");
   }
   const matches = evidence && (evidence.fingerprint === shotFingerprint(s, item.shotId, type)
     || type === "keyframe" && evidence.fingerprint === shotFingerprint(s, item.shotId));

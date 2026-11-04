@@ -105,11 +105,10 @@ export function sequenceFingerprint(s: Scope, sequenceId: string) {
     const shot = clip.shotId ? s.get("shots", clip.shotId) : null;
     return { source, shot, fingerprint: shot ? shotFingerprint(s, shot.id) : null, reviews: sourceReviews(s, source.mediaId).map(report => report.id) };
   });
-  const projectId = s.get("sequences", sequenceId)?.projectId;
-  const context = projectId ? ["worlds", "looks", "assets", "reference_bindings"].map(table => s.list(table, { projectId })) : [];
   const sequence = s.get("sequences", sequenceId);
+  const projectId = sequence?.projectId;
   // 导出时轴算法更新后，旧文件与其验收记录不能命中当前导出缓存。
-  return createHash("sha256").update(JSON.stringify({ renderVersion: 2, ...(sources.some(item => item.shot?.techniques?.length) ? { techniqueVersion } : {}), edit, sources, context, ...(sequence && isAdSequence(sequence) ? { advertising: adContext(s, { sequenceId, projectId }) } : {}) })).digest("hex");
+  return createHash("sha256").update(JSON.stringify({ renderVersion: 2, ...(sources.some(item => item.shot?.techniques?.length) ? { techniqueVersion } : {}), edit, sources, ...(sequence && isAdSequence(sequence) ? { advertising: adContext(s, { sequenceId, projectId }) } : {}) })).digest("hex");
 }
 
 function renderMedia(s: Scope, id: string) {

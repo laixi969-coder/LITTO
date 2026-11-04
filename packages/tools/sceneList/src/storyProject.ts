@@ -45,7 +45,7 @@ export const storyReviewSchema = z.strictObject({
   quality: z.strictObject({
     causality: storyEvidenceSchema.describe("核对实际因果；异常故事核对触发、范围、限制及全部关键使用，不需要幻想规则时检查现实行动条件"),
     payoff: storyEvidenceSchema.describe("核对开头主要期待与结尾实际行动的对应；开放结尾也须说明已经完成的主体事件，不能只换到新谜团"),
-  }).optional().describe("完整版本采用前须有覆盖全部场次的quality审读。逐项引用正文原句与场次，给实际依据，不自报满分；旧记录和局部审稿可不填"),
+  }).optional().describe("可选的因果与结尾审读。引用正文原句与场次并给出依据；局部审稿可不填"),
 });
 const media = z.strictObject({ path: storyPath, mimeType: text(150).min(1) });
 export const storyBoardSchema = z.strictObject({ sceneId: z.string().regex(/^s\d{2,3}$/), duration: z.number().finite().min(1).max(180), image: media.optional(), audio: media.optional() });
@@ -86,7 +86,7 @@ export const storyActionSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("confirmSource"), id }),
   z.strictObject({ type: z.literal("directions"), values: z.array(storyDirectionSchema).min(2).max(3) }),
   z.strictObject({ type: z.literal("chooseDirection"), id }),
-  z.strictObject({ type: z.literal("draft"), value: storyDraftSchema, parentId: id.optional() }),
+  z.strictObject({ type: z.literal("draft"), value: storyDraftSchema, parentId: id.optional().describe("仅传已有故事版本的 id，不是方向 id；第一版省略。保存后从返回的 revisions 中读取新版本 id") }),
   z.strictObject({ type: z.literal("review"), value: storyReviewSchema }),
   z.strictObject({ type: z.literal("decideIssue"), reviewId: id, issueId: id, reason: text(2000).min(1) }),
   z.strictObject({ type: z.literal("approve"), id, reason: text(2000) }),
@@ -111,7 +111,7 @@ export function applyStoryTextEdits(text: string, edits: { before: string; after
 }
 export const storyDecisionSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("confirmSource"), id }),
-  z.strictObject({ type: z.literal("chooseDirection"), reconsider: z.boolean().optional() }),
+  z.strictObject({ type: z.literal("chooseDirection"), reconsider: z.boolean().optional() }).describe("展示已保存的全部方向供选择，不要传 id；已有选择直接复用"),
   z.strictObject({ type: z.literal("decideIssue"), reviewId: id, issueId: id, reason: text(2000).min(1) }),
   z.strictObject({ type: z.literal("release"), value: storyReleaseSchema }),
 ]);
@@ -197,4 +197,4 @@ ${storyRelationshipGuide}
 productionContext.characters 来自当前项目角色资产，沿用 characterDirection 的措辞习惯、行为和关系；具体场景改变策略与语气，不统一成同一种腔调。knowledge 明确列“观众已见证据；各角色已知/误信/未知；本场何时经由何动作或对白揭示”，将揭示实际写入 text，再安排有依据的反应。不要让人物提前知道仅观众看见的秘密。
 剧本按场保存稳定 sceneId（s01 等），写可见行动与声音。每场记录目标、阻碍、变化、人物和观众各自知道什么、依赖哪些场次；speech 仅放实际需要朗读的对白/旁白，逐句换行，不含角色名前缀、通道标记和表演说明（例如 text 写“小林：你来了。”，speech 只写“你来了。”）。canon/threads 是待确认的事实与线索，写出来源场次；knowledge 中的已知信息须有正文可见证据或前场依据，猜测不能写成确认事实。回忆与倒叙注明，因果依据可以来自叙事顺序之后的场次。
 审稿仅针对指定版本，先逐项核对 brief 的关键行动、结尾与禁止事项是否在正文落实，再核对场间知情、持物和空间转场；不能只检查内部自洽而漏掉创作要求。coverage 逐场列出真正审阅的范围，每个问题有原文精确引句、依据、类别（明确矛盾/理解风险/审美建议）和最小改法；缺失的要求引用最相关场的现有正文，不能编造不存在的引句。检查 speech 是否会读出角色名或说明。空问题不等于爆款。模型审稿不是观众实验；没有观众数据不要编造完播、转化或传播效果。
-完整版本采用前，review须覆盖全部场次，quality.causality与quality.payoff分别引用正文原句、说明实际因果或开头期待如何兑现，给pass/revise/unverified；缺口不以自评分数抵消。局部改写保留sceneId，整场用rewrite，只改指定词句用patch的edits并按需同步speechEdits，程序保留其余字段及文字，产生新版本重新审读。用户授权自行决定时，故事方向和版本可由助手通过确认工具的 automaticChoice 选择并记录依据，不冒充用户确认；授权不明确时使用聊天卡片。资料事实、审稿保留与发布反馈由用户决定。工具不可用时在聊天说明缺项并保留成果，不强制跳转工作台。已确认的内容不重复询问。输出必须通过提供的结构化工具保存；工具拒绝时修正后再提交。`;
+工作台审稿按需记录，重点指出影响主要行动、理解或结局的具体问题；次要细节作为建议，不因审稿字段缺失或意见分歧阻止采用。引用正文并说明依据，不以自评分数替代审读。局部改写保留sceneId，整场用rewrite，只改指定词句用patch的edits并按需同步speechEdits，程序保留其余字段及文字，产生新版本，按需审读。用户授权自行决定时，故事方向和版本可由助手通过确认工具的 automaticChoice 选择并记录依据，不冒充用户确认；授权不明确时使用聊天卡片。资料事实、审稿保留与发布反馈由用户决定。工具不可用时在聊天说明缺项并保留成果，不强制跳转工作台。已确认的内容不重复询问。输出必须通过提供的结构化工具保存；工具拒绝时修正后再提交。`;

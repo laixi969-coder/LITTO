@@ -39,7 +39,7 @@ export function planVideoSegments(shots: z.infer<typeof generationShotSchema>[],
     if (left.isolateReason || right.isolateReason) return left.isolateReason ?? right.isolateReason!;
     if (left.sceneId !== right.sceneId) return "场景变化";
     if (left.paragraphId !== right.paragraphId) return "完整剧情段落边界";
-    if (right.transition === "cut" && (singleTake || multiShotState === "unsupported")) return singleTake ? "要求一镜到底" : "已核验当前模式不支持内部切镜";
+    if (right.transition === "cut" && (singleTake || multiShotState !== "supported")) return singleTake ? "要求一镜到底" : multiShotState === "unsupported" ? "已核验当前模式不支持内部切镜" : "内部切镜能力未知，按安全边界分段";
     return "";
   };
   let start = 0;
@@ -68,7 +68,7 @@ export function planVideoSegments(shots: z.infer<typeof generationShotSchema>[],
   }
   if (singleTake && segments.length > 1) issues.push("一镜到底不能拆成多次生成，请保留原方案并解决时长或输入限制");
   const researchRequired = multiShotState !== "supported" && multiShotState !== "unsupported" && segments.some(segment => segment.timeline.some((beat, index) => index > 0 && beat.transition === "cut"));
-  if (researchRequired) issues.push("内部切镜能力未知：保留合段草案，先查实际供应商官方资料，核验能力记录后重规划；不因缺信息拆短，也不提交生成");
+  if (researchRequired) issues.push("内部切镜能力未知且无法安全分段，请调整动作或对白安排，或核验实际模型能力后重规划");
   return { segments, editShotCount: shots.length, generationCallCount: segments.length, researchRequired, issues };
 }
 

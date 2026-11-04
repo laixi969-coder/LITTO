@@ -60,7 +60,7 @@ export function readMultiShotCapabilities(provider: { id: string; version?: stri
       reason: entry ? "供应商实现、版本或实际API地址与已核验记录不一致，不能继承原能力" : "此供应商、精确模型版本及模式没有已核验的内部切镜记录",
       research: { query: `${provider.id} ${model.id} ${JSON.stringify(mode)} official API multi-shot camera cuts`,
         urls: [...new Set([...(entry?.sources.filter(source => source.url.startsWith("https://")).map(source => source.url) ?? []), ...(researchUrls[provider.id] ?? [])])],
-        instruction: "先用 webFetch/webSearch 阅读实际供应商官方接口资料，核对精确模型版本、模式和当前适配器是否传递所需参数；证据经代码审阅写入能力表后重规划。查不到或无法访问时保持未知与原合段方案，不拆短、不试生成、不以助手说明或搜索摘要放行。" } };
+        instruction: "先用 webFetch/webSearch 阅读实际供应商官方接口资料，核对精确模型版本、模式和当前适配器是否传递所需参数；证据经代码审阅写入能力表后重规划。查不到或无法访问时保持未知，在完整动作和对白的安全边界分段，不以助手说明或搜索摘要声称支持内部切镜。" } };
   });
 }
 
@@ -74,6 +74,6 @@ export function assertMultiShotCapability(model: MediaModel, mode: unknown, time
   if (capability?.state === "supported") return;
   throw Object.assign(new Error(capability?.state === "unsupported"
     ? "当前供应商、模型版本和模式明确不支持内部切镜，请重新规划必要的生成段"
-    : "内部切镜能力待核实：先查询实际供应商官方资料并更新受审阅能力记录；保留合段方案，不自动拆短或提交生成"),
+    : "内部切镜能力未知：请在完整动作和对白的安全边界拆分生成段，或核实该模型模式后重规划"),
   { status: 400, code: capability?.state === "unsupported" ? "multiShotUnsupported" : "multiShotResearchRequired", research: capability?.research });
 }

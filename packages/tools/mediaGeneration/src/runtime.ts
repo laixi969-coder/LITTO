@@ -163,7 +163,7 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
   return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take", techniques, startingFrame,
     checks: type === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"], speechRanges, interaction,
-    motionPlan: type === "take" ? { mode: shot.camera?.design?.mode, beats: motionBeats, checkpoints, note: "逐段对照实际身体任务、接触结果、位移与接点；singleTake的节拍边界不能跳切或复位。完整播放后用 motionReview 逐项记录实际时间点、观察与 pass/revise；计划不是观察证据，未检查保持未验证。" } : undefined };
+    motionPlan: type === "take" ? { mode: shot.camera?.design?.mode, beats: motionBeats, checkpoints, note: "逐段对照实际身体任务、接触结果、位移与接点；singleTake的节拍边界不能跳切或复位。完整播放后用 motionReview 逐项记录实际时间点、观察与 pass/revise/unverified；计划不是观察证据，未检查保持未验证。" } : undefined };
 }
 
 export function finalReviewFields(kind: string, lipSync: boolean, music: boolean) {
@@ -203,8 +203,8 @@ export const agentReviewSchema = z.strictObject({
   fullPlayback: z.boolean().default(false).describe("只有实际完整播放当前视频后才为true，抽帧不能替代看听"),
   observedStateDelta: z.record(z.string(), z.json()).optional().describe("实际观察到的镜尾状态变化，沿用 intendedStateDelta 分组但不得照抄计划；无变化传 {}。完整视频检查通过且提供实际末态时采用为正式镜头，并传递给后镜"),
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
-  techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
-  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise"]), note: z.string().trim().min(10).max(2000) })).max(150).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未观察不填。批量由助手记录，不逐项向用户确认。"),
+  techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
+  motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().min(10).max(2000) })).max(150).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未确认的项目填 unverified。批量由助手记录，不逐项向用户确认。"),
   creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字；关键帧对照plan.startingFrame写实际视线、手部任务、姿态与触发前起点，不能仅复述计划。肤面核对无来源色块及磨皮；视频按motionPlan检查对白和听者反应。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),

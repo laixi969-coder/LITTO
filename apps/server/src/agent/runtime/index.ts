@@ -143,8 +143,8 @@ export async function run(
     }
     const storyTask = `${taskIntent}\n${prompt.split("\n").slice(1).join("\n")}`;
     const ruleTask = requiresStoryRuleValidation(storyTask);
-    const directStoryTask = /故事|剧本|短剧/.test(taskIntent) && /写|创作|生成|成稿/.test(taskIntent) && !/工作台|场次表|分镜|保存|审稿|点评|评分|分析|只改|局部/.test(taskIntent);
-    const enforceStoryDelivery = directStoryTask || (ruleTask || /故事/.test(taskIntent)) && /写一篇|写一个|创作|成稿/.test(taskIntent) && /(?:只|仅)(?:交|要|输出)[^。；\n]*(?:正文|故事|文字)/.test(taskIntent) && !/(?:只|仅)(?:审|评|分析)/.test(taskIntent);
+    // ACT: 只有明确要求纯文字交稿才启用文字交付门控；普通故事创作可能需要工作台与后续制作。
+    const enforceStoryDelivery = (ruleTask || /故事|剧本|短剧/.test(taskIntent)) && /写|创作|生成|成稿/.test(taskIntent) && /(?:只|仅)(?:交|要|输出)[^。；\n]*(?:正文|故事|文字)/.test(taskIntent) && !/(?:只|仅)(?:审|评|分析)/.test(taskIntent);
     const storyTextEvents = new Map<string, { blockId: string; content: string }>();
     const publish = send;
     send = event => {
@@ -196,7 +196,7 @@ export async function run(
     } });
     let reviewAttempts = 0;
     // ACT: 同轮最多审五次，为规则、决定与关系修改留出余量，同时限制付费自评；正文和规则记录均相同时复用结果。
-    if (ruleTask || planning) tools = tools.map(tool => tool.name !== "prepareStoryText" ? tool : {
+    if (planning) tools = tools.map(tool => tool.name !== "prepareStoryText" ? tool : {
       ...tool,
       async execute(id, params, ...rest) {
         if (planning && !planning.current()) {

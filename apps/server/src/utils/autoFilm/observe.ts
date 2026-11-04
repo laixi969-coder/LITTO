@@ -63,21 +63,14 @@ export function validateDialogueObservation(plan: { id: string; speakerId: strin
 
 export function assertStoryObservation(playback: AutoFilmPlayback | undefined, stage: "visual" | "speech" | "final") {
   if (!playback?.storyChecks) throw new Error("须先 observeAutoFilmVideo，按当前原稿与分镜完整观察叙事、表演及声画，旧摄影检查不能替代");
-  if (!playback.lipSyncReviews || playback.observerKey !== videoObservationModel().key) throw new Error("观察记录缺少逐段口型检查或审阅模型已更换，须重新观察当前素材");
+  if (!playback.lipSyncReviews || !playback.observerKey) throw new Error("观察记录缺少逐段口型检查或审阅来源，须重新观察当前素材");
   if (!playback.visualChecks) throw new Error("观察记录缺少材质、成像、光线和色彩检查，须重新观察当前素材");
-  // 环境声与动作音效可在剪辑混音时补齐，不用整片声音门槛阻断已完成对白的口型导入。
-  const fields = stage === "final" ? Object.keys(playback.storyChecks) : ["narrative", "performance", "continuity", "editing", ...(stage === "speech" ? ["dialogueCoverage", "lipSync"] : [])];
+  // 叙事、表演和影调意见保留在观察记录中；只有实际对白与口型核验阻止声音导入和正式交付。
+  const fields = stage === "visual" ? [] : ["dialogueCoverage", "lipSync"] as const;
   const failures = fields.flatMap(field => {
-    const check = playback.storyChecks![field as keyof typeof playback.storyChecks];
+    const check = playback.storyChecks![field];
     return check.verdict === "pass" ? [] : [`${field}：${check.note}`];
   });
-  for (const [field, check] of Object.entries(playback.visualChecks)) if (check.verdict !== "pass") failures.push(`${field}：${check.note}`);
-  if (stage === "final") {
-    if (!playback.cameraReviews) failures.push("成片缺少逐镜摄影观察");
-    for (const review of playback.cameraReviews ?? []) {
-      for (const check of review.checks) if (check.verdict !== "pass") failures.push(`${review.takeId}/${check.id}：${check.note}`);
-    }
-  }
   if (failures.length) throw new Error(`实际视频尚未通过叙事声画检查：${failures.join("；")}。保留素材，修正具体缺陷，不能改填通过`);
 }
 

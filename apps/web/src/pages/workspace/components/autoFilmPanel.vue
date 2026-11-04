@@ -21,6 +21,8 @@
         <div class="taskHeader"><strong>{{ statusLabels[task.status] }}</strong><span>媒体生成 {{ task.generationCount }} / 120 次</span></div>
         <p class="progressText" role="status" aria-live="polite">{{ task.progress }}</p>
         <p v-if="task.error" class="errorMessage">{{ task.error }}</p>
+        <p v-if="task.output?.qualityStatus === 'unverified'">文件检查已完成，内容尚未通过完整验收。</p>
+        <p v-else-if="task.output?.qualityStatus === 'fail'">文件检查已完成，内容验收发现问题，请查看验收记录。</p>
         <video v-if="task.status === 'completed' && task.output" class="filmPreview" :src="task.output.url" controls preload="metadata" aria-label="自动制作的成片" />
         <a v-if="task.status === 'completed' && task.output" :href="task.output.url" target="_blank" rel="noopener">打开成片</a>
         <details v-if="task.decisions.length" class="decisionList">

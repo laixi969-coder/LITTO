@@ -158,13 +158,13 @@ const plugin: ToolPlugin = {
       async execute() { const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read()); return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) }); },
     }, {
       name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
-      description: "按 readStoryProject 的 version 保存资料、方向、候选与审稿。完整review须提供quality因果及结尾依据；规则故事另有logic.rules逐项记录关键对象的触发、边界变化、高潮尝试与结果，数量有歧义给logic.quantities。服务端复算，不能用空问题列表或pass总评绕过缺证据及计数错误。整场改写用rewrite；指定词句用patch并按需同步speechEdits，保留其余内容与旧版。采用用requestStoryApproval，不代用户确认资料、问题保留或观众反馈。",
+      description: "按 readStoryProject 的 version 保存资料、方向、候选与审稿。审稿按需保存，问题须引用正文；先关注会影响主线理解或结局的问题，次要细节作为建议，不反复要求审稿通过。整场改写用rewrite；指定词句用patch并按需同步speechEdits，保留其余内容与旧版。draft.parentId 只能是 revisions 中已有版本 id，第一版省略，不能填写方向 id。每次保存或改写后使用返回的最新 version 和 revisions 最后一个 id，后续操作不得沿用旧版本。采用用requestStoryApproval，不代用户确认资料、问题保留或观众反馈。",
       parameters: z.toJSONSchema(z.object({ expectedVersion: z.number().int().nonnegative(), action: storyActionSchema }), { target: "draft-07", io: "input" }),
       async execute(_id, params) { const input = params as { expectedVersion: number; action: unknown }; return json(await story.apply(input.expectedVersion, input.action)); },
     });
     if (story?.requestApproval) tools.push({
       name: "requestStoryApproval", label: "确认采用故事", executionMode: "sequential",
-      description: "审稿完成后调用，在聊天里展示指定故事版本的采用确认卡片并等待用户点击；确认后自动保存采用记录，返回 approved。不要让用户自行去故事工作台寻找按钮。暂不采用、跳过或取消均不授权后续制作。已采用版本不会重复询问。",
+      description: "候选保存后调用，在聊天里展示指定故事版本和已有审稿建议的采用确认卡片并等待用户点击；确认后自动保存采用记录，返回 approved。不要让用户自行去故事工作台寻找按钮。暂不采用、跳过或取消均不授权后续制作。已采用版本不会重复询问。",
       parameters: z.toJSONSchema(storyApprovalSchema, { target: "draft-07", io: "input" }),
       async execute(id, params, signal) {
         const { revisionId } = storyApprovalSchema.parse(params);
@@ -173,7 +173,7 @@ const plugin: ToolPlugin = {
     });
     if (story?.requestDecision) tools.push({
       name: "requestStoryDecision", label: "确认故事创作选择", executionMode: "sequential",
-      description: "在 decision 中指定故事创作选择，并在聊天中请用户确认资料理解、比较并选择已保存的故事方向，或按展示的理由保留审稿问题。confirmSource 传资料 id；chooseDirection 展示全部候选，不代用户选定；已有方向直接返回，仅用户明确改选时传 reconsider:true；release 传 value 展示并保存用户提供的发布反馈，不执行对外发布；decideIssue 传 reviewId、issueId、reason，理由须展示给用户确认。返回 applied: true 才表示决定已保存；跳过或暂不决定时等待，不循环追问。已有明确决定不重复询问。采用定稿用 requestStoryApproval。",
+      description: "在 decision 中指定故事创作选择，并在聊天中请用户确认资料理解、比较并选择已保存的故事方向，或按展示的理由保留审稿问题。confirmSource 传资料 id；chooseDirection 的 decision 只含 type 字段，用于展示全部候选，不传方向 id，不代用户选定；已有方向直接返回，仅用户明确改选时传 reconsider:true；release 传 value 展示并保存用户提供的发布反馈，不执行对外发布；decideIssue 传 reviewId、issueId、reason，理由须展示给用户确认。返回 applied: true 才表示决定已保存；跳过或暂不决定时等待，不循环追问。已有明确决定不重复询问。采用定稿用 requestStoryApproval。",
       parameters: z.toJSONSchema(storyDecisionParameters, { target: "draft-07", io: "input" }),
       async execute(id, params, signal) {
         const { decision } = storyDecisionParameters.parse(params);

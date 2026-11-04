@@ -53,5 +53,5 @@ export interface AutoFilmTask {
   progress: string;
   error?: string;
   decisions: { tool: string; title: string; answer: string; values?: Record<string, string | number | boolean | string[]>; reason: string }[];
-  output?: { renderId: string; sequenceId: string; mediaId: string; url: string };
+  output?: { renderId: string; sequenceId: string; mediaId: string; url: string; qualityStatus?: "pass" | "unverified" | "fail" };
 }

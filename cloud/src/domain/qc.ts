@@ -40,7 +40,7 @@ const DIAGNOSIS: Record<string, { cause: string; action: string; detail: string;
 };
 export const OBSERVATION_KINDS = Object.keys(DIAGNOSIS);
 
-export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; reviewedSegments?: { start: number; end: number }[]; dismissedKinds?: string[]; techniqueReview?: { id: string; verdict: "pass" | "revise"; note: string }[]; motionReview?: { id: string; verdict: "pass" | "revise"; note: string }[]; audioReview?: { speech: string; lipSync: string; referenceMediaId?: string; inspectionKey?: string; offsetMs?: number; note: string } } = {}) {
+export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "take"; id: string }, observations: { kind: string; note?: string }[] = [], review: { reviewed?: string[]; note?: string; actor?: string; vision?: unknown; observedStateDelta?: Record<string, unknown>; fullPlayback?: boolean; reviewedSegments?: { start: number; end: number }[]; dismissedKinds?: string[]; techniqueReview?: { id: string; verdict: "pass" | "revise" | "unverified"; note: string }[]; motionReview?: { id: string; verdict: "pass" | "revise" | "unverified"; note: string }[]; audioReview?: { speech: string; lipSync: string; referenceMediaId?: string; inspectionKey?: string; offsetMs?: number; note: string } } = {}) {
     const shot = s.get("shots", shotId);
     if (!shot) throw notFound("shot");
     const obj = s.get(target.type === "take" ? "takes" : "keyframes", target.id);
@@ -52,11 +52,11 @@ export function runQc(s: Scope, shotId: string, target: { type: "keyframe" | "ta
     const motionReview = motionReviewSchema.parse(review.motionReview ?? []);
     if (new Set(motionReview.map(item => item.id)).size !== motionReview.length || motionReview.some(item => !checkpoints.some(checkpoint => checkpoint.id === item.id))) throw bad("动作检查须对应本镜当前 motionPlan.checkpoints，不得重复或引用其他镜头检查点");
     if (motionReview.some(item => item.verdict === "pass") && review.fullPlayback !== true) throw bad("动作检查通过须实际完整播放当前视频，抽帧和计划不能证明动作达标");
-    if (reviewed.length && checkpoints.some(checkpoint => !motionReview.some(item => item.id === checkpoint.id))) throw bad("请由助手对 motionPlan.checkpoints 逐项提交 motionReview 的 id、pass/revise 和实际时间点与观察，不需要用户逐项确认");
+    if (reviewed.length && checkpoints.some(checkpoint => !motionReview.some(item => item.id === checkpoint.id))) throw bad("请由助手对 motionPlan.checkpoints 逐项提交 motionReview 的 id、pass/revise/unverified 和实际时间点与观察，不需要用户逐项确认");
     observations = [...observations, ...motionReview.filter(item => item.verdict === "revise").map(item => ({ kind: "creativeMismatch", note: `${item.id}：${item.note}` }))];
     const techniqueReview = techniqueReviewSchema.parse(review.techniqueReview ?? []);
     if (new Set(techniqueReview.map(item => item.id)).size !== techniqueReview.length || techniqueReview.some(item => !plan.techniques.some(required => required.id === item.id))) throw bad("技法检查须对应本镜当前检查计划，不能重复或引用无关技法");
-    if (target.type === "take" && reviewed.length && plan.techniques.some(item => !techniqueReview.some(check => check.id === item.id))) throw bad("选用技法的视频须逐项填写 techniqueReview 的 id、pass/revise 和真实观察 note；先完整播放，不让用户重做选择确认");
+    if (target.type === "take" && reviewed.length && plan.techniques.some(item => !techniqueReview.some(check => check.id === item.id))) throw bad("选用技法的视频须逐项填写 techniqueReview 的 id、pass/revise/unverified 和真实观察 note；先完整播放，不让用户重做选择确认");
     observations = [...observations, ...techniqueReview.filter(item => item.verdict === "revise").map(item => ({ kind: "creativeMismatch", note: item.note }))];
     if (review.reviewedSegments?.some(range => range.end > (s.get("media", obj.mediaId)?.duration ?? 0))) throw bad("看听区间超出当前素材时长");
     if (review.audioReview && (target.type !== "take" || (review.audioReview.speech === "pass" || review.audioReview.lipSync === "pass") && !(review.fullPlayback || coversSpeechRanges(plan.speechRanges, review.reviewedSegments ?? [])))) throw bad("声音与口型通过须实际看听全部发声区间；局部发现的问题可以记录为 fail");

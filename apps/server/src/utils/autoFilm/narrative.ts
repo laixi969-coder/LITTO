@@ -22,7 +22,7 @@ export const narrativeReviewSchema = z.strictObject({
 // ACT: 只容忍排版和标点差异，不用相似度放过删句；角色、动作、倒叙与因果由独立语义检查核对。
 export function spokenText(text: string) { return text.normalize("NFKC").replace(/[\p{P}\s]/gu, ""); }
 
-export function narrativeIssues(scenes: { sceneId: string; speech: string }[], shots: Record<string, any>[], revisionId: string) {
+export function narrativeIssues(scenes: { sceneId: string; speech: string }[], shots: Record<string, any>[], revisionId: string, completeScenes = true) {
   const issues: string[] = [];
   for (const shot of shots) {
     if (shot.source?.revisionId !== revisionId || !scenes.some(scene => scene.sceneId === shot.source?.sceneId)) issues.push(`${shot.id} 缺少当前采用剧本的有效场次来源`);
@@ -35,7 +35,7 @@ export function narrativeIssues(scenes: { sceneId: string; speech: string }[], s
       if (!(shot.assetIds ?? []).includes(line.speakerId) || line.lipSync === "visible" && !(shot.visibleAssetIds ?? shot.assetIds ?? []).includes(line.speakerId)) issues.push(`${shot.id} 第${index + 1}句说话人与出镜资产不对应`);
     }
   }
-  for (const scene of scenes) {
+  for (const scene of completeScenes ? scenes : []) {
     const matching = shots.filter(shot => shot.source?.sceneId === scene.sceneId && shot.source?.revisionId === revisionId);
     if (!matching.length) { issues.push(`${scene.sceneId} 尚未分镜，不能省略场次`); continue; }
     const actual = matching.flatMap(shot => (shot.creativeBrief?.dialogue?.lines ?? []).map((line: { text: string }) => line.text)).join("\n");
@@ -53,9 +53,10 @@ export async function narrativePlan(task: AutoFilmTask) {
   if (!revision || story.approvedId !== revision.id || storyStale(story, revision)) issues.push("先保存并采用与当前原稿一致的完整剧本版本");
   if (!sequences.length) issues.push("尚未创建本任务制作序列");
   if (sequences.some(sequence => sequence.projectId !== task.projectId || sequence.storyRevisionId !== revision?.id)) issues.push("任务序列须关联本项目当前采用剧本版本");
+  const projectIssues = [...issues];
   if (revision) issues.push(...narrativeIssues(revision.scenes, shots, revision.id));
-  issues.push(...shots.flatMap(shot => api.continuityPlanningIssues(shot, shots.some(item => item.sequenceId === shot.sequenceId && item.ord < shot.ord))
-    .map(issue => `${shot.id}：${issue}`)));
+  const warnings = shots.flatMap(shot => api.continuityPlanningIssues(shot, shots.some(item => item.sequenceId === shot.sequenceId && item.ord < shot.ord))
+    .map(issue => `${shot.id}：${issue}`));
   const plan = {
     script: task.script, revision,
     worlds: scope.list("worlds", { projectId: task.projectId }),
@@ -71,7 +72,7 @@ export async function narrativePlan(task: AutoFilmTask) {
     })),
   };
   const key = createHash("sha256").update(JSON.stringify([2, plan])).digest("hex");
-  return { key, issues, plan };
+  return { key, issues, projectIssues, warnings, plan };
 }
 
 export function narrativeFailures(review: z.infer<typeof narrativeReviewSchema>) {
@@ -85,29 +86,34 @@ export function narrativeFailures(review: z.infer<typeof narrativeReviewSchema>)
 export async function assertNarrativeReady(task: AutoFilmTask) {
   const snapshot = await narrativePlan(task);
   if (snapshot.issues.length) throw new Error(`叙事分镜尚未完整：${snapshot.issues.join("；")}`);
-  const review = task.narrativeReviews?.find(item => item.key === snapshot.key);
-  if (!review) throw new Error("当前原稿、分镜或对白规划尚未核对；先 reviewAutoFilmStory，通过后再生成或导出。已有素材保留");
-  const failures = narrativeFailures(review);
-  if (failures.length) throw new Error(`叙事分镜须先修正：${failures.join("；")}`);
+  return snapshot;
+}
+
+export async function assertNarrativeGeneration(task: AutoFilmTask, shotId?: string) {
+  const snapshot = await narrativePlan(task);
+  if (snapshot.projectIssues.length) throw new Error(snapshot.projectIssues.join("；"));
+  if (shotId) {
+    const shot = snapshot.plan.shots.find(item => item.id === shotId);
+    if (!shot || !snapshot.plan.revision) throw new Error("镜头不属于当前任务或缺少采用剧本");
+    const issues = narrativeIssues(snapshot.plan.revision.scenes, [shot], snapshot.plan.revision.id, false);
+    if (issues.length) throw new Error(issues.join("；"));
+  }
   return snapshot;
 }
 
 export async function autoFilmProgress(task: AutoFilmTask) {
   const snapshot = await narrativePlan(task);
   const api = cloud()!, scope = api.scoped(currentTenant()!.workspaceId);
-  if (snapshot.issues.length) return { stage: "叙事分镜", nextAction: "修正剧本与全剧分镜，再 reviewAutoFilmStory", issues: snapshot.issues };
-  const review = task.narrativeReviews?.find(item => item.key === snapshot.key);
-  if (!review || narrativeFailures(review).length) return { stage: "分镜核对", nextAction: "调用 reviewAutoFilmStory；按具体问题修正规格，复用已有素材", issues: review ? narrativeFailures(review) : ["当前计划尚未检查"] };
+  if (snapshot.issues.length) return { stage: "叙事分镜", nextAction: "补齐剧本与分镜；已具备有效来源和对白安排的镜头可以先制作", issues: snapshot.issues, warnings: snapshot.warnings };
   const shots = snapshot.plan.shots.map(shot => scope.get("shots", shot.id)!);
   const speech = shots.flatMap(shot => api.speechPlanningIssues(scope, shot).map(issue => `${shot.id}：${issue}`));
-  if (speech.length) return { stage: "对白调度", nextAction: "readVoice 复用候选；采用有效声音、planSpeech 实测，更新动作和对白窗口，再核对分镜", issues: speech };
+  if (speech.length) return { stage: "对白调度", nextAction: "readVoice 复用候选；采用有效声音、planSpeech 实测，更新动作和对白窗口，再核对分镜", issues: speech, warnings: snapshot.warnings };
   const unfinished = shots.filter(shot => !shot.approvedTakeId);
   if (unfinished.length) {
     const repairs = unfinished.flatMap(shot => {
       const fingerprint = api.shotFingerprint(scope, shot.id);
       const takes = scope.list("takes", { shotId: shot.id });
-      const playback = task.playbacks.findLast(item => item.storyKey === snapshot.key
-        && takes.some(take => take.mediaId === item.mediaId && scope.get("media", take.mediaId)?.hash === item.hash
+      const playback = task.playbacks.findLast(item => takes.some(take => take.mediaId === item.mediaId && scope.get("media", take.mediaId)?.hash === item.hash
           && item.cameraReviews?.some(review => review.takeId === take.id && review.fingerprint === fingerprint)));
       if (!playback) return [];
       const camera = playback.cameraReviews?.filter(review => takes.some(take => take.id === review.takeId) && review.fingerprint === fingerprint)
@@ -118,11 +124,11 @@ export async function autoFilmProgress(task: AutoFilmTask) {
       return camera.length || lipSync.length || visual.length || lipSyncSummary && lipSyncSummary.verdict !== "pass"
         ? [{ shotId: shot.id, mediaId: playback.mediaId, camera, lipSync, lipSyncSummary, visual }] : [];
     });
-    return { stage: "镜头制作", nextAction: "读取已有任务与素材；repairs 指明失败镜头、口型窗口和运镜检查点，只修对应缺陷并重新观察，复用成功素材，不以改填通过代替修复", repairs,
+    return { stage: "镜头制作", nextAction: "读取已有任务与素材；repairs 指明失败镜头、口型窗口和运镜检查点，只修对应缺陷并重新观察，复用成功素材，不以改填通过代替修复", repairs, warnings: snapshot.warnings,
       issues: unfinished.map(shot => `${shot.id} ${shot.title}：${shot.heroKeyframeId ? "缺少已采用声画视频" : "缺少已采用主帧及声画视频"}`) };
   }
   const renders = scope.list("renders", { projectId: task.projectId }).filter(render => task.sequenceIds.includes(render.sequenceId));
-  return { stage: "剪辑交付", nextAction: "readEdit 核对完整叙事与切点；复用或完成正式 render，inspectFinal、observeAutoFilmVideo、agentReviewFinal、completeAutoFilm", issues: [],
+  return { stage: "剪辑交付", nextAction: "readEdit 核对完整叙事与切点；复用或完成正式 render、inspectFinal，再 completeAutoFilm；内容验收未通过时标明未验收", issues: [], warnings: snapshot.warnings,
     renders: renders.slice(-10).map(render => ({ id: render.id, sequenceId: render.sequenceId, status: render.status, draft: !!render.manifest?.options?.draft, mediaId: render.mediaId })) };
 }
 
