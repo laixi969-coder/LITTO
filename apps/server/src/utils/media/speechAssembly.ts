@@ -19,7 +19,8 @@ const lineSchema = z.object({
   lineIndex: z.number().int().nonnegative(), lineId: z.string(), takeId: z.string(), text: z.string(), sourceKey: z.string(),
   audioPath: z.string(), audioHash: hashSchema, audioMediaId: z.string(), start: z.number().nonnegative(), duration: z.number().positive(),
   visible: z.boolean(), requestId: z.uuid(),
-  segment: z.object({ path: z.string(), hash: hashSchema, duration: z.number().positive() }).optional(),
+  segment: z.object({ path: z.string(), hash: hashSchema, duration: z.number().positive(), start: z.number().nonnegative().optional(),
+    drive: z.object({ path: z.string(), hash: hashSchema }).optional() }).optional(),
   result: z.object({ path: z.string(), hash: hashSchema, mediaId: z.string(), jobId: z.string(), inspectionKey: hashSchema }).optional(),
 });
 const assemblySchema = z.object({
@@ -107,9 +108,10 @@ export async function validateSpeechSegmentRequest(directory: string, request: M
   const line = assembly.lines.find(line => line.lineIndex === segment.lineIndex);
   if (!line?.visible || !line.segment || line.requestId !== segment.requestId || request.providerId !== assembly.providerId || request.modelId !== assembly.modelId
     || request.shotId || request.productionFingerprint || request.generateAudio === false || request.videos?.length !== 1 || request.audios?.length !== 1
-    || request.videos[0].path !== line.segment.path || request.audios[0].path !== line.audioPath
+    || request.videos[0].path !== line.segment.path || request.audios[0].path !== (line.segment.drive?.path ?? line.audioPath)
+    || await mediaHash(directory, request.audios[0].path) !== (line.segment.drive?.hash ?? line.audioHash)
     || await mediaHash(directory, line.segment.path) !== line.segment.hash) throw new Error("逐句口型请求与服务端保存的真实片段不一致");
-  return { videoHash: line.segment.hash, audioHash: line.audioHash, videoDuration: line.segment.duration, audioDuration: line.duration,
+  return { videoHash: line.segment.hash, audioHash: line.segment.drive?.hash ?? line.audioHash, videoDuration: line.segment.duration, audioDuration: line.segment.drive ? line.segment.duration : line.duration,
     ratio: `${assembly.width}:${assembly.height}`, lineId: line.lineId, voiceSourceKey: line.sourceKey,
     assemblyId: assembly.id, lineIndex: line.lineIndex, start: line.start, sourceVideoHash: assembly.sourceHash, specFingerprint: assembly.fingerprint };
 }
@@ -166,10 +168,14 @@ async function createAssembly(directory: string, shotId: string, signal?: AbortS
     lines.push({ lineIndex, lineId: line.id, takeId: take.id, text: plan.text, sourceKey: take.sourceKey, audioPath: take.audio.path, audioHash,
       audioMediaId: plan.audio.mediaId, start: plan.start, duration: audioDuration, visible: plan.lipSync === "visible", requestId: randomUUID() });
   }
-  const id = createHash("sha256").update(JSON.stringify([1, directory, projectId, shotId, fingerprint, media.id, media.hash,
-    project.lipSyncProviderId, project.lipSyncModelId, lines.map(({ requestId, ...line }) => line)])).digest("hex");
-  try { const saved = await readSpeechAssembly(directory, id); await assertCurrent(saved, signal); return saved; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  const identity = [directory, projectId, shotId, fingerprint, media.id, media.hash,
+    project.lipSyncProviderId, project.lipSyncModelId, lines.map(({ requestId, ...line }) => line)];
+  const id = createHash("sha256").update(JSON.stringify([2, ...identity])).digest("hex");
+  const previousId = createHash("sha256").update(JSON.stringify([1, ...identity])).digest("hex");
+  for (const candidate of [id, previousId]) {
+    try { const saved = await readSpeechAssembly(directory, candidate); await assertCurrent(saved, signal); return saved; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  }
   const assembly = assemblySchema.parse({ id, directory, projectId, shotId, sequenceId: shot.sequenceId, fingerprint,
     sourceMediaId: media.id, sourceHash: media.hash, sourcePath, duration, width: video.width, height: video.height, fps,
     hasAudio: probe.streams.some(stream => stream.codec_type === "audio"), providerId: project.lipSyncProviderId, modelId: project.lipSyncModelId, lines });
@@ -187,10 +193,11 @@ async function verifyResults(assembly: SpeechAssembly, signal?: AbortSignal) {
     if (job?.projectId !== assembly.projectId || job.status !== "SUCCEEDED" || job.kind !== "video" || job.parameters?.directory !== assembly.directory
       || input?.speechSegment?.assemblyId !== assembly.id || input.speechSegment.lineIndex !== line.lineIndex || input.speechSegment.requestId !== line.requestId
       || input.providerId !== assembly.providerId || input.modelId !== assembly.modelId
-      || input.speechSyncInputs?.videoHash !== line.segment.hash || input.speechSyncInputs?.audioHash !== line.audioHash
+      || input.speechSyncInputs?.videoHash !== line.segment.hash || input.speechSyncInputs?.audioHash !== (line.segment.drive?.hash ?? line.audioHash)
       || !scope.list("generation_outputs", { jobId: job.id }).some(output => output.mediaId === line.result!.mediaId)
       || scope.get("media", line.result.mediaId)?.hash !== line.result.hash || await mediaHash(assembly.directory, line.result.path) !== line.result.hash
-      || await mediaHash(assembly.directory, line.segment.path) !== line.segment.hash) throw new Error("口型片段任务或输入输出关联已失效，不能拼接旧结果");
+      || await mediaHash(assembly.directory, line.segment.path) !== line.segment.hash
+      || line.segment.drive && await mediaHash(assembly.directory, line.segment.drive.path) !== line.segment.drive.hash) throw new Error("口型片段任务或输入输出关联已失效，不能拼接旧结果");
   }
 }
 
@@ -219,11 +226,17 @@ export async function syncShotSpeech(directory: string, input: unknown, signal?:
         await assertCurrent(assembly, signal);
         onProgress?.(`处理第${line.lineIndex + 1}句口型：${line.start.toFixed(3)}秒起，保留完整配音`);
         if (!line.segment) {
-          const segment = await renderFile(directory, ffmpeg(assembly.sourcePath).seekInput(line.start).duration(line.duration).noAudio()
+          const index = assembly.lines.indexOf(line), previous = assembly.lines[index - 1], next = assembly.lines[index + 1];
+          const start = previous ? (previous.start + previous.duration + line.start) / 2 : 0;
+          const end = next ? (line.start + line.duration + next.start) / 2 : assembly.duration;
+          const segment = await renderFile(directory, ffmpeg(assembly.sourcePath).seekInput(start).duration(end - start).noAudio()
             .videoCodec("libx264").outputOptions(["-pix_fmt yuv420p", "-crf 18", "-preset fast", "-map_metadata -1"]), "mp4", signal);
           const probe = await probeMedia(ffmpeg, segment.path), duration = Number(probe.streams.find(stream => stream.codec_type === "video")?.duration ?? probe.format.duration);
-          if (!Number.isFinite(duration) || Math.abs(duration - line.duration) > 0.15) throw new Error("自动裁片时长未对齐实际配音，原片保留");
-          line.segment = { ...segment, duration };
+          if (!Number.isFinite(duration) || Math.abs(duration - (end - start)) > 0.15 || start + duration + 0.001 < line.start + line.duration) throw new Error("自动裁片时长未覆盖完整配音，原片保留");
+          const delay = Math.round((line.start - start) * 24000);
+          const drive = await renderFile(directory, ffmpeg(line.audioPath).noVideo().audioChannels(1).audioFrequency(24000).audioCodec("pcm_s16le")
+            .audioFilters(`aresample=24000,adelay=${delay}S:all=1,apad,atrim=duration=${duration}`), "wav", signal);
+          line.segment = { ...segment, duration, start, drive };
           await assertCurrent(assembly, signal); await save(assembly);
         }
         if (!line.result) {
@@ -232,11 +245,11 @@ export async function syncShotSpeech(directory: string, input: unknown, signal?:
           if (!take || take.audio.path !== line.audioPath) throw new Error("采用配音已变化，停止旧口型任务");
           const files = await generateMedia(directory, "video", { providerId: assembly.providerId, modelId: assembly.modelId, purpose: "standalone",
             prompt: "Synchronize the visible speaker to the supplied complete recording. Preserve the camera, action and all other people.",
-            videos: [{ path: line.segment.path, mimeType: "video/mp4" }], audios: [{ path: line.audioPath, mimeType: take.audio.mimeType }], generateAudio: true,
+            videos: [{ path: line.segment.path, mimeType: "video/mp4" }], audios: [{ path: line.segment.drive?.path ?? line.audioPath, mimeType: line.segment.drive ? "audio/wav" : take.audio.mimeType }], generateAudio: true,
             outputName: `speech${assembly.id}Line${line.lineIndex}`, speechSegment: { assemblyId: assembly.id, lineIndex: line.lineIndex, requestId: line.requestId } }, signal, onProgress);
           const file = files.find(file => file.mediaType === "video");
           if (!file) throw new Error("口型任务没有返回视频，保留任务记录，不重新提交");
-          const inspection = await inspectSpeechSync(directory, line.audioPath, file.path, signal, line.segment.path);
+          const inspection = await inspectSpeechSync(directory, line.segment.drive?.path ?? line.audioPath, file.path, signal, line.segment.path);
           if (!inspection.audioMatches) throw new Error(`第${line.lineIndex + 1}句口型声音核验未通过：${inspection.note}`);
           const probe = await probeMedia(ffmpeg, file.path), frame = probe.streams.find(stream => stream.codec_type === "video");
           if (frame?.width !== assembly.width || frame.height !== assembly.height) throw new Error("口型结果改变了原片尺寸，保留结果，不拉伸或重生成");
@@ -263,10 +276,16 @@ export async function syncShotSpeech(directory: string, input: unknown, signal?:
       const visible = assembly.lines.filter(line => line.visible), videoCommand = ffmpeg(assembly.sourcePath);
       visible.forEach(line => videoCommand.input(line.result!.path));
       videoCommand.input(audio.path);
-      const filters = ["[0:v]setpts=PTS-STARTPTS[baseVideo]", ...visible.flatMap((line, index) => [
-        `[${index + 1}:v]fps=${assembly.fps},setpts=PTS-STARTPTS+${line.start}/TB[part${index}]`,
-        `[${index ? `merged${index - 1}` : "baseVideo"}][part${index}]overlay=eof_action=pass:repeatlast=0:enable='gte(t,${line.start})*lt(t,${line.start + line.duration})'[merged${index}]`,
-      ])];
+      const filters = ["[0:v]setpts=PTS-STARTPTS[baseVideo]", ...visible.flatMap((line, index) => {
+        const start = line.segment!.start ?? line.start;
+        const next = assembly.lines[assembly.lines.indexOf(line) + 1];
+        const end = line.segment!.start === undefined ? start + line.segment!.duration
+          : Math.min(start + line.segment!.duration, next ? (line.start + line.duration + next.start) / 2 : assembly.duration);
+        return [
+          `[${index + 1}:v]fps=${assembly.fps},setpts=PTS-STARTPTS+${start}/TB[part${index}]`,
+          `[${index ? `merged${index - 1}` : "baseVideo"}][part${index}]overlay=eof_action=pass:repeatlast=0:enable='gte(t,${start})*lt(t,${end})'[merged${index}]`,
+        ];
+      })];
       const video = await renderFile(directory, videoCommand.complexFilter(filters).outputOptions([
         `-map [${visible.length ? `merged${visible.length - 1}` : "baseVideo"}]`, `-map ${visible.length + 1}:a`,
         "-c:v libx264", "-crf 18", "-preset fast", "-pix_fmt yuv420p", "-c:a aac", "-b:a 192k", "-map_metadata -1", `-t ${assembly.duration}`,
@@ -281,7 +300,7 @@ export async function syncShotSpeech(directory: string, input: unknown, signal?:
     await validateSpeechAssembly(directory, assembly.id);
     return { assemblyId: assembly.id, shotId, ...assembly.output!, sourceVideoPath: assembly.sourcePath,
       windows: assembly.lines.map(line => ({ lineIndex: line.lineIndex, start: line.start, end: line.start + line.duration, text: line.text, lipSync: line.visible ? "visible" : "offscreen", jobId: line.result?.jobId })),
-      note: "整镜已自动拆片、对口型并按原时间合回；未自动采用。仅对白窗口经过口型处理，窗口外仍是原画面；请特别检查静音时原人物是否仍在说话以及拼接点。先 observeAutoFilmVideo 完整看听此 mediaId，再 importSpeech 携带 assemblyId 与返回路径、inspectionKey；登记后重新观察摄影清单并 reviewProduction。不要再向 A1 重复铺这批对白。" };
+      note: `${assembly.lines.filter(line => line.visible).every(line => line.segment?.drive) ? "整镜已按说话顺序扩展处理片段并在对白前后填充静音" : "沿用之前生成的口型结果，仅对白片段经过处理"}，保留原对白与时间；画外音区间仍使用原画面。多人同框时模型可能选错人物，须逐段检查说话者、静音嘴部与拼接点；未自动采用。先 observeAutoFilmVideo 完整看听，再 importSpeech 并 reviewProduction。不要再向 A1 重复铺这批对白。` };
   } finally { running.delete(key); }
 }
 

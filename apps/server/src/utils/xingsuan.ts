@@ -48,14 +48,14 @@ async function request(path: string, body?: unknown) {
   return result.Result;
 }
 
-export async function createGroup(name: string, description: string) {
+export async function createGroup(name: string, description: string, supplier?: "default" | "byteplus") {
   const path = filePath();
   await mkdir(privateDataDirectory(), { recursive: true });
   const release = lockWorkspaceFiles([path]);
   try {
     const current = account();
     const groups = await readGroups();
-    const result = await request("/asset-groups", { Name: name, Description: description });
+    const result = await request(supplier === "byteplus" ? "/byteplus/asset-groups" : "/asset-groups", { Name: name, Description: description });
     if (!result.Id) throw new Error("星算云未返回素材组 ID");
     groups.push({ account: current, id: result.Id, name, assets: [] });
     try { await writeAtomic(path, JSON.stringify(groups, null, 2)); }

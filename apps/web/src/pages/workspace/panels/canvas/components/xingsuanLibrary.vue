@@ -1,7 +1,7 @@
 <template>
   <el-dialog v-model="visible" title="星算云素材库" width="min(620px, calc(100vw - 32px))" appendToBody @open="load">
     <el-form labelPosition="top" @submit.prevent>
-      <el-form-item label="创建素材组"><div class="row"><el-input v-model="groupName" placeholder="素材组名称" aria-label="素材组名称" /><el-button type="primary" :loading="busy" :disabled="!groupName.trim()" @click="createGroup">创建</el-button></div></el-form-item>
+      <el-form-item label="创建素材组"><div class="row"><el-input v-model="groupName" placeholder="素材组名称" aria-label="素材组名称" /><el-select v-model="supplier" aria-label="素材上游"><el-option label="默认上游" value="default" /><el-option label="BytePlus" value="byteplus" /></el-select><el-button type="primary" :loading="busy" :disabled="!groupName.trim()" @click="createGroup">创建</el-button></div></el-form-item>
       <el-form-item label="上传素材到素材组">
         <div class="fields">
           <el-select v-model="groupId" placeholder="选择素材组" aria-label="选择素材组"><el-option v-for="group in groups" :key="group.id" :label="group.name" :value="group.id" /></el-select>
@@ -24,6 +24,7 @@ type Group = { id: string; name: string; assets: { id: string; name: string; typ
 const visible = defineModel<boolean>({ default: false });
 const groups = ref<Group[]>([]);
 const groupName = ref("");
+const supplier = ref<"default" | "byteplus">("default");
 const groupId = ref("");
 const assetName = ref("");
 const assetUrl = ref("");
@@ -39,7 +40,7 @@ async function load() {
 async function createGroup() {
   busy.value = true;
   try {
-    groups.value = (await axios.post<{ data: Group[] }>("/api/xingsuan/createGroup", { name: groupName.value.trim(), description: "" })).data.data;
+    groups.value = (await axios.post<{ data: Group[] }>("/api/xingsuan/createGroup", { name: groupName.value.trim(), description: "", supplier: supplier.value })).data.data;
     groupName.value = "";
     ElMessage.success("素材组已创建");
   } catch (error) { showError(error); } finally { busy.value = false; }
