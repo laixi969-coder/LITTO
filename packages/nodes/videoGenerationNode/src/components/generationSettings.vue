@@ -3,7 +3,7 @@
     <template #reference>
       <el-button class="settingsButton" text size="small" :disabled="disabled" aria-label="视频生成设置">
         <span class="ratioShape" :style="ratioStyle(ratio)" aria-hidden="true" />
-        <span>{{ [ratio, resolution, duration ? `${duration}秒` : ''].filter(Boolean).join(' · ') }}</span>
+        <span>{{ [ratio, resolution, duration ? `${duration}秒` : '', model?.audio === 'optional' ? (generateAudio ? '有声' : '无声') : ''].filter(Boolean).join(' · ') }}</span>
         <icon-chevron-up :size="14" aria-hidden="true" />
       </el-button>
     </template>
@@ -39,6 +39,8 @@
         <span class="sectionLabel">生成音频</span>
         <el-switch v-model="generateAudio" :disabled="disabled" aria-label="生成音频" />
       </div>
+      <div v-else-if="model?.audio === true" class="audioOption"><span class="sectionLabel">此模型不提供音频开关</span></div>
+      <div v-else-if="model" class="audioOption"><span class="sectionLabel">此模型未提供音频生成</span></div>
     </div>
   </el-popover>
 </template>

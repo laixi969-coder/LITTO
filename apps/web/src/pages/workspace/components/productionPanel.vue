@@ -149,6 +149,8 @@
               <label v-if="kind === 'video'">分辨率<select v-model="resolution"><option value="">选择分辨率</option><option v-for="value in resolutions" :key="value">{{ value }}</option></select></label>
               <label v-if="kind === 'video'">生成时长（含剪辑余量）<select v-model.number="duration"><option v-for="value in durations" :key="value" :value="value">{{ value }} 秒</option></select></label>
               <label v-if="kind === 'video' && selectedModel?.audio === 'optional'"><input v-model="generateAudio" type="checkbox" />生成声音</label>
+              <span v-else-if="kind === 'video' && selectedModel?.audio === true">此模型不提供音频开关</span>
+              <span v-else-if="kind === 'video' && selectedModel">此模型未提供音频生成</span>
               <label v-if="kind === 'image' && selectedModel?.imageSizes?.length">尺寸<select v-model="size"><option v-for="value in selectedModel.imageSizes" :key="value">{{ value }}</option></select></label>
               <label>画幅<select v-model="ratio"><option v-for="value in selectedModel?.cameraTrajectory ? ['20:11'] : selectedModel?.imageRatios?.length ? selectedModel.imageRatios : ['16:9', '9:16', '1:1']" :key="value">{{ value }}</option></select></label>
               <template v-if="kind === 'video' && selectedModel?.cameraTrajectory">
@@ -369,7 +371,7 @@ const qualityLabel = computed(() => ({ basic: "基础检查 · 集中预览", vi
 const reviewFields = computed(() => realismFields.filter(field => qualityPlan.value.checks.includes(field[0])));
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
 const modeLabel = (mode: unknown) => Array.isArray(mode) ? `多参考 (${mode.join(" / ")})` : ({ singleImage: "首帧", startFrameOptional: "首帧可选", startEndRequired: "首尾帧", endFrameOptional: "首帧与可选尾帧", text: "纯文本" }[String(mode)] ?? String(mode));
-const generateAudio = ref(true);
+const generateAudio = ref(false);
 watch([kind, modelKey, modeKey, resolution, duration, size, ratio, shotId, generateAudio], () => { preview.value = null; pendingRequestId = ""; });
 watch(selectedModel, model => {
   modeKey.value = ""; resolution.value = ""; size.value = model?.imageSizes?.[0] ?? "";
@@ -529,7 +531,7 @@ async function selectShot(id: string) {
   draft.value = structuredClone(toRaw(detail.value));
   draft.value.realism ??= Object.fromEntries(realismFields.map(field => [field[0], ""]));
   duration.value = draft.value.generationDuration ?? draft.value.duration;
-  generateAudio.value = !draft.value.musicVideo || draft.value.musicVideo.audioMode === "generated";
+  generateAudio.value = false;
   selectPendingVersion();
   void refreshJobs().catch(() => {});
   await refreshCandidatePool();

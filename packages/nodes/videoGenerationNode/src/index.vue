@@ -109,7 +109,7 @@ data.value.promptModel ??= [];
 data.value.model ??= "";
 data.value.resolution ??= "";
 data.value.mode ??= "";
-data.value.generateAudio ??= true;
+data.value.generateAudio ??= false;
 data.value.ratio ??= "";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
@@ -177,7 +177,6 @@ watch([selectedModel, () => data.value.duration], ([choice]) => {
   if (!durations.includes(data.value.duration!)) data.value.duration = undefined;
   const resolutions = getResolutions(choice, data.value.duration);
   if (!resolutions.includes(data.value.resolution)) data.value.resolution = resolutions[0] ?? "";
-  if (choice.audio !== "optional") data.value.generateAudio = choice.audio === true;
 }, { flush: "sync" });
 const modelGroups = computed(() => groupNodeModels(models.value));
 const generationPrompt = computed(() =>
@@ -286,7 +285,7 @@ async function startGeneration() {
     duration: data.value.duration,
     resolution: data.value.resolution || undefined,
     ratio: data.value.ratio,
-    generateAudio: choice.audio === "optional" ? data.value.generateAudio : choice.audio,
+    ...(choice.audio === "optional" ? { generateAudio: data.value.generateAudio } : choice.audio === true ? { generateAudio: true } : {}),
     outputDirectory: `assets/${id}`,
     images: frameMode.value || choice.cameraTrajectory ? undefined : images,
     firstFrame: choice.cameraTrajectory || frameMode.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
@@ -390,7 +389,7 @@ function getConfig() {
       resolution: data.value.resolution,
       ratio: data.value.ratio,
       mode: selectedMode.value,
-      generateAudio: data.value.generateAudio,
+      generateAudio: selectedModel.value?.audio === "optional" ? data.value.generateAudio : selectedModel.value?.audio === true ? true : undefined,
       cameraTrajectory: data.value.cameraTrajectory,
       imageAndCameraOnly: data.value.imageAndCameraOnly,
     },
