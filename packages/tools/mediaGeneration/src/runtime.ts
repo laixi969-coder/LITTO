@@ -11,6 +11,8 @@ export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia
  */
 export type SkinFinish = "clean" | "natural";
 
+export const photographicVisualBrief = "保持既定媒介、身份、年龄、造型、场景光色与剧情状态；写实画面中人物和环境遵循同一实际光源及遮挡，主体必要细节可辨，保留阴影层次；真人肤色自然、高光柔和、细微纹理符合景别，皮肤、衣料及其他材质的反光各异。不靠磨皮、粗毛孔或过度锐化制造真实感。";
+
 export const skinFinishes: Record<SkinFinish, string> = {
   clean:
     "人物妆面干净自然，保留既定肤色、年龄、身份、符合景别的细微纹理与自然血色差异。额头、鼻侧、两颊和嘴唇按实际光源、转向与材质呈现适度不同的光泽；轻薄底妆与颈部衔接，不把整张脸处理成统一颜色、统一粗糙度或无高光的哑光面。皮肤高光保持柔和层次，不以磨皮、锐化或额外腮红色块替代纹理和光照。眉毛、睫毛、发根与衣料保持自然细节；妆容、湿润状态和特殊妆效服从当前明确设计。不要新增伤斑、疲态、粗大毛孔、蜡质皮肤或无来源的局部色光。",

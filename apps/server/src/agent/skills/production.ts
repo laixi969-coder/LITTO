@@ -72,8 +72,8 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     { match: /人物|角色|表演|对白|对话|演唱|唱跳|反应|演技|performance|dialogue/i, name: "cinema", paths: ["references/performanceDirection.md", "references/creativePreparation.md"] },
     { match: /资产|角色卡|三视图|四视图|妆造|服装|道具|场景设计/, name: "workflow", paths: ["references/assets.md", "references/methods/visualDesign.md"] },
     { match: /妆造|服装|换装|妆发|衣装/, name: "workflow", paths: ["references/methods/characterStyling.md"] },
-    { match: /布光|灯光|光线|调色|滤镜|色板|材质|质感|lighting|grading|filter/i, name: "workflow", paths: ["references/methods/colorAndLight.md"] },
-    { match: /真人|写实|质感|皮肤|塑料|手机|realism|photoreal|live.action/i, name: "continuity", paths: ["references/realism.md"] },
+    { match: /布光|灯光|光线|调色|滤镜|色板|材质|质感|视频|镜头|关键帧|生图|lighting|grading|filter/i, name: "workflow", paths: ["references/methods/colorAndLight.md"] },
+    { match: /真人|写实|质感|皮肤|塑料|手机|视频|镜头|关键帧|生图|realism|photoreal|live.action/i, name: "continuity", paths: ["references/realism.md"] },
     { match: /创意|大纲|编剧|写.*剧本|故事开发/, name: "story", paths: ["references/core-methodology.md"] },
     { match: /镜头|分镜|运镜|摄影|构图|机位|俯视|剖面|全景|白模|camera|cinematography/i, name: "cinema", paths: ["references/shotLanguage.md", "references/masterShots.md"] },
     { match: /九宫格|九格|9\s*[宫宮格]|十六宫格|16\s*[宫宮格]|多格分镜|宫格分镜|storyboard\s*grid/i, name: "cinema", paths: ["references/storyboardGrid.md"] },
@@ -89,7 +89,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const projectId = api && tenant ? workspaceProject(cwd, false) : undefined;
   const pendingShots = projectId ? api!.scoped(tenant!.workspaceId).list("shots", { projectId }).filter(shot => !shot.approvedTakeId) : [];
   // ACT: 专项路由也读取待制作镜头，续作不能只靠本轮措辞；这里只匹配主题，不把全项目规格重复塞入上下文。
-  const topicText = `${task}\n${JSON.stringify(project.revisions.find(item => item.id === project.approvedId)?.brief ?? project.brief)}\n${JSON.stringify(pendingShots.map(shot => ({ action: shot.action, creativeBrief: shot.creativeBrief, camera: shot.camera })))}`;
+  const topicText = `${task}\n${JSON.stringify(project.revisions.find(item => item.id === project.approvedId)?.brief ?? project.brief)}\n${JSON.stringify(pendingShots.map(shot => ({ action: shot.action, creativeBrief: shot.creativeBrief, camera: shot.camera, lighting: shot.lighting, realism: shot.realism })))}`;
   const selectedTopics = topics.filter(topic => topic.match.test(topicText));
   // ACT: 先读取已保存的制作上下文再判断入口，避免“再快一点”等续作指令在专项路由前被漏掉。
   if (!explicitNames.length && !music && !advertising && !story && !selectedTopics.length && !/视频|短片|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";

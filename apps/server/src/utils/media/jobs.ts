@@ -2,6 +2,7 @@ import { basename, join } from "node:path";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, realpathSync } from "@toonflow/file";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
+import { photographicVisualBrief } from "@toonflow/tool-media-generation/runtime";
 import type { ProviderTask } from "@toonflow/providers";
 import type { GenRequest, GenResult } from "@/lib/cloud";
 import { cloud } from "@/lib/cloud";
@@ -50,19 +51,24 @@ async function optimizeCompiledPrompt(directory: string, sections: Record<string
   if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
   const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotConnection", "continuityContext", "shotExecution", "startingFrame", "staging", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding", "Objective", "Immutable locks", "Target duration", "Timeline", "Audio direction", "Shot execution", "Avoid"]);
   protectedKeys.add("humanPerformance");
+  // ACT: 优先原文保留已写明的质感与参考职责；空间不足时仍交给视觉背景压缩，避免仅因保护项过长阻塞制作。
+  for (const key of ["look", "realism", "opticalTexture", "appearance", "referenceIntent", "references"]) {
+    const protectedLength = Object.entries(sections).filter(([name, value]) => value && (protectedKeys.has(name) || name === key)).reduce((sum, [name, value]) => sum + name.length + value.length + 3, 0);
+    if (protectedLength + photographicVisualBrief.length + suffix.length + 350 <= limit) protectedKeys.add(key);
+  }
   const essential = Object.entries(sections).filter(([key, value]) => value && protectedKeys.has(key)).map(([key, value]) => `${key.toUpperCase()}: ${value}`).join("\n");
-  const baseline = "PHOTOGRAPHICBASELINE: 保持已定媒介、身份、年龄、造型、干净完整状态及自然肤质；明确的剧情和视觉设计优先。";
+  const baseline = `PHOTOGRAPHICBASELINE: ${photographicVisualBrief}`;
   const budget = limit - [baseline, essential, suffix].join("\n").length - 32;
   if (budget < 100) throw new Error(`模型提示词上限 ${limit} 字符，保留动作、对白和关键约束后空间不足；请拆分镜头或精简规格。未提交生成。`);
   const choice = selectedModel("text");
   if (!choice) throw new Error(`提示词超过模型 ${limit} 字符上限，需要先配置对话模型才能自动精简；未提交生成。`);
-  const source = Object.fromEntries(Object.entries(sections).filter(([key, value]) => value && !protectedKeys.has(key)));
+  const source = Object.fromEntries(Object.entries(sections).filter(([key, value]) => value && !protectedKeys.has(key) && key.toLowerCase() !== "photographicbaseline"));
   const key = createHash("sha256").update(JSON.stringify([directory, choice, limit, essential, source, suffix])).digest("hex");
   let pending = promptOptimizations.get(key);
   if (!pending) {
     pending = (async () => {
       const configured = getConfiguredModel(choice.providerId, choice.modelId);
-      const stream = streamAi(configured, { systemPrompt: `你是电影提示词编辑。仅压缩输入的镜头背景和视觉设定，去重并合并同义表述，保留具体人物身份、服饰、环境、摄影、光线、接戏、参考用途及明确禁止事项。不能增加剧情、改变动作、对白或约束。只输出压缩后的正文，不要代码块或解释，最多 ${budget} 字符。`, messages: [{ role: "user", timestamp: Date.now(), content: [{ type: "text", text: JSON.stringify(source) }] }] }, AbortSignal.timeout(90000));
+      const stream = streamAi(configured, { systemPrompt: `你是电影提示词编辑。仅压缩输入的镜头背景和视觉设定，去重并合并同义表述，优先保留具体人物身份、服饰、光源与受光关系、肤色与材质响应、影调、参考用途及明确禁止事项。不能增加剧情、改变动作、对白或约束。只输出压缩后的正文，不要代码块或解释，最多 ${budget} 字符。`, messages: [{ role: "user", timestamp: Date.now(), content: [{ type: "text", text: JSON.stringify(source) }] }] }, AbortSignal.timeout(90000));
       for await (const _event of stream) { /* 等待语言模型完成精简 */ }
       const result = await stream.result();
       recordTextUsage({ ...result, provider: configured.providerId });

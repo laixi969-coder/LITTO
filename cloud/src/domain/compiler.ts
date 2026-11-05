@@ -11,7 +11,7 @@ import type { ShotInput } from "./schema.ts";
 import { cameraDirectionIssues, creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair, continuityPlanningIssues } from "./continuity.ts";
-import { physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
+import { photographicVisualBrief, physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
 import { musicSource } from "./music.ts";
 import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
@@ -491,7 +491,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }).join("\n");
     if (techniqueDirection) sections["Objective" in sections ? "Selected techniques" : "selectedTechniques"] = techniqueDirection;
     // ACT: 视频规格保留原文，只缩短通用规则；空间不足时由调用方明确报错，不截断内容。
-    if (kind === "video" && model.limits.workspaceExecution) sections["Objective" in sections ? "PHOTOGRAPHICBASELINE" : "photographicBaseline"] = "保持指定媒介、身份、年龄、造型、光照和自然肤质；明确的剧情与视觉设计优先。";
+    if (kind === "video" && model.limits.workspaceExecution) sections["Objective" in sections ? "PHOTOGRAPHICBASELINE" : "photographicBaseline"] = photographicVisualBrief;
     // 剪辑、声音和叙事仍交各自真实流程，不当作单镜视觉动作；返回待执行项目供导演继续。
     for (const stage of ["edit", "audio", "story"] as const) {
         const planned = techniquePlan(shot, stage);
