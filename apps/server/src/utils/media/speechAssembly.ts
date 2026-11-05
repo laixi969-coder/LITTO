@@ -77,7 +77,8 @@ async function assertCurrent(assembly: SpeechAssembly, signal?: AbortSignal) {
     throw new Error("人物原片已改变，不能复用旧口型片段");
   const edit = api.editView(scope, api.getEdit(scope, assembly.sequenceId, false));
   const clips = edit.clips.filter(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video");
-  if (clips.length !== 1 || clips[0].speed !== 1 || ![assembly.sourceMediaId, assembly.output?.mediaId].includes(clips[0].source.mediaId!))
+  if (clips.length !== 1 || clips[0].speed !== 1 || clips[0].in !== 0 || Math.abs(clips[0].duration - assembly.duration) > 0.15
+    || ![assembly.sourceMediaId, assembly.output?.mediaId].includes(clips[0].source.mediaId!))
     throw new Error("原镜剪辑来源或速度已变化，停止处理并保留已有结果");
   signal?.throwIfAborted();
 }
@@ -148,6 +149,8 @@ async function createAssembly(directory: string, shotId: string, signal?: AbortS
   const fps = numerator / denominator;
   if (!video?.width || !video.height || !Number.isFinite(fps) || fps <= 0 || fps > 240 || !Number.isFinite(duration) || duration <= 0 || duration > 600)
     throw new Error("原视频的尺寸、帧率或时长无法核验，单次整镜口型最多10分钟");
+  if (clips[0].in !== 0 || Math.abs(clips[0].duration - duration) > 0.15)
+    throw new Error("当前剪辑只使用了原视频的一部分；请先准备对应的完整镜头素材再处理口型，避免声音或画面错位");
   const lines: SpeechAssembly["lines"] = [];
   for (const [lineIndex, plan] of planned.entries()) {
     const matches = project.lines.filter(line => line.shotId === shotId && (line.dialogueLineIndex === lineIndex || line.dialogueLineIndex === undefined && line.text.trim() === plan.text)
@@ -224,9 +227,12 @@ export async function syncShotSpeech(directory: string, input: unknown, signal?:
           await assertCurrent(assembly, signal); await save(assembly);
         }
         if (!line.result) {
+          const { project } = await readVoiceProject(directory);
+          const take = project.lines.find(item => item.id === line.lineId)?.takes.find(item => item.id === line.takeId);
+          if (!take || take.audio.path !== line.audioPath) throw new Error("采用配音已变化，停止旧口型任务");
           const files = await generateMedia(directory, "video", { providerId: assembly.providerId, modelId: assembly.modelId, purpose: "standalone",
             prompt: "Synchronize the visible speaker to the supplied complete recording. Preserve the camera, action and all other people.",
-            videos: [{ path: line.segment.path, mimeType: "video/mp4" }], audios: [{ path: line.audioPath, mimeType: "audio/wav" }], generateAudio: true,
+            videos: [{ path: line.segment.path, mimeType: "video/mp4" }], audios: [{ path: line.audioPath, mimeType: take.audio.mimeType }], generateAudio: true,
             outputName: `speech${assembly.id}Line${line.lineIndex}`, speechSegment: { assemblyId: assembly.id, lineIndex: line.lineIndex, requestId: line.requestId } }, signal, onProgress);
           const file = files.find(file => file.mediaType === "video");
           if (!file) throw new Error("口型任务没有返回视频，保留任务记录，不重新提交");
@@ -275,7 +281,7 @@ export async function syncShotSpeech(directory: string, input: unknown, signal?:
     await validateSpeechAssembly(directory, assembly.id);
     return { assemblyId: assembly.id, shotId, ...assembly.output!, sourceVideoPath: assembly.sourcePath,
       windows: assembly.lines.map(line => ({ lineIndex: line.lineIndex, start: line.start, end: line.start + line.duration, text: line.text, lipSync: line.visible ? "visible" : "offscreen", jobId: line.result?.jobId })),
-      note: "整镜已自动拆片、对口型并按原时间合回；未自动采用。先 observeAutoFilmVideo 完整看听此 mediaId，再 importSpeech 携带 assemblyId 与返回路径、inspectionKey；登记后重新观察摄影清单并 reviewProduction。不要再向 A1 重复铺这批对白。" };
+      note: "整镜已自动拆片、对口型并按原时间合回；未自动采用。仅对白窗口经过口型处理，窗口外仍是原画面；请特别检查静音时原人物是否仍在说话以及拼接点。先 observeAutoFilmVideo 完整看听此 mediaId，再 importSpeech 携带 assemblyId 与返回路径、inspectionKey；登记后重新观察摄影清单并 reviewProduction。不要再向 A1 重复铺这批对白。" };
   } finally { running.delete(key); }
 }
 

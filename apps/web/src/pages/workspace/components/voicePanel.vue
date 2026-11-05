@@ -10,7 +10,7 @@
         <el-button :disabled="busy || !loaded" @click="run(importStory)">同步已采用剧本台词（保留旧方案）</el-button>
         <el-button v-if="operation" :disabled="stopping" @click="stop">停止处理</el-button>
       </div>
-      <p class="hint">对白或演唱可使用已有声音片段。对口型仅选择明确支持此能力的专用模型；音轨匹配与逐字口型分别检查，已有候选和有效检查保留复用。旁白无需对口型。</p>
+      <p class="hint">每个角色绑定固定音色，逐句填写情绪与表演。对口型仅选择明确支持此能力的专用模型；音轨匹配不代表逐字口型准确，也请检查静音时人物是否仍在说话。已有候选保留复用，旁白无需对口型。</p>
       <fieldset :disabled="busy || !loaded">
         <h3>角色与音色</h3>
         <div v-for="role in project.roles" :key="role.id" class="roleRow">
