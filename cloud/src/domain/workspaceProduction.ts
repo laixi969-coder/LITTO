@@ -16,6 +16,7 @@ import { approveTake, promoteHero } from "./lifecycle.ts";
 import { selectWorkingTake, applyOps, getEdit, editView, resolveClip } from "./nle.ts";
 import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema, motionReviewSchema, requireReviewed } from "./realism.ts";
 import { creativeReviewSchema } from "./creativeDirection.ts";
+import { effectiveLook, lookReferenceBindings } from "./visualDefaults.ts";
 import { searchFilmTechniques, techniqueStages } from "@toonflow/tool-media-generation/filmTechniques";
 import { adReadiness, saveAdDirection } from "./adDirection.ts";
 import { createSequence, sequenceInput } from "./sequences.ts";
@@ -94,6 +95,14 @@ export async function importWorkspaceAudio(s: Scope, projectId: string, bytes: B
   if (kind === "speech" && (!probe?.hasAudio || !Number.isFinite(probe.duration) || probe.duration! <= 0)) throw bad("配音须有实际可解码音轨与实测时长，不能以文件声明或估时替代");
   let media = s.list("media", { projectId, hash: sha256(bytes) })[0] ?? await saveMedia(s.workspaceId, projectId, bytes, { source: kind === "speech" ? "speechReference" : "audioReference" });
   if (kind === "speech") media = s.update("media", media.id, { source: "speechReference", duration: probe!.duration });
+  if (!s.get("projects", projectId)) throw notFound("project");
+  return mediaView(media);
+}
+
+export async function importWorkspaceImage(s: Scope, projectId: string, bytes: Buffer) {
+  if (!s.get("projects", projectId)) throw notFound("project");
+  if (!sniff(bytes)?.mime.startsWith("image/")) throw bad("参考素材须为可识别的图片");
+  const media = s.list("media", { projectId, hash: sha256(bytes) })[0] ?? await saveMedia(s.workspaceId, projectId, bytes, { source: "upload" });
   if (!s.get("projects", projectId)) throw notFound("project");
   return mediaView(media);
 }
@@ -243,8 +252,8 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     const media = item && s.get("media", item.mediaId);
     if (!item || !shot || !media || [item, shot, media].some(row => row.projectId !== projectId)) throw notFound("project output");
     if (!media.mime.startsWith(input.targetType === "take" ? "video/" : "image/")) throw bad("审阅目标的媒体类型不符");
-    if (shot.creativeBrief && !input.creativeReview) throw bad("请由助手对照 creativeBrief 和实际输出填写 creativeReview：verdict 为 pass 或 revise，styling 说明妆发服装与视觉目标是否相符，staging 说明动作起点/实际攻防是否相符。无变形不等于造型与编排合格，不要求用户填写。");
-    if (input.creativeReview?.verdict === "revise") input.observations.push({ kind: "creativeMismatch", note: `${input.creativeReview.styling}；${input.creativeReview.staging}` });
+    if ((shot.creativeBrief || effectiveLook(s, projectId, shot.sequenceId, shot.id).colorReferenceIds.length) && !input.creativeReview) throw bad("请由助手对照 creativeBrief、Look、实际参考和输出填写 creativeReview：verdict 为 pass 或 revise，styling 说明妆发服装（无人镜头说明不适用），staging 说明构图与动作起点，visual 说明材质、曝光、光色和空间层次的具体比较。无变形不等于视觉目标合格，不要求用户填写。");
+    if (input.creativeReview?.verdict === "revise") input.observations.push({ kind: "creativeMismatch", note: `${input.creativeReview.styling}；${input.creativeReview.staging}；${input.creativeReview.visual}` });
     if (input.targetType === "take" && (!media.duration || input.frameTimes.length < 2
       || input.frameTimes.some((time, index) => time >= media.duration || index > 0 && time <= input.frameTimes[index - 1]!))) {
       throw bad("视频工作版须记录至少两个递增且位于素材时长内的实际抽帧时间");
@@ -260,6 +269,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
       if (!input.observations.length && input.creativeReview?.verdict !== "revise"
         && previous?.evidence?.mediaId === item.mediaId && previous.evidence.fingerprint === shotFingerprint(s, shot.id, input.targetType)
         && previous.evidence.vision?.source === "delegatedAgent"
+        && JSON.stringify(input.creativeReview) === JSON.stringify(previous.evidence.vision.creativeReview)
         && plan.checks.every(key => previous.evidence.reviewed?.includes(key))
         && (!input.fullPlayback || previous.evidence.fullPlayback)
         && (!input.observedStateDelta || JSON.stringify(input.observedStateDelta) === JSON.stringify(previous.evidence.observedStateDelta))
@@ -312,6 +322,7 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     if (!current) throw notFound(table);
     const schema = operation === "world" ? worldSchema : lookSchema;
     const patch = schema.partial().strict().parse(data);
+    if (operation === "look") lookReferenceBindings(s, projectId, lookSchema.partial().parse(patch));
     return s.update(table, current.id, { data: schema.parse({ ...current, ...patch }) });
   }
   if (operation === "asset") {

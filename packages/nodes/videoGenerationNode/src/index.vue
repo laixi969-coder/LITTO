@@ -72,7 +72,7 @@
             :disabled="deleting || uploading || (!generating && (!generationPrompt || !selectedModel))"
             :title="generating ? '停止生成' : '生成视频'"
             :aria-label="generating ? '停止生成' : '生成视频'"
-            @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration().catch((error) => showNodeError(error, '视频生成失败'))" />
+            @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration(true).catch((error) => showNodeError(error, '视频生成失败'))" />
         </div>
       </el-card>
     </template>
@@ -83,7 +83,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { cameraTrajectorySchema, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { cameraTrajectorySchema, videoDurations, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
@@ -103,7 +103,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "视频生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { purpose?: "asset" | "standalone"; production?: { shotId: string; productionFingerprint: string }; cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; resolution: string; ratio: string; mode: string; generateAudio: boolean });
+const data = computed(() => node.data as { purpose?: "asset" | "standalone"; production?: { shotId: string; productionFingerprint: string }; cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; durationReason?: string; resolution: string; ratio: string; mode: string; generateAudio: boolean });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -152,10 +152,6 @@ function getMatchingModes(choice?: NodeMediaModel) {
   });
 }
 
-function getDurations(choice: NodeMediaModel) {
-  return [...new Set((choice.durationResolutionMap ?? []).flatMap((item) => item.duration))].sort((a, b) => a - b);
-}
-
 function getResolutions(choice: NodeMediaModel, duration?: number) {
   // ACT: 当前视频分辨率使用 p 单位；出现其他单位时再统一换算。
   return [...new Set((choice.durationResolutionMap ?? []).filter((item) => duration === undefined || item.duration.includes(duration)).flatMap((item) => item.resolution))]
@@ -171,12 +167,12 @@ watch([selectedModel, matchingModes, () => data.value.mode], ([choice, matches])
   data.value.mode = mode === undefined ? "" : JSON.stringify(mode);
 }, { flush: "sync" });
 // ACT: 参数在节点内归一化，未选中、未挂载底部设置时也可由 Agent 直接生成。
-watch([selectedModel, () => data.value.duration], ([choice]) => {
+watch([selectedModel, () => data.value.duration, () => data.value.resolution], ([choice]) => {
   if (!choice) return;
-  const durations = getDurations(choice);
-  if (!durations.includes(data.value.duration!)) data.value.duration = undefined;
-  const resolutions = getResolutions(choice, data.value.duration);
+  const resolutions = getResolutions(choice);
   if (!resolutions.includes(data.value.resolution)) data.value.resolution = resolutions[0] ?? "";
+  const durations = videoDurations(choice, data.value.resolution);
+  if (!durations.includes(data.value.duration!)) data.value.duration = durations.at(-1);
 }, { flush: "sync" });
 const modelGroups = computed(() => groupNodeModels(models.value));
 const generationPrompt = computed(() =>
@@ -260,7 +256,7 @@ function loadModels() {
   return modelsRequest;
 }
 
-async function startGeneration() {
+async function startGeneration(manual = false) {
   const choice = selectedModel.value;
   if (generating.value) throw new Error("视频正在生成，请等待完成");
   if (uploading.value) throw new Error("视频正在替换，请等待完成");
@@ -283,6 +279,7 @@ async function startGeneration() {
     purpose: data.value.purpose,
     mode: selectedMode.value,
     duration: data.value.duration,
+    durationReason: data.value.durationReason || (manual ? `用户按视频节点当前配置明确发起 ${data.value.duration} 秒生成` : undefined),
     resolution: data.value.resolution || undefined,
     ratio: data.value.ratio,
     ...(choice.audio === "optional" ? { generateAudio: data.value.generateAudio } : choice.audio === true ? { generateAudio: true } : {}),
@@ -386,6 +383,7 @@ function getConfig() {
       providerId: selectedModel.value?.providerId ?? "",
       modelId: selectedModel.value?.modelId ?? "",
       duration: data.value.duration,
+      durationReason: data.value.durationReason,
       resolution: data.value.resolution,
       ratio: data.value.ratio,
       mode: selectedMode.value,
@@ -396,6 +394,7 @@ function getConfig() {
     models: models.value,
     ratios: ratioOptions,
     matchingModes: matchingModes.value,
+    maxSingleGenerationDuration: selectedModel.value ? videoDurations(selectedModel.value, data.value.resolution).at(-1) : undefined,
   };
 }
 
@@ -418,6 +417,7 @@ nodeTools.register({
     providerId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
     duration: z.number().positive().optional(),
+    durationReason: z.string().trim().min(3).max(500).optional(),
     resolution: z.string().min(1).optional(),
     ratio: z.enum(ratioOptions).optional(),
     mode: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
@@ -433,9 +433,12 @@ nodeTools.register({
     const choice = args.modelId === undefined ? selectedModel.value
       : models.value.find((item) => item.providerId === args.providerId && item.modelId === args.modelId);
     if (!choice) throw new Error("请选择 getConfig 返回的有效视频模型");
-    const durations = getDurations(choice);
+    const targetResolution = args.resolution ?? (getResolutions(choice).includes(data.value.resolution) ? data.value.resolution : undefined);
+    const durations = videoDurations(choice, targetResolution);
     if (args.duration !== undefined && !durations.includes(args.duration)) throw new Error(`当前模型不支持时长 ${args.duration}，可选：${durations.join("、")}`);
-    const duration = args.duration ?? (durations.includes(data.value.duration!) ? data.value.duration : undefined);
+    const duration = args.duration ?? (data.value.durationReason && durations.includes(data.value.duration!) ? data.value.duration : durations.at(-1));
+    const durationReason = args.durationReason ?? (duration === data.value.duration ? data.value.durationReason : undefined);
+    if (duration !== undefined && duration < (durations.at(-1) ?? 0) && !durationReason) throw new Error("短于模型当前分辨率上限须提供 durationReason：用户指定短样片、段落收尾或必要拆分/修复依据；默认选择最大时长");
     const resolutions = getResolutions(choice, duration);
     if (args.resolution !== undefined && !resolutions.includes(args.resolution)) throw new Error(`当前时长不支持分辨率 ${args.resolution}，可选：${resolutions.join("、")}`);
     const resolution = args.resolution ?? (resolutions.includes(data.value.resolution) ? data.value.resolution : resolutions[0] ?? "");
@@ -445,6 +448,7 @@ nodeTools.register({
     if (args.production) { data.value.production = args.production; data.value.purpose = undefined; }
     data.value.model = JSON.stringify([choice.providerId, choice.modelId]);
     data.value.duration = duration;
+    data.value.durationReason = durationReason;
     data.value.resolution = resolution;
     if (args.ratio !== undefined) data.value.ratio = args.ratio;
     if (args.mode !== undefined) data.value.mode = JSON.stringify(args.mode);

@@ -6,14 +6,14 @@ import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
 import { ensureReferenceCrop } from "./referenceCrop.ts";
-import { lookSchema, validateActionTimeline, validateMusicVideoTiming } from "./schema.ts";
+import { validateActionTimeline, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
 import { cameraDirectionIssues, creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair, continuityPlanningIssues } from "./continuity.ts";
 import { photographicVisualBrief, physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
 import { musicSource } from "./music.ts";
-import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
+import { cleanVisualDefaults, characterReferenceUse, effectiveLook, lookReferenceBindings } from "./visualDefaults.ts";
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 import { speechPlanningIssues, shotDialogueMode } from "./speechPlanning.ts";
 import { requireReviewed } from "./realism.ts";
@@ -64,25 +64,8 @@ export function renderCompiledPrompt(sections: Record<string, string>) {
 }
 
 // ACT: 同一渲染约束用于自由生成与镜头编译；只约束已选写实媒介，不将插画/动画改成摄影。
-const photographicRendering = "Keep the chosen medium. For photography, use coherent source lighting, contact shadows, material-specific roughness and scale-appropriate texture; preserve natural skin detail without smoothing or artificial sharpening.";
+const photographicRendering = photographicVisualBrief;
 const compactVideoMotion = "按时间线以实际速度完成动作和结果，保持接触、重量及声音同步；只在指定时刻切镜或慢动作。";
-
-function effectiveLook(s: Scope, projectId: string, sequenceId?: string, shotId?: string) {
-  const looks = s.list("looks", { projectId });
-  const result: Record<string, unknown> = {};
-  for (const layer of [
-    looks.find(item => item.scope === "project"),
-    sequenceId ? looks.find(item => item.scope === "sequence" && item.scopeId === sequenceId) : undefined,
-    shotId ? looks.find(item => item.scope === "shot" && item.scopeId === shotId) : undefined,
-  ]) {
-    if (!layer) continue;
-    // 未填写字段继承上层；显式关闭效果请写 none，不以空字符串清掉项目质感。
-    for (const [key, value] of Object.entries(lookSchema.parse(layer))) {
-      if (typeof value === "string" ? value.trim() : value.length) result[key] = value;
-    }
-  }
-  return lookSchema.parse(result);
-}
 
 export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: string, purpose?: unknown, kind?: "image" | "video") {
   if (!s.get("projects", projectId)) throw bad("生成项目不存在");
@@ -154,7 +137,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             .map((referenceId: string) => ({ referenceId, role, weight: 1, lockLevel: "LOCK", crop: null, notes: `${asset.name} 的已绑定资产参考` }));
         return [...inherited, ...references, ...audio];
     });
-    const bindings = [...s.list("reference_bindings", { targetType: "shot", targetId: shotId }), ...assetBindings].filter(binding => {
+    // 视频由已检查首帧继承影调；静帧须实际发送视觉目标，容量不足仍走原有锁定参考门禁。
+    const lookBindings = kind === "image" ? lookReferenceBindings(s, proj, look) : [];
+    const bindings = [...s.list("reference_bindings", { targetType: "shot", targetId: shotId }), ...assetBindings, ...lookBindings].filter(binding => {
         if (!["IDENTITY", "WARDROBE", "GEOMETRY", "ENVIRONMENT"].includes(binding.role)) return true;
         const reference = s.get("refs", binding.referenceId);
         const owners = [...projectAssets.values()].filter(asset => asset.references?.includes(binding.referenceId)
@@ -227,7 +212,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
         if (inputs.some(input => input.mediaId === mediaId && input.role === role)) continue;
         const sent = !!caps[roleCap[role]] && used < maxInputs && !(adapter === "openai-compatible" && kind === "video");
-        inputs.push({ referenceId: `asset:${asset.id}`, mediaId, role, weight: 1, lockLevel: "LOCK", sent });
+        inputs.push({ referenceId: `asset:${asset.id}`, mediaId, text: `${asset.name} 的已采用${role === "IDENTITY" ? "身份与体型" : role === "ENVIRONMENT" ? "空间与材质" : "资产结构"}参考，姿态与镜头光线服从本镜设计${role === "ENVIRONMENT" ? "；仅沿用建筑布局与材料，不复制参考中的灯光色调、曝光、污损或可移动道具的位置。按当前lighting重新布光，持物与摆放严格依当前起始画面" : ""}`, role, weight: 1, lockLevel: "LOCK", sent });
         if (sent) used++;
         else degradations.push({ role, strategy: `${asset.name}: 当前模型或输入容量无法发送权威参考图` });
     }
@@ -309,7 +294,11 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     });
 
     let sections: Record<string, string> = {
-        creativeIntent: kind === "video" && shot.creativeBrief ? J([shot.creativeBrief.intent, shot.creativeBrief.visualPayoff]) : "",
+        creativeIntent: kind === "image" && cam.design?.start
+            ? "Create only the specified starting instant. The starting frame defines present gaze, position and held objects; later story outcomes must remain absent. Use the current lighting and Look even when the environment reference has different exposure or color."
+            : J([brief?.intent, brief?.visualPayoff,
+            cam.design?.purpose && `Viewing purpose: ${cam.design.purpose}`,
+            kind === "image" && (brief || cam.design?.purpose) && "This is one starting frame. Prepare the specified viewing relationship and visual hierarchy before the planned trigger; do not render future revelations, reactions or action results."]),
         combatDesign: kind === "video" && brief?.combat ? J([brief.combat.dramaticTurn, brief.combat.signature,
             `摄影覆盖：${brief.combat.coverage}；只在唯一执行时间线明确标记的切点切换机位，连续节拍不新增切镜。`,
             ...brief.combat.beats.map(beat => {
@@ -343,7 +332,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && !cam.design?.cameraPath?.trim() && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
         lighting: J([lt.worldSource && `fixed world light source: ${lt.worldSource}`, lt.keyDirection && lt.keyDirection !== "none" && `key direction ${lt.keyDirection} in ${lt.directionSpace ?? "screen"} coordinates`, lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
         world: world ? J([world.realism && `medium: ${world.realism}`, world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
-        look: J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette.length > 0 && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`]),
+        look: J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette.length > 0 && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`, look.shadowBehavior && `shadow behavior ${look.shadowBehavior}`, look.bloom && `bloom ${look.bloom}`, look.texture && `material texture ${look.texture}`, look.sharpnessPhilosophy && `sharpness philosophy ${look.sharpnessPhilosophy}`]),
         // Realism stack: concrete behaviours instead of adjectives.
         realism: J(Object.entries(shot.realism ?? {}).filter(([key, value]) => value && (kind === "video" || key !== "motion")).map(([key, value]) => `${key}: ${clean(String(value), `realism.${key}`)}`)),
         renderingStandard: photographicRendering,
@@ -382,7 +371,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             compactVideoMotion,
         ]);
         sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
-        sections.renderingStandard = "保持指定媒介、光照和材质，保留自然肤质。";
+        sections.renderingStandard = model.limits.workspaceExecution ? "" : photographicRendering;
         if (sections.continuityContext) sections.continuityContext = sections.continuityContext.replace(/^.*?: (?=\{)/, "接续状态，遵循本镜起点和动作顺序：");
     }
     let negativePrompt = J(shotAvoid(freedom));

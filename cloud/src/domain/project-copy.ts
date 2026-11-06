@@ -26,9 +26,9 @@ export function duplicateProject(s: Scope, id: string, name: string, actor: stri
             if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [idMap.get(key) ?? key, remapAssetIds(item)]));
             return value;
         }
-        for (const l of s.list("looks", { projectId: id })) if (l.scope === "project") { const dl = s.list("looks", { projectId: dst.id })[0]; const { scope, scopeId, schemaVersion, ...d } = strip(l); s.update("looks", dl.id, { data: d }); }
         const refMap = new Map<string, string>();
         for (const r of s.list("refs", { projectId: id })) { const n = s.insert("refs", { project_id: dst.id, kind: r.kind, name: r.name, media_id: r.mediaId, text: r.text, source: r.source, source_ref: r.sourceRef }); refMap.set(r.id, n.id); }
+        for (const l of s.list("looks", { projectId: id })) if (l.scope === "project") { const dl = s.list("looks", { projectId: dst.id })[0]; const { scope, scopeId, schemaVersion, ...d } = strip(l); s.update("looks", dl.id, { data: { ...d, colorReferenceIds: (d.colorReferenceIds ?? []).map((refId: string) => refMap.get(refId) ?? refId) } }); }
         for (const a of s.list("assets", { projectId: id }) as any[]) {
             const { type, name: an, version, schemaVersion, approvalStatus, approvedVersion, parentAssetId, ...data } = strip(a);
             const n = s.insert("assets", { project_id: dst.id, type, name: an, version: 1, schema_version: schemaVersion, approval_status: approvalStatus, approved_version: approvalStatus === "approved" ? 1 : null, data: { ...data, references: (data.references ?? []).map((x: string) => refMap.get(x) ?? x) } });

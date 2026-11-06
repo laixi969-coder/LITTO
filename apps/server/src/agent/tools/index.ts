@@ -238,6 +238,12 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           await writeWorkspaceFile(target.path, image);
           return { ...result, path, note: "这是前镜真实视频帧，可读图检查或作为新机位编辑参考；它不是动态镜头，也未自动采用。前镜改变后此候选失效。" };
         }
+        if (operation === "importImage") {
+          const input = z.strictObject({ path: z.string().min(1).max(2048) }).parse(data);
+          const image = await readReference(cwd, { path: input.path, mimeType: "image/png" }, "image", signal);
+          signal?.throwIfAborted();
+          return api.importWorkspaceImage(scope, projectId, Buffer.from(image.data, "base64"));
+        }
         if (operation === "importAudio") {
           const input = z.strictObject({ path: z.string().min(1).max(2048), kind: z.enum(["speech", "music", "sfx"]).default("speech") }).parse(data);
           const audio = await readReference(cwd, { path: input.path, mimeType: "audio/wav" }, "audio", signal);

@@ -2,7 +2,7 @@
 name: cinema
 description: 制作叙事影片、电影短片、电影式动画及武打动作场面，涵盖现代格斗、武侠兵器、仙侠法术和多人交锋：从故事意图、世界与视觉设定出发，规划镜头、人物调度、表演、摄影、光线、运动和剪辑衔接，建立资产与状态连续性，再制作关键帧和视频片段。用于电影创作及既有影片的续作、局部修改；产品广告使用 adfilm，画布与模型执行使用 workflow 和 canvas。
 metadata:
-  version: "2.5.0"
+  version: "2.5.2"
   displayName: 电影创作
   author: MILI MILI
 ---

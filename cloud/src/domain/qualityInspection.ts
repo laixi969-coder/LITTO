@@ -34,7 +34,7 @@ export function inspectProductionQuality(s: Scope, projectId: string, type: "key
   const shot = item && s.get("shots", item.shotId);
   const media = item && s.get("media", item.mediaId);
   if (!item || !shot || !media || [item, shot, media].some(row => row.projectId !== projectId)) throw notFound("project output");
-  const key = sha256(JSON.stringify(["basicQuality2", media.id, media.hash]));
+  const key = sha256(JSON.stringify(["basicQuality3", media.id, media.hash]));
   const cached = item.meta?.basicQuality;
   if (cached?.key === key) return Promise.resolve({ ...cached, reused: true, aspectIssue: mediaAspectIssue(s, item), plan: qualityReviewPlan(shot, type) });
   const pendingKey = `${s.workspaceId}:${type}:${id}:${key}`;

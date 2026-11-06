@@ -16,7 +16,7 @@ import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@
 import { blockingLine } from "@/utils/media/blocking";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { applyMediaQuality, readMediaAspect } from "@/utils/media/quality";
-import { skinFinishes, videoMotionTiming, type SkinFinish } from "@toonflow/tool-media-generation/runtime";
+import { photographicVisualBrief, skinFinishes, videoMotionTiming, type SkinFinish } from "@toonflow/tool-media-generation/runtime";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { inspectVideoPrompt, isDirectorPrompt, positivePromptText } from "@/utils/media/videoPrompt";
 import { autoFilmScope } from "@/utils/autoFilm/scope";
@@ -185,6 +185,7 @@ const photographicBaseline = [
   "PHOTOGRAPHICBASELINE 实拍成像基底：以下仅补充未指定的成像细节，已确定的媒介、布光、时段、景深与妆容优先。真实光学透视与自然高光滚降，高光保留层次。",
   "__SKIN__",
   "布料可见纤维与自然褶皱，金属与玻璃有各自的光泽与反射，不共用同一种塑料光泽。",
+  "空间遵循真实透视与遮挡，前中后景有自然层次，主体清晰可辨，背景依照指定景深保留合理细节；建筑、地面、植物和天空各自呈现符合景别的材质与光照，不套用固定色调或天气。",
   "光源来自画面内可见或可推断的实际光源，人物与环境受同一光源支配；角色资产用侧上方约 45° 的柔光营造面部体积，避免正面平光与正面反光板把整张脸照平。",
   "头发有碎发飞出与不均匀的发丝反光，发根保留蓬松与分缝。",
   "曝光与色彩服从当前光源和时段，高光平滑，暗部保留必要细节；人物面部与画面主体始终有可辨认的受光——夜景与暗调场景也须由画面内实际光源（门灯、霓虹、路灯、室内灯、窗光）给出正面或侧面照明，不得整帧死黑、不得把主体埋进阴影而失去肤质、表情与材质细节；清爽不等于把夜景改成白天，也不抹去已指定的夕阳、暖灯或胶片风格。",
@@ -255,7 +256,7 @@ export function withPhotographicBaseline(prompt: string, skinFinish?: SkinFinish
   if (isDirectorPrompt(body)) {
     if (body.includes(skinFinishes[finish])) return body;
     return body.replace(/(^[ \t]*【画面质感与光影】[ \t\r]*$)/m,
-      `$1\n仅对真人对象补充未指定的肤面细节；已定身份、年龄、肤色、特殊妆效、剧情状态和场景光色优先：${skinFinishes[finish]}\n`);
+      `$1\n${photographicVisualBrief}\n仅对真人对象补充未指定的肤面细节；已定身份、年龄、肤色、特殊妆效、剧情状态和场景光色优先：${skinFinishes[finish]}\n`);
   }
   const baseline = photographicBaseline.map(line => line === "__SKIN__" ? skinFinishes[finish] : line).join("");
   return `${baseline}\n\n${body}`;

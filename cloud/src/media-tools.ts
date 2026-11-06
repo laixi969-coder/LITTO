@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "@toonflow/file";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { run } from "./db.ts";
@@ -35,7 +35,13 @@ export async function makeDerivatives(media: { id: string; workspaceId: string; 
     } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
-export type Probe = { duration: number | null; width: number | null; height: number | null; hasVideo: boolean; hasAudio: boolean };
+export type Probe = {
+  duration: number | null; width: number | null; height: number | null; hasVideo: boolean; hasAudio: boolean;
+  video: {
+    codec: string | null; pixelFormat: string | null; bitsPerRawSample: number | null;
+    colorRange: string | null; colorSpace: string | null; colorTransfer: string | null; colorPrimaries: string | null;
+  } | null;
+};
 const run2 = (cmd: string, args: string[], signal?: AbortSignal) => new Promise<{ code: number; out: string; err: string }>((resolve) => {
   const process = spawn(cmd, args, { signal, killSignal: "SIGKILL", stdio: ["ignore", "pipe", "pipe"] });
   let out = "", err = "", failed = false;
@@ -54,7 +60,12 @@ export async function probeFile(path: string, signal?: AbortSignal): Promise<Pro
         const j = JSON.parse(r.out);
         const v = (j.streams ?? []).find((s: any) => s.codec_type === "video" && s.disposition?.attached_pic !== 1);
         const d = Number(j.format?.duration ?? v?.duration);
-        return { duration: Number.isFinite(d) ? d : null, width: v?.width ?? null, height: v?.height ?? null, hasVideo: !!v, hasAudio: (j.streams ?? []).some((s: any) => s.codec_type === "audio") };
+        const bits = Number(v?.bits_per_raw_sample);
+        const tag = (value: unknown) => typeof value === "string" && value !== "unknown" && value !== "unspecified" ? value : null;
+        return { duration: Number.isFinite(d) ? d : null, width: v?.width ?? null, height: v?.height ?? null, hasVideo: !!v, hasAudio: (j.streams ?? []).some((s: any) => s.codec_type === "audio"),
+          // ACT: 只保留源文件声明；缺标记不猜BT.709，raw sample位数不等于有效影像精度。
+          video: v ? { codec: tag(v.codec_name), pixelFormat: tag(v.pix_fmt), bitsPerRawSample: Number.isInteger(bits) && bits > 0 ? bits : null,
+            colorRange: tag(v.color_range), colorSpace: tag(v.color_space), colorTransfer: tag(v.color_transfer), colorPrimaries: tag(v.color_primaries) } : null };
     } catch { return null; }
 }
 export async function probeBuffer(data: Buffer, signal?: AbortSignal): Promise<Probe | null> {

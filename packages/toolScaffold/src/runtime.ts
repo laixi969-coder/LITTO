@@ -140,6 +140,12 @@ export interface MediaShotSpec {
   endState?: string;
 }
 
+/** 当前分辨率的真实时长档位；不通过降低分辨率取得更长时长。 */
+export function videoDurations(model: Pick<MediaModel, "durationResolutionMap">, resolution?: string) {
+  return [...new Set((model.durationResolutionMap ?? []).filter(rule => !resolution || rule.resolution.includes(resolution)).flatMap(rule => rule.duration))]
+    .filter(value => Number.isFinite(value) && value > 0).sort((left, right) => left - right);
+}
+
 export interface MediaGenerationRequest {
   /** 仅由服务端整镜口型流程创建；恢复任务时按私有制作记录核验。 */
   speechSegment?: { assemblyId: string; lineIndex: number; requestId: string };
@@ -173,6 +179,7 @@ export interface MediaGenerationRequest {
   quality?: string;
   resolution?: string;
   duration?: number;
+  durationReason?: string;
   generateAudio?: boolean;
   voice?: string;
   instructions?: string;

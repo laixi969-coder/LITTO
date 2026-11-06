@@ -1,6 +1,6 @@
 import { readFile, writeAtomic } from "@toonflow/file";
 import { z } from "zod";
-import type { MediaGenerationRequest, MediaModel, QuestionContext } from "@toonflow/tools-scaffold/runtime";
+import { videoDurations, type MediaGenerationRequest, type MediaModel, type QuestionContext } from "@toonflow/tools-scaffold/runtime";
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { listMediaModels } from "@/utils/media/generation";
 import { currentTenant } from "@/utils/tenant";
@@ -28,7 +28,7 @@ const generationShotSchema = z.strictObject({
 export function planVideoSegments(shots: z.infer<typeof generationShotSchema>[], supportedDurations: number[], multiShotState: "supported" | "unsupported" | "unknown" = "unknown", singleTake = false) {
   const durations = [...new Set(supportedDurations.filter(value => Number.isFinite(value) && value > 0))].sort((a, b) => a - b);
   const maximum = durations.at(-1) ?? 0;
-  const segments: { duration: number; generationDuration: number; handles: number; splitReason: string; timeline: { editId: string; start: number; end: number; description: string; transition: "continuous" | "cut" }[] }[] = [];
+  const segments: { duration: number; generationDuration: number; durationReason?: string; handles: number; splitReason: string; timeline: { editId: string; start: number; end: number; description: string; transition: "continuous" | "cut" }[] }[] = [];
   const issues: string[] = [];
   if (!maximum) return { segments, editShotCount: shots.length, generationCallCount: 0, issues: ["当前分辨率没有可用生成时长"] };
   if (new Set(shots.map(shot => shot.editId)).size !== shots.length) return { segments, editShotCount: shots.length, generationCallCount: 0, issues: ["剪辑镜号 editId 不能重复"] };
@@ -62,8 +62,10 @@ export function planVideoSegments(shots: z.infer<typeof generationShotSchema>[],
       offset = Math.round((offset + shot.duration) * 1e6) / 1e6;
       return { editId: shot.editId, start: from, end: offset, description: shot.description, transition: index ? shot.transition : "continuous" as const };
     });
-    const generationDuration = durations.find(value => value >= offset)!;
-    segments.push({ duration: offset, generationDuration, handles: Math.max(0, generationDuration - offset), splitReason, timeline });
+    // ACT: 默认用满单次上限；只有实际边界、隔离要求或最后收尾段使用较短档位，核心动作不拉慢。
+    const shortReason = shots[start]!.isolateReason || (end < shots.length ? boundary(end) : start > 0 ? "全片最后收尾段，保留完整动作和对白" : "");
+    const generationDuration = shortReason ? durations.find(value => value >= offset)! : maximum;
+    segments.push({ duration: offset, generationDuration, ...(generationDuration < maximum ? { durationReason: shortReason } : {}), handles: Math.max(0, generationDuration - offset), splitReason, timeline });
     start = end;
   }
   if (singleTake && segments.length > 1) issues.push("一镜到底不能拆成多次生成，请保留原方案并解决时长或输入限制");
@@ -93,6 +95,7 @@ export async function planMediaGeneration(directory: string, input: unknown) {
   const { requests } = z.strictObject({ requests: z.array(z.strictObject({
     kind: z.enum(["image", "video"]), count: z.number().int().min(1).max(100),
     quality: z.string().min(1).max(64).optional(), duration: z.number().finite().positive().max(3600).optional(),
+    durationReason: z.string().trim().min(3).max(500).optional(),
     mode: z.union([z.string().min(1).max(100), z.array(z.string().regex(/^(image|video|audio)Reference:\d+$/)).min(1).max(3)]).optional(),
     referenceCount: z.number().int().min(0).max(100).optional(), singleTake: z.boolean().optional(),
     shots: z.array(generationShotSchema).min(1).max(400).optional(),
@@ -103,7 +106,8 @@ export async function planMediaGeneration(directory: string, input: unknown) {
     if (!model) return { ...request, ready: false, issues: ["当前没有可用的已选模型，先合并说明所需模型与规格，不能自行换模型"] };
     const options = qualityOptions(model);
     const quality = request.quality ?? saved.preferences.find(item => item.kind === request.kind && item.providerId === model.providerId && item.modelId === model.modelId)?.value ?? (options.length === 1 ? options[0] : undefined);
-    const durations = [...new Set(model.durationResolutionMap?.filter(rule => !quality || rule.resolution.includes(quality)).flatMap(rule => rule.duration) ?? [])].sort((a, b) => a - b);
+    const durations = videoDurations(model, quality);
+    const duration = request.kind === "video" && !request.shots ? request.duration ?? durations.at(-1) : request.duration;
     const modes = Array.isArray(model.mode) ? model.mode : [];
     const mode = request.mode ?? (modes.length === 1 && typeof modes[0] === "string" ? modes[0] : undefined);
     const multiShotCapability = selectedMultiShotCapability(model, mode);
@@ -119,10 +123,11 @@ export async function planMediaGeneration(directory: string, input: unknown) {
       ? planVideoSegments(request.shots, durations, multiShotCapability?.state ?? "unknown", request.singleTake) : undefined;
     if (request.kind === "video" && request.shots && !segmentPlan) issues.push("先确定当前模型有效分辨率，再按该分辨率的实际时长规划生成段");
     if (segmentPlan) issues.push(...segmentPlan.issues);
-    if (request.kind === "video" && !request.shots && (!request.duration || !durations.includes(request.duration))) issues.push(request.singleTake
+    if (request.kind === "video" && !request.shots && (!duration || !durations.includes(duration))) issues.push(request.singleTake
       ? "所需一镜到底时长未受当前模型明确支持；保留长镜头方案，不自动切成短段或把拼接冒充一镜到底"
       : "生成段时长尚未确定或不受当前规格支持；按动作单元规划素材与剪辑，不按上限机械均分");
-    return { ...request, mode, requiredReferenceCount, providerId: model.providerId, modelId: model.modelId, quality, qualityOptions: options, supportedDurations: durations,
+    if (request.kind === "video" && duration && duration < (durations.at(-1) ?? 0) && !request.durationReason) issues.push(`默认优先生成当前分辨率上限 ${durations.at(-1)} 秒；使用 ${duration} 秒须填写 durationReason 的具体依据`);
+    return { ...request, duration, mode, requiredReferenceCount, providerId: model.providerId, modelId: model.modelId, quality, qualityOptions: options, supportedDurations: durations,
       maxSingleGenerationDuration: durations.at(-1) ?? null, modes: model.mode, audio: model.audio, segmentPlan,
       multiShotCapability, research: segmentPlan?.researchRequired ? multiShotCapability?.research ?? { query: `${model.providerId} ${model.modelId} official API multi-shot`, instruction: "先确定实际生成模式并读取官方资料；不能提交助手声明替代正式能力记录" } : undefined,
       nextAction: segmentPlan?.researchRequired ? "research" : issues.length ? "resolveIssues" : "compile",
@@ -192,14 +197,23 @@ export async function applyMediaQuality(directory: string, kind: "image" | "vide
   request = { ...request, ratio: aspect || request.ratio };
   const field = kind === "image" ? "size" : "resolution";
   const saved = (await readMediaQuality(directory)).preferences.find(item => item.kind === kind && item.providerId === request.providerId && item.modelId === request.modelId);
-  const value = request[field] ?? saved?.value;
   const options = qualityOptions(model);
+  const value = request[field] ?? saved?.value ?? (options.length === 1 ? options[0] : undefined);
   if (!value && options.length > 1) throw new Error(`尚未选择${kind === "image" ? "图片精度" : "视频分辨率"}，请用 requestProductionDecision(selectQuality) 在聊天中选择；用户已明确指定时用 productionSpec(setQuality) 保存。此次未提交生成。`);
   if (value && options.length && !options.includes(value)) throw new Error(`所选精度 ${value} 不受当前模型支持，可选：${options.join("、")}。未提交生成，不会静默降级。`);
   const pixels = kind === "image" && value ? /^(\d+)[x*](\d+)$/.exec(value) : null;
   const ratio = request.ratio?.split(":").map(Number);
   if (pixels && ratio?.length === 2 && Number(pixels[1]) * ratio[1]! !== Number(pixels[2]) * ratio[0]!) throw new Error(`图片尺寸 ${value} 与画幅 ${request.ratio} 不一致，请选择匹配规格，不会自动改变用户选择`);
   if (kind === "image" && request.ratio && model.imageRatios?.length && !model.imageRatios.includes(request.ratio) && !pixels) throw new Error(`当前模型不支持图片画幅 ${request.ratio}；不会回退到默认比例，此次未提交生成`);
+  if (kind === "video") {
+    const durations = videoDurations(model, value);
+    const maximum = durations.at(-1);
+    if (maximum) {
+      const duration = request.duration ?? maximum;
+      if (duration < maximum && !request.durationReason?.trim()) throw new Error(`当前分辨率优先生成 ${maximum} 秒；${duration} 秒短段须在 durationReason 写明用户指定、段落收尾或必要拆分/修复依据。正式镜头先同步 generationDuration 与完整执行时间线，此次未提交生成`);
+      request = { ...request, duration };
+    }
+  }
   if (kind === "video" && value && request.duration !== undefined && model.durationResolutionMap?.length && !model.durationResolutionMap.some(rule => rule.resolution.includes(value) && rule.duration.includes(request.duration!))) throw new Error(`视频 ${value} 不支持 ${request.duration} 秒，请保持所选精度并调整时长，或由用户改选精度`);
   return value ? { ...request, [field]: value } : request;
 }

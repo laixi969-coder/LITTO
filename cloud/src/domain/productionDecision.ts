@@ -16,6 +16,7 @@ import { applyOps, editView, getEdit, opSchema, selectWorkingTake } from "./nle.
 import { finalQualityView, sequenceFingerprint } from "./finalQuality.ts";
 import { assembleApprovedSequence } from "./assembly.ts";
 import { adDirectionSchema, saveAdDirection } from "./adDirection.ts";
+import { lookReferenceBindings } from "./visualDefaults.ts";
 
 const id = z.string().min(1).max(128);
 const ids = z.array(id).min(1).max(60).refine(value => new Set(value).size === value.length, "候选不能重复");
@@ -201,6 +202,10 @@ export function prepareProductionDecision(s: Scope, projectId: string, input: un
       if (!current) throw notFound(table);
       records.push(current, s.list("shots", { projectId }).map(shot => [shot.id, shot.heroKeyframeId, shot.approvedTakeId]));
       const schema = action.operation === "world" ? worldSchema : lookSchema;
+      if (action.operation === "look") for (const binding of lookReferenceBindings(s, projectId, action.data)) {
+        const reference = record("refs", binding.referenceId);
+        if (reference.mediaId) preview(reference.mediaId, `${reference.name} · 影调参考`);
+      }
       completed = hash(schema.parse(current)) === hash(schema.parse({ ...current, ...action.data }));
       request.title = action.operation === "world" ? "修改世界设定" : "修改整体影调";
       request.question = `当前设定：\n${describe(schema.parse(current))}\n\n拟修改为：\n${describe(schema.parse({ ...current, ...action.data }))}\n\n受影响的已采用镜头需要重新检查，旧素材保留。`;

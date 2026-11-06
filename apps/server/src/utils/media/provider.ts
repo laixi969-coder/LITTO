@@ -438,8 +438,8 @@ export async function loadMediaProviderSource(source: string, config: Record<str
         return fetchRequest(input, { ...init, signal: requestSignal ? AbortSignal.any([signal, requestSignal]) : signal });
       }, { preconnect: fetchRequest.preconnect }) as typeof fetch : fetchRequest,
       hash: Bun.hash,
-      relayImage: (input: MediaInput) => relayImage(input, signal),
-      relayMedia: (input: MediaInput) => relayMedia(input, signal),
+      relayImage: (input: MediaInput) => relayImage(input, signal, jobId),
+      relayMedia: (input: MediaInput) => relayMedia(input, signal, jobId),
       errorMessage: (value: unknown) => mediaErrorMessage(value, providerConfig),
       image: Bun.Image,
       assertAspectRatio: async (input: MediaInput, ratio: string) => {

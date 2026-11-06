@@ -212,7 +212,9 @@ export function prepareWorkspaceShot(input: {
       : kind === "image" && ref.role === "START_FRAME" && input.kind === "video" && firstFrame ? "native start frame"
       : `${kind} ${++inputNumbers[kind]}`;
     const intent = ref.role === "START_FRAME" && !slot.startsWith("native") ? "approved appearance/composition reference; not a native start-frame constraint" : ref.role;
-    return `${slot}: ${intent}, ${ref.lockLevel}, intended weight ${ref.weight}, reference ${ref.referenceId}${ref.text ? ` (${ref.text})` : ""}`;
+    const asset = ref.referenceId.startsWith("asset:") ? s.get("assets", ref.referenceId.slice(6)) : undefined;
+    const owner = asset?.projectId === input.projectId ? ` for ${asset.name}` : "";
+    return `${slot}: ${intent}${owner}, ${ref.lockLevel}, intended weight ${ref.weight}, reference ${ref.referenceId}${ref.text ? ` (${ref.text})` : ""}`;
   }).join("; ");
   compiled.sections["Objective" in compiled.sections ? "Reference binding" : "reference plan"] = referencePlan;
   compiled.prompt = renderCompiledPrompt(compiled.sections);

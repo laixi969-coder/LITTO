@@ -14,6 +14,7 @@ import { assembleApprovedSequence } from "../domain/assembly.ts";
 import { directorRun } from "../domain/director.ts";
 import { assetDirector, cinematographer, motionDirector, visualDirector, storyboardDirector } from "../domain/skills.ts";
 import { compileShot } from "../domain/compiler.ts";
+import { lookReferenceBindings } from "../domain/visualDefaults.ts";
 import { mustRoute, resolvePolicy } from "../providers/router.ts";
 import { bad, HttpError, notFound } from "../util.ts";
 import { importLegacyCanvas } from "../legacy.ts";
@@ -45,6 +46,7 @@ production.put(`${P}/looks/:scope/:scopeId?`, async (c) => {
     if (!["project", "sequence", "shot"].includes(scope)) throw bad("scope must be project|sequence|shot");
     const scopeId = scope === "project" ? null : c.req.param("scopeId");
     const b = await body(c, lookSchema.partial());
+    lookReferenceBindings(s, c.req.param("pid"), b);
     const ex = (s.list("looks", { projectId: c.req.param("pid") }) as any[]).find((l) => l.scope === scope && (l.scopeId ?? null) === scopeId);
     if (ex) { const { id, workspaceId, projectId, scope: _s, scopeId: _c, schemaVersion, createdAt, updatedAt, ...cur } = ex; return c.json(s.update("looks", ex.id, { data: { ...cur, ...b } })); }
     return c.json(s.insert("looks", { project_id: c.req.param("pid"), scope, scope_id: scopeId, data: lookSchema.parse(b) }), 201);

@@ -221,7 +221,7 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
     const hash = createHash("sha256").update(data).digest("hex");
     const previous = render.manifest?.quality;
     // ACT: 只复用同一检测版本、实际文件哈希及完整制作指纹；保留既有告警、广告审片和人工验收。
-    if (previous?.inspectionVersion === 2 && previous.hash === hash && previous.mediaId === media.id
+    if (previous?.inspectionVersion === 3 && previous.hash === hash && previous.mediaId === media.id
       && previous.inspectionFingerprint === inspectionFingerprint && render.manifest.sourceFingerprint === fingerprint) {
       const current = s.get("renders", id);
       if (!current || current.mediaId !== media.id || s.get("media", media.id)?.storageKey !== media.storageKey
@@ -281,7 +281,7 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
     const latest = s.get("renders", id)!;
     if (!latest || latest.mediaId !== media.id || s.get("media", media.id)?.storageKey !== media.storageKey
       || sequenceFingerprint(s, render.sequenceId) !== fingerprint || JSON.stringify(latest.manifest) !== JSON.stringify(render.manifest)) throw conflict("检测期间方案、素材或验收已改变，请重新检测", "stale");
-    const quality = { analysisId: randomUUID(), inspectionVersion: 2, inspectionFingerprint, mediaId: media.id, hash, checkedAt: now(), status: findings.some(item => item.severity === "block") ? "fail" : "unverified", coverage: "decodeAndAudioSignals", duration, hasAudio: probe.hasAudio, findings, seams, silences };
+    const quality = { analysisId: randomUUID(), inspectionVersion: 3, inspectionFingerprint, mediaId: media.id, hash, checkedAt: now(), status: findings.some(item => item.severity === "block") ? "fail" : "unverified", coverage: "decodeAndAudioSignals", duration, hasAudio: probe.hasAudio, video: probe.video, findings, seams, silences };
     s.update("renders", id, { manifest: { ...latest.manifest, quality } });
     return finalQualityView(s, s.get("renders", id)!);
   } finally { await rm(directory, { recursive: true, force: true }); }

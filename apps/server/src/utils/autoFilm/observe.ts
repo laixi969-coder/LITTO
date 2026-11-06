@@ -9,7 +9,7 @@ import { selectedModel } from "@/utils/modelSelection";
 import { createWorkspaceFfmpeg, getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { recordTextUsage } from "@/utils/usage";
-import { needsLipSync, qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
+import { needsLipSync, qualityReviewPlan, photographicVisualBrief } from "@toonflow/tool-media-generation/runtime";
 import { speechSourceKey } from "@toonflow/tool-media-generation/voiceProject";
 import { readVoiceProject } from "@/utils/media/voiceDecision";
 import { validateSpeechAssembly } from "@/utils/media/speechAssembly";
@@ -83,7 +83,7 @@ export function videoObservationModel() {
   const model = selectedModel("videoReview");
   if (!model) throw new Error("请先配置支持视频与声音理解的视频审阅模型");
   const configured = getConfiguredModel(model.providerId, model.modelId, "videoReview");
-  const key = createHash("sha256").update(JSON.stringify(["dialoguePerformance1", model, configured.provider.apiUrl, configured.provider.protocol, configured.provider.apiKey])).digest("hex");
+  const key = createHash("sha256").update(JSON.stringify(["dialoguePerformance2", photographicVisualBrief, model, configured.provider.apiUrl, configured.provider.protocol, configured.provider.apiKey])).digest("hex");
   return { configured, key };
 }
 
@@ -293,6 +293,7 @@ export async function observeVideo(directory: string, taskId: string, projectId:
 叙事核对当前视频覆盖的事件、动作主体/对象和因果，不能因符合错误分镜而忽略原稿。表演核对触发、动作、对手反应、结果；接戏核对持物、伤势、位置与动作衔接。对白逐句记实际听到的原句和说话人，嘴形核对发声窗口与目标人物，音轨匹配不等于口型通过，不能将别人的嘴动当成目标角色。剪辑核对实际进出点与无效等待；声音检查清晰度、环境和关键动作的声画对应，不强求配乐。缺陷必须给出实际时间段与可见或可听证据，不写“若有字幕”等假设。对白提到尚未揭示或画外的物件，不等于该物件必须在本镜出现；按当前原稿与镜头职责判断。角色姓名、身份与说话对象以系统资产和剧情为准，不把对白中的机构或称谓臆断为角色姓名。听清耳语本身不构成声学错误；只记录实际失真、噪声遮蔽或规格冲突。接触的接近、承托、释放未看清时单独记unverified，不能以整体流畅或镜尾姿态判接触通过。只有完整成片才核对全剧是否完整，单镜不能因未包含其他场次判缺失；跨镜实际接点无法从单镜验证时说明本次只核对本镜状态，全片时必须观察实际接点。
 无对白等不适用项可pass并说明依据；计划有对白但实际无声/错声时dialogueCoverage、lipSync、sound不能pass。后配音原片的narrative/performance只判断可见行动，不因待补声音而否定已成立的视觉表演。具体缺陷填revise，不能看清/听清填unverified；不能因为用户不审核而放过缺陷。
 真人表演专项：区分只有嘴动而头颈、躯干冻结，与有目的的屏息、凝视和等待。连续约三秒无变化仅是定位线索，不是自动失败阈值；按实际任务与触发判断，记录时间段、视线对象、身体证据、听者是否在信息到达后回应、台词与动作是否同镜同步、镜尾是否无故复位。摄影机运动不算演员活动；不因缺少眨眼、摇头或固定数量动作判失败。脸或身体被遮挡则相应细节unverified；动画、静物、空镜不套真人肌肉要求。结合采用Look核对光质、饱和度、对比和暗部表情可读性，不强改风格、不凭肤质精细判演技通过。
+采用的摄影基准：${photographicVisualBrief}。整洁、无噪、明亮柔光或低对比本身不得判为塑料感，不得建议新增脏污、颗粒或随机瑕疵。皮肤与布料按实际景别判断，不要求中远景逐个毛孔可见；仍须报告被抹平的材质、异常反光和时域变化等实际缺陷。
 必须返回 visualChecks:{surface:{verdict,note},imaging:{verdict,note},lighting:{verdict,note},color:{verdict,note}}。按实际媒介与采用Look检查，不把动画强改真人：surface核对皮肤、头发、衣物、产品材质与动态稳定性；imaging核对焦点、曝光、景深和非预期磨皮、锐化、噪点；lighting核对场景光源、转身受光、阴影和接触；color核对肤色、产品本色、跨镜一致性及实际调色，不能把滤镜描述当已执行。未看清或分辨率不足为unverified，每项note给出实际时间点和证据。目标规格：${JSON.stringify({ worlds: scope.list("worlds", { projectId }), looks: scope.list("looks", { projectId }), sequenceGrade: edit?.grade, shots: placements.map(item => ({ id: item.shot?.id, start: item.start, in: item.in, speed: item.speed, lighting: item.shot?.lighting, realism: item.shot?.realism, grade: item.shot?.grade })) })}。
 动作清单不止运镜：beat检查准备、执行、反应、收势和跨节拍持续性；contact检查真实接触、受力、支撑、释放和持物归属；combat检查攻防双方、避让、反应、位移及其他角色作用。遮挡接触、脚部不可见或无法判断受力时不能通过，不以人物未变形代替动作成立。
 必须额外返回 lipSyncReviews:[{id,start,end,faceVisible,verdict,note}]，逐项覆盖以下口型窗口：${JSON.stringify(lipSyncPlan)}。start/end记录实际完整核对的区间；嘴部太小、遮挡或无法辨认则faceVisible:false且unverified，不能凭张嘴判同步。note写真实音节及嘴形对应或偏差；未听清不得猜词。无窗口返回空数组。MV按当前原曲演唱核对，不能因没有对白清单判口型不适用。

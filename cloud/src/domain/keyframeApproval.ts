@@ -5,6 +5,8 @@ import { keyframeView, promoteHero } from "./lifecycle.ts";
 import { runQc } from "./qc.ts";
 import { realismChecks, requireReviewed, shotFingerprint } from "./realism.ts";
 import { mediaAspectIssue } from "./qualityInspection.ts";
+import { effectiveLook, lookReferenceBindings } from "./visualDefaults.ts";
+import { mediaView } from "../storage.ts";
 
 export function prepareKeyframeApproval(s: Scope, projectId: string, input: unknown) {
   const ids = z.array(z.string().min(1).max(128)).min(1).max(60).parse(input);
@@ -38,6 +40,11 @@ export function prepareKeyframeApproval(s: Scope, projectId: string, input: unkn
       id, shotId: shot.id as string, title: String(shot.title), mediaId: String(media.id),
       fingerprint: shotFingerprint(s, shot.id, "keyframe"), heroKeyframeId: shot.heroKeyframeId ?? null,
       reportId: report?.id ?? null, approved, reviewRequired, media: keyframeView(keyframe).media,
+      visualTarget: shot.creativeBrief?.visualPayoff ?? shot.narrativeFunction,
+      lookReferences: lookReferenceBindings(s, projectId, effectiveLook(s, projectId, shot.sequenceId, shot.id)).map(binding => {
+        const reference = s.get("refs", binding.referenceId)!;
+        return { name: reference.name || "影调参考", media: mediaView(s.get("media", reference.mediaId)!) };
+      }),
     };
   });
 }

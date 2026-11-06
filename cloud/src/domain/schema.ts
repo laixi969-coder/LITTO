@@ -38,7 +38,7 @@ export const lookSchema = z.object({
     contrast: z.string().default(""), saturation: z.string().default(""), palette: z.array(z.string()).default([]), skinTone: z.string().default(""),
     blackLevel: z.string().default(""), highlightRolloff: z.string().default(""), shadowBehavior: z.string().default(""), grain: z.string().default(""),
     halation: z.string().default(""), bloom: z.string().default(""), lensCharacter: z.string().default(""), texture: z.string().default(""),
-    sharpnessPhilosophy: z.string().default(""), colorReferenceIds: z.array(z.string()).default([]),
+    sharpnessPhilosophy: z.string().default(""), colorReferenceIds: z.array(z.string().min(1)).max(8).default([]).describe("当前项目的图片 reference ID，用于实际生图输入与质感对照；不是媒体 ID"),
 });
 
 export const assetInput = z.object({
@@ -89,7 +89,7 @@ export const cameraSchema = z.object({
     design: z.object({
         mode: z.enum(["singleTake", "multiShot"]).optional().describe("singleTake为本生成段内连续镜头，multiShot允许明确标记的镜内切镜；不代表多段拼接是真正一镜到底"),
         timeline: actionTimelineSchema.optional().describe("剧情和广告的唯一执行节拍，description写身体任务、路径、接触结果与构图变化；MV沿用musicVideo.timeline，不同时填写两份"),
-        technique: z.string().max(200), purpose: z.string().max(2000),
+        technique: z.string().max(200), purpose: z.string().max(2000).describe("为什么在此时从此位置观看，什么事件引导注意或揭示信息；固定机位同样有效，不能用运镜术语代替目的"),
         start: z.string().max(2000), end: z.string().max(2000),
         subjectPath: z.string().max(2000), cameraPath: z.string().max(2000),
         timing: z.string().max(2000).describe("本镜局部秒数，从0到本镜duration；不使用整段全局秒数。与action、performance及combat节拍一致，跨镜动作从前镜真实末态接续"), cut: z.string().max(2000),
@@ -138,8 +138,8 @@ export const musicVideoSchema = z.object({
 const directionText = z.string().trim().min(1).max(2000);
 export const creativeBriefSchema = z.object({
     kind: z.enum(["combat", "performance", "establishing", "product"]),
-    intent: directionText,
-    visualPayoff: directionText,
+    intent: directionText.describe("本镜使观众理解或感受到什么、既定行动带来什么变化；氛围与非剧情段按自身目标，不擅加反转"),
+    visualPayoff: directionText.describe("实际要看清的证据、互动或视觉关系及揭示时机；关键帧只准备触发前观看关系，不提前呈现后续结果"),
     combat: z.object({
         dramaticTurn: directionText,
         signature: directionText,
@@ -209,6 +209,7 @@ export const shotInput = z.object({
     freedomMap: freedomMapSchema.optional(), constraints: z.array(z.string()).default([]),
     duration: z.number().finite().positive().max(3600).describe("本生成段计划用于剪辑的总时长，按完整剧情段落规划；必须显式提供，不默认4秒"),
     generationDuration: z.number().finite().positive().max(3600).optional(),
+    durationReason: z.string().trim().min(3).max(500).optional().describe("采用短于当前模型/分辨率上限的生成时长时，记录用户指定短片、段落收尾或必要拆分/局部修复的具体依据"),
     musicVideo: musicVideoSchema.nullable().optional(),
     interactions: z.array(z.object({
         assetIds: z.array(z.string().min(1)).min(1).max(6),

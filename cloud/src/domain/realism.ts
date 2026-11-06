@@ -10,6 +10,7 @@ import { techniqueVersion, techniquePlan } from "@toonflow/tool-media-generation
 import { assertSpeechPlan } from "./speechPlanning.ts";
 import { mediaAspectIssue } from "./qualityInspection.ts";
 import { getEdit, resolveClip } from "./nle.ts";
+import { effectiveLook, lookReferenceBindings } from "./visualDefaults.ts";
 export { needsLipSync } from "@toonflow/tool-media-generation/runtime";
 // 云领域使用Zod 3，工具运行时使用Zod 4；边界分别校验，不能混用两版schema实例。
 export const audioReviewSchema = z.object({
@@ -58,9 +59,16 @@ export function shotFingerprint(s: Scope, shotId: string, type: "keyframe" | "ta
   }
   const previous = continuityPredecessor(s, shot);
   const previousTake = previous?.approvedTakeId ? s.get("takes", previous.approvedTakeId) : null;
-  const { creativeBrief, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
+  const { creativeBrief, durationReason, ...shotData } = shotInput.parse({ ...shot, sceneId: shot.sceneId ?? undefined });
   const advertising = adContext(s, shot);
+  const lookReferences = lookReferenceBindings(s, shot.projectId, effectiveLook(s, shot.projectId, shot.sequenceId, shotId));
   const data = {
+    ...(shot.camera?.design?.purpose?.trim() ? { directionReviewVersion: 1 } : {}),
+    ...(lookReferences.length ? { lookReferences: lookReferences.map(binding => {
+      const reference = s.get("refs", binding.referenceId)!;
+      const media = s.get("media", reference.mediaId);
+      return { reference, media: media ? { id: media.id, hash: media.hash } : null };
+    }) } : {}),
     ...(creativeBrief?.dialogue.lines.length ? { performanceReviewVersion: 1 } : {}),
     ...(shot.continuity?.mode === "continuous" && previous ? { continuationCut: getEdit(s, previous.sequenceId, false).clips
       .filter(clip => clip.shotId === previous.id).map(clip => ({ mediaId: resolveClip(s, clip).mediaId, in: clip.in, out: clip.in + clip.duration * clip.speed, speed: clip.speed })) } : {}),

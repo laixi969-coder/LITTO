@@ -46,6 +46,6 @@ shot / updateShot 保存 creativeBrief，与 action、camera、performance、rea
 
 camera.design.timing、action 与 combat 中的秒数使用本镜局部时间，从 0 到该镜 duration，不把整段累计时间直接写入单镜生成请求。跨镜移动须在前镜末态中已经开始，后镜从该末态接续；坐标、退步方向和持物变化逐项对照，不能用已结束的动作或已消散的兵器继续攻防。intendedStateDelta 按 characters/wardrobe/props/environment/lighting/motion/emotional 分组；例如 {characters:{真实角色ID:{position:"镜尾位置",pose:"镜尾姿态"}}}，不把角色名或 ID 放在根层。编译告警须先修复，不能把成功返回提示词当作准备完成。
 
-获得自主采用授权后，agentReview 额外传 creativeReview:{verdict:"pass"|"revise",styling:"实际造型与目标对照的具体依据",staging:"实际构图、动作起点或攻防结果与目标对照的具体依据"}。每项必须基于查看真实素材，不写“检查通过”凑字段；未查看不能填 pass。关键帧只评静态设计，视频另评连续运动与实际声音。revise 会保留问题并阻止采用，不因身份一致自动通过。
+获得自主采用授权后，agentReview 额外传 creativeReview:{verdict:"pass"|"revise",styling:"实际造型与目标对照的具体依据",staging:"实际构图、动作起点或攻防结果与目标对照的具体依据",visual:"对照当前Look及真实参考的材质、曝光、光色、空间层次，指出偏差与未验证项"}。分别判断故事和维护状态是否正确、目标摄影质感是否达到；衣服整洁、站位正确和没有变形均不能替代第二项。每项必须基于查看真实素材，不复述提示词或写“检查通过”凑字段；未查看不能填 pass。关键帧只评静态设计，视频另评连续运动与实际声音。revise 会保留问题并阻止采用，不因身份一致自动通过。
 
 这些字段记录助手的判断，不是自动审美评分器。通过类型检查、请求成功、文件可播放、检查项齐全均不能替代实际质量验证。最终报告分别说明代码验证、设计检查、视频效果和对白口型检查。

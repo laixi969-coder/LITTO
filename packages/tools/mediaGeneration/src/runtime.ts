@@ -11,7 +11,7 @@ export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia
  */
 export type SkinFinish = "clean" | "natural";
 
-export const photographicVisualBrief = "保持既定媒介、身份、年龄、造型、场景光色与剧情状态；写实画面中人物和环境遵循同一实际光源及遮挡，主体必要细节可辨，保留阴影层次；真人肤色自然、高光柔和、细微纹理符合景别，皮肤、衣料及其他材质的反光各异。不靠磨皮、粗毛孔或过度锐化制造真实感。";
+export const photographicVisualBrief = "保持既定媒介、身份、年龄、造型、场景光色与剧情状态，用户最新明确限制优先于旧草案。写实摄影中人物和环境共享可信的光源、遮挡与接触阴影，受光随位置和朝向自然变化；空间有前后层次，主体清晰可辨，背景按景深保留合理细节。皮肤、头发、衣料、建筑与环境各有符合景别的细节和反光；保留自然肤色差异与柔和高光，不靠磨皮、粗毛孔、脏污、雾化或过度锐化制造真实感。未明确选择时不添加可见噪点、胶片颗粒、彩噪、压缩块或随机纹理闪烁；自然细微纹理不等于噪点，不能以降噪为由抹平材质。用户选择明亮手机Vlog时保留通透日光、自然肤色、柔和阴影和生活化持机视点，不强制暗调、硬光或全哑光皮肤。";
 
 export const skinFinishes: Record<SkinFinish, string> = {
   clean:
@@ -142,7 +142,7 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
     ] : []),
     ...(cameraDesign && Number.isFinite(duration) && duration > 0 ? [
       { id: "cameraStart", start: 0, end: Math.min(0.5, duration), criterion: `起幅：${cameraDesign.start}。核对实际观看方向、景别与画内主体，不能只凭参考图判定。` },
-      { id: "cameraPath", start: 0, end: duration, criterion: `相机路线：${cameraDesign.cameraPath}；技法：${cameraDesign.technique}。对照唯一执行时间线检查触发、方向与停止点，区分主体移动与相机移动；固定镜头检查是否漂移。` },
+      { id: "cameraPath", start: 0, end: duration, criterion: `观看目的：${cameraDesign.purpose}；相机路线：${cameraDesign.cameraPath}；技法：${cameraDesign.technique}。对照唯一执行时间线检查触发、方向与停止点，区分主体移动与相机移动；固定镜头检查是否漂移。记录观众何时实际看到${shot.creativeBrief?.visualPayoff ?? "本镜的观看重点"}，是否提前泄露或未能看清；遮挡、景深和调度须让既定信息可读，路线到位不等于叙事成立。` },
       { id: "cameraEnd", start: Math.max(0, duration - 0.5), end: duration, criterion: `结束构图：${cameraDesign.end}。检查目标主体及部位是否完整可见、是否到达并停在预定落点；${(cameraDesign.acceptance ?? []).join("；")}` },
     ] : []),
     ...(lines.length && Number.isFinite(duration) && duration > 0 ? [{
@@ -164,6 +164,8 @@ export function qualityReviewPlan(shot: Record<string, any>, type: "keyframe" | 
   const tier = speech ? "speech" : visual || !shot.camera?.shotSize ? "visual" : "basic";
   const speechRanges: { start: number; end: number }[] = speech ? (needsLipSync({ ...shot, creativeBrief: undefined }) ? [{ start: 0, end: duration }] : lines.map((line: any) => ({ start: line.start, end: line.end }))) : [];
   return { tier, sampleCount: tier === "basic" && !techniques.length ? 3 : 8, fullPlayback: type === "take", techniques, startingFrame,
+    visualTarget: { intent: shot.creativeBrief?.intent, payoff: shot.creativeBrief?.visualPayoff, camera: shot.camera, lighting: shot.lighting, realism: shot.realism,
+      criterion: "分别核对故事与维护状态是否正确，以及实际材质、主体曝光、肤色、高光、景深与构图主次是否达到当前Look和真实参考。关键帧核对触发前观看关系，不要求提前完成后续揭示；视频记录信息出现、行动后果与反应的实际时点，比较人物转向或移动时与环境共享的光照、衣料和接触影。画面整洁、无变形或色板相似不等于质感达标；参考未看或缺失须明确未验证，不能默认通过。" },
     checks: type === "take" ? ["surface", "imaging", "world", "motion", "cinematic"] : ["surface", "imaging", "world", "cinematic"], speechRanges, interaction,
     motionPlan: type === "take" ? { mode: shot.camera?.design?.mode, beats: motionBeats, checkpoints, note: "逐段对照实际身体任务、接触结果、位移与接点；singleTake的节拍边界不能跳切或复位。完整播放后用 motionReview 逐项记录实际时间点、观察与 pass/revise/unverified；计划不是观察证据，未检查保持未验证。" } : undefined };
 }
@@ -207,7 +209,7 @@ export const agentReviewSchema = z.strictObject({
   audioReview: audioReviewSchema.optional().describe("对白/演唱须按真实完整看听记录声音和逐字口型。帧图不能证明同步，未听未看不填pass"),
   techniqueReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().min(10).max(2000) })).max(8).optional().describe("选用技法的视频须逐项对照检查计划，完整播放后记录实际证据；不能用检索结果或提示词冒充通过"),
   motionReview: z.array(z.strictObject({ id: z.string().min(1), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().min(10).max(2000) })).max(150).optional().describe("视频按检查计划 motionPlan.checkpoints 的 id 逐项记录实际时间点和动作/空间/接触结果；完整播放后才能 pass，未确认的项目填 unverified。批量由助手记录，不逐项向用户确认。"),
-  creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise，不能用workingVersion。styling和staging各至少10字；关键帧对照plan.startingFrame写实际视线、手部任务、姿态与触发前起点，不能仅复述计划。肤面核对无来源色块及磨皮；视频按motionPlan检查对白和听者反应。"),
+  creativeReview: z.strictObject({ verdict: z.enum(["pass", "revise"]), styling: z.string().trim().min(10).max(2000), staging: z.string().trim().min(10).max(2000), visual: z.string().trim().min(10).max(2000) }).optional().describe("有creativeBrief时必填。verdict只能为pass或revise。styling、staging、visual各至少10字；对照plan.visualTarget、当前Look和实际参考，visual写真实材质、曝光、光色、空间层次的比较及未验证项，不能把整洁或无变形当质感达标。关键帧对照plan.startingFrame写实际视线、手部任务和触发前起态。视频按motionPlan检查完整动作和对白反应，不能仅复述计划。"),
   observations: z.array(z.strictObject({
     kind: z.enum(["creativeMismatch", "anatomy_failure", "wardrobe_drift", "plastic_surface", "imaging_failure", "temporal_drift", "performance_failure", "hand_artifact", "face_artifact", "identity_drift", "composition_off", "motion_physics", "scene_structure", "color_shift", "capability_mismatch", "deliveryResolution", "deliveryUnverified", "logo_distortion"]),
     note: z.string().min(1),
@@ -234,6 +236,7 @@ export const videoGenerationSchema = z.strictObject({
   lastFrame: imageReference.optional(),
   resolution: z.string().trim().min(1).max(64).optional(),
   duration: z.number().finite().positive().max(3600).optional(),
+  durationReason: z.string().trim().min(3).max(500).optional().describe("低于当前分辨率最大生成时长时必填：用户指定短样片、段落收尾、必要换场/参考/接戏边界或局部修复的具体依据；不得为默认6秒/10秒编造理由。"),
   generateAudio: z.boolean().optional().describe("需要视频模型原生生成对白、口型或环境声时明确传 true；使用独立配音或需要静音时传 false。原生声音须实际检查，音频参考不保证复用原句或固定音色。"),
   mode: z.union([
     z.enum(["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional", "text"]),

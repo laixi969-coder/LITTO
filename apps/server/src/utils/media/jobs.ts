@@ -300,6 +300,10 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     if (!ratio) throw new Error("精修须保持原图画幅；当前画幅或模型不支持，不能通过裁剪、拉伸改变原构图");
     request = { ...request, ratio };
   }
+  if (kind === "video" && !request.durationReason) {
+    const shot = api.scoped(tenant.workspaceId).get("shots", shotId);
+    if (shot && shot.projectId === workspaceProject(directory)) request = { ...request, durationReason: shot.durationReason };
+  }
   request = await applyMediaQuality(directory, kind, request, model);
   validateCameraRequest(model, request, kind);
   if (kind === "video") {

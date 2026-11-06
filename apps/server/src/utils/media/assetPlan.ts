@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync } from "@toonflow/file";
 import { join } from "node:path";
 import { getConfiguredModel } from "@/utils/ai";
 import { selectedModel } from "@/utils/modelSelection";
@@ -13,16 +13,16 @@ export interface AssetItem {
   priority: "must" | "nice";
 }
 
-const SYSTEM = `你是电影美术指导，负责在开拍前把剧本拆成可制作的视觉资产清单。
+const systemPrompt = `你是电影美术指导，负责在开拍前把剧本拆成可制作的视觉资产清单。
 只提取剧本明确写到的角色、场景与道具，不发明没有出现的东西。
 角色写清年龄、体态、发型、服装面料与版型；场景写清空间结构、材质、光源与时间；道具写清形状、尺寸、材质与在剧情里的作用。
 每个资产给出一条可直接用于生成的提示词，以及这个资产该用什么镜头拍成定妆图。
 
 三条硬规则，违反即作废：
 
-1. 按故事年代写当代物件。2026 年的年轻电工用的是 LED 灯管、全面屏手机、尼龙工具包、锂电池电钻、铝合金窗、化纤混纺工装；不要写搪瓷杯、白炽灯、木格窗、帆布包、老式闸刀开关、搪瓷脸盆这些过时物件。
-2. 默认干净完整。服装平整、皮肤干净、道具无油污锈斑汗渍。不主动添加「脏、旧、破、锈、汗湿、剥落、污渍」这类状态描述；剧本没写就不要加。
-3. 旧只属于建筑本身——楼龄、墙面老化、管线陈旧可以写，但不扩散到人物的衣服、随身工具与日用品。只有剧本明确要求的破败场景才写脏旧，且只影响该对象。
+1. 先保留原稿明确的年代、地点、用途和物件。未写明的必要外观仅作简短设计提案，不把现代场景擅改成老店、旧巷或工业废墟，也不擅改原稿明确的传统物件。
+2. 人物、服装、建筑与道具都默认整洁完好、正常维护。材质写本色、结构、纹理尺度和受光反应；真人感不要求老化、锈蚀、污损、粗毛孔、疲态、降饱和或颗粒。
+3. 做旧或损坏必须有原稿或用户明确要求的依据，写明具体对象、部位、程度和适用场次。建筑没有默认例外；后厨与工装不自动带油污，经营困难不自动成为破败环境和旧衣，历史年代与木石材质不自动产生裂纹、霉斑或褪色。故事处境、物品维护状态与摄影风格分别判断，不能互相代替。
 
 只输出 JSON。`;
 
@@ -39,7 +39,7 @@ export async function planAssets(script: string): Promise<{ items: AssetItem[] }
     temperature: 0.4,
     stream: false,
     messages: [
-      { role: "system", content: SYSTEM },
+      { role: "system", content: systemPrompt },
       {
         role: "user",
         content: [

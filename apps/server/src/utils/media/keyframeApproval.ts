@@ -16,8 +16,11 @@ export async function requestKeyframeApproval(directory: string, toolCallId: str
   if (!pending.length) return { title, approved: true, reviewRequired, keyframes: frames.map(item => ({ shotId: item.shotId, heroKeyframeId: item.id })), answer: reviewRequired.length ? "选图决定已保存，无需重新选择或确认。部分镜头规格或检查记录已变化，助手须复核当前素材；技术门禁仍生效，不能靠重复采用解除。" : "这些关键帧已采用，无需再次确认" };
   const request: QuestionRequest = {
     title,
-    question: "请查看下列图片，核对材质、成像、空间关系与电影感。确认后会一次保存为各镜头的主关键帧，可继续生成视频。已有主帧被替换时仍保留旧版本。",
-    images: pending.map(item => ({ id: item.id, title: item.title, url: item.media.url.startsWith("/") ? `/cloud${item.media.url}` : item.media.url })),
+    question: `请查看候选与质感参考，分别核对故事、服装和空间是否正确，以及材质、曝光、光色和构图是否达到目标。参考只借成像关系，场景时段与人物仍按本镜。\n${pending.map(item => `${item.title}：${item.visualTarget || "沿用当前视觉方案"}`).join("\n")}\n确认后保存为主关键帧，可继续已授权的视频生成；旧版本保留。`,
+    images: [
+      ...pending.map(item => ({ id: item.id, title: `${item.title} · 候选`, url: item.media.url.startsWith("/") ? `/cloud${item.media.url}` : item.media.url })),
+      ...[...new Map(pending.flatMap(item => item.lookReferences).map(reference => [reference.media.id, reference])).values()].map(reference => ({ id: reference.media.id, title: `${reference.name} · 质感对照`, url: reference.media.url.startsWith("/") ? `/cloud${reference.media.url}` : reference.media.url })),
+    ],
     options: ["已看过并采用以上全部关键帧", "暂不采用"],
   };
   const response = await question.ask(toolCallId, request, signal);

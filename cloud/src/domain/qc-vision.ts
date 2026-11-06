@@ -12,7 +12,7 @@ import { z } from "zod";
 import { referenceCropSchema } from "./schema.ts";
 import { sampleVideoFrames } from "./mediaInspection.ts";
 import { createHash } from "node:crypto";
-import { cleanVisualDefaults, characterReferenceUse } from "./visualDefaults.ts";
+import { cleanVisualDefaults, characterReferenceUse, effectiveLook, lookReferenceBindings } from "./visualDefaults.ts";
 import { statesOf } from "./state.ts";
 
 type VisionRequest = { workspaceId: string; projectId: string; actor: string; providerId: string; modelId: string; system: string; prompt: string; frames: { data: Buffer; mime: string }[]; label?: string; signal?: AbortSignal };
@@ -59,7 +59,7 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
   const media = s.get("media", obj.mediaId);
   if (!media) return { used: false, reason: "媒体不可读" };
   const plan = qualityReviewPlan(shot, type);
-  const inspectionKey = model ? createHash("sha256").update(JSON.stringify(["performanceStart4", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
+  const inspectionKey = model ? createHash("sha256").update(JSON.stringify(["visualTarget8", media.id, media.hash, shotFingerprint(s, shotId, type), model])).digest("hex") : undefined;
   const cached = inspectionKey && s.list("qc_reports", { targetType: type, targetId: id }, "created_at DESC, rowid DESC")
     .find(report => report.evidence?.vision?.inspectionKey === inspectionKey)?.evidence?.vision;
   if (cached?.used) return { ...cached, reused: true };
@@ -116,36 +116,52 @@ export async function autoObserve(s: Scope, shotId: string, type: "keyframe" | "
     } finally { await rm(directory, { recursive: true, force: true }); }
   } else return { used: false, reason: `尚不支持自动观察 ${media.mime}` };
   const kinds = OBSERVATION_KINDS.filter(kind => kind !== "capability_mismatch");
-  const assets = (shot.assetIds as string[]).map(assetId => s.get("assets", assetId)).filter((asset): asset is NonNullable<typeof asset> => !!asset);
+  const startingState = statesOf(s, shotId).start;
+  const visibleIds = (shot.visibleAssetIds ?? shot.assetIds) as string[];
+  const assetIds = [...new Set([...visibleIds, ...visibleIds.map(id => startingState.characters[id]?.wardrobeId).filter((id): id is string => !!id)])];
+  const assets = assetIds.map(assetId => s.get("assets", assetId)).filter((asset): asset is NonNullable<typeof asset> => !!asset);
+  const look = effectiveLook(s, shot.projectId, shot.sequenceId, shotId);
   const referenceRoles = [
     ...assets.filter(asset => asset.attributes?.authoritativeReference).map(asset => ({
       mediaId: asset.attributes.authoritativeReference as string,
       role: asset.type === "Character" || asset.type === "Creature" ? "IDENTITY" : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY",
       notes: `${asset.name}: authoritative asset reference`,
     })),
-    ...s.list("reference_bindings", { targetType: "shot", targetId: shotId }).map(binding => ({
+    ...lookReferenceBindings(s, shot.projectId, look).map(binding => ({
+      mediaId: s.get("refs", binding.referenceId)?.mediaId as string | undefined, role: binding.role, notes: binding.notes,
+    })),
+    ...assets.filter(asset => !asset.attributes?.authoritativeReference).flatMap(asset => (asset.references ?? []).map((referenceId: string) => ({
+      mediaId: s.get("refs", referenceId)?.mediaId as string | undefined,
+      role: asset.type === "Character" || asset.type === "Creature" ? "IDENTITY" : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY",
+      notes: `${asset.name}: bound asset reference`,
+    }))),
+    ...s.list("reference_bindings", { projectId: shot.projectId }).filter(binding => binding.targetType === "shot" ? binding.targetId === shotId : assets.some(asset => asset.id === binding.targetId && !asset.attributes?.authoritativeReference)).map(binding => ({
       mediaId: s.get("refs", binding.referenceId)?.mediaId as string | undefined, role: binding.role, notes: binding.notes,
     })),
   ];
   const references = [...new Set(referenceRoles.map(reference => reference.mediaId)
-    .filter((id): id is string => !!id && /^image\/(png|jpeg|webp)$/.test(s.get("media", id)?.mime ?? "")))].slice(0, 4);
+    .filter((id): id is string => !!id && /^image\/(png|jpeg|webp)$/.test(s.get("media", id)?.mime ?? "")))].slice(0, 8);
   const input = { workspaceId: s.workspaceId, projectId: shot.projectId, actor, frames, imageMediaIds: references,
-    json: true, label: "qc.observe", system: `Inspect actual film imagery, not prompt quality. First ${frames.length} images are output images; full frames are in temporal order, with additional native-resolution regions indexed in the prompt; remaining images are references. Report only visible defects using ${kinds.join(", ")}. Explicitly count visible limbs and track them through occlusion; duplicated arms/legs or impossible mirror anatomy are anatomy_failure. Compare wardrobe/product length, seams and shape against references and earlier frames; unexplained changes are wardrobe_drift. Check waxy/plastic skin, erased texture, implausible material highlights, exposure and focus, spatial contact, temporal identity/layout drift, performance. Check uniform waxy or oily rendering, erased skin detail and unexplained local color patches. Preserve natural regional skin variation, source-driven highlights, explicit makeup and planned wet states; do not force every face to uniform color or matte roughness. For a keyframe, compare each visible actor to startingFrameReview before later triggers; already looking at the partner cannot prove a planned later look-up was prepared correctly. Record confirmed starting-state conflicts as performance_failure, and missing visual evidence as uncertain. For exposure: night scenes may be dark, but the main subject's face and key subjects must stay readable by light from in-frame sources; a fully black frame or a subject buried in unreadable shadow is imaging_failure. Sampled frames cannot prove biomechanics, lip sync or sound quality. Cite frame/time and visible evidence. Separate confirmed visible defects from uncertainty caused by occlusion, missing references, sampling gaps or perspective. Do not treat plausible motion blur, lighting or foreshortening alone as defects. Return JSON {"observations":[{"kind":"...","note":"...","certainty":"defect or uncertain or clear"}]}; Use defect only for a confirmed visible defect, uncertain for insufficient evidence, and clear for normal behavior or absent defects. Normal motion, correct composition and no anomaly must never use defect. Do not claim a complete pass.`,
+    json: true, label: "qc.observe", system: `Inspect actual film imagery, not prompt quality. First ${frames.length} images are output images; full frames are in temporal order, with additional native-resolution regions indexed in the prompt; remaining images are references. Report only visible defects using ${kinds.join(", ")}. Explicitly count visible limbs and track them through occlusion; duplicated arms/legs or impossible mirror anatomy are anatomy_failure. Compare wardrobe/product length, seams and shape against references and earlier frames; unexplained changes are wardrobe_drift. Check waxy/plastic skin, erased texture, implausible material highlights, exposure and focus, spatial contact, temporal identity/layout drift, performance. Check uniform waxy or oily rendering, erased skin detail and unexplained local color patches. Preserve natural regional skin variation, source-driven highlights, explicit makeup and planned wet states; do not force every face to uniform color or matte roughness. For a keyframe, compare each visible actor to startingFrameReview before later triggers; already looking at the partner cannot prove a planned later look-up was prepared correctly. Record confirmed starting-state conflicts as performance_failure, and missing visual evidence as uncertain. For exposure: night scenes may be dark, but the main subject's face and key subjects must stay readable under plausible scene lighting, including motivated off-camera sources; a fully black frame or a subject buried in unreadable shadow is imaging_failure. Sampled frames cannot prove biomechanics, lip sync or sound quality. Cite frame/time and visible evidence. Separate confirmed visible defects from uncertainty caused by occlusion, missing references, sampling gaps or perspective. Do not treat plausible motion blur, lighting or foreshortening alone as defects. Return JSON {"observations":[{"kind":"...","note":"...","certainty":"defect or uncertain or clear"}]}; Use defect only for a confirmed visible defect, uncertain for insufficient evidence, and clear for normal behavior or absent defects. Normal motion, correct composition and no anomaly must never use defect. Do not claim a complete pass.`,
     prompt: JSON.stringify({ shot: { action: shot.action, camera: shot.camera, lighting: shot.lighting, realism: shot.realism, performance: shot.performance }, world: s.list("worlds", { projectId: shot.projectId }), looks: s.list("looks", { projectId: shot.projectId }).filter(look => look.scope === "project" || look.scope === "sequence" && look.scopeId === shot.sequenceId || look.scope === "shot" && look.scopeId === shotId),
       techniqueReview: plan.techniques.map(item => ({ id: item.id, criterion: item.criterion, limits: item.limits })),
       motionPlan: plan.motionPlan,
       startingFrameReview: plan.startingFrame,
+      visualTargetReview: plan.visualTarget,
+      storytellingReview: "Compare visible framing, focus and occlusion with the camera's viewing purpose and visual payoff at the planned trigger. For a starting frame, establish the opportunity for later disclosure without demanding its result now. In sampled video, cite when the intended information becomes visible or is prematurely revealed; unclear timing between samples stays uncertain. A correct camera endpoint alone cannot prove motivated storytelling. Do not invent a plot event, dirt, damage or camera motion to increase drama.",
+      look,
+      targetComparison: "Compare the actual output with the sent LOOK references for material response, subject exposure, skin color, highlight transitions, depth and visual hierarchy. Borrow those relationships, not their people, scenery, weather or exact color temperature. Check story/location/maintenance correctness separately from photographic quality. A tidy scene is not automatically photographic, and realism never requires grime, damaged clothes, haze, grain or underexposure. Missing or omitted reference images leave that comparison unverified.",
       objectInteractionReview: plan.interaction.required ? { instruction: plan.interaction.instruction, ranges: plan.interaction.ranges,
         evidence: "Track the actual opening/support location and object through approach, contact, passage/transfer, release and settling. Compare earlier frames and references, including both sides of cuts. Visible entry through a closed surface or unsupported objects are motion_physics; an invented/moved opening or changing object geometry is scene_structure. Cite visible frame/time evidence. If the contact or opening is obscured or falls between samples, do not infer success from the final pose or prompt. Sampled images cannot establish complete physical correctness." } : undefined,
       surfaceReview: "Inspect the whole frame, not just faces: foliage, soil, walls, mountains, sky, water and props. Look for uniform waxy/glossy response across different materials, repeated or melted texture, implausibly equal foreground/background sharpness, HDR halos, flattened atmospheric depth and mismatched subject/environment lighting or contact shadows. Compare to the specified medium and references; intentional stylization, makeup, soft light or clean surfaces alone are not defects. Natural skin texture must be age- and shot-scale-appropriate; do not demand wrinkles, dirt or grain. Cite visible locations and evidence; a matching color palette is not proof of matching photographic texture.",
       visualDefaults: cleanVisualDefaults,
       referenceUse: characterReferenceUse,
       assets,
-      startingState: statesOf(s, shotId).start,
+      startingState,
       plannedChanges: shot.intendedStateDelta,
       referenceRoles: referenceRoles.map(reference => ({ ...reference, imageIndex: references.indexOf(reference.mediaId ?? "") >= 0 ? frames.length + references.indexOf(reference.mediaId!) : null })),
       referenceIndexConvention: "imageIndex is zero-based in the complete image input list; null means the reference image was not sent and cannot be visually verified.",
-      conditionReview: "Report visible unrequested dirt, damage, aging of garments/props, unreadable underexposure or excessive noise using the existing defect kinds. Distinguish specified age features, night lighting and authorized local wear from defects. Planned changes are intent, not proof they occurred. Identity is compared to the approved character reference, not merely the previous generated frame. If the necessary reference or authorization evidence is absent, state the uncertainty; do not invent a pass or demand pristine restoration of an established state.",
+      conditionReview: "The user's latest explicit visual restrictions override earlier drafts. Report visible unrequested dirt, damage or aging of garments/props as creativeMismatch; unreadable underexposure or noise that violates the current Look as imaging_failure; waxy/plastic surfaces or beauty-filter smoothing as plastic_surface. For a clean, no-noise target, do not excuse visible grain, chroma noise, compression blocks or random texture flicker as cinematic realism. Locate the evidence; natural skin texture, fabric weave, specified age features, reasonable motion blur, night lighting and authorized local wear are not defects. Bright phone-vlog daylight, broad soft light, low contrast and clean surfaces are valid choices, not plastic-surface defects by themselves. Judge actual erased texture, implausible reflections and material response against the chosen Look. Frame samples cannot prove temporal stability. Planned changes are intent, not proof they occurred. Identity is compared to the approved character reference, not merely the previous generated frame. If the necessary reference or authorization evidence is absent, state the uncertainty; do not invent a pass or demand pristine restoration of an established state.",
       timestamps, regions, referenceCount: references.length }),
   };
   for (const id of model ? references : []) {

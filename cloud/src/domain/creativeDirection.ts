@@ -63,4 +63,5 @@ export const creativeReviewSchema = z.object({
   verdict: z.enum(["pass", "revise"]),
   styling: z.string().trim().min(10).max(2000),
   staging: z.string().trim().min(10).max(2000),
+  visual: z.string().trim().min(10).max(2000),
 }).strict();
