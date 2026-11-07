@@ -12,6 +12,10 @@ export async function createAgentModel(providerId: string, modelId: string, thin
   const configured = getConfiguredModel(providerId, modelId);
   await assertConfiguredUpstream(configured);
   const { provider, model, baseUrl } = configured;
+  const hostname = new URL(baseUrl).hostname;
+  const qwenPayload = ["qwen3.8-flash", "qwen3.8-omni-flash"].includes(model.id)
+    && (/(?:^|\.)maas\.(?:aliyuncs|qwencloudapi)\.com$/.test(hostname) || ["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com"].includes(hostname));
+  const lunaPayload = ["gpt-6-luna", "openai/gpt-6-luna"].includes(model.id) && ["api.openai.com", "api.atlascloud.ai"].includes(hostname);
   const runtime = await ModelRuntime.create({ credentials: new InMemoryCredentialStore(), modelsPath: null, refreshOnCreate: false });
   runtime.registerProvider(providerId, {
     api: provider.protocol,
@@ -20,7 +24,7 @@ export async function createAgentModel(providerId: string, modelId: string, thin
       ? (model, context, options) => streamTrial({ ...model, contextWindow: configured.model.contextWindow }, context, { ...options,
         onPayload: async (payload, requestModel) => prepareModelPayload(configured, await options?.onPayload?.(payload, requestModel) ?? payload, thinkingLevel),
       })
-      : provider.protocol === "openai-completions" && ["https://api.deepseek.com", "https://open.bigmodel.cn", "https://api.z.ai"].includes(new URL(baseUrl).origin)
+      : provider.protocol === "openai-completions" && (qwenPayload || lunaPayload || ["https://api.deepseek.com", "https://open.bigmodel.cn", "https://api.z.ai"].includes(new URL(baseUrl).origin))
       ? (model, context, options) => openAICompletionsApi().streamSimple({ ...model, api: "openai-completions" }, context, { ...options, fetch: modelFetch,
         onPayload: async (payload, requestModel) => prepareModelPayload(configured, await options?.onPayload?.(payload, requestModel) ?? payload, thinkingLevel),
       })

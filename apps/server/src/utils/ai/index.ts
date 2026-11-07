@@ -103,9 +103,19 @@ export function prepareModelPayload(configured: Pick<ReturnType<typeof getConfig
   if (!payload || typeof payload !== "object") return payload;
   const body = payload as Record<string, unknown>;
   const url = new URL(configured.baseUrl);
+  // Luna 的 Chat Completions 工具调用要求显式关闭推理，省略会使用上游默认值并返回400。
+  // https://developers.openai.com/api/docs/models/gpt-6-luna
+  if (thinkingLevel === "off" && Array.isArray(body.messages) && ["gpt-6-luna", "openai/gpt-6-luna"].includes(configured.model.id)
+    && ["api.openai.com", "api.atlascloud.ai"].includes(url.hostname))
+    return { ...body, reasoning_effort: "none" };
   // DeepSeek V4 默认开启思考；应用选择关闭时必须显式传递，否则审读可能耗尽输出额度。
   if (url.origin === "https://api.deepseek.com" && /^(?:deepseek-flash|deepseek-v4-pro)$/.test(configured.model.id) && thinkingLevel === "off")
     return { ...body, thinking: { type: "disabled" } };
+  // Qwen Flash 默认开启思考，需使用百炼扩展参数落实应用的关闭设置。
+  // https://help.aliyun.com/en/model-studio/deep-thinking
+  if (thinkingLevel === "off" && configured.model.id === "qwen3.8-flash"
+    && (/(?:^|\.)maas\.(?:aliyuncs|qwencloudapi)\.com$/.test(url.hostname) || ["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com"].includes(url.hostname)))
+    return { ...body, enable_thinking: false };
   // Omni 默认开启思考；工作区专属域名也须显式传递应用选择的关闭状态。
   if (thinkingLevel === "off" && configured.model.id === "qwen3.8-omni-flash"
     && (/(?:^|\.)maas\.(?:aliyuncs|qwencloudapi)\.com$/.test(url.hostname) || ["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com"].includes(url.hostname)))
