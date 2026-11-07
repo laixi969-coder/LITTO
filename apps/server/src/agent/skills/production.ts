@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { musicFilmWritingGuide } from "@toonflow/tool-scene-list/storyProject";
 import { createSkillContext, loadAgentSkills } from "@/agent/skills";
 import { readStoryProject } from "@/utils/story";
 import { cloud } from "@/lib/cloud";
@@ -19,15 +20,17 @@ function explicitlyNamesSkill(task: string, name: string) {
   return task.split(/[^a-zA-Z0-9_-]+/).includes(name);
 }
 
-export async function loadStoryWritingContext(cwd: string, tools: SkillTools, task: string, signal?: AbortSignal) {
+export async function loadStoryWritingContext(cwd: string, tools: SkillTools, task: string, signal?: AbortSignal, musicFilm = false) {
   if (!canReadSkills(tools)) return "";
   const skill = loadAgentSkills(cwd).skills.find(item => item.name === "story");
   if (!skill || skill.disableModelInvocation && !explicitlyNamesSkill(task, skill.name)) return "";
   const context = createSkillContext(cwd);
   const manifest = await context.read({ name: "story" }, signal);
   // ACT: 工作区自定义旧技能未引用新资料时沿用自身正文，不越过覆盖关系读取内置方法。
-  if (!manifest.content.includes("references/storyCreation.md")) return manifest.content;
-  return (await context.read({ name: "story", path: "references/storyCreation.md" }, signal)).content;
+  const method = manifest.content.includes("references/storyCreation.md")
+    ? (await context.read({ name: "story", path: "references/storyCreation.md" }, signal)).content
+    : manifest.content;
+  return musicFilm ? `${method}\n\n${musicFilmWritingGuide}` : method;
 }
 
 async function selectedVideoSkillModel() {
@@ -99,7 +102,8 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const sequenceKinds = new Set(projectId ? api!.scoped(tenant!.workspaceId).list("sequences", { projectId }).map(item => item.kind).filter(Boolean) : []);
   const savedKind = project.revisions.find(item => item.id === project.approvedId)?.brief.kind
     ?? (project.version > 0 ? project.brief.kind : sequenceKinds.size === 1 ? [...sequenceKinds][0] : project.brief.kind);
-  const kind = music ? "musicFilm" : advertising ? "adfilm" : story ? "story"
+  // ACT: MV 内讨论剧情或说“不要故事”仍是 MV；明确指定 story 技能才切回故事入口。
+  const kind = music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
     : savedKind;
   const primary = kind === "musicFilm" ? "musicfilm" : ["adfilm", "brandFilm"].includes(kind) ? "adfilm" : "story";
   const intentText = explicitNames.length || /图片|图像|生图|视频|短片|分镜|剧本|五板块/.test(task) ? task : topicText;
@@ -114,6 +118,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const focusedNames = explicitNames.filter(name => ["gavenDirectImagePrompts", "gavenScriptToVideo", "gavenQingluAllegory", "insight", "directorPalettes", "breakdown", "canvas"].includes(name));
   const names = focusedNames.length ? [...focusedNames] : imagePrompt ? ["gavenDirectImagePrompts"] : scriptPrompt ? ["gavenScriptToVideo"]
     : storyOnly ? ["story"] : ["workflow", primary, "cinema", "continuity", ...(standalonePrompt ? ["videoPromptDirector"] : [])];
+  if (primary === "musicfilm" && names.includes("musicfilm")) names.push("story");
   if (!storyOnly && !imagePrompt && !scriptPrompt && !focusedNames.length) {
     if (/旅拍|婚礼|旅行|vlog/i.test(topicText)) names.push("travelWeddingDirector");
     if (/小清新|清透色彩|光感清新|lightFreshDirector/.test(topicText)) names.push("lightFreshDirector");
