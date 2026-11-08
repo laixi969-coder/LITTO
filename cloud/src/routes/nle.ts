@@ -24,7 +24,7 @@ nle.post("/renders/:id/quality/analyze", async c => {
 });
 nle.post("/renders/:id/quality/review", async c => {
     const { s, a } = ctx(c, "EDITOR");
-    return c.json(reviewFinalQuality(s, c.req.param("id"), await body(c, finalReviewSchema), a.user.id));
+    return c.json(await reviewFinalQuality(s, c.req.param("id"), await body(c, finalReviewSchema), a.user.id));
 });
 
 const view = (c: any, s: any, id: string, persist: boolean) => editView(s, getEdit(s, id, persist));

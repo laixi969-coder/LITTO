@@ -10,6 +10,7 @@ import { bad, conflict, now } from "../util.ts";
 import { gradeFilters, isNeutral } from "./grade.ts";
 import { end, getEdit, resolveClip, validateTimeline, type EClip } from "./nle.ts";
 import { assertSpeechExport } from "./finalQuality.ts";
+import { requireNarrative } from "./narrativeGate.ts";
 
 const r3 = (n: number) => Number(n.toFixed(3));
 const ext = (mime: string | null) => ({ "video/mp4": "mp4", "video/webm": "webm", "audio/mpeg": "mp3", "audio/wav": "wav", "image/png": "png", "image/jpeg": "jpg" })[mime ?? ""] ?? "bin";
@@ -49,8 +50,10 @@ export async function startNleRender(workspaceId: string, projectId: string, seq
     const signal = AbortSignal.timeout(30 * 60_000);
     let dir: string | undefined;
     try {
+        const unchanged = !opts.draft ? await requireNarrative({ workspaceId, projectId, sequenceId }, signal) : undefined;
         dir = mkdtempSync(join(tmpdir(), "milimili-nle-"));
         const media = await renderTimeline(s, sequenceId, dir, opts, undefined, signal);
+        await unchanged?.();
         signal.throwIfAborted();
         const saved = await saveMedia(workspaceId, projectId, readFileSync(media.file), { source: "render", duration: media.duration, signal });
         s.update("renders", renderId, { status: "SUCCEEDED", media_id: saved.id });

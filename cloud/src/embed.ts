@@ -13,6 +13,7 @@ import { sweepUploads } from "./routes/extra.ts";
 import { sweepWorkspacePurges } from "./storage.ts";
 import { recoverInterruptedRenders } from "./domain/nle-render.ts";
 export { configureWorkspacePurge } from "./storage.ts";
+export { configureNarrativeGate } from "./domain/narrativeGate.ts";
 export { storage, mediaView, saveMedia, sniff } from "./storage.ts";
 
 export { resolveSession, modelPermissions, requireModelAccess } from "./auth.ts";
@@ -27,7 +28,7 @@ export { encrypt, decrypt } from "./crypto.ts";
 export { workspaceProduction, readWorkspaceAsset, importWorkspaceKeyframe, importWorkspaceImage, importWorkspaceAudio, importWorkspaceSpeechTake, extractContinuationFrame } from "./domain/workspaceProduction.ts";
 export { prepareKeyframeApproval, approveKeyframes } from "./domain/keyframeApproval.ts";
 export { prepareProductionDecision, applyProductionDecision } from "./domain/productionDecision.ts";
-export { inspectFinalQuality, finalQualityView, sequenceFingerprint, assertSpeechExport } from "./domain/finalQuality.ts";
+export { inspectFinalQuality, finalQualityView, finalReviewPlan, sequenceFingerprint, assertSpeechExport } from "./domain/finalQuality.ts";
 export { shotFingerprint } from "./domain/realism.ts";
 export { continuityPlanningIssues } from "./domain/continuity.ts";
 export { assertSpeechPlan, speechPlanningIssues, shotDialogueMode } from "./domain/speechPlanning.ts";

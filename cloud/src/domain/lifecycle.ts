@@ -124,6 +124,10 @@ export function approveTake(s: Scope, takeId: string, actor: string, override?: 
     const evidence = requireReviewed(s, "take", take);
     if (!evidence.observedStateDelta) throw conflict("请记录视频结束时实际观察到的资产状态", "result_state_required");
     const shot = s.get("shots", take.shotId)!;
+    if (shot.source?.revisionId) {
+        checkSequence(s, shot.sequenceId);
+        if (openHighIssues(s, shot.id).length) throw conflict("叙事镜头存在严重接戏问题，不能用强制采用理由绕过", "continuity_blocked");
+    }
     if (shot.approvedTakeId === takeId && take.status === "approved" && JSON.stringify(take.meta?.observedStateDelta) === JSON.stringify(evidence.observedStateDelta)) {
         selectWorkingTake(s, takeId);
         return take;

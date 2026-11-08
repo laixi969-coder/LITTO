@@ -8,7 +8,7 @@ export interface AutoFilmCheck {
 export interface AutoFilmNarrativeReview {
   key: string;
   source: AutoFilmCheck;
-  scenes: ({ sceneId: string } & Record<"fidelity" | "causality" | "staging" | "timing" | "continuity", AutoFilmCheck>)[];
+  scenes: ({ sceneId: string; events?: { quote: string; shotId: string | null }[] } & Record<"fidelity" | "causality" | "staging" | "timing" | "continuity", AutoFilmCheck>)[];
 }
 
 export interface AutoFilmPlayback {
@@ -21,6 +21,8 @@ export interface AutoFilmPlayback {
   visualChecks?: Record<"surface" | "imaging" | "lighting" | "color", AutoFilmCheck>;
   lipSyncReviews?: ({ id: string; faceVisible: boolean; start: number; end: number } & AutoFilmCheck)[];
   storyChecks?: Record<"narrative" | "performance" | "continuity" | "dialogueCoverage" | "lipSync" | "editing" | "sound", AutoFilmCheck>;
+  eventReviews?: ({ id: string; quote: string; start: number | null; end: number | null; evidence: "direct" | "inferred" | "unverified" } & AutoFilmCheck)[];
+  cutReviews?: ({ id: string; seconds: number } & AutoFilmCheck)[];
   dialogueReviews?: { id: string; speakerId: string; transcript: string; start: number | null; end: number | null; verdict: "pass" | "revise" | "unverified"; note: string }[];
   cameraReviews?: {
     takeId: string;

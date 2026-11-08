@@ -11,6 +11,7 @@ import { inc, observe } from "./metrics.ts";
 import { assertSpeechPlan } from "./domain/speechPlanning.ts";
 import { shotFingerprint } from "./domain/realism.ts";
 import { requireModelAccess } from "./auth.ts";
+import { requireNarrative } from "./domain/narrativeGate.ts";
 
 export type JobSpec = {
     workspaceId: string; projectId: string | null; kind: "image" | "video"; targetType?: string; targetId?: string; modelId: string;
@@ -204,6 +205,14 @@ async function execute(jobId: string) {
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
+        let narrativeUnchanged: (() => Promise<void>) | undefined;
+        if (job.projectId && (job.kind === "video" || job.targetType === "shot") && !raw.provider_task_id && (!p.remoteTask || ["failed", "rejected"].includes(p.remoteTask.status))) {
+            try {
+                narrativeUnchanged = await requireNarrative({ workspaceId: job.workspaceId, projectId: job.projectId,
+                    shotId: job.targetType === "shot" ? job.targetId : undefined,
+                    generation: { kind: job.kind, prompt: job.compiledPrompt, parameters: p } }, controller.signal);
+            } catch (cause) { throw Object.assign(cause as Error, { retryable: false, fallbackAllowed: false }); }
+        }
         if (job.kind === "video" && job.targetType === "shot" && !raw.provider_task_id && !p.remoteTask) {
             const shot = s.get("shots", job.targetId);
             try {
@@ -218,6 +227,8 @@ async function execute(jobId: string) {
         let taskId: string | null = raw.provider_task_id; // resume after restart
         const deadline = started + prov.timeout_ms;
         if (!taskId) {
+            try { await narrativeUnchanged?.(); }
+            catch (cause) { throw Object.assign(cause as Error, { retryable: false, fallbackAllowed: false }); }
             if (job.providerId !== "workspaceMedia") {
                 if (p.remoteTask && !["failed", "rejected"].includes(p.remoteTask.status)) throw Object.assign(new Error("供应商提交结果待核查，不能重复提交"), { retryable: false, fallbackAllowed: false });
                 run("UPDATE generation_jobs SET parameters=? WHERE id=?", j({ ...p, remoteTask: { status: "submitting", updatedAt: now() } }), jobId);

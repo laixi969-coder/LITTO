@@ -251,6 +251,9 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     const shot = item && s.get("shots", item.shotId);
     const media = item && s.get("media", item.mediaId);
     if (!item || !shot || !media || [item, shot, media].some(row => row.projectId !== projectId)) throw notFound("project output");
+    if (input.targetType === "take" && shot.source?.revisionId && input.creativeReview && item.meta?.narrativeObservation?.eventReviews) {
+      input.creativeReview.events = item.meta.narrativeObservation.eventReviews.map(({ id, ...event }: any) => event);
+    }
     if (!media.mime.startsWith(input.targetType === "take" ? "video/" : "image/")) throw bad("审阅目标的媒体类型不符");
     if ((shot.creativeBrief || effectiveLook(s, projectId, shot.sequenceId, shot.id).colorReferenceIds.length) && !input.creativeReview) throw bad("请由助手对照 creativeBrief、Look、实际参考和输出填写 creativeReview：verdict 为 pass 或 revise，styling 说明妆发服装（无人镜头说明不适用），staging 说明构图与动作起点，visual 说明材质、曝光、光色和空间层次的具体比较。无变形不等于视觉目标合格，不要求用户填写。");
     if (input.creativeReview?.verdict === "revise") input.observations.push({ kind: "creativeMismatch", note: `${input.creativeReview.styling}；${input.creativeReview.staging}；${input.creativeReview.visual}` });

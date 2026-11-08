@@ -60,6 +60,7 @@ export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; n
 }
 
 export const creativeReviewSchema = z.object({
+  events: z.array(z.object({ quote: z.string().min(1).max(500), evidence: z.enum(["direct", "inferred", "unverified"]), start: z.number().finite().nonnegative().nullable(), end: z.number().finite().nonnegative().nullable(), verdict: z.enum(["pass", "revise", "unverified"]), note: z.string().trim().min(1).max(2000) }).strict()).max(1000).optional(),
   verdict: z.enum(["pass", "revise"]),
   styling: z.string().trim().min(10).max(2000),
   staging: z.string().trim().min(10).max(2000),

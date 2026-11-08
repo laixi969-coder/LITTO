@@ -580,6 +580,11 @@ export async function generateMediaDirect(
   reportTask?: ProviderTools["reportTask"],
   execution?: MediaExecution,
 ): Promise<GeneratedMedia[]> {
+  if ((mediaType === "video" || mediaType === "image" && request.shotId) && !execution) {
+    const { readStoryProject } = await import("@/utils/story");
+    const story = await readStoryProject(cwd);
+    if (story.approvedId || story.revisions.length) throw new Error("叙事镜头须通过项目生成队列执行完整检查，不能直接调用供应商绕过叙事审查");
+  }
   const started = Date.now();
   const base = { kind: mediaType, providerId: request.providerId, modelId: request.modelId, durationMs: 0, ...(execution ? { detail: { jobId: execution.jobId } } : {}) };
   let releaseVoice: (() => void) | undefined;

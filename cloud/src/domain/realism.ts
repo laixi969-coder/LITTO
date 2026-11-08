@@ -125,6 +125,31 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     if (coverageIssue) throw conflict(coverageIssue, "speech_media_coverage_required");
   }
   const plan = qualityReviewPlan(shot ?? {}, type);
+  if (type === "take" && shot?.source?.revisionId && (!evidence?.fullPlayback || evidence.vision?.creativeReview?.verdict !== "pass" || !evidence.observedStateDelta)) {
+    throw conflict("叙事镜头须完整播放，对照剧本确认表演与动作衔接通过，并记录实际末态，才能采用或定稿", "narrative_playback_required");
+  }
+  if (type === "take" && shot?.source?.revisionId) {
+    const observation = item.meta?.narrativeObservation;
+    if (observation?.version !== 1 || observation.hash !== s.get("media", item.mediaId)?.hash || observation.fingerprint !== shotFingerprint(s, shot.id)
+      || ["narrative", "performance", "continuity"].some(key => observation.storyChecks?.[key]?.verdict !== "pass")
+      || !Array.isArray(observation.eventReviews) || observation.eventReviews.some((event: any) => event.verdict !== "pass" || event.evidence !== "direct")) {
+      throw conflict("须先对当前视频执行 observeNarrative 或 observeAutoFilmVideo；实际事件/动作阶段检查未通过，不能手工改填通过", "narrative_observation_required");
+    }
+    const events = evidence?.vision?.creativeReview?.events;
+    if (!Array.isArray(events) || events.length !== observation.eventReviews.length || events.some((event: any, index: number) =>
+      ["quote", "evidence", "start", "end", "verdict", "note"].some(key => event[key] !== observation.eventReviews[index][key]))) throw conflict("采用事件证据与服务端实际观察不一致，不能改写或删掉失败事件", "narrative_observation_mismatch");
+    const duration = s.get("media", item.mediaId)?.duration ?? 0;
+    let sourceIndex = -1, observedStart = -1;
+    for (const event of events) {
+      const text = shot.source.sceneText ?? "", index = text.indexOf(event.quote);
+      if (!event.quote || index < 0 || index !== text.lastIndexOf(event.quote) || index <= sourceIndex || event.verdict !== "pass" || event.evidence !== "direct"
+        || !Number.isFinite(event.start) || !Number.isFinite(event.end) || event.start < 0 || event.end <= event.start || event.end > duration || event.start < observedStart || !event.note?.trim()) {
+        throw conflict("关键事件原句、实际时间、先后或检查结论无效，不能采用为已连贯", "narrative_evidence_required");
+      }
+      sourceIndex = index;
+      observedStart = event.start;
+    }
+  }
   if (type === "take" && (needsLipSync(shot ?? {}) || shot?.creativeBrief?.dialogue?.lines?.length)) {
     const audio = evidence?.audioReview;
     if (!audio || !(evidence.fullPlayback === true || coversSpeechRanges(plan.speechRanges, evidence.reviewedSegments ?? [])) || audio.speech !== "pass" || needsLipSync(shot ?? {}) && audio.lipSync !== "pass") {
@@ -138,13 +163,13 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     const coverageIssue = motionCoverageIssue(s, shot!, item);
     if (coverageIssue) throw conflict(coverageIssue, "motion_media_coverage_required");
     if (plan.motionPlan?.checkpoints.length && (!evidence?.fullPlayback || !plan.motionPlan.checkpoints.every(checkpoint =>
-      evidence.motionReview?.some((review: { id: string; verdict: string; note: string }) => review.id === checkpoint.id && review.verdict !== "revise" && review.note?.trim().length >= 10)))) {
-      throw conflict("须按当前 motionPlan.checkpoints 记录动作阶段、接触及空间关系的实际检查 motionReview；未观察项应如实标为 unverified，明确缺陷需先处理。由助手批量记录已授权审阅，不重复询问用户", "motion_review_required");
+      evidence.motionReview?.some((review: { id: string; verdict: string; note: string }) => review.id === checkpoint.id && review.verdict === "pass" && review.note?.trim().length >= 10)))) {
+      throw conflict("须按当前 motionPlan.checkpoints 记录动作阶段、接触及空间关系的实际检查 motionReview；未观察项保留 unverified 并先完成核验，只有 pass 才能采用。由助手批量记录已授权审阅，不重复询问用户", "motion_review_required");
     }
   }
   if (type === "take" && plan.techniques.length && (!evidence?.fullPlayback || !plan.techniques.every(item =>
-    evidence.techniqueReview?.some((review: { id: string; verdict: string }) => review.id === item.id && review.verdict !== "revise")))) {
-    throw conflict("选用镜头技法的视频须完整播放并逐项记录真实检查依据；未验证保留 unverified，明确缺陷需先处理", "technique_review_required");
+    evidence.techniqueReview?.some((review: { id: string; verdict: string }) => review.id === item.id && review.verdict === "pass")))) {
+    throw conflict("选用镜头技法的视频须完整播放并逐项记录真实检查依据；未验证保留 unverified，完成核验并明确 pass 后才能采用", "technique_review_required");
   }
   const matches = evidence && (evidence.fingerprint === shotFingerprint(s, item.shotId, type)
     || type === "keyframe" && evidence.fingerprint === shotFingerprint(s, item.shotId));

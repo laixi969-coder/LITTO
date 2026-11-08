@@ -7,6 +7,7 @@ import { createWorkspaceFfmpeg, getStatus } from "@/utils/ffmpeg";
 import { inspectFilm } from "@/utils/media/qc";
 import { exportTimeline } from "@/utils/media/timeline";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
+import { readStoryProject } from "@/utils/story";
 
 export interface ComposeFilm {
   /** 高光溢出强度，0-0.25；只作用于高光，不柔化全画面 */
@@ -59,6 +60,8 @@ async function edgeEnergy(ffmpeg: Awaited<ReturnType<typeof createWorkspaceFfmpe
  */
 export async function composeFilm(cwd: string, request: Pick<ComposeRequest, "clips" | "output" | "grade" | "film" | "targetLufs" | "headTail" | "verify" | "timeline">, signal?: AbortSignal) {
   signal?.throwIfAborted();
+  const story = await readStoryProject(cwd);
+  if (story.approvedId || story.revisions.length) throw new Error("叙事项目须使用制作时间线 render；直接拼接文件无法核对镜头来源、因果与实际接点，不能作为成片导出");
   const sources = await Promise.all(request.clips.map(clip => resolveWorkspacePath(cwd, clip)));
   const target = await resolveWorkspacePath(cwd, request.output, true);
   await mkdir(dirname(target.path), { recursive: true });

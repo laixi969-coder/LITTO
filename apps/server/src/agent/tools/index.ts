@@ -30,6 +30,8 @@ import { syncShotSpeech } from "@/utils/media/speechAssembly";
 import { speechSegmentSchema, speechSyncPathsSchema, speechTakeInputSchema } from "@toonflow/tool-media-generation/voiceProject";
 import { planMediaGeneration, readMediaQuality, saveMediaQuality } from "@/utils/media/quality";
 import { listAiModels } from "@/utils/ai";
+import { narrativePlan, narrativeFailures, reviewNarrative } from "@/utils/autoFilm/narrative";
+import { cameraObservationPlan, observeVideo, videoObservationModel } from "@/utils/autoFilm/observe";
 
 export function createAgentToolContext(cwd: string, config: Record<string, unknown> = {}, canvas?: CanvasContext, question?: QuestionContext, parentSignal?: AbortSignal): ToolContext {
   const skillsDirectory = join(dirname(conf.path), "skills");
@@ -185,13 +187,44 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const model = data.model ?? (models.length === 1 ? { providerId: models[0]!.providerId, modelId: models[0]!.modelId } : undefined);
           return api.inspectAd(scope, projectId, operation, { ...data, model }, tenant.userId, mediaSignal(signal));
         }
-        if ((operation === "shot" || operation === "updateShot") && data.source !== undefined) {
-          const source = z.strictObject({ sceneId: z.string().regex(/^s\d{2,3}$/) }).parse(data.source);
+        if (operation === "sequence" && data.storyRevisionId === undefined) {
+          const story = await readStoryProject(cwd);
+          if (story.approvedId) data = { ...data, storyRevisionId: story.approvedId };
+        }
+        if (operation === "shot" || operation === "updateShot" && data.source !== undefined) {
           const story = await readStoryProject(cwd);
           const revision = story.revisions.find(item => item.id === story.approvedId);
-          const scene = revision?.scenes.find(item => item.sceneId === source.sceneId);
-          if (!revision || !scene) throw new Error("来源场次必须属于当前已采用的剧本");
-          data = { ...data, source: { sceneId: scene.sceneId, revisionId: revision.id, episodeNumber: scene.episodeNumber, sceneText: scene.text, speech: scene.speech, knowledge: scene.knowledge } };
+          if (revision && data.source === undefined) throw new Error("当前项目已有采用剧本，新建分镜须提供 source:{sceneId}；先读取对应场次完整行动与反应，不能只凭镜头标题重写剧情");
+          if (data.source !== undefined) {
+            const source = z.strictObject({ sceneId: z.string().regex(/^s\d{2,3}$/) }).parse(data.source);
+            const scene = revision?.scenes.find(item => item.sceneId === source.sceneId);
+            if (!revision || !scene) throw new Error("来源场次必须属于当前已采用的剧本");
+            data = { ...data, source: { sceneId: scene.sceneId, revisionId: revision.id, episodeNumber: scene.episodeNumber, sceneText: scene.text, speech: scene.speech, knowledge: scene.knowledge } };
+          }
+        }
+        if (operation === "reviewNarrative" || operation === "observeNarrative") {
+          const parsed = z.strictObject({ sequenceIds: z.array(z.string().min(1)).min(1).max(100), mediaId: z.string().min(1).optional() }).parse(data);
+          const { sequenceIds } = parsed;
+          if (operation === "observeNarrative" && !parsed.mediaId) throw new Error("观察实际视频须提供 mediaId");
+          const sequences = sequenceIds.map(id => scope.get("sequences", id));
+          if (sequences.some(sequence => !sequence || sequence.projectId !== projectId)) throw new Error("只能审查当前项目的序列");
+          const story = await readStoryProject(cwd);
+          const input = { directory: cwd, projectId, sequenceIds, storyRevisionId: story.approvedId ?? undefined,
+            script: sequences.map(sequence => sequence!.script ?? "").join("\n") };
+          const snapshot = await narrativePlan(input);
+          const review = await reviewNarrative(snapshot, mediaSignal(signal) ?? new AbortController().signal);
+          if ((await narrativePlan(input)).key !== snapshot.key) throw new Error("审查期间剧本、分镜或剪辑已变化，请重新核对");
+          const issues = [...snapshot.issues, ...narrativeFailures(review)];
+          if (operation === "observeNarrative") {
+            const mediaId = parsed.mediaId!;
+            const plan = await cameraObservationPlan(cwd, projectId, mediaId, sequenceIds);
+            const observerKey = videoObservationModel().key;
+            const events = review.scenes.flatMap(scene => (scene.events ?? []).map(event => ({ ...event, sceneId: scene.sceneId })));
+            const observation = await observeVideo(cwd, projectId, projectId, mediaId, JSON.stringify(snapshot.plan), mediaSignal(signal) ?? new AbortController().signal, plan, events);
+            if ((await narrativePlan(input)).key !== snapshot.key || videoObservationModel().key !== observerKey) throw new Error("观察期间剧本、分镜或审片模型已变化，请重新观察");
+            return { issues, observation, storyKey: snapshot.key, observerKey };
+          }
+          return { ready: !issues.length, issues, warnings: snapshot.warnings, review };
         }
         if (operation === "readStoryImpact") {
           const story = await readStoryProject(cwd);

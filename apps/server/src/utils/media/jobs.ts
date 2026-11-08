@@ -46,7 +46,7 @@ function promptLimit(kind: "image" | "video", providerId: string, modelId: strin
   if (kind === "video" && providerId === "vidu") return 20000;
 }
 
-async function optimizeCompiledPrompt(directory: string, sections: Record<string, string>, prompt: string, negativePrompt: string | undefined, limit: number) {
+export async function optimizeCompiledPrompt(directory: string, sections: Record<string, string>, prompt: string, negativePrompt: string | undefined, limit: number) {
   const suffix = negativePrompt ? `\n画面中不得出现：${negativePrompt}。` : "";
   if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
   const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotConnection", "continuityContext", "shotExecution", "startingFrame", "staging", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding", "Objective", "Immutable locks", "Target duration", "Timeline", "Audio direction", "Shot execution", "Avoid"]);
@@ -68,6 +68,8 @@ async function optimizeCompiledPrompt(directory: string, sections: Record<string
   if (!pending) {
     pending = (async () => {
       const configured = getConfiguredModel(choice.providerId, choice.modelId);
+      // ACT: 只生成压缩后的视觉背景，最多请求4096 token；不直接申请模型配置的全量输出额度，截断仍由下方检查拒绝。
+      configured.model.maxOutputTokens = Math.min(configured.model.maxOutputTokens, 4096, Math.max(1024, budget * 2));
       const stream = streamAi(configured, { systemPrompt: `你是电影提示词编辑。仅压缩输入的镜头背景和视觉设定，去重并合并同义表述，优先保留具体人物身份、服饰、光源与受光关系、肤色与材质响应、影调、参考用途及明确禁止事项。不能增加剧情、改变动作、对白或约束。只输出压缩后的正文，不要代码块或解释，最多 ${budget} 字符。`, messages: [{ role: "user", timestamp: Date.now(), content: [{ type: "text", text: JSON.stringify(source) }] }] }, AbortSignal.timeout(90000));
       for await (const _event of stream) { /* 等待语言模型完成精简 */ }
       const result = await stream.result();

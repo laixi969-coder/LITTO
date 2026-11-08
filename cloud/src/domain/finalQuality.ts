@@ -287,7 +287,7 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
   } finally { await rm(directory, { recursive: true, force: true }); }
 }
 
-export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: string, authorization?: string) {
+export async function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: string, authorization?: string) {
   const review = finalReviewSchema.parse(input);
   const { render } = renderMedia(s, id);
   const quality = finalQualityView(s, render);
@@ -301,6 +301,15 @@ export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: 
   const passing = plan.fields.every(field => review.checks[field.id as keyof typeof review.checks] === "pass")
     && Object.values(review.checks).every(value => value === "pass") && !review.techniqueReview.some(item => item.verdict === "revise")
     && plan.cuts.every(cut => review.cutReview.some(item => item.id === cut.id && item.verdict === "pass"));
+  if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(shot => shot.source?.revisionId)) {
+    const observed = render.manifest?.narrativeObservation;
+    if (observed?.version !== 1 || observed.hash !== s.get("media", render.mediaId)?.hash || observed.fingerprint !== sequenceFingerprint(s, render.sequenceId)
+      || ["narrative", "performance", "continuity", "editing", "sound", "dialogueCoverage", "lipSync"].some(key => observed.storyChecks?.[key]?.verdict !== "pass")
+      || !Array.isArray(observed.eventReviews) || observed.eventReviews.some((event: any) => event.verdict !== "pass" || event.evidence !== "direct")
+      || plan.cuts.some(cut => !observed.cutReviews?.some((item: any) => item.id === cut.id && item.seconds === cut.seconds && item.verdict === "pass"))) {
+      throw conflict("当前成片缺少有效的实际事件与接点观察，不能手工填 pass 完成验收", "narrative_observation_required");
+    }
+  }
   if (passing && techniques.some(item => !review.techniqueReview.some(check => check.shotId === item.shotId && check.id === item.id && check.verdict === "pass"))) throw bad("成片的剪辑、声音和叙事技法须按 techniques 计划完整看听并逐项记录，不能跳过检查或用提示词替代");
   if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(needsLipSync) && review.checks.lipSync !== "pass") throw bad("成片包含画内对白或演唱，须完整看听并确认逐字口型同步；不能只以声音检查替代口型验收");
   if (passing) assertSpeechExport(s, render.sequenceId);
@@ -313,6 +322,13 @@ export function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: 
   if (passing && quality.findings.some((item: Finding) => item.severity === "block")) throw conflict("最终文件或源素材存在阻断问题", "qc_blocked");
   if (passing && quality.findings.some((item: Finding) => !review.acknowledgements.some(ack => ack.id === item.id))) throw bad("请逐项填写声音、时长或广告表达告警的复核依据；尚未解决则标记返修");
   const status = passing ? "pass" : Object.values(review.checks).includes("fail") || review.cutReview.some(item => item.verdict === "fail") || review.techniqueReview.some(item => item.verdict === "revise") ? "fail" : "unverified";
+  if (passing) {
+    const { requireNarrative } = await import("./narrativeGate.ts");
+    const unchanged = await requireNarrative({ workspaceId: s.workspaceId, projectId: render.projectId, sequenceId: render.sequenceId });
+    await unchanged();
+    const current = finalQualityView(s, s.get("renders", id)!);
+    if (current.analysisId !== review.analysisId || current.status === "stale") throw conflict("审查期间成片或源素材已改变，请重新检测", "stale");
+  }
   const { plan: reviewPlan, techniques: reviewTechniques, techniqueReviewRequired, speechReviewRequired, ...inspection } = quality;
   const next = { ...inspection, status, review: { ...review, actor, ...(authorization ? { authorization } : {}), reviewedAt: now() } };
   s.update("renders", id, { manifest: { ...render.manifest, quality: next } });

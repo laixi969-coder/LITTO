@@ -27,6 +27,8 @@ export async function mountCloud(app: Express) {
   embed = await import("../../../../cloud/src/embed");
   const { executeMediaJob } = await import("@/utils/media/jobs");
   embed.configureWorkspaceMedia(executeMediaJob);
+  const { inspectProductionNarrative } = await import("@/utils/autoFilm/narrative");
+  embed.configureNarrativeGate(inspectProductionNarrative);
   const { inspectFrames } = await import("@/utils/media/vision");
   embed.configureWorkspaceVision(inspectFrames);
   embed.configureWorkspacePurge(async workspaceId => {

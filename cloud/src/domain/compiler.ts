@@ -314,7 +314,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         assetDetails: J(appearance),
         action: kind === "image" && cam.design?.start ? "Render the specified starting frame only, before subsequent actions and their results." : clean(shot.action || shot.title, "action"),
         performance: kind === "video" ? J([
-            shot.performance?.gesture, !(cam.design?.timeline?.length || musicVideo?.timeline?.length) && shot.performance?.timing,
+            // ACT: 时间线存在不代表已包含触发与反应；保留导演原文，语义冲突由现有叙事审查处理。
+            shot.performance?.gesture, shot.performance?.timing,
             shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`,
             shot.performance?.lookTarget && `looking at ${shot.performance.lookTarget}`,
             !shot.performance?.gesture && shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`,
@@ -356,7 +357,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         if (cam.design?.timeline) {
             sections.timeline = cam.design.timeline.map((item: { editId?: string; start: number; end: number; description: string; transition?: string }) => `【${item.start}-${item.end}s${item.editId ? ` · 源镜号 ${item.editId}` : ""} · ${item.transition === "cut" ? "切镜" : "连续动作"}】${item.description}`).join("\n");
         }
-        // ACT: 时间线是执行节拍的唯一来源；验收标准、备用方案和跨镜剪点留在规格中，不发给生成模型执行。
+        // ACT: 时间线组织执行节拍，已写明的触发与时序仍保留；验收标准、备用方案和跨镜剪点不作为生成动作。
         sections.shotDesign = cam.design ? J([
             cam.design.technique && `Camera technique: ${cam.design.technique}`,
             cam.design.start && `Starting state: ${cam.design.start}`,
@@ -367,7 +368,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         ]) : "";
         sections.motionTiming = J([
             (musicVideo || cam.design?.timeline) && "The execution timeline defines the action order, timing and explicitly timed camera changes. Apply untimed path and camera descriptions only where compatible; never introduce an extra action, cut or pause from background context.",
-            !musicVideo && !cam.design?.timeline && cam.design?.timing && `Action timing: ${cam.design.timing}`,
+            cam.design?.timing && `Action timing: ${cam.design.timing}`,
             compactVideoMotion,
         ]);
         sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
@@ -392,10 +393,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
                 "Immutable locks": J([sections.lock, sections.constraintPriority]),
                 "Target duration": `${shot.generationDuration ?? shot.duration} seconds`,
                 Timeline: timeline,
-                shotConnection: sections.shotConnection,
-                "Visual direction": J([
-                    Object.entries(sections).filter(([key]) => !["narrative", "action", "lock", "state", "observedState", "constraintPriority", "forbiddenChanges", "shotConnection"].includes(key)).filter(([, value]) => value).map(([key, value]) => `${key}: ${value}`).join("; "),
-                ]),
+                // 保留执行字段的独立名称，让下游压缩继续原文保护表演、调度和接戏。
+                ...Object.fromEntries(Object.entries(sections).filter(([key]) => !["action", "timeline", "lock", "constraintPriority", "forbiddenChanges"].includes(key))),
                 "Audio direction": audio,
                 Preserve: "Preserve details not explicitly changed by this shot.",
                 // ACT: 该模型的排除项只经 Avoid 段落表达；独立 negativePrompt 字段对它无效，仍返回给调用方用于模型切换后复用。
