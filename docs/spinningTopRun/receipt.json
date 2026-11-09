@@ -1,0 +1,159 @@
+{
+  "selected": {
+    "providerId": "atlasCloud",
+    "modelId": "openai/gpt-6-luna"
+  },
+  "endpoint": "https://api.atlascloud.ai/v1",
+  "protocol": "openai-completions",
+  "startedAt": "2026-11-09T07:05:37.488Z",
+  "brief": "请创作一个独立原创的完整中文故事。共同前提：一个人终于回到日思夜想的家。他用来检验现实的陀螺一直旋转，而家人开始催他吃饭。从这个处境发展一个值得读下去的故事。人物、过去、世界规则和具体情节全部原创，不使用任何现成影视作品的人物、组织、术语、事件或后续剧情。保留现实与梦境难以分辨、求真与情感发生冲突的创作空间。除此之外不限制字数、人数、场景、讲法，不指定反转数量和结尾走向，也不强制用科学解释或某种主题。请把故事写得吸引人、精彩、有具体场面和人物；由你按所附创作方法自行选择方向。用户已授权直接完成，方法中的提问和阶段确认不执行。最终交完整故事正文，不交方法说明或评分。",
+  "temperature": 0.8,
+  "maxTokens": 16384,
+  "thinking": "off",
+  "mapping": {
+    "one": "current",
+    "two": "shanyin"
+  },
+  "order": [
+    "two",
+    "one"
+  ],
+  "methodSources": {
+    "two": [
+      "SKILL.md",
+      "references/core-methodology.md",
+      "references/format-short.md",
+      "references/dialogue-aesthetics.md",
+      "references/narrative-arsenal.md"
+    ],
+    "one": "data/skills/story/references/storyCreation.md"
+  },
+  "stages": [
+    {
+      "label": "two",
+      "stage": "plan",
+      "durationMs": 26447,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 2099,
+        "cacheRead": 0,
+        "cacheWrite": 36674,
+        "reasoning": 0,
+        "totalTokens": 38776,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
+    },
+    {
+      "label": "two",
+      "stage": "draft",
+      "durationMs": 19309,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 1878,
+        "cacheRead": 0,
+        "cacheWrite": 38980,
+        "reasoning": 0,
+        "totalTokens": 40861,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
+    },
+    {
+      "label": "two",
+      "stage": "story",
+      "durationMs": 13306,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 1868,
+        "cacheRead": 0,
+        "cacheWrite": 41137,
+        "reasoning": 0,
+        "totalTokens": 43008,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
+    },
+    {
+      "label": "one",
+      "stage": "plan",
+      "durationMs": 28732,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 2909,
+        "cacheRead": 0,
+        "cacheWrite": 3139,
+        "reasoning": 0,
+        "totalTokens": 6051,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
+    },
+    {
+      "label": "one",
+      "stage": "draft",
+      "durationMs": 19726,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 2691,
+        "cacheRead": 0,
+        "cacheWrite": 6446,
+        "reasoning": 0,
+        "totalTokens": 9140,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
+    },
+    {
+      "label": "one",
+      "stage": "story",
+      "durationMs": 21090,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 2685,
+        "cacheRead": 0,
+        "cacheWrite": 9581,
+        "reasoning": 0,
+        "totalTokens": 12269,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      }
+    }
+  ]
+}

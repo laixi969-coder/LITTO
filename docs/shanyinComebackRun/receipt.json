@@ -1,0 +1,162 @@
+{
+  "selected": {
+    "providerId": "atlasCloud",
+    "modelId": "openai/gpt-6-luna"
+  },
+  "endpoint": "https://api.atlascloud.ai/v1",
+  "protocol": "openai-completions",
+  "startedAt": "2026-11-09T06:47:54.220Z",
+  "brief": "写一篇现实职场逆袭爽剧，单集完整故事，不是全剧架构或分集大纲。固定题材：酒店庆功宴即将开席，宴会主管的功劳被上司抢走，团队已约定的奖金被上司扣下；主管要在开席前让团队实际拿回奖金，并让抢功者在相关人面前承担具体后果。主要人物只有宴会主管、抢功上司、客户代表、团队员工代表四人，其他宾客员工只作背景。主要空间只用宴会厅及其相连准备间。正文1200—1600个非空白字符，不含标题，以完整可视听行动与对白写故事，不交大纲或分镜表。要有受压、有效反击、对手针对性反制和可见兑现，但不按固定回合数填空。让人看得痛快，不能只剩取证流程或讲道理。主角靠已有职业能力、合作或已建立的证据与筹码赢，禁止隐藏富豪身份、突然来的董事长亲属、神秘电话、直播爆红、万能黑客或对手突然变蠢。不得破坏食品安全、绑架宾客、销毁证据或靠停办宴会勒索来赢。奖金总额、人数与分配、付款权限及资金来源须前后一致，关键规则在使用前建立；可以设定虚构企业内部安排，但不能把臆造法律当解法。结束前写清真实到账而非承诺、申请或签字，宴会如期开席。其他人物姓名、具体反击办法、金额和结尾由你创作。用户已授权直接交付，方法中的提问或阶段确认不执行。",
+  "temperature": 0.8,
+  "maxTokens": 8192,
+  "thinking": "off",
+  "order": [
+    "a",
+    "b"
+  ],
+  "methodSources": {
+    "a": [
+      "SKILL.md",
+      "references/core-methodology.md",
+      "references/format-short.md",
+      "references/format-duanju.md",
+      "references/dialogue-aesthetics.md",
+      "references/narrative-arsenal.md"
+    ],
+    "b": "data/skills/story/references/storyCreation.md"
+  },
+  "stages": [
+    {
+      "label": "a",
+      "stage": "plan",
+      "durationMs": 17075,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 1052,
+        "cacheRead": 0,
+        "cacheWrite": 49038,
+        "reasoning": 0,
+        "totalTokens": 50093,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "bodyCharacters": 1205
+    },
+    {
+      "label": "a",
+      "stage": "draft",
+      "durationMs": 16346,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 1027,
+        "cacheRead": 0,
+        "cacheWrite": 50131,
+        "reasoning": 0,
+        "totalTokens": 51161,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "bodyCharacters": 1160
+    },
+    {
+      "label": "a",
+      "stage": "story",
+      "durationMs": 8723,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 944,
+        "cacheRead": 0,
+        "cacheWrite": 51308,
+        "reasoning": 0,
+        "totalTokens": 52255,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "bodyCharacters": 1067
+    },
+    {
+      "label": "b",
+      "stage": "plan",
+      "durationMs": 17589,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 1067,
+        "cacheRead": 0,
+        "cacheWrite": 3306,
+        "reasoning": 0,
+        "totalTokens": 4376,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "bodyCharacters": 1240
+    },
+    {
+      "label": "b",
+      "stage": "draft",
+      "durationMs": 10611,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 1003,
+        "cacheRead": 0,
+        "cacheWrite": 4454,
+        "reasoning": 0,
+        "totalTokens": 5460,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "bodyCharacters": 1162
+    },
+    {
+      "label": "b",
+      "stage": "story",
+      "durationMs": 7577,
+      "stopReason": "stop",
+      "usage": {
+        "input": 3,
+        "output": 1009,
+        "cacheRead": 0,
+        "cacheWrite": 5628,
+        "reasoning": 0,
+        "totalTokens": 6640,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "bodyCharacters": 1175
+    }
+  ]
+}

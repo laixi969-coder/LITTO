@@ -143,4 +143,6 @@ compile只发送当前阶段适用的具体视觉要求；edit/audio/story返回
 
 ## 镜头方法接入
 
+打斗的具体动作、运镜和效果选词按需读[打斗素材库](references/combatPalette.md)，与既有动作编排共同使用，不直接复制整套案例或默认参数。
+
 涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](references/masterShots.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。
