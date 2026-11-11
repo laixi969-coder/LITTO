@@ -33,9 +33,9 @@ const musicPlanSchema = z.strictObject({
   musicOrder: z.string().min(1).describe("按原曲已知歌词顺序连续使用；未知时不分配虚构主副歌，说明待对齐部分"),
 });
 
-const storyBeatPrompt = "你是资深剧作架构师。brief是用户要求，direction是锁定方向与事实，writingMethod是创作参考，不能覆盖用户指定的题材、节奏和结尾。规划场面节拍与承重事实，不交正文。先明确观众期待的结果，再按本篇需要安排人物目标、行动、回应和可见变化；场数由内容与篇幅决定。每个关键场面区分观众与角色当时已知什么、何时看到或听到新证据、人物因此怎么做以及结果如何引出下一步。对抗题材须推演有立场的对手如何针对主角办法反制、筹码或代价怎样变化，以及高潮如何由已建立条件和人物选择决定；温情、喜剧、观察式及其他类型沿用自身期待，不强加反派、绝境、不可逆牺牲或悬念结尾。已有物件、空间或动作可通过不同使用发展意义，不为套母题新增事实，不用脏旧、衰老或固定影调代替情感。事实清单只保留影响行动的物件持有与交接、知情依据、时空、数量单位及规则；严格区分原稿事实与创作提案。最终兑现本篇承诺，保留必要余波，不重复解释已经发生的结果。";
+const storyBeatPrompt = "依据上面的统一 story 技能及用户要求，内部规划场面节拍和承重事实，不交完整正文。沿用已选方向与锁定内容；按本篇需要组织行动、应对、变化、信息顺序、时空和持物。不能把节拍或元数据当作已经写出的戏。工作台保存与采用由主助手处理，本次不操作工作台。";
 
-const storyExecutionPrompt = "你是故事作者。依据用户要求、锁定方向、场面节拍与承重事实，按同一writingMethod写可信、连贯的完整正文，不评分、不操作工作台。用可见行动、真实对白、倾听反应与空间关系让观众经历事件；按预定顺序展示证据，不让角色无故全知，不用旁白解释掉关键过程。对抗题材写出双方策略、针对性反制与行动后果，温情、喜剧和观察式作品保持自己的力度与节奏；不能一律写成强敌压迫、悲剧牺牲或强行反转。已建立的物件与动作通过人物选择产生意义变化，不擅加污损、破败、疲态或滤镜。遵守既定物理、职业与事实逻辑，高潮或关键变化兑现已建立的条件和关系；完成本篇期待后留下适合当前方向的余波，不重复说理或多次收尾。用户指定的开放结尾、慢节奏、旁白形式和其他限制优先。第一行用‘# 标题’，之后只交完整正文。未限定字数时按情节需要充分写完，不自动缩写。";
+const storyExecutionPrompt = "依据同一 story 技能、用户要求、已定方向及场面计划写完整故事或剧本。实际正文须落实计划中的独立戏剧场景，交付前按技能逐场自检。严格遵守用户指定格式；没有格式要求时可用 # 标题开头，之后只交完整正文，不附分析、评分或自检表。本次只负责正文，保存与采用由主助手处理。";
 
 const musicBeatPrompt = "本次是 MV。先从 brief 提取真实歌曲顺序、总时长、允许的声音通道及固定歌手/演员关系；不把猜测的主副歌名称当作事实。先构思一个观众会关心结果的具体事件，让人物在开场就行动。主要人物各有所求，主角的尝试引来具体回应，帮助的来路和局限预先成立；高潮是前面行动造成的选择与结果，不靠突然提供解法。逐场记录：观众实际看见什么证据、人物如何回应、结果为何迫使下一步、结尾选择的愿望与转机在哪里发生。无对白时，不用读唇或作者解释替代证据。再按连续原曲分配段落，只标已知的歌词顺序；同一句重复出现按出现次数区分，后段不能重播前段歌词。无时间码只给连续覆盖全曲的大致百分比，明确是画面预算而非实测对齐。每段估算串行动作、阅读、位移、反应和音乐留白所需容量；装不下先减事件或合并重复信息，不靠加快动作解决。未指定故事方向时内部比较不同事件的观看期待后选一套展开，不向用户重复征求选项。纯表演方向沿用音乐与舞台任务，不强加剧情。";
 
@@ -44,6 +44,7 @@ const musicExecutionPrompt = "本次是 MV。正文只写观众能看到或被�
 const musicRevisionPrompt = "你是本篇 MV 的作者，进行一次完整稿修订。brief 的用户要求和 direction 的锁定事实优先，beats 和 draft 都是可修订草稿。只对照实际正文核查并修复：1.移除作者解释、不可听对白、读唇和细小文字后，观众是否仍能理解目标、证据与变化；缺证据须重写相关行动，不能只删解释。2.关键决定是否由先前展示的愿望、可行办法、眼前转机和回应促成；帮助是否有来路，主角是否参与解局；不能用签表、远望、微笑自动代表成长。3.开场是否让人关心一个具体结果，中段的行动是否改变下一步，高潮是否兑现前文；弱处改事件及其必要前因，不靠增加灾难、反派或固定反转凑刺激。4.原曲歌词按输入顺序及实际重复次数单向使用，演唱切入不能重新唱过前文歌词；无时间码不虚构段落位置，必要时去掉未经验证的逐句卡点，只保留顺序和画面预算。5.逐段串行动作、位移、阅读、反应和停留能否容纳在总时长内；删并重复信息，不压缩关键动作，不用平均分配掩盖超时。6.固定歌手和其他演员身份、服装状态、持物与出入场一致，声轨遵守用户限制。保留已成立的戏及原有风格，只修实际问题与依赖；不要为了审核把故事写成说明书。没有问题就完整保留原文。第一行用‘# 标题’，之后只交修订后的完整可视听正文，不输出审稿报告或自评通过。";
 
 export async function writeStoryDraft(brief: string, direction: string, providerId: string, modelId: string, signal?: AbortSignal, writingMethod = "", musicFilm = false, resume?: { plan: unknown; text: string; draft: unknown }) {
+  if (!writingMethod.trim()) throw new Error("故事技能未加载，请启用 story 的读取后重试；未使用其他默认写法生成");
   const input = inputSchema.parse({ brief, direction });
   assertModelSelection("text", providerId, modelId);
   const configured = await createAgentModel(providerId, modelId, "off");
@@ -75,8 +76,8 @@ export async function writeStoryDraft(brief: string, direction: string, provider
     planCorrectionAttempted = attempt > 0;
     const started = performance.now();
     const first = await runtime.completeSimple(model, {
-      systemPrompt: musicFilm ? `${storyBeatPrompt}\n${musicBeatPrompt}\n只调用 submitMusicStoryPlan，先完成场面推演，不写正文。各段提交建议时长作为分配权重，程序按全曲时长固定各场预算后再写动作；按事件需要分配，不把歌曲机械三等分。避免把整个故事简化为主角遇到一个小技术故障、旁人指点后成功、最后填表决定新生活；日常题材也须让人物之间真正有牵挂与变化。内在矛盾要通过具体互动发生，不规定必须激烈或悲剧。故事若依赖读者代补关系、关键决定仅由小技巧成功推出，就在提交前重构承重场面。` : storyBeatPrompt,
-      messages: [{ role: "user", content: JSON.stringify({ ...input, writingMethod, ...(attempt > 0 ? { previousPlan: beats, correction: `${planIssue}。保留已有故事、人物与事件，只修正上述结构或预算错误；不得改全曲时长来凑总数。重新提交完整计划。` } : {}) }), timestamp: Date.now() }],
+      systemPrompt: musicFilm ? `${writingMethod}\n\n${storyBeatPrompt}\n${musicBeatPrompt}\n只调用 submitMusicStoryPlan，先完成场面推演，不写正文。各段提交建议时长作为分配权重，程序按全曲时长固定各场预算后再写动作；按事件需要分配，不把歌曲机械三等分。避免把整个故事简化为主角遇到一个小技术故障、旁人指点后成功、最后填表决定新生活；日常题材也须让人物之间真正有牵挂与变化。内在矛盾要通过具体互动发生，不规定必须激烈或悲剧。故事若依赖读者代补关系、关键决定仅由小技巧成功推出，就在提交前重构承重场面。` : `${writingMethod}\n\n${storyBeatPrompt}`,
+      messages: [{ role: "user", content: JSON.stringify({ ...input, ...(attempt > 0 ? { previousPlan: beats, correction: `${planIssue}。保留已有故事、人物与事件，只修正上述结构或预算错误；不得改全曲时长来凑总数。重新提交完整计划。` } : {}) }), timestamp: Date.now() }],
       ...(musicFilm ? { tools: [{ name: "submitMusicStoryPlan", description: "提交MV场面计划，只做结构推演与画面时间预算，不生成媒体", parameters: z.toJSONSchema(musicPlanSchema) }] } : {}),
     }, { reasoning, maxTokens: model.maxTokens,
       ...(musicFilm && model.id === "qwen3.8-flash" && model.api === "openai-completions" ? { onPayload: (payload: unknown) => ({ ...payload as object, tool_choice: { type: "function", function: { name: "submitMusicStoryPlan" } } }) } : {}),
@@ -124,8 +125,8 @@ export async function writeStoryDraft(brief: string, direction: string, provider
   if (!resume && beats && (musicFilm ? !planIssue : firstStopReason === "stop" || beats.length >= 200)) {
     const started = performance.now();
     const second = await runtime.completeSimple(model, {
-      systemPrompt: musicFilm ? `${storyExecutionPrompt}\n${musicExecutionPrompt}` : storyExecutionPrompt,
-      messages: [{ role: "user", content: `用户要求、创作限制与同一工作法：\n${JSON.stringify({ ...input, writingMethod })}\n\n已确定的场面节拍与事实清单：\n${beats}`, timestamp: Date.now() }],
+      systemPrompt: `${writingMethod}\n\n${storyExecutionPrompt}${musicFilm ? `\n${musicExecutionPrompt}` : ""}`,
+      messages: [{ role: "user", content: `用户要求、创作限制与同一工作法：\n${JSON.stringify(input)}\n\n已确定的场面节拍与事实清单：\n${beats}`, timestamp: Date.now() }],
     }, { reasoning, maxTokens: model.maxTokens, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300000)]) : AbortSignal.timeout(300000) });
     stageDurations.push({ stage: "draft", durationMs: Math.round(performance.now() - started) });
     recordTextUsage(second);
@@ -157,8 +158,8 @@ export async function writeStoryDraft(brief: string, direction: string, provider
           } else {
             const revision = await runtime.completeSimple(model, {
               tools: [{ name: "submitMusicDraft", description: "提交完整正文，每个固定scene键必须填写", parameters: z.toJSONSchema(submissionSchema) }],
-              systemPrompt: musicRevisionPrompt.replace("第一行用‘# 标题’，之后只交修订后的完整可视听正文，不输出审稿报告或自评通过。", "只调用submitMusicDraft。actions.action是交付正文，不另填正文或场时长。每段只围绕一次主要操作及直接反应，不把多个串行动作挤在同一句。hold只描述已建立画面的停留。未知专业解局改为普通事件，保留人物能力限制；必要的工序和位移可以用明确可辨的跳切省略时间，不能瞬间完成全过程。原曲唯一时不要写可听对白、铃声和音效；无校正时间码不指定逐句唱点。"),
-              messages: [{ role: "user", content: JSON.stringify({ ...input, writingMethod, beats: plan, slots: slots.map((seconds, index) => ({ scene: `scene${index + 1}`, seconds })), draft: written, feedback, output: "scenes填对象并交齐所有scene键，每场动作总耗时不得超过预算。为反应留时间；超量删并，不按比例缩短估计。保留人物关系和观看期待，不新增设备、规则、权限或象征物补洞。" }), timestamp: Date.now() }],
+              systemPrompt: `${writingMethod}\n\n${musicRevisionPrompt.replace("第一行用‘# 标题’，之后只交修订后的完整可视听正文，不输出审稿报告或自评通过。", "只调用submitMusicDraft。actions.action是交付正文，不另填正文或场时长。每段只围绕一次主要操作及直接反应，不把多个串行动作挤在同一句。hold只描述已建立画面的停留。未知专业解局改为普通事件，保留人物能力限制；必要的工序和位移可以用明确可辨的跳切省略时间，不能瞬间完成全过程。原曲唯一时不要写可听对白、铃声和音效；无校正时间码不指定逐句唱点。")}`,
+              messages: [{ role: "user", content: JSON.stringify({ ...input, beats: plan, slots: slots.map((seconds, index) => ({ scene: `scene${index + 1}`, seconds })), draft: written, feedback, output: "scenes填对象并交齐所有scene键，每场动作总耗时不得超过预算。为反应留时间；超量删并，不按比例缩短估计。保留人物关系和观看期待，不新增设备、规则、权限或象征物补洞。" }), timestamp: Date.now() }],
             }, { reasoning, maxTokens: model.maxTokens,
               ...(model.id === "qwen3.8-flash" && model.api === "openai-completions" ? { onPayload: (payload: unknown) => ({ ...payload as object, tool_choice: { type: "function", function: { name: "submitMusicDraft" } } }) } : {}),
               signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300000)]) : AbortSignal.timeout(300000) });

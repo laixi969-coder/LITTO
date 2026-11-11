@@ -17,7 +17,7 @@ const storyTextSchema = z.strictObject({
   maxCharacters: z.number().int().positive().max(120000).optional(),
   countMode: z.enum(["text", "characters"]).optional().describe("默认text：统计字母、汉字和数字，不计空白及标点；仅明确要求含标点的字符数时用characters"),
   logic: storyLogicSchema.optional(),
-  requireRuleValidation: z.boolean().optional().describe("高概念或异常规则故事须为true；运行时可强制开启，不能通过省略字段跳过"),
+  requireRuleValidation: z.boolean().optional().describe("需要核对异常规则关键使用时为true；高概念题材本身不代表存在超自然规则"),
 }).refine(value => !value.minCharacters || !value.maxCharacters || value.minCharacters <= value.maxCharacters, "字数下限不能大于上限");
 
 type SavedSceneList = SceneList & { schemaVersion: 1; version: number; savedAt: string };
@@ -64,7 +64,7 @@ const plugin: ToolPlugin = {
     const tools: ToolDefinition[] = [
       {
         name: "prepareStoryText", label: "核对文字稿",
-        description: "不写文件。核对不含标题的正文篇幅、数量声明与关键规则。默认按汉字、字母和数字计数，不计空白、标点及符号；明确要求含标点字符数时用countMode=characters。高概念须requireRuleValidation:true并提供logic.rules：每个关键对象有触发及改变条件的边界证据，另有高潮应用，尝试和结果分别引用正文；不能以他人的试验代证。数量有歧义时先读取返回的quantities，再按claimId给logic.quantities的实际字串或全文未展示的依据。ready:false须修稿或补真实证据，不能把猜测填pass。精确局改传原稿和edits，其他文字由程序保留。核对后直接交付返回text，不重新生成；工具不代替语义审读或文学评价。",
+        description: "不写文件。核对不含标题的正文篇幅、数量声明与关键规则。默认按汉字、字母和数字计数，不计空白、标点及符号；明确要求含标点字符数时用countMode=characters。异常规则需要核对时用requireRuleValidation:true并提供logic.rules，引用关键行动及结果。边界变化和高潮应用只在实际涉及时记录，不强制为每个对象补实验或高潮。数量有歧义时先读取返回的quantities，再按claimId给logic.quantities的实际字串或全文未展示的依据。ready:false须修稿或补真实证据，不能把猜测填pass。精确局改传原稿和edits，其他文字由程序保留。核对后直接交付返回text，不重新生成；工具不代替语义审读或文学评价。",
         parameters: z.toJSONSchema(storyTextSchema, { io: "input", target: "draft-07" }),
         async execute(_id, params) {
           const input = storyTextSchema.parse(params);

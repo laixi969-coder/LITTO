@@ -21,6 +21,15 @@ export function loadAgentSkills(cwd: string, scope?: SkillScope) {
   });
 }
 
+export async function readStoryInstructions(cwd: string, signal?: AbortSignal) {
+  const context = createSkillContext(cwd);
+  const manifest = await context.read({ name: "story" }, signal);
+  // ACT: 只展开主技能直接引用的创作资料，不递归加载参考库或其他技能，避免上下文无限增长。
+  const paths = [...new Set([...manifest.content.matchAll(/\]\((references\/[^\s)#?]+\.md)(?:#[^\s)]*)?\)/g)].map(match => match[1]!))];
+  const references = await Promise.all(paths.map(path => context.read({ name: "story", scope: manifest.scope, path }, signal)));
+  return [manifest.content, ...references.map(reference => `## ${reference.path}\n${reference.content}`)].join("\n\n");
+}
+
 export function createSkillContext(cwd: string): SkillContext {
   const skillScope = (filePath: string): SkillScope => isWithin(join(cwd, "skill"), filePath) ? "workspace" : "global";
 

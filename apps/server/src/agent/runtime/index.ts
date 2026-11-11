@@ -189,7 +189,7 @@ export async function run(
     // ACT: MV 入口与简短续作也保留编剧能力；是否写剧情由已选方向决定，不强制纯演唱创作故事。
     if (musicFilm || /故事|剧本|剧情|短剧|爽剧|悬疑剧|剧集|story/i.test(taskIntent)) tools.push(createStoryWriter(providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm), musicFilm));
     if (prepareTools) tools = prepareTools(tools);
-    const planning = enforceStoryDelivery ? createStoryPlanning(storyTask, providerId, modelId) : undefined;
+    const planning = enforceStoryDelivery ? createStoryPlanning(storyTask, providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm)) : undefined;
     const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();
     const storyReviewClaims = new Map<string, string>();
     const storyLengths = new Map<string, { countMode?: string; minCharacters?: number; maxCharacters?: number }>();
@@ -225,7 +225,8 @@ export async function run(
             try {
               // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限。
               const reviewer = await createAgentModel(providerId, modelId, "off");
-              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? storyTask : prompt, prepared.text, ruleClaims, signal!);
+              const instructions = await loadStoryWritingContext(cwd, tools, taskIntent, signal, musicFilm);
+              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? storyTask : prompt, prepared.text, ruleClaims, signal!, instructions);
             } catch (error) {
               if (signal?.aborted) throw error;
               semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };

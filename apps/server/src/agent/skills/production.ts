@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { musicFilmWritingGuide } from "@toonflow/tool-scene-list/storyProject";
-import { createSkillContext, loadAgentSkills } from "@/agent/skills";
+import { createSkillContext, loadAgentSkills, readStoryInstructions } from "@/agent/skills";
 import { readStoryProject } from "@/utils/story";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
@@ -24,12 +24,7 @@ export async function loadStoryWritingContext(cwd: string, tools: SkillTools, ta
   if (!canReadSkills(tools)) return "";
   const skill = loadAgentSkills(cwd).skills.find(item => item.name === "story");
   if (!skill || skill.disableModelInvocation && !explicitlyNamesSkill(task, skill.name)) return "";
-  const context = createSkillContext(cwd);
-  const manifest = await context.read({ name: "story" }, signal);
-  // ACT: 工作区自定义旧技能未引用新资料时沿用自身正文，不越过覆盖关系读取内置方法。
-  const method = manifest.content.includes("references/storyCreation.md")
-    ? (await context.read({ name: "story", path: "references/storyCreation.md" }, signal)).content
-    : manifest.content;
+  const method = await readStoryInstructions(cwd, signal);
   return musicFilm ? `${method}\n\n${musicFilmWritingGuide}` : method;
 }
 
@@ -145,13 +140,6 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     videoPromptDirector: ["references/segmentPlanning.md", ...(standalonePrompt ? ["references/fiveBlockWriting.md"] : [])],
     cinema: ["references/shotLanguage.md", "references/movementDirection.md", "references/referenceQuality.md"],
     workflow: [],
-    // ACT: 创作默认只预读共同工作法；案例研究和专项审稿按任务读取，避免方法重复挤占正文上下文。
-    story: ["references/storyCreation.md", ...(storyOnly ? [
-      ...(/分析|研究|借鉴|参照/.test(task) ? ["references/storyMechanisms.md"] : []),
-      ...(/评分|审稿|审读|评估/.test(task) ? ["references/evaluation.md"] : []),
-      ...(/对白|台词/.test(task) ? ["references/dialogue-aesthetics.md"] : []),
-      ...(/高概念|异常规则|世界规则/.test(task) ? ["references/high-concept.md"] : []),
-    ] : [])],
     adfilm: ["references/creativeTranslation.md"],
     musicfilm: ["references/musicVideoDirection.md"],
     continuity: ["references/shotChecklist.md"],
@@ -171,6 +159,10 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     if (!skill) { warnings.push(`缺少技能 ${name}`); continue; }
     if (skill.disableModelInvocation && !explicitNames.includes(name)) {
       warnings.push(`${name} 已关闭自动调用，未加载`);
+      continue;
+    }
+    if (name === "story") {
+      documents.push(await readStoryInstructions(cwd));
       continue;
     }
     for (const path of [undefined, ...new Set(referencePaths[name] ?? [])]) {

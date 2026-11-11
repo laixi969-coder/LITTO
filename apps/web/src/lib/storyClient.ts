@@ -16,3 +16,7 @@ export async function updateStory(directory: string, expectedVersion: number, ac
 export async function readStoryProductionContext(directory: string) {
   return (await client.get("/get", { params: { directory } })).data.data.productionContext;
 }
+
+export async function readStoryInstructions(directory: string): Promise<string> {
+  return (await client.get("/instructions", { params: { directory } })).data.data.instructions;
+}

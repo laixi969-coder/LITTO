@@ -1,2 +1,2 @@
 export * from "@/agent/runtime";
-export { loadAgentSkills } from "@/agent/skills";
+export { loadAgentSkills, readStoryInstructions } from "@/agent/skills";
