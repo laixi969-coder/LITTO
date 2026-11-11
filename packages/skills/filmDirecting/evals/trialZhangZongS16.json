@@ -1,0 +1,222 @@
+{
+  "project": "张总·同学会",
+  "scene": "S15-S16 酒店包厢对峙",
+  "methods": [
+    "Dancyger director idea",
+    "Nolan no wall cheat",
+    "Katz I-pattern",
+    "Kenworthy 10.3/10.6",
+    "Kenworthy 1.1",
+    "Kenworthy 10.2"
+  ],
+  "abandoned": [
+    "2.1 orbit: 包厢墙会穿",
+    "11.1 circle: 两人坐着",
+    "按七句拆七镜"
+  ],
+  "original": {
+    "S15": "双人侧面，镜头几乎不动，四句同镜。",
+    "S16": "双人正面，镜头几乎不动，七轮对白塞进一镜。后实验拆成六镜正反打。"
+  },
+  "axis": {
+    "pair": [
+      "李伟",
+      "张强"
+    ],
+    "sides": [
+      {
+        "id": "K15",
+        "side": -1
+      },
+      {
+        "id": "K16a",
+        "side": -1
+      },
+      {
+        "id": "K16b",
+        "side": -1
+      },
+      {
+        "id": "K16c",
+        "side": -1
+      }
+    ],
+    "crossing": false
+  },
+  "cameraTexts": [
+    {
+      "id": "K15",
+      "text": "机位 K15；景别双人中景；张强在画面中央；李伟在画面右侧；I 形态侧面同框，门在画深右。"
+    },
+    {
+      "id": "K16a",
+      "text": "机位 K16a；景别双人中景；李伟在画面中央；前景是张强的肩，虚焦压在画面左侧；I 形态过张强肩，含门。"
+    },
+    {
+      "id": "K16b",
+      "text": "机位 K16b；景别近景；张强在画面中央；前景是李伟的肩，虚焦压在画面右侧；力量对比：低机位越过李伟肩拍张强。"
+    },
+    {
+      "id": "K16c",
+      "text": "机位 K16c；景别近景；张强在画面中央；李伟在画面右侧；L 形从张强左后推向眼睛。"
+    }
+  ],
+  "coverage": {
+    "check": {
+      "key": "coverage",
+      "level": "warn",
+      "passed": false,
+      "detail": "2 行有多轮对白（S15、S16b），须核对同框调度、模型能力和真实声音容量，不强制每句切镜；2 行换了一轮说话人，同框长镜可保留，但要确认听者有可见反应",
+      "rule": "对白覆盖与正反打"
+    },
+    "rows": [
+      {
+        "id": "S15",
+        "speaker": "李伟",
+        "visible": [
+          "李伟",
+          "张强"
+        ],
+        "ownShot": false,
+        "turns": 4,
+        "chars": 27,
+        "duration": 11,
+        "problem": "overloaded",
+        "detail": "S15：一镜有 4 轮说话人，核对同框调度、逐句可见性、模型同步能力和实际声音容量；能完整执行的持续镜头可以保留，不强制拆镜"
+      },
+      {
+        "id": "S16a",
+        "speaker": "李伟",
+        "visible": [
+          "李伟",
+          "张强"
+        ],
+        "ownShot": true,
+        "turns": 2,
+        "chars": 6,
+        "duration": 4,
+        "problem": "multi",
+        "detail": "S16a：一镜里换了一轮说话人，同框长镜可以保留，但要给听者可见反应"
+      },
+      {
+        "id": "S16b",
+        "speaker": "张强",
+        "visible": [
+          "李伟",
+          "张强"
+        ],
+        "ownShot": true,
+        "turns": 3,
+        "chars": 16,
+        "duration": 5,
+        "problem": "overloaded",
+        "detail": "S16b：一镜有 3 轮说话人，核对同框调度、逐句可见性、模型同步能力和实际声音容量；能完整执行的持续镜头可以保留，不强制拆镜"
+      },
+      {
+        "id": "S16c",
+        "speaker": "李伟",
+        "visible": [
+          "李伟",
+          "张强"
+        ],
+        "ownShot": true,
+        "turns": 2,
+        "chars": 11,
+        "duration": 5,
+        "problem": "multi",
+        "detail": "S16c：一镜里换了一轮说话人，同框长镜可以保留，但要给听者可见反应"
+      }
+    ],
+    "splits": []
+  },
+  "results": [
+    {
+      "title": "S15 同框求情",
+      "schemaOk": true,
+      "schemaError": null,
+      "cameraIssues": [],
+      "creativeIssues": [],
+      "compiled": {
+        "intent": "观众要相信：求情的人已经没牌，安静坐着的人掌握出口。",
+        "visualPayoff": "李伟前倾而张强身体不来；门仍在他身后那一侧。",
+        "dialogue": "0.4–3.2s 李伟说：\"张强，咱们是老同学。\"；更低、更近；visible；双人中景，李伟口型可见\n4–4.8s 张强说：\"嗯。\"；气声、不抬音量；visible；同框，张强口型可见\n6–9.4s 李伟说：\"这公司是我全部身家。我抵押了房子。\"；咽一下再继续；visible；同框\n9.6–10.6s 张强说：\"我知道。\"；平静；visible；同框",
+        "action": "李伟上身前倾求情，张强坐着几乎不动，只应一声嗯。两人座位不交换。",
+        "performance": "李伟前倾双手近桌沿；张强脊背贴椅，筷子已放下; 0-11s 同框，不按句切; eyeline 略偏镜头左侧，不对视到底; looking at 李伟看张强下颌；张强看桌面转盘再瞥李伟",
+        "blocking": "foreground: 圆桌白布与转盘残席; midground: I 形态面对面，李伟画面左、张强画面右，身体有角度不叠脑袋; background: 米金壁纸与门缝冷白，门在画深右侧",
+        "camera": "MS shot; 50mm lens; eye level height; neutral angle; axis side A",
+        "shotDesign": "Camera technique: shared two-shot, I-pattern, glance not locked eyeline; Viewing purpose: 让观众看见李伟把同学关系当最后一张牌，而张强不肯把身体交给这场恳求; Starting state: 两人坐圆桌两侧面对面。李伟上身已略前倾，张强靠椅。吊灯在上，门在画深右，两侧墙可见。; Ending state: 李伟仍前倾，张强仍坐原位说完「我知道」，没有起身、没有换座。; Subject path: 李伟上身前倾约一掌距离后停住；张强不移动，只点头幅度内应声。; Camera path: 锁定。机位在轴线 A 侧桌旁，50mm 平视，不绕桌、不退墙外。; Invariants: 包厢四面墙不拆; 门在画深右侧; 轴线 A 侧; 两人座位不交换; 吊灯暖黄主光方向不变",
+        "timeline": "【0-4s · 连续动作】李伟前倾：「张强，咱们是老同学。」张强不看他。\n【4-6s · 连续动作】张强仍坐原位，应一声「嗯」。\n【6-11s · 连续动作】李伟咽一下继续抵押房子；张强说「我知道」。",
+        "lighting": "fixed world light source: 包厢圆顶吊灯暖黄顶光，走廊冷白光从门缝进来，是唯一侧向补光; key direction top",
+        "soapRisk": "clear",
+        "wallCheat": "clear",
+        "pathSplit": true
+      }
+    },
+    {
+      "title": "S16a 建立条件",
+      "schemaOk": true,
+      "schemaError": null,
+      "cameraIssues": [],
+      "creativeIssues": [],
+      "compiled": {
+        "intent": "打断发生在已经建立的包厢地理里，不是新空间。",
+        "visualPayoff": "李伟话停在半句，张强仍坐着答应。",
+        "dialogue": "0.3–1.8s 李伟说：\"你能不能……\"；发紧、没说完；visible；过肩，李伟嘴可见\n2.2–3.2s 张强说：\"可以。\"；平静打断；offscreen；声源是前景肩所属的张强，已有独立镜覆盖",
+        "action": "李伟话没说完，张强平静打断。两人仍坐原位。",
+        "performance": "李伟双手撑桌沿；张强手掌仍在协议上; 0-4s; eyeline 略偏; looking at 李伟看张强；张强看李伟",
+        "blocking": "foreground: 张强右肩虚; midground: I 形态过肩，李伟在中央; background: 门在李伟身后偏右",
+        "camera": "MCU shot; 50mm lens; eye level height; neutral angle; axis side A",
+        "shotDesign": "Camera technique: I-pattern OTS two-shot, locked; Viewing purpose: 先让观众确认座位没换、门还在，打断发生在同一地理里。; Starting state: 越过张强右肩看李伟。李伟双手撑桌沿，张强肩在前景左下。门在画深。; Ending state: 张强说完「可以」，李伟抬眼愣住，座位未变。; Subject path: 李伟上身停在撑桌位置；张强不离椅。; Camera path: 锁定，轴线 A 侧，50mm 平视。; Invariants: 墙不拆; 轴线 A; 门在画深; 座位不交换",
+        "timeline": "【0-2.2s · 连续动作】李伟：「你能不能……」话未完。\n【2.2-4s · 连续动作】张强：「可以。」李伟抬眼。",
+        "lighting": "fixed world light source: 包厢圆顶吊灯暖黄顶光，走廊冷白光从门缝进来，是唯一侧向补光; key direction top",
+        "soapRisk": "clear",
+        "wallCheat": "clear",
+        "pathSplit": true
+      }
+    },
+    {
+      "title": "S16b 力量对比",
+      "schemaOk": true,
+      "schemaError": null,
+      "cameraIssues": [],
+      "creativeIssues": [],
+      "compiled": {
+        "intent": "条件来自占桌的人，不是来自音量。",
+        "visualPayoff": "短焦微仰的张强与前景李伟肩；他没有站起来。",
+        "dialogue": "0.3–1.8s 张强说：\"我有个条件。\"；平静；visible；低过肩，张强嘴可见\n2.2–3s 李伟说：\"你说。\"；立刻接；offscreen；声源是前景肩，李伟另有 S16a 画内\n3.4–4.8s 张强说：\"刚才那句话，再说一遍。\"；不抬音量；visible；同机位",
+        "action": "张强提出条件，要李伟把羞辱的话再说一遍。张强不离椅、不靠近。",
+        "performance": "张强上身微前倾仍坐着，手掌压协议; 0-5s; eyeline 略偏镜头右; looking at 张强看李伟；李伟肩在前景",
+        "blocking": "foreground: 李伟左肩虚在画面下方; midground: 张强居中，短焦略仰; background: 木饰面墙裙，不露墙外",
+        "camera": "MCU shot; 32mm lens; below chest height; slight low angle; axis side A",
+        "shotDesign": "Camera technique: power contrast, low OTS on controlling character; Viewing purpose: 看他用安静占住桌子，条件是从压迫透视里说出来的。; Starting state: 越过李伟肩看张强。机位低于张强胸，32mm 微仰。李伟肩在前景。; Ending state: 张强说完「再说一遍」，仍坐原椅，手掌还在协议上。; Subject path: 张强上身略前倾不离椅；李伟肩停在前景。; Camera path: 锁定。不上摇到俯拍，不绕到轴线 B 侧。; Invariants: 轴线 A; 墙不拆; 张强不站起来; 吊灯方向不变",
+        "timeline": "【0-2.2s · 连续动作】张强：「我有个条件。」\n【2.2-3.4s · 连续动作】李伟画外：「你说。」\n【3.4-5s · 连续动作】张强：「刚才那句话，再说一遍。」",
+        "lighting": "fixed world light source: 包厢圆顶吊灯暖黄顶光，走廊冷白光从门缝进来，是唯一侧向补光; key direction top",
+        "soapRisk": "clear",
+        "wallCheat": "clear",
+        "pathSplit": true
+      }
+    },
+    {
+      "title": "S16c L形隔离",
+      "schemaOk": true,
+      "schemaError": null,
+      "cameraIssues": [],
+      "creativeIssues": [],
+      "compiled": {
+        "intent": "抵抗写在静止里，不写在站起来。",
+        "visualPayoff": "镜头超过静止的张强，李伟变成脱焦背景。",
+        "dialogue": "0.2–1.2s 李伟说：\"哪句？\"；皱眉；offscreen；画外，听者是张强\n1.6–4.6s 张强说：\"你说我混成那样那句。\"；很轻；visible；推到眼睛，嘴可见",
+        "action": "张强保持静止。镜头从他左后推到眼睛。李伟在门前方向脱焦。",
+        "performance": "张强身体锁住，只有嘴动; 推近贯穿整句，句末停止; eyeline 略偏; looking at 张强看前方李伟方向，不看镜头",
+        "blocking": "foreground: 张强后颈与左肩; midground: 张强头转到近乎侧特写; background: 李伟与门脱焦",
+        "camera": "CU shot; 85mm lens; eye level height; neutral angle; axis side A",
+        "shotDesign": "Camera technique: L-block push isolating resistant character; Viewing purpose: 他不站起来、不绕桌，镜头从他身后超过去，读出抵抗。; Starting state: 张强左后，李伟在门前方向脱焦。L 形：张强近、李伟远。; Ending state: 停在张强眼睛特写，他说完「你说我混成那样那句。」; Subject path: 张强静止，不转身离椅。李伟仍坐原位。; Camera path: 从张强左后缓慢推到眼睛特写，句末停止。不穿过后墙。; Invariants: 张强不移动; 轴线 A; 墙不拆; 李伟仍在门前方向",
+        "timeline": "【0-1.6s · 连续动作】李伟画外：「哪句？」镜头已开始推。\n【1.6-5s · 连续动作】张强：「你说我混成那样那句。」推近在句末停。",
+        "lighting": "fixed world light source: 包厢圆顶吊灯暖黄顶光，走廊冷白光从门缝进来，是唯一侧向补光; key direction top",
+        "soapRisk": "clear",
+        "wallCheat": "clear",
+        "pathSplit": true
+      }
+    }
+  ]
+}

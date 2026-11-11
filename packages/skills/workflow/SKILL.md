@@ -2,7 +2,7 @@
 name: workflow
 description: 在 MILI MILI 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.17.2"
+  version: "2.17.3"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -132,8 +132,9 @@ metadata:
 | 对白、倾听、无声反应、情绪变化、群像，或修复僵硬表演 | 规划或修复前读取[表演指导](../cinema/references/performanceDirection.md)，按剧情、唱跳或产品互动选择重点，落实角色目标、触发、目光与节拍；复用现有字段和单一时间线，不叠加上游技能全文 |
 | 需要转场、J/L cut、多轨、字幕、精调切点 | 生成链路只负责素材与顺序，**精剪不进生成**。调 `POST /api/ai/media/timeline` 导出 OpenTimelineIO 与 CMX3600 EDL（`composeFilm` 合成后也会自动导一份到 `assets/timeline/`），交给 filmcraft / 达芬奇 / Premiere 剪。EDL 带 `* SOURCE FILE:` 绝对路径，导入时能自动链接素材 |
 | 批量生成（一次超过 5 镜或合计超过 60 秒） | **先调 `POST /api/ai/media/estimate` 报价**：给 providerId/modelId/duration/resolution，返回这一批的条数、秒数、参考积分，以及最近 24 小时已消耗多少。把报价和「已经烧了多少」一起报给用户，得到明确同意再提交。额度是真实货币，不是沙盒 |
-| 一镜里的人物在左在右、过谁的肩、机位放哪、有没有跳轴 | 生成前先做**走位板**：调 `POST /api/ai/media/blocking`，给房间尺寸、人物坐标与朝向、每个机位的坐标与视线，返回一张俯视图 SVG、每镜的空间描述（主体居中 + 前景压在哪侧）、以及**跳轴判定**。结构存 `assets/blocking.json`，写提示词时直接取 `blocking` 字段，不要自己编左右 |
-| 有对白的场景要拆镜、要多轮对白、要判断谁说话给谁镜头 | 拆镜前读取[对白覆盖与正反打](../cinema/references/coverage.md)。先调 `POST /api/ai/media/coverage` 把分镜台词归属算一遍：它返回每镜的轮次、台词容量与拆镜建议，并写入 `assets/coverage.json`。覆盖表中未交代声源或画内发声缺覆盖的 block 会拦截；有依据的画外声和多轮同框可保留。轮次、字数只提示容量风险，不按轮次硬切、不删句或加速；生成配音后使用真实时长与口型检查 |
+| 一镜里的人物在左在右、过谁的肩、机位放哪、有没有跳轴 | 先读取[电影导演调度](../filmDirecting/SKILL.md) 决定 I/A/L 形态、轴线和工作区，再做**走位板**：调 `POST /api/ai/media/blocking`，给房间尺寸、人物坐标与朝向、每个机位的坐标与视线，返回一张俯视图 SVG、每镜的空间描述（主体居中 + 前景压在哪侧）、以及**跳轴判定**。结构存 `assets/blocking.json`，写提示词时直接取 `blocking` 字段，不要自己编左右 |
+| 有对白的场景要拆镜、要多轮对白、要判断谁说话给谁镜头 | 拆镜前读取[对白覆盖与正反打](../cinema/references/coverage.md) 和[电影导演调度](../filmDirecting/SKILL.md)。先调 `POST /api/ai/media/coverage` 把分镜台词归属算一遍：它返回每镜的轮次、台词容量与拆镜建议，并写入 `assets/coverage.json`。覆盖表中未交代声源或画内发声缺覆盖的 block 会拦截；有依据的画外声和多轮同框可保留。轮次、字数只提示容量风险，不按轮次硬切、不删句或加速；生成配音后使用真实时长与口型检查。机位与走位按调度技能写入 camera.design，不按说话轮次左右翻转 |
+| 对白场面调度、力量对比、正反打形态、先期平面图 | 读取[电影导演调度](../filmDirecting/SKILL.md)，按场面打开肯沃斯或卡茨卡片；导演思维、不拆墙和平面图编号写入 camera.design 与 blocking，不把原书插图或导演姓名写进提示词 |
 | 武打、搏击、追逐、兵器、仙侠法术或复杂身体交互 | 规划或修复前读取[动作编排](../cinema/references/actionChoreography.md)，落实空间、受力、反应与状态衔接；攻防节拍、多人换位、法术及连续长镜头再读[武打导演专项](../cinema/references/manjuActionDirection.md)；同时有表演诉求时结合表演指导 |
 | 多镜头、续作、局部重做、反打或跨镜动作 | 读取[连续性守则](../continuity/SKILL.md)，按实际状态承接身份、光线、情绪、道具与动作 |
 | 只有角色身份资产、无人场景或静物产品图 | 使用[资产制作](references/assets.md)与适用的摄影方法；不自动套哭戏、打斗、眨眼或群像规则 |
@@ -223,7 +224,7 @@ metadata:
 
 ## 镜头方法接入
 
-涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](../cinema/references/masterShots.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。
+涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](../cinema/references/masterShots.md)。对白调度、轴线、平面图和导演意图再读取 [电影导演调度](../filmDirecting/SKILL.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。
 
 ## 制作模板的按需取用与落地
 
@@ -235,7 +236,7 @@ metadata:
 | 角色、妆造、场景、道具与产品结构 | [资产](references/assets.md)、[视觉设计](references/methods/visualDesign.md)、[妆造](references/methods/characterStyling.md) | 已采用资产、当前变体与真实参考 |
 | 光源、材质、色板、重光与调色 | [色彩与用光](references/methods/colorAndLight.md) | World/Look、lighting、realism及实际剪辑grade |
 | 特写、关系、倾听与声音表演 | [表演](../cinema/references/performanceDirection.md) | action/performance、逐句delivery及唯一时间线 |
-| 摄影、空间路线、白模和参考转译 | [摄影](../cinema/references/shotLanguage.md)、[参考执行](../cinema/references/referenceQuality.md) | camera.design、blocking、实际输入与降级 |
+| 摄影、空间路线、白模和参考转译 | [摄影](../cinema/references/shotLanguage.md)、[参考执行](../cinema/references/referenceQuality.md)、[导演调度](../filmDirecting/SKILL.md) | camera.design、blocking、实际输入与降级 |
 | 打斗、群战、动作/深度参考 | [动作](../cinema/references/combatDesign.md) | combat、interactions及同一timeline |
 | 广告、产品片、UGC和餐厅推广 | [广告转译](../adfilm/references/creativeTranslation.md) | adDirection、advertising及当前商品事实 |
 | MV、唱跳、原曲和混剪 | [MV编排](../musicfilm/references/musicVideoDirection.md) | musicVideo、歌曲入点、舞台/造型单元 |

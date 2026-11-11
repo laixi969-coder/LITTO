@@ -2,7 +2,7 @@
 name: cinema
 description: 制作叙事影片、电影短片、电影式动画及武打动作场面，涵盖现代格斗、武侠兵器、仙侠法术和多人交锋：从故事意图、世界与视觉设定出发，规划镜头、人物调度、表演、摄影、光线、运动和剪辑衔接，建立资产与状态连续性，再制作关键帧和视频片段。用于电影创作及既有影片的续作、局部修改；产品广告使用 adfilm，画布与模型执行使用 workflow 和 canvas。
 metadata:
-  version: "2.5.2"
+  version: "2.5.3"
   displayName: 电影创作
   author: MILI MILI
 ---
@@ -19,7 +19,7 @@ metadata:
 - [canvas](../canvas/SKILL.md)：查询实际节点、配置、参考顺序并操作画布，不猜节点能力。
 - [continuity](../continuity/SKILL.md)：身份、服装、道具、空间、动作、光线与情绪的跨镜状态；锁定资产与版本修复。
 - [videoPromptDirector](../videoPromptDirector/SKILL.md)：独立生成段可用五板块 `final_video_prompt`，先连接资产并回读 references，再绑定实际 `{{ref N}}` 标记。正式剧情镜头仍以 ShotSpec 和 productionSpec 编译请求为准，不用独立段绕过规格。真人资产与各镜默认采用其中[清爽人物方法](../videoPromptDirector/references/cleanPortrait.md)，把肤面写入 realism.surface 并继承角色参考；既定年龄、伤势、汗水、夜景和特殊妆效优先，不改变叙事、表演与场景光向。
-- 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)，**对白怎么切镜见 [对白覆盖与正反打](references/coverage.md)**。
+- 本技能：叙事、镜头职责、表演与调度、摄影设计、剪辑节奏和电影质量验收。镜头语言细则见 [摄影与剪辑](references/shotLanguage.md)，结构与节奏见 [叙事节奏](references/pacing.md)，**对白怎么切镜见 [对白覆盖与正反打](references/coverage.md)**。对白场面的形态、轴线、双路径和先期平面图按需读取 [电影导演调度](../filmDirecting/SKILL.md)。
 - **有对白先核对 coverage 表再决定拆镜**：逐句保留原文、说话人、画内/画外及声源依据、观看对象、实际音频时长和局部窗口。多轮同框、合法画外声和持续镜头可保留；按可读性、真实容量和所选模型能力决定拆镜，不按轮次或字数硬切，不删台词、加速或跨镜挪音。
 - **后配音先按实测声音规划再生成画面**：productionSpec(planSpeech) 复用已选声音或明确映射的旧素材，返回原速整句窗口和容量下限；导演复核后保存逐句 audio 与完整可见 coverage。配音未定、超窗或覆盖缺口只允许规划预览，不提交付费视频。容量不足重新组织有意义的表演／镜头，不拉慢打斗救援来填秒数。见 [创作准备](references/creativePreparation.md)。
 - MV 镜头另外读取 [MV 导演编排](../musicfilm/references/musicVideoDirection.md)：沿用 musicfilm 的开场悬念与故事选择，音乐和表演共同占用时间；完整内容保存到 `musicVideo` 后编译，不只写自由提示词。
@@ -97,7 +97,7 @@ compile只发送当前阶段适用的具体视觉要求；edit/audio/story返回
 
 电影镜头规划前必须读取[专业摄影与剪辑方法](references/shotLanguage.md)，把本场摄影方向落实到 camera、lighting、performance 和实际编译请求。专业电影不默认使用手机成像瑕疵；用户明确要求自拍或纪实时才按该方向选择。
 
-涉及角色表演、对白、无声反应或群像时，必须读取[表演指导与人物调度](references/performanceDirection.md)。将角色目标、潜台词、触发与反应、倾听、目光及跨镜情绪落实到 action、performance、blocking；编译后核对实际请求，不能只列“悲伤/愤怒”等标签。角色外貌和声音身份保持稳定，表情与当场语气可以有因果地变化。
+涉及角色表演、对白、无声反应或群像时，必须读取[表演指导与人物调度](references/performanceDirection.md)。将角色目标、潜台词、触发与反应、倾听、目光及跨镜情绪落实到 action、performance、blocking；编译后核对实际请求，不能只列“悲伤/愤怒”等标签。角色外貌和声音身份保持稳定，表情与当场语气可以有因果地变化。对白机位、I/A/L 形态、越轴或力量对比再读取 [电影导演调度](../filmDirecting/SKILL.md)，把编舞落到 camera.design 的 subjectPath 与 cameraPath。
 
 涉及妆发、服装或状态变化时读取[妆造设计](../workflow/references/methods/characterStyling.md)，核对当前资产、参考分工和换装时点。造型必须支持本场动作与反应；起始状态用于接戏，不等于全程冻结。
 
@@ -145,4 +145,4 @@ compile只发送当前阶段适用的具体视觉要求；edit/audio/story返回
 
 打斗的具体动作、运镜和效果选词按需读[打斗素材库](references/combatPalette.md)，与既有动作编排共同使用，不直接复制整套案例或默认参数。
 
-涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](references/masterShots.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。
+涉及镜头选择、产品展示、音乐运镜、预演或运镜验收时，按需读取 [镜头方法卡](references/masterShots.md)。对白调度、轴线、平面图和导演意图再读取 [电影导演调度](../filmDirecting/SKILL.md)。将方法落到 ShotSpec.camera.design 与现有摄影、表演字段；不以大师姓名替代规格。

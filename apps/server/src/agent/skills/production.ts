@@ -79,6 +79,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     { match: /真人|写实|质感|皮肤|塑料|手机|视频|镜头|关键帧|生图|realism|photoreal|live.action/i, name: "continuity", paths: ["references/realism.md"] },
     { match: /创意|大纲|编剧|写.*剧本|故事开发/, name: "story", paths: ["references/core-methodology.md"] },
     { match: /镜头|分镜|运镜|摄影|构图|机位|俯视|剖面|全景|白模|camera|cinematography/i, name: "cinema", paths: ["references/shotLanguage.md", "references/masterShots.md"] },
+    { match: /场面调度|对话调度|对白调度|正反打|过肩|轴线|三角机位|力量对比|走位|blocking|staging/i, name: "filmDirecting", paths: [] },
     { match: /九宫格|九格|9\s*[宫宮格]|十六宫格|16\s*[宫宮格]|多格分镜|宫格分镜|storyboard\s*grid/i, name: "cinema", paths: ["references/storyboardGrid.md"] },
     { match: /剖面|全景|白模|空间设计|群像设计|环境|场景|真人|写实|脏旧|做旧|破败|维护状态|photoreal|live.action/i, name: "workflow", paths: ["references/methods/visualDesign.md"] },
     { match: /打斗|交锋|群战|武打|武术|武侠|仙侠|搏击|格斗|追逐|武器|兵器|刀剑|剑斗|法术|combat|martial|fight|wuxia/i, name: "cinema", paths: ["references/combatDesign.md", "references/actionChoreography.md", "references/manjuActionDirection.md", "references/creativePreparation.md"] },
@@ -159,6 +160,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     chineseGardenDirector: ["references/spaceAndLight.md"],
     orientalEpicDirector: ["references/scaleAndStructure.md", "references/dreamSpace.md"],
     gavenScriptToVideo: ["references/camera-motion.md", "references/performance.md", "references/continuity-qc.md"],
+    filmDirecting: [],
   };
   if (storyboardOnly) referencePaths.cinema = ["references/shotLanguage.md", "references/movementDirection.md", "references/performanceDirection.md", "references/coverage.md"];
   // ACT: 默认视频模型在开始本轮前已选定时预读模型规则；中途切换仍须按工具返回的实际模型读取。
