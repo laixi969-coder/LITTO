@@ -57,11 +57,13 @@
             </el-option-group>
           </el-select>
           <generationSettings
-            v-model:size="data.size"
-            v-model:ratio="data.ratio"
+            :size="data.size"
+            :ratio="data.ratio"
             :sizes="sizeOptions"
             :ratios="ratioOptions"
-            :disabled="generating || deleting || !selectedModel" />
+            :disabled="generating || deleting || !selectedModel"
+            @update:size="setImageSize"
+            @update:ratio="setImageRatio" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -133,18 +135,31 @@ function pixelRatio(size: string) {
   while (remainder) [divisor, remainder] = [remainder, divisor % remainder];
   return `${Number(pixels[1]) / divisor}:${Number(pixels[2]) / divisor}`;
 }
-const ratioOptions = computed(() => {
-  const ratio = pixelRatio(data.value.size);
-  return ratio ? [ratio] : selectedModel.value?.imageRatios?.length ? selectedModel.value.imageRatios : [data.value.ratio || "16:9"];
-});
+function imageRatios(model: NodeMediaModel) {
+  const ratios = model.imageSizes?.map(pixelRatio).filter((ratio): ratio is string => !!ratio) ?? [];
+  return ratios.length ? [...new Set(ratios)] : model.imageRatios?.length ? model.imageRatios : [data.value.ratio || "16:9"];
+}
+const ratioOptions = computed(() => selectedModel.value ? imageRatios(selectedModel.value) : [data.value.ratio || "16:9"]);
+function imageSizeForRatio(sizes: string[], ratio: string, current: string) {
+  const matching = sizes.filter(size => !pixelRatio(size) || pixelRatio(size) === ratio);
+  if (matching.includes(current)) return current;
+  const longestSide = (size: string) => Math.max(...size.split(/[x*]/).map(Number.parseFloat));
+  return matching.toSorted((left, right) => Math.abs(longestSide(left) - (longestSide(current) || 0)) - Math.abs(longestSide(right) - (longestSide(current) || 0)))[0];
+}
+function setImageSize(size: string) {
+  data.value.size = size;
+  data.value.ratio = pixelRatio(size) ?? data.value.ratio;
+}
+function setImageRatio(ratio: string) {
+  const size = imageSizeForRatio(sizeOptions.value, ratio, data.value.size);
+  if (size) data.value.size = size;
+  data.value.ratio = ratio;
+}
 watch(
   [selectedModel, () => data.value.size],
   ([choice]) => {
     if (!choice) return;
-    // ACT: 现有分辨率使用 K 单位；出现其他单位时再统一换算，未知名称排在数值选项之后。
-    if (!sizeOptions.value.includes(data.value.size)) data.value.size = sizeOptions.value.filter(size => !pixelRatio(size) || pixelRatio(size) === data.value.ratio).toSorted((left, right) =>
-      (Number.parseFloat(left) || Infinity) - (Number.parseFloat(right) || Infinity)
-    )[0] ?? data.value.size;
+    if (!sizeOptions.value.includes(data.value.size)) data.value.size = imageSizeForRatio(sizeOptions.value, data.value.ratio, data.value.size) ?? data.value.size;
   },
   { flush: "sync" }
 );
@@ -227,7 +242,7 @@ async function startGeneration() {
   if (uploading.value) throw new Error("图片正在替换，请等待完成");
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择图片模型");
-  if (!sizeOptions.value.includes(data.value.size) || !ratioOptions.value.includes(data.value.ratio)) throw new Error("当前模型或尺寸不支持已选画幅，请调整模型或尺寸；不会自动改为默认比例");
+  if (!sizeOptions.value.includes(data.value.size) || !ratioOptions.value.includes(data.value.ratio) || pixelRatio(data.value.size) && pixelRatio(data.value.size) !== data.value.ratio) throw new Error("当前模型或尺寸不支持已选画幅，请调整模型或尺寸；不会自动改为默认比例");
   if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
   if (!data.value.production && refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const workspace = files.getWorkspaceFiles();
@@ -328,7 +343,7 @@ function getConfig() {
       size: data.value.size,
       ratio: data.value.ratio,
     },
-    models: models.value.map(model => ({ ...model, ...(model.imageSizes?.some(size => pixelRatio(size)) ? { imageRatios: [...new Set(model.imageSizes.map(size => pixelRatio(size)).filter((ratio): ratio is string => !!ratio))] } : {}) })),
+    models: models.value.map(model => ({ ...model, imageRatios: imageRatios(model) })),
   };
 }
 
@@ -363,12 +378,13 @@ nodeTools.register({
       : models.value.find((item) => item.providerId === args.providerId && item.modelId === args.modelId);
     if (!choice) throw new Error("请选择 getConfig 返回的有效图片模型");
     const sizes = choice.imageSizes?.length ? choice.imageSizes : ["2K"];
-    const pixel = pixelRatio(args.size ?? (sizes.includes(data.value.size) ? data.value.size : sizes[0]!));
+    const size = args.size ?? imageSizeForRatio(sizes, args.ratio ?? data.value.ratio, data.value.size) ?? data.value.size;
+    const pixel = pixelRatio(size);
     const ratios = pixel ? [pixel] : choice.imageRatios?.length ? choice.imageRatios : [args.ratio ?? data.value.ratio];
-    if (args.size !== undefined && !sizes.includes(args.size)) throw new Error(`当前模型不支持分辨率 ${args.size}，可选：${sizes.join("、")}`);
+    if (!sizes.includes(size)) throw new Error(`当前模型不支持分辨率 ${size}，可选：${sizes.join("、")}`);
     if (!ratios.includes(args.ratio ?? data.value.ratio)) throw new Error(`当前模型或尺寸不支持比例 ${args.ratio ?? data.value.ratio}，可选：${ratios.join("、")}；不会自动改写已选比例`);
     data.value.model = JSON.stringify([choice.providerId, choice.modelId]);
-    if (args.size !== undefined) data.value.size = args.size;
+    data.value.size = size;
     if (args.ratio !== undefined) data.value.ratio = args.ratio;
     return getConfig();
   },
