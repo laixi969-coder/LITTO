@@ -3,6 +3,8 @@ import type { Rule } from "@form-create/element-ui";
 import type { FfmpegFactory } from "@toonflow/ffmpeg/types";
 import type { Stats } from "@toonflow/file";
 import { z } from "zod";
+import type { VideoStoryboard } from "./videoStoryboard";
+export * from "./videoStoryboard";
 import type { CameraTrajectory } from "@toonflow/providers";
 export type { CameraTrajectory } from "@toonflow/providers";
 
@@ -148,6 +150,7 @@ export function videoDurations(model: Pick<MediaModel, "durationResolutionMap">,
 }
 
 export interface MediaGenerationRequest {
+  storyboard?: VideoStoryboard;
   /** 仅由服务端整镜口型流程创建；恢复任务时按私有制作记录核验。 */
   speechSegment?: { assemblyId: string; lineIndex: number; requestId: string };
   voiceLineId?: string;

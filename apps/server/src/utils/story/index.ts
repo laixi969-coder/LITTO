@@ -6,6 +6,7 @@ import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
 import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
 import { inspectStoryLogic } from "@toonflow/tool-scene-list/storyLogic";
+import { storyFrameworkBasis, storyFrameworkReady, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
 
 const fileName = "storyProject.json";
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -81,6 +82,18 @@ export async function requestStoryDecision(directory: string, toolCallId: string
   let title: string, content: string;
   let choices: { label: string; action: StoryAction }[];
   switch (decision.type) {
+    case "confirmFramework": {
+      if (question.decisionSource) fail("故事框架需要用户亲自确认，不能由自动决定代替", 403);
+      const framework = project.frameworks.at(-1);
+      if (!framework || framework.id !== decision.id) fail("框架已更新，请读取当前框架后再确认", 409);
+      if (framework.basis !== storyFrameworkBasis(project)) fail("目标、方向或资料已变化，请先更新框架", 409);
+      title = `确认《${framework.title}》框架`;
+      content = `${framework.format}\n\n${framework.content}\n\n确认后仅展开你选择的下一步；修改框架会重新等待确认。`;
+      choices = (Object.keys(storyExpansionLabels) as (keyof typeof storyExpansionLabels)[])
+        .filter(step => step !== "episodes" || project.brief.kind === "serial")
+        .map(step => ({ label: `确认框架，${storyExpansionLabels[step]}`, action: { type: "confirmFramework", id: framework.id, step } }));
+      break;
+    }
     case "confirmSource": {
       const source = project.sources.find(item => item.id === decision.id) ?? fail("资料不存在");
       if (!source.coverage.trim()) fail("请先说明读取覆盖范围和未知项");
@@ -141,7 +154,7 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
   const parsed = storyActionSchema.safeParse(input);
   if (!parsed.success) fail(parsed.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("；"));
   const action = parsed.data;
-  if (!human && ["confirmSource", "chooseDirection", "decideIssue", "approve", "release"].includes(action.type)) {
+  if (!human && ["confirmFramework", "confirmSource", "chooseDirection", "decideIssue", "approve", "release"].includes(action.type)) {
     const tool = action.type === "approve" ? "requestStoryApproval" : "requestStoryDecision";
     fail(`请调用 ${tool}，在聊天中展示具体内容并等待用户决定`, 403);
   }
@@ -153,6 +166,9 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
     const now = new Date().toISOString();
     const getRevision = (id: string) => project.revisions.find(item => item.id === id) ?? fail("故事版本不存在");
     const addDraft = async (value: Parameters<typeof validateStoryDraft>[0], parentId?: string) => {
+      if (!human && ["story", "serial"].includes(project.brief.kind) && !project.revisions.length && !storyFrameworkReady(project)) fail("请先保存并确认故事框架，再展开正文", 409);
+      if (project.frameworks.length && !storyFrameworkReady(project)) fail("请先确认当前故事框架，再保存展开稿", 409);
+      if (!human && project.frameworks.length && project.frameworkApproval?.step !== "draft") fail("用户尚未选择展开完整正文，请只保存已授权范围的 expansion", 409);
       try { validateStoryDraft(value, project.brief); }
       catch (cause) { fail(cause instanceof Error ? cause.message : "剧本结构无效"); }
       await checkSources(directory, project.sources);
@@ -169,6 +185,23 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
       });
     };
     switch (action.type) {
+      case "expansion":
+        if (!storyFrameworkReady(project) || project.frameworkApproval?.id !== action.frameworkId || project.frameworkApproval.step !== action.step) fail("请先确认框架并选择本次展开范围", 409);
+        if (project.expansions.length >= 100) fail("展开版本已达到100个，请另开项目");
+        project.expansions.push({ frameworkId: action.frameworkId, step: action.step, text: action.text, createdAt: now });
+        break;
+      case "framework":
+        if (project.frameworks.length >= 100) fail("框架版本已达到100个，请保留历史并另开项目");
+        project.frameworks.push({ ...action.value, id: randomUUID(), createdAt: now, basis: storyFrameworkBasis(project) });
+        project.frameworkApproval = undefined;
+        break;
+      case "confirmFramework": {
+        const framework = project.frameworks.at(-1);
+        if (!framework || framework.id !== action.id || framework.basis !== storyFrameworkBasis(project)) fail("框架或依据已变化，请核对当前版本", 409);
+        if (action.step === "episodes" && project.brief.kind !== "serial") fail("当前作品不是剧集，请先明确修改作品形式和框架");
+        project.frameworkApproval = { id: action.id, step: action.step };
+        break;
+      }
       case "visualBoard":
         project.visualBoard = action.values; break;
       case "brief": project.brief = action.value; break;

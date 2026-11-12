@@ -5,6 +5,7 @@ import type { FfprobeData } from "@toonflow/ffmpeg/types";
 import { Router } from "express";
 import { z } from "zod";
 import { audioGenerationSchema, imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
+import { videoStoryboardSchema, compileVideoStoryboard } from "@toonflow/tools-scaffold/runtime";
 import { validateFields } from "@/lib/middleware";
 import { success, error } from "@/lib/responseFormat";
 import u from "@/utils";
@@ -206,6 +207,10 @@ export default Router().post("/", validateFields({
   const { directory, mediaType, requestId, continueFrom, styleReference, cast, skinFinish, ...raw } = req.body;
   const cwd = await u.workspace.resolveWorkspace(req, directory);
   let request: Record<string, unknown> = { ...raw };
+  const plan = raw.storyboard === undefined ? undefined : videoStoryboardSchema.safeParse(raw.storyboard);
+  if (plan && (!plan.success || mediaType !== "video")) return res.status(400).json(error("视频分镜编排无效", plan.success ? null : plan.error.issues, 400));
+  // 分镜也进入现有年代、人物与服装检查；实际正文仍由提交层统一编译一次。
+  const authoredPrompt = compileVideoStoryboard(String(raw.prompt ?? ""), plan?.success ? plan.data : undefined);
   const hasIdentityReference = (Array.isArray(raw.images) && raw.images.length > 0) || Boolean(raw.firstFrame) || typeof continueFrom === "string";
 
   // 肤质路径：资产与定妆固定 clean，其余按项目 assets/visual.json，请求可覆盖。
@@ -216,7 +221,7 @@ export default Router().post("/", validateFields({
 
   // 年代锚点：提示词写明年代才注入，避免把现代故事拍成旧年代。
   if (mediaType !== "audio" && !String(request.prompt ?? "").includes("ERA ")) {
-    const era = await eraAnchor(cwd, String(request.prompt ?? ""));
+    const era = await eraAnchor(cwd, authoredPrompt);
     if (era) request = { ...request, prompt: `${era}\n\n${request.prompt ?? ""}` };
   }
 
@@ -240,7 +245,7 @@ export default Router().post("/", validateFields({
   }
 
   // 影调参考不能顶替身份参考：先按原始请求判定，人物镜仍然要求真正的角色图。
-  if (typeof styleReference === "string" && mediaType === "video" && raw.purpose !== "asset" && !hasIdentityReference && !(Array.isArray(cast) && cast.length) && looksLikePersonShot(String(raw.prompt ?? ""))) {
+  if (typeof styleReference === "string" && mediaType === "video" && raw.purpose !== "asset" && !hasIdentityReference && !(Array.isArray(cast) && cast.length) && looksLikePersonShot(authoredPrompt)) {
     throw Object.assign(new Error("人物镜头不能只给影调参考：请另传角色定妆图（images）、角色档案（cast）或上一镜末帧（continueFrom）"), { status: 400 });
   }
   // 影调图永远放在最后，STYLEONLY 的「最后一张」才指得准。
@@ -258,16 +263,16 @@ export default Router().post("/", validateFields({
 
   // 资产门禁：拆过清单却还没建角色卡就进生成，等于让每一镜重新选角。
   // 要动下半身的镜头额外要求四视图，因为单张定妆撑不住蹲下、走远。
-  if (mediaType === "video" && raw.purpose !== "asset" && !/ASSETGATE\s*[:：]/i.test(String(raw.prompt ?? ""))) {
-    const gate = await assertAssetsReady(cwd, { needsLowerBody: lowerBodyAction.test(String(raw.prompt ?? "")) });
+  if (mediaType === "video" && raw.purpose !== "asset" && !/ASSETGATE\s*[:：]/i.test(authoredPrompt)) {
+    const gate = await assertAssetsReady(cwd, { needsLowerBody: lowerBodyAction.test(authoredPrompt) });
     if (!gate.ok) throw Object.assign(new Error(gate.message), { status: 400 });
   }
 
   // 服装锁：人物视频只要有下半身动作，就必须有服装依据，否则图生视频会把裤子和鞋省掉（实测：走远时整条裤子消失）。
-  if (mediaType === "video" && raw.purpose !== "asset" && looksLikePersonShot(String(raw.prompt ?? ""))) {
-    const declared = /WARDROBE\s*[:：]\s*([^\n]+)/.exec(String(raw.prompt ?? ""))?.[1] ?? "";
+  if (mediaType === "video" && raw.purpose !== "asset" && looksLikePersonShot(authoredPrompt)) {
+    const declared = /WARDROBE\s*[:：]\s*([^\n]+)/.exec(authoredPrompt)?.[1] ?? "";
     const wardrobe = castWardrobe || declared;
-    if (!wardrobe && lowerBodyAction.test(String(raw.prompt ?? ""))) {
+    if (!wardrobe && lowerBodyAction.test(authoredPrompt)) {
       throw Object.assign(new Error("这一镜含人物的下半身动作（蹲下、坐下、起身、走动、奔跑等），但没有服装依据：图生视频会把下装与鞋履省掉，生成后才发现只能整段重做。请二选一——①建 assets/cast/<角色>.json，写清 wardrobe（上衣、下装、鞋履、配饰）并配定妆参考图，用 cast 传入；②在提示词里写一行「WARDROBE: 米白棉麻衬衫、浅蓝直筒牛仔裤、深棕皮质凉鞋」"), { status: 400 });
     }
     request = { ...request, prompt: withWardrobeLock(String(request.prompt ?? ""), wardrobe) };

@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 import { mediaProviders, type Provider, type ProviderTask, type ProviderTools } from "@toonflow/providers";
 import { matchesAspect } from "@toonflow/providers/aspect";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
-import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
+import { cameraTrajectorySchema, validateVideoStoryboard, compileVideoStoryboard, storyboardGenerateAudio } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { modelAccess } from "@/utils/modelAvailability";
@@ -20,7 +20,23 @@ import { photographicVisualBrief, skinFinishes, videoMotionTiming, type SkinFini
 import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { inspectVideoPrompt, isDirectorPrompt, positivePromptText } from "@/utils/media/videoPrompt";
 import { autoFilmScope } from "@/utils/autoFilm/scope";
-import { readMultiShotCapabilities } from "@/utils/media/shotCapabilities";
+import { readMultiShotCapabilities, assertMultiShotCapability } from "@/utils/media/shotCapabilities";
+
+export function prepareVideoStoryboard(request: MediaGenerationRequest, model: MediaModel) {
+  if (!request.storyboard) return request;
+  try {
+    if (request.shotId || model.type !== "video") throw new Error("正式镜头请先将分镜编排保存到镜头时间线并重新编译");
+    const plan = validateVideoStoryboard(request.storyboard, request.duration);
+    if (model.promptControl === "imageAndCameraOnly" || model.lipSync) throw new Error("当前模型不执行分镜文字指令，请选择支持文字控制的视频模型");
+    assertMultiShotCapability(model, request.mode, plan.shots);
+    const prompt = compileVideoStoryboard(request.prompt, plan);
+    if (/\{\{ref \d+\}\}/.test(prompt)) throw new Error("分镜中存在未解析的素材引用，请重新连接参考");
+    // ACT: 在提交前消费结构化数据，记录与实际请求共用正文；恢复任务不重复追加分镜。
+    return { ...request, storyboard: undefined, prompt, generateAudio: storyboardGenerateAudio(plan, model.audio, request.generateAudio) };
+  } catch (cause) {
+    throw Object.assign(cause instanceof Error ? cause : new Error(String(cause)), { status: 400 });
+  }
+}
 
 export type { SkinFinish } from "@toonflow/tool-media-generation/runtime";
 
@@ -663,6 +679,7 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
       const model = (await listMediaModels()).find(model => model.type === mediaType && model.providerId === request.providerId && model.modelId === request.modelId);
       if (!model) invalid("所选媒体模型不存在或类型不匹配");
       request = await applyMediaQuality(cwd, mediaType, request, model);
+      request = prepareVideoStoryboard(request, model);
       const blocking = request.prompt.includes("BLOCKING:") ? "" : await blockingLine(cwd, request.outputName);
       if (blocking) request = { ...request, prompt: `${blocking}\n\n${request.prompt}` };
     }

@@ -9,7 +9,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline, withHumanPerformance } from "@/utils/media/generation";
+import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline, withHumanPerformance, prepareVideoStoryboard } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection, isSelectedModel, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { assertMultiShotCapability } from "@/utils/media/shotCapabilities";
@@ -108,7 +108,8 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   if (request.purpose === "storyboard" && (kind !== "image" || request.shotId)) throw Object.assign(new Error("多格总览仅用于分镜规划，不绑定正式 shotId；正式镜头请独立生成高清关键帧"), { status: 400 });
   if (request.localRepair && (!request.shotId || kind !== "image")) throw Object.assign(new Error("精修须提供图像镜头 shotId"), { status: 400 });
   if (request.candidateDirection && (!request.shotId || kind !== "image" || request.localRepair)) throw Object.assign(new Error("系列变体仅支持普通镜头关键帧，不能与局部修改同时使用"), { status: 400 });
-  if (!request.shotId && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
+  if (!request.shotId && !request.storyboard && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
+  if (request.storyboard && (kind !== "video" || request.shotId)) throw Object.assign(new Error("正式镜头请先将分镜编排保存到镜头时间线并重新编译"), { status: 400 });
   await assertMediaModelSelection(kind, request, directory);
   const tenant = currentTenant();
   const api = cloud();
@@ -138,6 +139,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
       throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
     }
     request = await applyMediaQuality(directory, kind, request, model);
+    request = prepareVideoStoryboard(request, model);
     if (kind === "video" && model.lipSync) speechSyncInputs = await validateSpeechInputs(directory, request);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
     const spec = isDirectorPrompt(request.prompt) ? "" : compileShotSpec(request.shotSpec);

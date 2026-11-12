@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createAgentModel } from "@/agent/runtime/model";
 import { recordTextUsage } from "@/utils/usage";
+import { storyFrameworkReady, storyExpansionLabels, type StoryProject } from "@toonflow/tool-scene-list/storyProject";
 import { assertModelSelection } from "@/utils/modelSelection";
 import { musicDraftSchema, repairMusicScenes, musicCapacityIssues, renderMusicDraft, reviewMusicExecution } from "@/utils/story/musicExecution";
 
@@ -235,7 +236,7 @@ export async function writeStoryDraft(brief: string, direction: string, provider
   };
 }
 
-export function createStoryWriter(providerId: string, modelId: string, loadInstructions: (signal?: AbortSignal) => Promise<string>, musicFilm = false): ToolDefinition {
+export function createStoryWriter(providerId: string, modelId: string, loadInstructions: (signal?: AbortSignal) => Promise<string>, musicFilm = false, readProject?: () => Promise<StoryProject>): ToolDefinition {
   let attempts = 0;
   return {
     name: "writeStoryDraft", label: "创作故事正文", description: "在独立创作上下文中完成初稿与作者修订，不继承审稿辩论；返回修订草稿，沿用现有计数与审稿交付。",
@@ -243,10 +244,21 @@ export function createStoryWriter(providerId: string, modelId: string, loadInstr
     parameters: z.toJSONSchema(inputSchema), executionMode: "sequential",
     async execute(_id, params, signal) {
       const input = inputSchema.parse(params);
+      const project = await readProject?.();
+      const staged = project && ["story", "serial"].includes(project.brief.kind) && (!project.revisions.length || project.frameworks.length > 0);
+      if (staged) {
+        if (!storyFrameworkReady(project)) throw new Error("先用 updateStoryProject 保存 framework，再调用 requestStoryDecision(confirmFramework) 等待用户确认；尚未确认，不能展开正文");
+        if (project.frameworkApproval!.step !== "draft") throw new Error(`本次只授权${storyExpansionLabels[project.frameworkApproval!.step]}，请按范围创作并用 expansion 保存，不调用完整正文写作器`);
+        input.direction += `\n已确认框架（沿用形式、人物年龄、时间、道具和结局）：\n${JSON.stringify(project.frameworks.at(-1))}`;
+      }
       if (attempts >= 3) throw new Error("本轮三次独立创作已耗尽，请保留稿件并说明未完成部分");
       attempts++;
       const writingMethod = await loadInstructions(signal);
       const details = await writeStoryDraft(input.brief, input.direction, providerId, modelId, signal, writingMethod, musicFilm);
+      if (staged) {
+        const latest = await readProject!();
+        if (!storyFrameworkReady(latest) || JSON.stringify(latest.frameworkApproval) !== JSON.stringify(project.frameworkApproval)) throw new Error("生成期间框架或依据已变化，结果未作为当前展开稿保存");
+      }
       // 节拍草案留在工具详情供追溯；模型上下文只接收本次交付文本。
       const { initialDraft, initialText, revisionDraft, revisionHistory, executionReviews, executionReviewFailure, ...delivery } = details;
       return { content: [{ type: "text", text: JSON.stringify(delivery) }], details };

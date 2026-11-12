@@ -18,9 +18,12 @@ import { IconMaximize } from "@tabler/icons-vue";
 import xSender, { type AnyTagProps, type MentionItem } from "x-sender";
 import "x-sender/lib/XSender.css";
 
-const props = defineProps<{ references: (MentionItem & { value: string })[]; expandable?: boolean }>();
+const props = defineProps<{ references: (MentionItem & { value: string })[]; expandable?: boolean; label?: string }>();
 const model = defineModel<AnyTagProps[][]>({ required: true });
 const text = defineModel<string>("text", { default: "" });
+function replaceText(value: string) { syncModel([[{ type: "Write", text: value }]]); }
+function appendText(value: string) { replaceText([text.value.trimEnd(), value.trim()].filter(Boolean).join("\n")); }
+defineExpose({ replaceText, appendText, expand: () => { expanded.value = true; } });
 const senderElement = ref<HTMLElement>();
 const expanded = ref(false);
 const expandedTarget = ref<HTMLElement>();
@@ -233,7 +236,7 @@ watch(senderElement, (element, _previous, onCleanup) => {
     if (sender === instance && editor.isConnected) await insertNodes(normalizeModel(nodes));
   };
   editor.setAttribute("role", "textbox");
-  editor.setAttribute("aria-label", "生成提示词");
+  editor.setAttribute("aria-label", props.label ?? "生成提示词");
   editor.setAttribute("aria-multiline", "true");
   instance.bus.on("textPrompt", xSender.EventSet.EVENT_COMMON_CHANGE, () => syncModel());
   syncModel(initialModel);

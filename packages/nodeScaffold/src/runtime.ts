@@ -11,4 +11,5 @@ export * from "./nodeTools";
 export * from "./workspaceFiles";
 
 export * from "./nodeAi";
+export { videoStoryboardSchema, validateVideoStoryboard, compileVideoStoryboard, storyboardTimeline, storyboardGenerateAudio, type VideoStoryboard, type VideoStoryboardShot } from "@toonflow/tools-scaffold/runtime";
 export * from "./nodeFfmpeg";

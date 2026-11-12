@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cameraTrajectorySchema } from "@toonflow/tools-scaffold/runtime";
+import { cameraTrajectorySchema, videoStoryboardSchema } from "@toonflow/tools-scaffold/runtime";
 import { techniquePlan } from "./filmTechniques";
 
 export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia, MediaContext } from "@toonflow/tools-scaffold/runtime";
@@ -229,6 +229,7 @@ export const imageGenerationSchema = z.strictObject({
   quality: z.string().trim().min(1).max(64).optional().describe("图片画质档位（如 high），仅按供应商支持的值传入；与 size 输出尺寸不同。"),
 });
 export const videoGenerationSchema = z.strictObject({
+  storyboard: videoStoryboardSchema.optional(),
   cameraTrajectory: cameraTrajectorySchema.optional(),
   imageAndCameraOnly: z.boolean().optional(),
   ...sharedFields,

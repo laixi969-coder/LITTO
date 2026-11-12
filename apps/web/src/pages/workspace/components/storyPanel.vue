@@ -43,10 +43,29 @@
           </article>
         </template>
         <template v-if="section === 'directions'">
+          <template v-if="['story', 'serial'].includes(brief.kind)">
+            <p>先看故事框架，确认后再展开你选定的部分。</p>
+            <el-button :disabled="!modelKey || !brief.idea.trim() && !project.sources.length" @click="run(() => generate('framework'))">{{ framework ? '重新构思框架' : '生成故事框架' }}</el-button>
+            <article v-if="framework">
+              <label>标题<input v-model="frameworkEdit.title" /></label>
+              <label>作品形式<input v-model="frameworkEdit.format" /></label>
+              <label>故事框架<textarea v-model="frameworkEdit.content" rows="14" /></label>
+              <el-button :disabled="!frameworkDirty && framework.basis === storyFrameworkBasis(project)" @click="run(saveFramework)">保存修改，重新确认</el-button>
+              <p>{{ frameworkReady ? '框架已确认' : '框架待确认；确认前不会展开正文' }}</p>
+              <label>下一步<select v-model="expansionStep"><option value="sample">先写代表场次</option><option v-if="brief.kind === 'serial'" value="episodes">展开分集大纲</option><option value="draft">展开完整正文</option></select></label>
+              <el-button :disabled="frameworkDirty || !modelKey" @click="run(expandFramework)">{{ frameworkReady && project.frameworkApproval?.step === expansionStep ? '继续：' : '确认框架并' }}{{ storyExpansionLabels[expansionStep] }}</el-button>
+              <p v-if="framework.basis !== storyFrameworkBasis(project)" class="errorMessage">作品目标、方向或资料已变化，请重新构思或保存修订后的框架。</p>
+            </article>
+            <article v-for="(item, index) in project.expansions.filter(item => item.frameworkId === framework?.id)" :key="index"><h3>{{ storyExpansionLabels[item.step] }}</h3><div class="frameworkText">{{ item.text }}</div></article>
+            <details v-if="project.frameworks.length > 1"><summary>历史框架（{{ project.frameworks.length - 1 }}）</summary><article v-for="item in project.frameworks.slice(0, -1)" :key="item.id"><h3>{{ item.title }} · {{ item.format }}</h3><div class="frameworkText">{{ item.content }}</div></article></details>
+          </template>
+          <details>
+          <summary>探索其他创意方向</summary>
           <p>比较少量真正不同的创意方向，选定后再发展为完整故事。已有定稿可在剧本页直接导入。</p>
           <el-button :disabled="!modelKey || !brief.idea.trim() && !project.sources.length" @click="run(() => generate('directions'))">生成 2–3 个创意方向</el-button>
           <article v-for="direction in project.directions" :key="direction.id"><h3>{{ direction.title }}</h3><p>{{ direction.premise }}</p><p>观众为什么在意：{{ direction.audienceReason }}</p><p>代表性场面：{{ direction.signatureScene }}</p><p>制作难点：{{ direction.risk }}</p><el-button :disabled="project.directionId === direction.id" @click="run(() => apply({ type: 'chooseDirection', id: direction.id }))">{{ project.directionId === direction.id ? '已采用此方向' : '采用此方向' }}</el-button></article>
-          <el-button :disabled="!project.directionId || !modelKey" @click="run(() => generate('draft'))">按选定方向写剧本</el-button>
+          <el-button v-if="!['story', 'serial'].includes(brief.kind)" :disabled="!project.directionId || !modelKey" @click="run(() => generate('draft'))">按选定方向写剧本</el-button>
+          </details>
         </template>
         <template v-if="section === 'script' || section === 'preview'">
           <div class="toolbar"><label>故事版本<select :value="revisionId" :disabled="childBusy" @change="run(() => selectRevision(($event.target as HTMLSelectElement).value))"><option value="">选择版本</option><option v-for="(item, index) in project.revisions" :key="item.id" :value="item.id">版本 {{ index + 1 }} · {{ item.title }}{{ item.id === project.approvedId ? ' · 已采用' : '' }}</option></select></label></div>
@@ -150,6 +169,7 @@ import { createSourceAttachments } from "@/components/agent/sourceAttachments";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
 import storyPreview from "./storyPreview.vue";
 import storyFeedback from "./storyFeedback.vue";
+import { storyFrameworkBasis, storyFrameworkReady, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
 import visualReferenceBoard from "./visualReferenceBoard.vue";
 
 const props = defineProps<{ directory: string }>();
@@ -158,6 +178,29 @@ const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ settings: []; produce: [revisionId: string, model: string] }>();
 const directory = props.directory, files = useWorkspaceFiles(directory), ai = useNodeAi();
 const project = ref(newStoryProject()), brief = ref(newStoryProject().brief);
+const framework = computed(() => project.value.frameworks.at(-1));
+const frameworkReady = computed(() => storyFrameworkReady(project.value));
+const frameworkEdit = ref({ title: "", format: "", content: "" });
+const expansionStep = ref<"sample" | "episodes" | "draft">("sample");
+const frameworkDirty = computed(() => !!framework.value && ["title", "format", "content"].some(key => frameworkEdit.value[key as keyof typeof frameworkEdit.value] !== framework.value![key as keyof typeof frameworkEdit.value]));
+watch(() => framework.value?.id, () => {
+  const current = framework.value;
+  frameworkEdit.value = current ? { title: current.title, format: current.format, content: current.content } : { title: "", format: "", content: "" };
+});
+async function saveFramework() {
+  await saveBrief();
+  await apply({ type: "framework", value: { ...frameworkEdit.value } });
+}
+async function expandFramework() {
+  await saveBrief();
+  if (!framework.value || frameworkDirty.value) throw new Error("请先保存框架修改");
+  if (!frameworkReady.value || project.value.frameworkApproval?.step !== expansionStep.value) await apply({ type: "confirmFramework", id: framework.value.id, step: expansionStep.value });
+  if (expansionStep.value === "draft") return generate("draft");
+  const frameworkId = framework.value.id, step = expansionStep.value;
+  await modelAction("expansion", `仅${storyExpansionLabels[step]}，保留已确认框架的作品形式、人物、时间与道具。frameworkId=${frameworkId}，step=${step}。分集大纲按已定集数逐集交代主线、揭示与钩子；代表场次写一场完整动作和对白，不写全篇。`, undefined, action => {
+    if (action.type !== "expansion" || action.frameworkId !== frameworkId || action.step !== step) throw new Error("展开范围与确认不符");
+  });
+}
 const newId = () => crypto.randomUUID();
 const loaded = ref(false), busy = ref(false), childBusy = ref(false), error = ref(""), message = ref("");
 const section = ref("sources"), models = ref<NodeAiModel[]>([]), modelKey = ref("");
@@ -172,7 +215,7 @@ const manualQuality = ref<NonNullable<StoryProject["reviews"][number]["quality"]
 });
 const previewRef = ref<InstanceType<typeof storyPreview>>(), feedbackRef = ref<InstanceType<typeof storyFeedback>>();
 let controller: AbortController | undefined;
-const tabs = [{ id: "sources", label: "目标与资料" }, { id: "directions", label: "创意方向" }, { id: "script", label: "剧本与审稿" }, { id: "visual", label: "视觉参考" }, { id: "preview", label: "动态分镜" }, { id: "feedback", label: "发布反馈" }];
+const tabs = [{ id: "sources", label: "目标与资料" }, { id: "directions", label: "框架与展开" }, { id: "script", label: "剧本与审稿" }, { id: "visual", label: "视觉参考" }, { id: "preview", label: "动态分镜" }, { id: "feedback", label: "发布反馈" }];
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === modelKey.value));
 const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "shortDramaCommerce", label: "短剧带货" }, { value: "musicFilm", label: "音乐影像" }];
 const briefFields = [{ key: "idea", label: "想法 / 创作需求" }, { key: "audience", label: "谁会看 / 在什么情境下看" }, { key: "channel", label: "观看渠道" }, { key: "intent", label: "希望观众感受什么或做什么" }, { key: "genre", label: "类型" }, { key: "tone", label: "语气与风格" }, { key: "ending", label: "结尾选择" }, { key: "constraints", label: "不可改变的内容与制作预算 / 限制" }] as const;
@@ -188,7 +231,7 @@ const quantityClaims = computed(() => findStoryQuantityClaims(revisionText.value
 const logicReports = computed(() => Object.fromEntries(reviews.value.map(review => [review.id, inspectStoryLogic(revisionText.value, review.logic, requiresStoryRuleValidation(`${revision.value?.brief.idea ?? ""}\n${revision.value?.brief.genre ?? ""}`))])));
 const draftDirty = computed(() => !!draft.value && JSON.stringify(draft.value) !== savedDraft.value);
 const impact = computed(() => { const current = revision.value, parent = project.value.revisions.find(item => item.id === current?.parentId); return current && parent ? storyImpact(parent, current) : undefined; });
-const progress = computed(() => project.value.approvedId ? "已有采用版本，可制作预演并继续局部修改。" : project.value.revisions.length ? "已有故事候选，可按需审阅后采用。" : project.value.directionId ? "方向已确定，下一步发展剧本。" : "先说明作品目标或上传资料。" );
+const progress = computed(() => project.value.approvedId ? "已有采用版本，可制作预演并继续局部修改。" : project.value.revisions.length ? "已有故事候选，可按需审阅后采用。" : framework.value ? frameworkReady.value ? "框架已确认，按你选择的范围继续展开。" : "框架待确认，请在「框架与展开」中审阅并选择下一步。" : "先说明作品目标或上传资料，再生成故事框架。" );
 async function apply(action: StoryAction) { project.value = await updateStory(directory, project.value.version, action); message.value = "已保存；旧版本保留"; }
 async function run(action: () => Promise<void>) {
   if (busy.value || childBusy.value) return;
@@ -232,7 +275,7 @@ async function saveDraft() {
   await saveBrief(); await apply({ type: "draft", value: draft.value, parentId: revisionId.value || undefined });
   revisionId.value = project.value.revisions.at(-1)!.id; loadDraft();
 }
-async function flushEdits() { await previewRef.value?.flushSave(); feedbackRef.value?.flushSave(); if (sourceEdit.value) throw new Error("资料校正尚未保存，请保存或取消校正后继续"); await saveBrief(); if (draftDirty.value) await saveDraft(); }
+async function flushEdits() { if (frameworkDirty.value) await saveFramework(); await previewRef.value?.flushSave(); feedbackRef.value?.flushSave(); if (sourceEdit.value) throw new Error("资料校正尚未保存，请保存或取消校正后继续"); await saveBrief(); if (draftDirty.value) await saveDraft(); }
 async function switchSection(value: string) { await flushEdits(); section.value = value; }
 async function selectRevision(value: string) { await flushEdits(); revisionId.value = value; loadDraft(); }
 async function newDraft() { await flushEdits(); revisionId.value = ""; draft.value = { title: "", outline: "", scenes: [], canon: [], threads: [] }; savedDraft.value = JSON.stringify(draft.value); addScene(); }
@@ -266,7 +309,7 @@ async function modelAction(type: StoryAction["type"], instruction: string, refer
   const version = project.value.version;
   let saved = false;
   const [productionContext, instructions] = await Promise.all([readStoryProductionContext(directory), readStoryInstructions(directory)]);
-  const context = { productionContext, visualReferences: resolveVisualBoard(project.value.visualBoard), brief: project.value.brief, sources: project.value.sources, direction: project.value.directions.find(item => item.id === project.value.directionId), draft: revision.value, accepted: project.value.revisions.find(item => item.id === project.value.approvedId), reviews: reviews.value, releases: type === "learning" ? project.value.releases.slice(-50) : undefined, learnings: project.value.learnings.slice(-10) };
+  const context = { framework: framework.value, frameworkApproval: project.value.frameworkApproval, expansions: project.value.expansions.filter(item => item.frameworkId === framework.value?.id), productionContext, visualReferences: resolveVisualBoard(project.value.visualBoard), brief: project.value.brief, sources: project.value.sources, direction: project.value.directions.find(item => item.id === project.value.directionId), draft: revision.value, accepted: project.value.revisions.find(item => item.id === project.value.approvedId), reviews: reviews.value, releases: type === "learning" ? project.value.releases.slice(-50) : undefined, learnings: project.value.learnings.slice(-10) };
   const specializedGuide = project.value.brief.kind === "musicFilm" ? musicFilmWritingGuide : project.value.brief.kind === "serial" ? shortDramaWritingGuide : "";
   const systemPrompt = `${instructions}\n\n${storyWritingGuide}\n${specializedGuide}\n本次只执行请求的操作，并通过 saveStoryResult 保存对应结构。审稿逐一核对独立戏剧场景，引用指定版本正文，coverage 只记实际读过的场次；不代用户采用。`;
   if (type === "review") { context.reviews = []; context.learnings = []; }
@@ -304,11 +347,13 @@ async function analyzeSource(source: StoryProject["sources"][number]) {
     if (coverage) { action.value.coverage = coverage; action.value.unknowns.push("未分析声音与非采样画面，不能作为全片理解"); }
   });
 }
-async function generate(type: "directions" | "draft" | "review" | "rewrite") {
+async function generate(type: "framework" | "directions" | "draft" | "review" | "rewrite") {
   await saveBrief();
   if (draftDirty.value) await saveDraft();
   const id = revisionId.value;
+  if (type === "draft" && ["story", "serial"].includes(project.value.brief.kind) && (!frameworkReady.value || project.value.frameworkApproval?.step !== "draft")) throw new Error("请先确认框架并选择展开完整正文");
   const instructions = {
+    framework: "只构思一份可审阅故事框架，不写完整正文。value 包含 title、format、content；content 依次交代一句话故事、人物与锁定事实、主要段落或三幕、伏笔与揭示、结尾。沿用用户指定形式与已选方向，未指定篇幅不自定长剧。",
     directions: "生成 2–3 个真正不同的方向。资料未读部分明确标未知，信息不足时给假设，不要求用户填写专业参数。",
     draft: `按照已选择的方向写完整可视听剧本和简洁大纲，按目标时长控制台词与场次；parentId=${id || "未指定"}。`,
     review: `审阅版本 ${id}，记录实际阅读的场次与重要问题。检查是否符合用户要求，以及关键人物行动、因果和结尾是否可理解；区分明确矛盾、理解风险与审美建议。问题引用对应场次的正文原句；无需问题时 issues 留空，quality 和 logic 可省略。`,
@@ -358,6 +403,7 @@ defineExpose({ flushSave });
 
 <style scoped lang="scss">
 .storyPanel {
+  .frameworkText { white-space: pre-wrap; line-height: 1.8; overflow-wrap: anywhere; }
   color: var(--studioInk);
   p { line-height: 1.7; overflow-wrap: anywhere; } .hint { color: var(--studioMuted); font-size: 13px; } .errorMessage { color: var(--studioAttention); }
   nav, .toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 16px 0; }

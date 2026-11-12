@@ -871,6 +871,7 @@ async function insertSnapshot(snapshot: { nodes: Node[]; edges: Edge[] }, positi
   await canvasHistory.batch(async () => {
     flow.removeSelectedElements();
     addNodes(snapshot.nodes.map(node => ({ ...node, id: ids.get(node.id)!, parentNode: ids.get(node.parentNode ?? ""), selected: true,
+      data: { ...node.data, ...(Array.isArray(node.data.storyboardReferences) ? { storyboardReferences: node.data.storyboardReferences.map((item: { source: string; sourceHandle: string }) => ({ ...item, source: ids.get(item.source) ?? item.source })) } : {}) },
       position: node.parentNode ? node.position : { x: position.x + node.position.x - left, y: position.y + node.position.y - top } })));
     await nextTick();
     signal.throwIfAborted();

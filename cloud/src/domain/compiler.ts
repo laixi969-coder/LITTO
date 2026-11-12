@@ -17,6 +17,7 @@ import { cleanVisualDefaults, characterReferenceUse, effectiveLook, lookReferenc
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 import { speechPlanningIssues, shotDialogueMode } from "./speechPlanning.ts";
 import { requireReviewed } from "./realism.ts";
+import { storyboardDescription } from "@toonflow/tools-scaffold/runtime";
 
 const FLUFF = /\b(8k|4k|ultra[- ]?realistic|hyper[- ]?realistic|photorealistic|cinematic|masterpiece|perfect|best quality|highly detailed)\b/gi;
 /** "8K / ultra realistic / cinematic / perfect" are not a realism strategy (PRD §11). Strip them and report. */
@@ -279,6 +280,14 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
 
     const cam = shot.camera ?? {}, lt = shot.lighting ?? {};
     const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
+    const executionTimeline = (cam.design?.timeline ?? musicVideo?.timeline ?? []) as NonNullable<NonNullable<ShotInput["camera"]["design"]>["timeline"]>;
+    const timed = (key: "lensMm" | "aperture" | "cameraMove" | "foreground" | "background") => kind === "video" && executionTimeline.some(item => item[key] !== undefined && String(item[key]).trim() !== "");
+    const timelineDescription = (item: typeof executionTimeline[number]) => storyboardDescription({ ...item,
+        lensMm: timed("lensMm") ? item.lensMm ?? cam.lensMm : item.lensMm,
+        cameraMove: timed("cameraMove") ? item.cameraMove?.trim() || cam.design?.cameraPath || cam.motion : item.cameraMove,
+        foreground: timed("foreground") ? item.foreground?.trim() || shot.blocking?.foreground : item.foreground,
+        background: timed("background") ? item.background?.trim() || shot.blocking?.background : item.background,
+    });
     musicSource(s, shot, kind === "video");
     const lock: string[] = [...(shot.freedomMap?.LOCK ?? [])];
     for (const a of assets) {
@@ -324,13 +333,13 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             ? `Continuity ledger for present subjects, not additional action instructions. Retain compatible injuries, identity and prop ownership; previous poses or contacts may predate this shot. Follow the explicit starting state and current causal action order; never reinstate completed contact, restore lost power or replay an earlier event to fill speech: ${JSON.stringify(start)}` : "",
         shotConnection: shot.continuity ? `本镜跨镜关系 ${shot.continuity.mode}；起始画面承接要求：${shot.continuity.visual}。这是本镜起点约束，不重演前镜事件、不生成额外转场。${shot.continuity.mode === "coverage" ? "按本镜新机位保持空间、视线和动作阶段，不照搬前镜构图。" : ""}` : "",
         blocking: J([
-            (kind === "video" || !cam.design?.start) && shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`,
+            !timed("foreground") && (kind === "video" || !cam.design?.start) && shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`,
             (kind === "video" || !cam.design?.start) && shot.blocking?.midground && `midground: ${shot.blocking.midground}`,
-            (kind === "video" || !cam.design?.start) && shot.blocking?.background && `background: ${shot.blocking.background}`,
+            !timed("background") && (kind === "video" || !cam.design?.start) && shot.blocking?.background && `background: ${shot.blocking.background}`,
         ]),
         view: viewText,
         // ACT: 完整路线优先于旧运动摘要，避免默认 static 冲突；语义一致性由导演复核，不用关键词猜轨迹。
-        camera: J([`${cam.shotSize} shot`, `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && !cam.design?.cameraPath?.trim() && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
+        camera: J([`${cam.shotSize} shot`, !timed("lensMm") && `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, !timed("aperture") && cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && !timed("cameraMove") && !cam.design?.cameraPath?.trim() && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
         lighting: J([lt.worldSource && `fixed world light source: ${lt.worldSource}`, lt.keyDirection && lt.keyDirection !== "none" && `key direction ${lt.keyDirection} in ${lt.directionSpace ?? "screen"} coordinates`, lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
         world: world ? J([world.realism && `medium: ${world.realism}`, world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
         look: J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette.length > 0 && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`, look.shadowBehavior && `shadow behavior ${look.shadowBehavior}`, look.bloom && `bloom ${look.bloom}`, look.texture && `material texture ${look.texture}`, look.sharpnessPhilosophy && `sharpness philosophy ${look.sharpnessPhilosophy}`]),
@@ -355,7 +364,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     };
     if (kind === "video") {
         if (cam.design?.timeline) {
-            sections.timeline = cam.design.timeline.map((item: { editId?: string; start: number; end: number; description: string; transition?: string }) => `【${item.start}-${item.end}s${item.editId ? ` · 源镜号 ${item.editId}` : ""} · ${item.transition === "cut" ? "切镜" : "连续动作"}】${item.description}`).join("\n");
+            sections.timeline = executionTimeline.map(item => `【${item.start}-${item.end}s${item.editId ? ` · 源镜号 ${item.editId}` : ""} · ${item.transition === "cut" ? "切镜" : "连续动作"}】${timelineDescription(item)}`).join("\n");
         }
         // ACT: 时间线组织执行节拍，已写明的触发与时序仍保留；验收标准、备用方案和跨镜剪点不作为生成动作。
         sections.shotDesign = cam.design ? J([
@@ -363,7 +372,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             cam.design.start && `Starting state: ${cam.design.start}`,
             cam.design.end && `Ending state: ${cam.design.end}`,
             cam.design.subjectPath !== shot.action && cam.design.subjectPath && `Subject path: ${cam.design.subjectPath}`,
-            cam.design.cameraPath && `Camera path: ${cam.design.cameraPath}`,
+            !timed("cameraMove") && cam.design.cameraPath && `Camera path: ${cam.design.cameraPath}`,
             cam.design.invariants?.length && `Invariants: ${cam.design.invariants.join("; ")}`,
         ]) : "";
         sections.motionTiming = J([
@@ -377,7 +386,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }
     let negativePrompt = J(shotAvoid(freedom));
     if (kind === "video" && musicVideo) {
-        const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}${item.editId ? ` · 源镜号 ${item.editId}` : ""}${item.transition ? ` · ${item.transition === "cut" ? "切镜" : "连续动作"}` : ""}】${item.description}`).join("\n");
+        const timeline = musicVideo.timeline.map(item => `【${musicTimecode(item.start)}-${musicTimecode(item.end)}${item.editId ? ` · 源镜号 ${item.editId}` : ""}${item.transition ? ` · ${item.transition === "cut" ? "切镜" : "连续动作"}` : ""}】${timelineDescription(item)}`).join("\n");
         const audio = J([
             musicVideo.audioMode === "sourceTrack" && `原曲从 ${musicVideo.sourceStart}s 起对应本段 0s；最终剪辑沿用同一原曲，不在切镜处重启或重作歌曲`,
             musicVideo.audioMode === "generated" && "按以下声音设计生成本段声音；未要求音乐时不要自行配乐",

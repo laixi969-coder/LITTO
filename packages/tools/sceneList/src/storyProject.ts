@@ -22,6 +22,13 @@ export const storySourceSchema = z.strictObject({
   coverage: text(2000), unknowns: z.array(text(500)).max(50),
 });
 export const storyDirectionSchema = z.strictObject({ id, title: text(100).min(1), premise: text().min(1), audienceReason: text().min(1), signatureScene: text().min(1), risk: text().min(1) });
+export const storyFrameworkSchema = z.strictObject({
+  title: text(150).min(1),
+  format: text(300).min(1).describe("沿用用户指定的电影、短片或剧集形式及篇幅，不自行更改"),
+  content: text(20000).min(1).describe("可读的故事框架：一句话故事、人物及锁定事实、主要段落或三幕、信息揭示与伏笔、结尾；不是完整正文"),
+});
+export const storyExpansionSchema = z.enum(["sample", "episodes", "draft"]);
+export const storyExpansionLabels = { sample: "先写代表场次", episodes: "展开分集大纲", draft: "展开完整正文" };
 export const storySceneSchema = z.strictObject({
   sceneId: z.string().regex(/^s\d{2,3}$/), title: text(150).min(1), text: text(12000).min(1),
   episodeNumber: z.number().int().min(1).max(100).optional().describe("连载场次所属集号；跨集仍保留唯一 sceneId"),
@@ -69,6 +76,9 @@ export const storyProjectSchema = z.strictObject({
   littoStory: z.literal(1), version: z.number().int().nonnegative(), brief: storyBriefSchema,
   visualBoard: visualBoardSchema.default([]),
   sources: z.array(source).max(100), directions: z.array(storyDirectionSchema).max(3), directionId: id.optional(),
+  frameworks: z.array(storyFrameworkSchema.extend({ id, createdAt: z.string(), basis: z.string() })).max(100).default([]),
+  frameworkApproval: z.strictObject({ id, step: storyExpansionSchema }).optional(),
+  expansions: z.array(z.strictObject({ frameworkId: id, step: z.enum(["sample", "episodes"]), text: text(30000).min(1), createdAt: z.string() })).max(100).default([]),
   revisions: z.array(revision).max(200), approvedId: id.optional(), reviews: z.array(review).max(300),
   boards: z.record(z.string(), z.array(storyBoardSchema).max(100)),
   previews: z.array(z.strictObject({ id, revisionId: id, sourceKey: text(100000).min(1), media, createdAt: z.string() })).max(200),
@@ -89,6 +99,9 @@ export const storyActionSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("confirmSource"), id }),
   z.strictObject({ type: z.literal("directions"), values: z.array(storyDirectionSchema).min(2).max(3) }),
   z.strictObject({ type: z.literal("chooseDirection"), id }),
+  z.strictObject({ type: z.literal("framework"), value: storyFrameworkSchema }),
+  z.strictObject({ type: z.literal("confirmFramework"), id, step: storyExpansionSchema }),
+  z.strictObject({ type: z.literal("expansion"), frameworkId: id, step: z.enum(["sample", "episodes"]), text: text(30000).min(1) }),
   z.strictObject({ type: z.literal("draft"), value: storyDraftSchema, parentId: id.optional().describe("仅传已有故事版本的 id，不是方向 id；第一版省略。保存后从返回的 revisions 中读取新版本 id") }),
   z.strictObject({ type: z.literal("review"), value: storyReviewSchema }),
   z.strictObject({ type: z.literal("decideIssue"), reviewId: id, issueId: id, reason: text(2000).min(1) }),
@@ -113,6 +126,7 @@ export function applyStoryTextEdits(text: string, edits: { before: string; after
   return text;
 }
 export const storyDecisionSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("confirmFramework"), id }).describe("展示指定框架，让用户确认并选择下一步；不得自动确认"),
   z.strictObject({ type: z.literal("confirmSource"), id }),
   z.strictObject({ type: z.literal("chooseDirection"), reconsider: z.boolean().optional() }).describe("展示已保存的全部方向供选择，不要传 id；已有选择直接复用"),
   z.strictObject({ type: z.literal("decideIssue"), reviewId: id, issueId: id, reason: text(2000).min(1) }),
@@ -122,7 +136,14 @@ export function storyActionParameters(type: StoryAction["type"]) {
   return z.toJSONSchema(storyActionSchema.options.find(option => option.shape.type.value === type)!, { io: "input", target: "draft-07" });
 }
 export function newStoryProject(): StoryProject {
-  return { littoStory: 1, version: 0, visualBoard: [], brief: { kind: "story", idea: "", audience: "", channel: "", intent: "", genre: "", tone: "", ending: "", duration: 60, constraints: "" }, sources: [], directions: [], revisions: [], reviews: [], boards: {}, previews: [], releases: [], learnings: [], approvals: [] };
+  return { littoStory: 1, version: 0, visualBoard: [], brief: { kind: "story", idea: "", audience: "", channel: "", intent: "", genre: "", tone: "", ending: "", duration: 60, constraints: "" }, frameworks: [], expansions: [], sources: [], directions: [], revisions: [], reviews: [], boards: {}, previews: [], releases: [], learnings: [], approvals: [] };
+}
+export function storyFrameworkBasis(project: StoryProject) {
+  return JSON.stringify([project.brief, project.directions.find(item => item.id === project.directionId), project.sources.map(item => [item.id, item.fingerprint, item.confirmed])]);
+}
+export function storyFrameworkReady(project: StoryProject) {
+  const framework = project.frameworks.at(-1);
+  return !!framework && framework.id === project.frameworkApproval?.id && framework.basis === storyFrameworkBasis(project);
 }
 export function storyBoard(project: StoryProject, revisionId: string) {
   const revision = project.revisions.find(item => item.id === revisionId);

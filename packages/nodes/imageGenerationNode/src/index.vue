@@ -34,7 +34,7 @@
           v-model="refList"
           @preview="setReferencePreview"
           @remove="removeReference" />
-        <promptInput v-model="data.promptModel" v-model:text="data.prompt" :references="referenceMentions" expandable />
+        <promptInput ref="promptEditor" v-model="data.promptModel" v-model:text="data.prompt" :references="referenceMentions" expandable />
         <div class="promptFooter">
           <el-select
             v-model="data.model"
@@ -64,10 +64,11 @@
             :disabled="generating || deleting || !selectedModel"
             @update:size="setImageSize"
             @update:ratio="setImageRatio" />
+          <promptTools :text="data.prompt" mediaType="image" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
-            :disabled="deleting || uploading || (!generating && (!generationPrompt || !selectedModel))"
+            :disabled="deleting || uploading || toolsBusy || (!generating && (!generationPrompt || !selectedModel))"
             :title="generating ? '停止生成' : '生成图片'"
             :aria-label="generating ? '停止生成' : '生成图片'"
             @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration().catch((error) => showNodeError(error, '图片生成失败'))" />
@@ -88,6 +89,7 @@ import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImage
 import { IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
 import { groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeImageRequest, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
+import promptTools from "@toonflow/nodes-scaffold/promptTools";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import mediaHistory from "@toonflow/nodes-scaffold/mediaHistory";
 import generationSettings from "./components/generationSettings.vue";
@@ -101,6 +103,8 @@ defineOptions({
   ] satisfies NodeHandle[],
 });
 const vLoading = ElLoading.directive;
+const promptEditor = ref<InstanceType<typeof promptInput>>();
+const toolsBusy = ref(false);
 const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals } = useNode({
   label: "图片生成",
 });
@@ -237,6 +241,7 @@ function loadModels() {
 }
 
 async function startGeneration() {
+  if (toolsBusy.value) throw new Error("请先结束提示词增强或语音输入");
   const choice = selectedModel.value;
   if (generating.value) throw new Error("图片正在生成，请等待完成");
   if (uploading.value) throw new Error("图片正在替换，请等待完成");
@@ -451,6 +456,7 @@ nodeTools.register({
 
 .promptCard {
   .promptFooter {
+    flex-wrap: wrap;
     display: flex;
     align-items: center;
     justify-content: flex-start;

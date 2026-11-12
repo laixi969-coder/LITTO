@@ -75,6 +75,9 @@ const actionTimelineSchema = z.array(z.object({
     editId: z.string().trim().min(1).max(120).optional().describe("源剪辑镜号；一个生成段可包含多个剪辑镜头，同一镜号可跨多个动作节拍"),
     start: z.number().finite().nonnegative(), end: z.number().finite().positive(),
     description: z.string().trim().min(1).max(4000),
+    foreground: z.string().max(2000).optional(), background: z.string().max(2000).optional(),
+    lensMm: z.number().finite().positive().max(2000).optional(), aperture: z.number().finite().min(0.5).max(64).optional(),
+    cameraMove: z.string().max(2000).optional(),
     transition: z.enum(["continuous", "cut"]).optional(),
 }).strict()).min(1).max(120).superRefine((items, context) => {
     items.forEach((item, index) => {
