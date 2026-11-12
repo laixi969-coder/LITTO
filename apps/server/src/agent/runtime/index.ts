@@ -184,10 +184,10 @@ export async function run(
       }),
     }));
     const storyProject = await readStoryProject(cwd);
-    const musicFilm = /\bmv\b|musicfilm|音乐视频|音乐短片|音乐电影/i.test(taskIntent)
-      || !/\/skill:story\b/.test(taskIntent) && (storyProject.revisions.find(item => item.id === storyProject.approvedId)?.brief.kind ?? storyProject.brief.kind) === "musicFilm";
+    const musicFilm = storyProject.brief.kind !== "shortDramaCommerce" && (/\bmv\b|musicfilm|音乐视频|音乐短片|音乐电影/i.test(taskIntent)
+      || !/\/skill:story\b/.test(taskIntent) && (storyProject.revisions.find(item => item.id === storyProject.approvedId)?.brief.kind ?? storyProject.brief.kind) === "musicFilm");
     // ACT: MV 入口与简短续作也保留编剧能力；是否写剧情由已选方向决定，不强制纯演唱创作故事。
-    if (musicFilm || /故事|剧本|剧情|短剧|爽剧|悬疑剧|剧集|story/i.test(taskIntent)) tools.push(createStoryWriter(providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm), musicFilm));
+    if (musicFilm || storyProject.brief.kind === "shortDramaCommerce" || /故事|剧本|剧情|短剧|爽剧|悬疑剧|剧集|story/i.test(taskIntent)) tools.push(createStoryWriter(providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm), musicFilm));
     if (prepareTools) tools = prepareTools(tools);
     const planning = enforceStoryDelivery ? createStoryPlanning(storyTask, providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm)) : undefined;
     const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();

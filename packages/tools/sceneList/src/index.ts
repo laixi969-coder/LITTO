@@ -50,6 +50,7 @@ const plugin: ToolPlugin = {
       const approved = project.revisions.find(item => item.id === project.approvedId);
       if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先调用 requestStoryApproval 在聊天中确认采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
       if (JSON.stringify(value.scenes.map(item => item.sceneId)) !== JSON.stringify(approved.scenes.map(item => item.sceneId))) rejected(["场次表须按已采用剧本的顺序保留全部 sceneId"]);
+      if (project.brief.kind === "shortDramaCommerce" && value.kind !== "shortDramaCommerce") rejected(["短剧带货的场次表 kind 必须为 shortDramaCommerce"]);
       if (project.brief.kind === "musicFilm") {
         if (value.kind !== "musicFilm") rejected(["MV 的场次表 kind 必须为 musicFilm"]);
         for (const [index, scene] of value.scenes.entries()) {

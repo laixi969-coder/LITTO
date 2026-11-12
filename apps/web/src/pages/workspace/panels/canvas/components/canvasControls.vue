@@ -10,6 +10,7 @@
   <panel position="bottom-left">
     <el-card shadow="never" :bodyStyle="{ padding: '4px' }">
       <div class="canvasControls">
+        <el-button class="castingButton" text aria-label="画布选角色" @click="emit('casting')"><icon-users :size="17" />选角色</el-button>
         <el-tooltip :showArrow="false" :content="assetsVisible ? '关闭素材库' : '打开素材库'" placement="top" :hideAfter="0" :enterable="false" :triggerKeys="[]">
           <el-button
             class="toolButton"
@@ -130,7 +131,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Panel, useVueFlow, type XYPosition } from "@vue-flow/core";
 import { MiniMap } from "@vue-flow/minimap";
-import { IconMap, IconMagnet, IconFocusCentered, IconMinus, IconPlus, IconLayoutGrid } from "@tabler/icons-vue";
+import { IconMap, IconMagnet, IconFocusCentered, IconMinus, IconPlus, IconLayoutGrid, IconUsers } from "@tabler/icons-vue";
 import { ElMessage } from "element-plus";
 import { arrangeCanvas, arrangeResults } from "../arrangeCanvas";
 
@@ -139,6 +140,7 @@ const props = defineProps<{
   directory: string | undefined;
   batchHistory: (action: () => Promise<void>) => Promise<void>;
 }>();
+const emit = defineEmits<{ casting: [] }>();
 const snapEnabled = defineModel<boolean>("snapEnabled", { required: true });
 const showEdges = defineModel<boolean>("showEdges", { required: true });
 const assetsVisible = defineModel<boolean>("assetsVisible", { default: false });

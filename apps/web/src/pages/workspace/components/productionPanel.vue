@@ -6,7 +6,7 @@
       <nav class="productionTabs" aria-label="制作步骤">
         <button v-for="item in tabs" :key="item.id" type="button" :aria-pressed="section === item.id" @click="section = item.id">{{ item.label }}</button>
       </nav>
-      <fieldset :disabled="busy || !projectId">
+      <fieldset :disabled="busy || castingBusy || !projectId">
         <template v-if="section === 'world'">
           <h3>世界与影调</h3>
           <div class="fieldGrid">
@@ -21,6 +21,8 @@
           </nav>
           <h3>跨项目资产库</h3>
           <p class="reviewHint">上传照片或生成定妆图，保存并采用资产后收藏。资产库独立保存参考图，各项目导入后可单独修改；按上方类型分别查看人物、场景与道具。</p>
+          <characterPicker v-if="assetTypeFilter === 'Character'" v-model="selectedCharacters" :projectId="projectId" :existingIds="importedCharacterIds" :disabled="busy" @busy="castingBusy = $event" @imported="run(refreshAssetLibrary)" />
+          <details class="libraryManagement" :open="assetTypeFilter !== 'Character'"><summary>管理资产库（收藏、筛选与删除）</summary>
           <details class="libraryFilters"><summary>搜索与筛选</summary>
             <div class="fieldGrid">
               <label>名称或描述<input v-model="libraryFilter.q" @keyup.enter="run(searchLibraryAssets)" /></label>
@@ -34,10 +36,11 @@
             <figure v-if="entry.media"><el-image class="libraryPortrait" :src="mediaUrl(entry.media.url)" :alt="entry.name" :previewSrcList="(entry.images?.length ? entry.images : [entry.media]).map((image: any) => mediaUrl(image.url))" :previewTeleported="true" fit="contain" /></figure>
             <div class="libraryMeta"><strong>{{ entry.name }}</strong><span>{{ assetTypeLabel(entry.type) }} · {{ entry.images?.length || 1 }} 张参考图 · 复用 {{ entry.reuseCount }} 次<template v-if="hasPersonaTags(entry.personaTags)"> · {{ personaSummary(entry.personaTags) }}</template></span><details><summary>资产详情</summary><p>{{ entry.description }}</p><p v-for="(invariant, index) in entry.invariants" :key="index">{{ invariant }}</p></details></div>
             <button type="button" :aria-pressed="entry.favorite" @click="run(() => toggleFavorite(entry))">{{ entry.favorite ? '取消收藏' : '收藏' }}</button>
-            <button type="button" @click="run(() => importLibraryAsset(entry))">导入本项目</button>
+            <button type="button" :disabled="importedCharacterIds.includes(entry.id)" @click="run(() => importLibraryAsset(entry))">{{ importedCharacterIds.includes(entry.id) ? '已在本项目' : '导入本项目' }}</button>
             <button type="button" @click="run(() => removeLibraryAsset(entry))">从库中删除</button>
           </li></ul>
           <p v-if="librarySearched && !libraryAssets.length" class="reviewHint">资产库暂无匹配资产。</p>
+          </details>
           <h3>本项目资产</h3>
           <ul class="projectAssetGrid"><li v-for="item in filteredProjectAssets" :key="item.id">
             <button class="assetCard" type="button" :aria-label="'查看角色：' + item.name" @click="run(() => editAsset(item))">
@@ -257,6 +260,8 @@ const editPanel = ref<InstanceType<typeof productionEdit>>();
 const getCanvas = inject<() => CanvasContext | undefined>("canvas");
 import { ElMessageBox } from "element-plus";
 import { canManageModels } from "@/lib/session";
+import characterPicker from "@/components/characterPicker.vue";
+import type { CharacterSelection } from "@/lib/characterAssets";
 import type { MediaModel } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema, type CameraTrajectory } from "@toonflow/tools-scaffold/runtime";
 import { needsLipSync, qualityReviewPlan } from "@toonflow/tool-media-generation/runtime";
@@ -265,6 +270,7 @@ const props = defineProps<{ projectId?: string; directory: string }>();
 const projectId = props.projectId;
 const emit = defineEmits<{ generateCharacter: [assetId: string] }>();
 const section = ref("world"), busy = ref(false), error = ref(""), message = ref("");
+const selectedCharacters = ref<CharacterSelection[]>([]), castingBusy = ref(false);
 const controller = new AbortController();
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 onScopeDispose(() => { controller.abort(); clearTimeout(pollTimer); clearInterval(watchTimer); });
@@ -306,6 +312,7 @@ const roles = [["IDENTITY", "身份"], ["GEOMETRY", "几何"], ["WARDROBE", "服
 const observationKinds = [["anatomy_failure", "多肢、身体结构或遮挡错误"], ["wardrobe_drift", "服装或商品形状漂移"], ["plastic_surface", "塑料材质或磨皮"], ["imaging_failure", "曝光或光学不可信"], ["temporal_drift", "视频身份或材质漂移"], ["performance_failure", "表演或运镜不可信"], ["motion_physics", "动作受力或接触错误"], ["scene_structure", "场景结构错误"], ["identity_drift", "身份漂移"], ["hand_artifact", "手部错误"], ["face_artifact", "面部错误"], ["color_shift", "色差"]];
 const world = ref<Record<string, any>>({}), look = ref<Record<string, any>>({}), worldDirty = ref(false);
 const assets = ref<any[]>([]), shots = ref<any[]>([]), sequences = ref<any[]>([]), references = ref<any[]>([]);
+const importedCharacterIds = computed(() => libraryAssets.value.filter(entry => assets.value.some(asset => asset.id === entry.sourceAssetId || asset.attributes?.importedFrom === entry.id)).map(entry => entry.id));
 const editingAsset = ref(""), assetVersions = ref<any[]>([]);
 const assetAudioReference = ref(""), assetAudioBindings = ref<any[]>([]);
 const emptyPersona = () => ({ bearing: "", gaze: "", focus: "", rapport: "" });
@@ -766,7 +773,7 @@ async function confirmVersion() {
     await editPanel.value?.trackRender(result.autoRender.id, sequenceId, context && canvasId ? { context, id: canvasId } : undefined);
   }
 }
-async function flushSave() { if (JSON.stringify(asset.value) !== savedAsset) throw new Error("资产修改尚未保存，请先建立或保存资产版本"); if (worldDirty.value) await saveWorld(); await saveShot(); }
+async function flushSave() { if (castingBusy.value) throw new Error("角色正在加入项目，请稍后再关闭"); if (JSON.stringify(asset.value) !== savedAsset) throw new Error("资产修改尚未保存，请先建立或保存资产版本"); if (worldDirty.value) await saveWorld(); await saveShot(); }
 async function closePanel(done: () => void) { try { await flushSave(); done(); } catch (cause) { error.value = cause instanceof Error ? cause.message : "未保存，面板保持打开"; } }
 async function openShot(id: string) {
   await run(async () => { if (!loaded) { await load(); loaded = true; } await selectShot(id); section.value = "review"; visible.value = true; });
@@ -826,7 +833,7 @@ defineExpose({ flushSave, openShot, openLibrary });
   .jobList { padding: 0; list-style: none; li { padding: 12px 0; border-bottom: 1px solid var(--studioBorder); display: flex; justify-content: space-between; gap: 16px; } small { display: block; } }
   .assetPortrait { display: block; width: 180px; max-height: 240px; object-fit: contain; margin: 12px 0; border-radius: var(--ui-radius); }
   .assetImagePicker { margin: 12px 0; summary { cursor: pointer; } .assetImageGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 8px; max-height: 360px; overflow: auto; button, label { padding: 6px; display: flex; flex-direction: column; gap: 4px; &[aria-pressed="true"] { outline: 2px solid var(--el-color-primary); } img { width: 100%; height: 120px; object-fit: contain; } span { font-size: 11px; } } } }
-  .libraryFilters, .assetEditor { margin: 16px 0; summary { cursor: pointer; padding: 12px 0; } }
+  .libraryFilters, .libraryManagement, .assetEditor { margin: 16px 0; summary { cursor: pointer; padding: 12px 0; } }
   .assetAdvanced { margin: 16px 0; summary { cursor: pointer; padding: 12px 0; } }
   .libraryList, .projectAssetGrid {
     padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 16px;

@@ -2,12 +2,14 @@
 name: adfilm
 description: 创作商业广告、品牌片与原生短视频，支持消费者洞察、差异创意方向、Big Idea、品牌文案、脑洞与二创、Hook 和完整分镜。已整合 hiccai-insight-new、hiccai-72、hiccai-wenan、hiccai-wild 与 hiccai-pop 的适用方法；按任务选择，不强套反转或生活小故事。按用户要求交付创意成稿或衔接 MILI MILI 制作；纯叙事影片使用 cinema。
 metadata:
-  version: "1.8.0"
+  version: "1.8.1"
   displayName: 广告与原生短视频
   author: MILI MILI
 ---
 
 # 广告与原生短视频
+
+首页「商品图片」的已上传素材保存在当前项目 `brief.productImages`，path 是工作区相对路径。开始构思与制作前实际查看，用于商品外观、包装和结构参考；不把包装图当成人物身份或摄影风格，不从图片猜未经证实的功效。按[商品图片准备](../workflow/references/methods/productReference.md)执行 `brief.productPreparation` 的原图、抠图或三视图选项，保留真实原图；AI 补全角度是待核对候选。正式制作沿现有导入、产品资产与权威参考绑定复用图片。
 
 真人商业广告与品牌片默认采用[清爽人物方法](../videoPromptDirector/references/cleanPortrait.md)：肤色自然均匀、细微纹理、轻薄妆面、克制高光和清晰毛流。从人物资产到正式镜头沿用同一参考与肤面标准，写入 look、lighting、realism.surface 后 compile 回读；五板块提示词写入第二块。此默认不改变产品本色、包装、功效证据、既定光色或明确的特殊妆效；纯产品、动画与无人画面不套人物要求。
 

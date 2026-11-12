@@ -22,7 +22,9 @@ function explicitlyNamesSkill(task: string, name: string) {
 
 export async function loadStoryWritingContext(cwd: string, tools: SkillTools, task: string, signal?: AbortSignal, musicFilm = false) {
   if (!canReadSkills(tools)) return "";
-  const skill = loadAgentSkills(cwd).skills.find(item => item.name === "story");
+  const project = await readStoryProject(cwd);
+  const skillName = project.brief.kind === "shortDramaCommerce" ? "workflow" : "story";
+  const skill = loadAgentSkills(cwd).skills.find(item => item.name === skillName);
   if (!skill || skill.disableModelInvocation && !explicitlyNamesSkill(task, skill.name)) return "";
   const method = await readStoryInstructions(cwd, signal);
   return musicFilm ? `${method}\n\n${musicFilmWritingGuide}` : method;
@@ -96,19 +98,19 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     return "## 制作技能状态\n本轮技能正文读取未开启，未自动加载制作技能；不能声称已使用。";
   }
   const sequenceKinds = new Set(projectId ? api!.scoped(tenant!.workspaceId).list("sequences", { projectId }).map(item => item.kind).filter(Boolean) : []);
-  const savedKind = project.revisions.find(item => item.id === project.approvedId)?.brief.kind
-    ?? (project.version > 0 ? project.brief.kind : sequenceKinds.size === 1 ? [...sequenceKinds][0] : project.brief.kind);
+  const savedKind = project.version > 0 ? project.brief.kind : sequenceKinds.size === 1 ? [...sequenceKinds][0] : project.brief.kind;
+  const shortDramaCommerce = savedKind === "shortDramaCommerce";
   // ACT: MV 内讨论剧情或说“不要故事”仍是 MV；明确指定 story 技能才切回故事入口。
-  const kind = music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
+  const kind = shortDramaCommerce ? savedKind : music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
     : savedKind;
-  const primary = kind === "musicFilm" ? "musicfilm" : ["adfilm", "brandFilm"].includes(kind) ? "adfilm" : "story";
+  const primary = shortDramaCommerce ? "workflow" : kind === "musicFilm" ? "musicfilm" : ["adfilm", "brandFilm"].includes(kind) ? "adfilm" : "story";
   const intentText = explicitNames.length || /图片|图像|生图|视频|短片|分镜|剧本|五板块/.test(task) ? task : topicText;
   const imagePrompt = explicitNames.includes("gavenDirectImagePrompts") || /(?:图片|图像|生图|文生图).*提示词|提示词.*(?:图片|图像|生图)/.test(intentText) && !/视频|短片|分镜/.test(intentText);
   const scriptPrompt = explicitNames.includes("gavenScriptToVideo") || /(?:剧本|分镜).*(?:转|改写成|整理成).*(?:视频)?提示词/.test(intentText);
   const standalonePrompt = explicitNames.includes("videoPromptDirector") || /五板块|视频提示词|视频节点|生成段/.test(intentText);
   // ACT: 仅对明确的文字创作收窄上下文；按分句排除否定要求，复杂或不明意图仍沿用制作流程。
   const taskIntent = task.split(/[，,。；;\n]/).filter(part => !/^(?:请)?(?:不要|不用|无需|不必|不|勿)/.test(part.trim())).join("\n");
-  const storyOnly = story && primary === "story" && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
+  const storyOnly = (story || shortDramaCommerce) && ["story", "workflow"].includes(primary) && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
     && !/视频|分镜|关键帧|运镜|拍摄|预演|成片|制片/.test(taskIntent);
   // ACT: 采用稿已存在且本轮只拆分镜时，不重复加载编剧、资产生产与生成协议；不明确的续作仍走原流程。
   const storyboardOnly = !!project.approvedId && !explicitNames.length && /分镜/.test(taskIntent)
@@ -117,7 +119,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   // ACT: 文字/单图专项只加载自己的方法；正式制作不预读互斥的五板块输出协议。
   const focusedNames = explicitNames.filter(name => ["gavenDirectImagePrompts", "gavenScriptToVideo", "gavenQingluAllegory", "insight", "directorPalettes", "breakdown", "canvas"].includes(name));
   const names = focusedNames.length ? [...focusedNames] : imagePrompt ? ["gavenDirectImagePrompts"] : scriptPrompt ? ["gavenScriptToVideo"]
-    : storyOnly ? ["story"] : storyboardOnly ? ["cinema", "continuity"] : ["workflow", primary, "cinema", "continuity", ...(standalonePrompt ? ["videoPromptDirector"] : [])];
+    : storyOnly ? [primary] : storyboardOnly ? ["cinema", "continuity"] : ["workflow", primary, "cinema", "continuity", ...(standalonePrompt ? ["videoPromptDirector"] : [])];
   if (primary === "musicfilm" && names.includes("musicfilm")) names.push("story");
   if (!storyOnly && !storyboardOnly && !imagePrompt && !scriptPrompt && !focusedNames.length) {
     if (/旅拍|婚礼|旅行|vlog/i.test(topicText)) names.push("travelWeddingDirector");
@@ -130,6 +132,11 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     for (const topic of selectedTopics) if (!names.includes(topic.name)) names.push(topic.name);
   }
   for (const name of explicitNames) if (!names.includes(name)) names.push(name);
+  // ACT: 短剧带货只复用公共制作工艺，不并入其他板块的创意主方法。
+  if (shortDramaCommerce) {
+    for (let index = names.length - 1; index >= 0; index--) if (["story", "adfilm", "musicfilm"].includes(names[index]!)) names.splice(index, 1);
+    if (!names.includes("workflow")) names.push("workflow");
+  }
   const videoModel = names.includes("workflow") || names.includes("gavenScriptToVideo") ? await selectedVideoSkillModel() : undefined;
   if (names.includes("gavenScriptToVideo") && videoModel?.seedance && !names.includes("workflow")) names.push("workflow");
   const context = createSkillContext(cwd);
@@ -150,11 +157,16 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     gavenScriptToVideo: ["references/camera-motion.md", "references/performance.md", "references/continuity-qc.md"],
     filmDirecting: [],
   };
+  if (shortDramaCommerce) referencePaths.workflow.push("references/shortDramaCommerce.md", "references/methods/shortDramaStory.md");
+  if (project.brief.productImages?.length && ["shortDramaCommerce", "adfilm", "brandFilm"].includes(savedKind)) {
+    if (!names.includes("workflow")) names.push("workflow");
+    referencePaths.workflow.push("references/methods/productReference.md");
+  }
   if (storyboardOnly) referencePaths.cinema = ["references/shotLanguage.md", "references/movementDirection.md", "references/performanceDirection.md", "references/coverage.md"];
   // ACT: 默认视频模型在开始本轮前已选定时预读模型规则；中途切换仍须按工具返回的实际模型读取。
   if (names.includes("workflow") && videoModel?.seedance) referencePaths.workflow.push("references/seedanceDirector.md");
   if (!focused) for (const topic of selectedTopics) referencePaths[topic.name].push(...topic.paths);
-  for (const name of names) {
+  for (const name of new Set(names)) {
     const skill = available.find(item => item.name === name);
     if (!skill) { warnings.push(`缺少技能 ${name}`); continue; }
     if (skill.disableModelInvocation && !explicitNames.includes(name)) {
@@ -162,6 +174,10 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
       continue;
     }
     if (name === "story") {
+      documents.push(await readStoryInstructions(cwd));
+      continue;
+    }
+    if (name === "workflow" && shortDramaCommerce && storyOnly) {
       documents.push(await readStoryInstructions(cwd));
       continue;
     }

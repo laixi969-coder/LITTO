@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" title="故事工作台" size="min(1120px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
+  <el-drawer v-model="visible" :title="project.brief.kind === 'shortDramaCommerce' ? '短剧带货工作台' : '故事工作台'" size="min(1120px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
     <div class="storyPanel" :aria-busy="busy || childBusy">
       <p v-if="error" class="errorMessage" role="alert">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
       <div class="toolbar">
@@ -174,7 +174,7 @@ const previewRef = ref<InstanceType<typeof storyPreview>>(), feedbackRef = ref<I
 let controller: AbortController | undefined;
 const tabs = [{ id: "sources", label: "目标与资料" }, { id: "directions", label: "创意方向" }, { id: "script", label: "剧本与审稿" }, { id: "visual", label: "视觉参考" }, { id: "preview", label: "动态分镜" }, { id: "feedback", label: "发布反馈" }];
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === modelKey.value));
-const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "musicFilm", label: "音乐影像" }];
+const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "shortDramaCommerce", label: "短剧带货" }, { value: "musicFilm", label: "音乐影像" }];
 const briefFields = [{ key: "idea", label: "想法 / 创作需求" }, { key: "audience", label: "谁会看 / 在什么情境下看" }, { key: "channel", label: "观看渠道" }, { key: "intent", label: "希望观众感受什么或做什么" }, { key: "genre", label: "类型" }, { key: "tone", label: "语气与风格" }, { key: "ending", label: "结尾选择" }, { key: "constraints", label: "不可改变的内容与制作预算 / 限制" }] as const;
 const sceneFields = [{ key: "goal", label: "人物目标" }, { key: "obstacle", label: "阻碍" }, { key: "change", label: "此场改变了什么" }, { key: "knowledge", label: "人物与观众分别知道什么" }, { key: "speech", label: "实际对白 / 旁白（不含角色名与表演说明）" }] as const;
 const issueLabels = { contradiction: "明确矛盾", comprehension: "理解风险", taste: "审美建议" };

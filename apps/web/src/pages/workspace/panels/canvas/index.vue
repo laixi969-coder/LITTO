@@ -72,7 +72,9 @@
         :canvasId="canvasId"
         :directory="project?.directory"
         :batchHistory="canvasHistory.batch"
-        @update:showEdges="edgeDisconnect = undefined" />
+        @update:showEdges="edgeDisconnect = undefined"
+        @casting="castingVisible = !castingVisible" />
+      <canvasCharacters v-if="project?.projectId && project?.directory" v-model="castingVisible" :projectId="project.projectId" :directory="project.directory" :availableNodes="availableNodes" :batchHistory="canvasHistory.batch" :getSignal="getCanvasSignal" />
       <nodeMenu
         :key="JSON.stringify(['nodeMenu', project?.directory, canvasId])"
         ref="nodeMenuRef"
@@ -159,6 +161,7 @@ import remoteNode from "./components/remoteNode.vue";
 import canvasMenu from "./components/canvasMenu.vue";
 import canvasControls from "./components/canvasControls.vue";
 import assetLibrary from "./components/assetLibrary.vue";
+import canvasCharacters from "./components/canvasCharacters.vue";
 import groupNode from "./components/groupNode.vue";
 import selectionToolbar from "./components/selectionToolbar.vue";
 import nodeSearch from "./components/nodeSearch.vue";
@@ -222,6 +225,7 @@ const isDesktop = new URLSearchParams(window.location.search).get("desktop") ===
 let copyingNodes = false;
 const showEdges = ref(true);
 const assetsVisible = ref(false);
+const castingVisible = ref(false);
 const assetLibraryRef = ref<InstanceType<typeof assetLibrary>>();
 const edgeDisconnect = ref<{ id: string; x: number; y: number }>();
 const flow = useVueFlow(props.runtimeKey);

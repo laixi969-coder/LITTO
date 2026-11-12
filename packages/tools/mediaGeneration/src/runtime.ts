@@ -178,7 +178,8 @@ export function finalReviewFields(kind: string, lipSync: boolean, music: boolean
     ["performance", "角色目的、触发、反应与调度"], ["dialogueCoverage", "原文台词、说话人与声音通道"],
     ["editing", "节奏、留白与邻镜连接"], ["composition", "构图与视觉主次"], ["color", "整片色调、肤色与产品本色"],
     ...(lipSync ? [["lipSync", "画内对白或演唱的逐字口型"]] : []),
-    ...(["adfilm", "brandFilm"].includes(kind) ? [["emotion", "情绪与创意表达"], ["product", "产品证明、识别与品牌记忆"]] : []),
+    ...(["adfilm", "brandFilm", "shortDramaCommerce"].includes(kind) ? [["emotion", "情绪与创意表达"], ["product", "产品证明、识别与品牌记忆"]] : []),
+    ...(kind === "shortDramaCommerce" ? [["hook", "开场观看期待与持续推进"], ["reversal", "反转前因、信息揭晓与情绪兑现"], ["productIntegration", "商品出现与人物行动、剧情转折的衔接"]] : []),
     ...(kind === "musicFilm" || music ? [["musicAlignment", "原曲、乐句、演唱与画面同步"], ["musicProgression", "主副歌层次、视觉母题的发展与回收"]] : []),
   ].map(([id, label]) => ({ id, label }));
 }

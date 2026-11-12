@@ -103,12 +103,14 @@
               <p v-if="!accounts && !workspaceDirectory" class="workspaceHint">先选择一个空文件夹，保存画布和素材。</p>
             </template>
           </el-card>
+          <characterPicker v-model="selectedCharacters" :disabled="creating || opening" />
           <div class="creationChoices">
             <button
               v-for="lane in creationLanes"
               :key="lane.kind"
               type="button"
               class="creationChoice"
+              :class="{ creationImport: lane.kind === 'existing' }"
               :disabled="creating || opening"
               @click="openBrief(lane.kind)">
               <component :is="lane.icon" :size="28" />
@@ -203,6 +205,25 @@
       :showClose="!creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
       @close="musicAnalysisRef?.stopPreview()">
       <el-form class="briefForm" labelPosition="top" @submit.prevent="startBrief">
+        <template v-if="briefKind === 'shortDramaCommerce' || briefKind === 'creative'">
+          <el-form-item label="商品图片">
+            <label class="musicUpload" :class="{ uploadDisabled: creating || readingSourceFiles }">
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple :disabled="creating || readingSourceFiles" aria-label="上传商品图片" @change="addSourceFiles($event, true)" />
+              <strong>{{ readingSourceFiles ? '正在读取图片…' : productImages.length ? '继续添加商品图片' : '上传商品图片' }}</strong>
+              <span>PNG · JPG · WEBP，可上传包装、正面与不同角度</span>
+            </label>
+          </el-form-item>
+          <attachmentList v-if="productImages.length" class="musicAttachments" :attachments="productImages" removable :disabled="creating || readingSourceFiles" @remove="productImages.splice($event, 1)" />
+          <p class="briefHint">用于保持商品外观、包装和结构一致。单张最多 100 MB，与参考资料合计最多 20 个附件。</p>
+          <el-form-item label="商品准备方式">
+            <el-select v-model="productPreparation" :disabled="creating || readingSourceFiles || !productImages.length" aria-label="商品准备方式">
+              <el-option value="original" label="保留原图" />
+              <el-option value="cutout" label="抠图，保留原视角" />
+              <el-option value="threeViews" label="三视图参考板" />
+            </el-select>
+          </el-form-item>
+          <p v-if="productPreparation !== 'original'" class="briefHint">开始创作后处理，保留原图；抠图和补图会使用图片生成额度。单图补出的侧面、背面属于 AI 推测，需核对。</p>
+        </template>
         <template v-if="briefKind === 'musicFilm'">
           <el-form-item label="歌曲与歌词文件">
             <label class="musicUpload" :class="{ uploadDisabled: creating || readingMusicFiles || musicBusy }">
@@ -217,7 +238,7 @@
           <musicAnalysis ref="musicAnalysisRef" :attachments="musicAttachments" :disabled="creating || readingMusicFiles" @busy="musicBusy = $event" @ready="musicHasLyrics = $event" />
         </template>
         <template v-if="briefKind !== 'musicFilm'">
-          <el-form-item :label="briefKind === 'creative' ? '产品、品牌与广告参考资料' : briefKind === 'story' ? '故事资料与参考素材' : '剧本与参考素材'">
+          <el-form-item :label="briefKind === 'shortDramaCommerce' ? '商品资料与剧情参考' : briefKind === 'creative' ? '产品、品牌与广告参考资料' : briefKind === 'story' ? '故事资料与参考素材' : '剧本与参考素材'">
             <label class="musicUpload" :class="{ uploadDisabled: creating || readingSourceFiles }">
               <input type="file" accept=".txt,.md,.docx,.pdf,.srt,.lrc,image/*,video/*" multiple :disabled="creating || readingSourceFiles" aria-label="上传文档、PDF、图片或参考片" @change="addSourceFiles" />
               <strong>{{ readingSourceFiles ? '正在读取文档…' : sourceFiles.length ? '继续添加素材' : '选择文档、图片或参考片' }}</strong>
@@ -228,7 +249,7 @@
           <attachmentList v-if="sourceFiles.length" class="musicAttachments" :attachments="sourceFiles.map(items => items[0]!)" removable :disabled="creating || readingSourceFiles" @remove="sourceFiles.splice($event, 1); sourceFileError = ''" />
           <p class="briefHint">文档最多 20 MB，正文最多 10 万字；UTF-8 文本最多 400 KB，图片或参考片最多 100 MB。PDF / DOCX 保留原件与提取正文，各占两个附件名额，总计最多 20 个。扫描 PDF 请先 OCR 或上传图片。</p>
         </template>
-        <el-form-item :label="currentLane.label" :required="briefKind !== 'musicFilm' && briefKind !== 'existing' && !sourceFiles.length">
+        <el-form-item :label="currentLane.label" :required="briefKind !== 'musicFilm' && briefKind !== 'existing' && !sourceFiles.length && !(['shortDramaCommerce', 'creative'].includes(briefKind) && productImages.length)">
           <el-input
             v-model="brief.subject"
             type="textarea"
@@ -236,6 +257,7 @@
             :disabled="creating"
             :placeholder="currentLane.placeholder" />
         </el-form-item>
+        <characterPicker v-model="selectedCharacters" :disabled="creating || readingSourceFiles || readingMusicFiles || musicBusy" />
         <mediaPreferences v-model="mediaPreferencesValue" :disabled="creating" />
         <p class="briefHint">受众、时长和画面风格不用现在想好，助手会在需要时再问你。</p>
       </el-form>
@@ -266,6 +288,7 @@ import {
   IconLayoutGrid,
   IconMovie,
   IconSpeakerphone,
+  IconShoppingBag,
   IconMusic,
   IconFileImport,
   IconArrowUpRight,
@@ -300,6 +323,8 @@ import { customProviders, loadPlatformTrial, platformTrial, settings as settings
 import workspacePicker from "./workspacePicker.vue";
 import mediaPreferences from "@/components/mediaPreferences.vue";
 import musicAnalysis from "./musicAnalysis.vue";
+import characterPicker from "@/components/characterPicker.vue";
+import { importCharacters, type CharacterSelection } from "@/lib/characterAssets";
 
 const settingsVisible = ref(false);
 const me = getMe();
@@ -474,6 +499,7 @@ async function renameProject(project: Project) {
 
 // message 默认取首页输入框；通道弹窗传入带技能指令的消息，不能写回输入框，否则用户会看到内部指令。
 const mediaPreferencesValue = ref({ imageRatio: "", imageSize: "", videoRatio: "", videoResolution: "" });
+const selectedCharacters = ref<CharacterSelection[]>([]);
 async function createProject(fromPrompt = true, message = prompt.value, attachments = promptAttachments.value, storyBrief?: StoryProject["brief"]) {
   if (modelSaving.value) return;
   if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
@@ -483,6 +509,7 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
     return openConnectModel("text");
   }
   creating.value = true;
+  const characters = fromPrompt ? selectedCharacters.value.map(character => ({ ...character })) : [];
   try {
     let path = workspaceDirectory.value;
     if (accounts) {
@@ -515,7 +542,21 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
       { milimiliCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
       true,
     );
-    if (storyBrief) await updateStory(directory, 0, { type: "brief", value: storyBrief });
+    if (storyBrief && ["shortDramaCommerce", "adfilm", "brandFilm"].includes(storyBrief.kind) && productImages.value.length) {
+      const files = useWorkspaceFiles(directory);
+      await files.mkdir("assets");
+      await files.mkdir("assets/products");
+      const uploaded = new Map<AgentAttachment, AgentAttachment>();
+      for (const image of productImages.value) {
+        if (!image.file) throw new Error("商品图片尚未就绪，请重新选择图片");
+        const extension = image.mimeType === "image/png" ? "png" : image.mimeType === "image/webp" ? "webp" : "jpg";
+        const path = `assets/products/${crypto.randomUUID()}.${extension}`;
+        await files.write(path, image.file, true);
+        uploaded.set(image, { name: image.name, mimeType: image.mimeType, path });
+      }
+      storyBrief = { ...storyBrief, productPreparation: productPreparation.value, productImages: [...uploaded.values()].map(({ name, mimeType, path }) => ({ name, mimeType: mimeType as "image/png" | "image/jpeg" | "image/webp", path })) };
+      attachments = attachments.map(attachment => uploaded.get(attachment) ?? attachment);
+    }
     if (fromPrompt && (mediaPreferencesValue.value.imageRatio || mediaPreferencesValue.value.videoRatio)) {
       await useWorkspaceFiles(directory).writeJson("mediaPreferences.json", {
         imageRatio: mediaPreferencesValue.value.imageRatio,
@@ -523,6 +564,14 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
       }, true);
     }
     await workspaceStore.openProject(directory);
+    if (characters.length) {
+      const projectId = workspaceStore.project?.projectId;
+      if (!projectId) throw new Error("当前项目尚未关联角色库，未开始创作；已选角色已保留，请重试");
+      const cast = await importCharacters(projectId, characters);
+      storyBrief = { ...(storyBrief ?? { ...newStoryProject().brief, idea: message }), cast };
+      message += `\n已选角色已导入本项目：${JSON.stringify(cast)}。以 assetId 复用身份和定妆参考，按 roleName 饰演；不重新选角或生成同名角色，人物关系与服装按本项目设定。`;
+    }
+    if (storyBrief) await updateStory(directory, 0, { type: "brief", value: storyBrief });
     if (fromPrompt && (message.trim() || attachments.length)) {
       workspaceStore.pendingAgentMessage = {
         directory: workspaceStore.project!.directory,
@@ -536,7 +585,7 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
     }
     briefVisible.value = false;
     // 想法已交给项目里的助手，清掉首页草稿。
-    if (fromPrompt) prompt.value = "";
+    if (fromPrompt) { prompt.value = ""; selectedCharacters.value = []; }
     await router.push("/workspace");
   } catch (err) {
     ElMessage.error(
@@ -551,11 +600,12 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
   }
 }
 const briefVisible = ref(false);
-// 四条创意通道各对应一个技能；“已有素材”走 story 的定稿剧本整理分支。
+// 四类作品并列；已有素材使用同等显眼的通栏卡片。
 const creationLanes = [
-  { kind: "story", skill: "story", icon: IconMovie, title: "写一个故事", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
-  { kind: "creative", skill: "adfilm", icon: IconSpeakerphone, title: "做一支广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
-  { kind: "musicFilm", skill: "musicfilm", icon: IconMusic, title: "拍一支 MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法（选填）", placeholder: "上传歌曲或歌词，补充你想要的情绪与画面感觉。也可以直接粘贴歌词。" },
+  { kind: "story", skill: "story", icon: IconMovie, title: "剧情片", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
+  { kind: "creative", skill: "adfilm", icon: IconSpeakerphone, title: "商业广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
+  { kind: "shortDramaCommerce", skill: "workflow", icon: IconShoppingBag, title: "短剧带货", desc: "用钩子与反转留住观众，让商品顺着剧情出现。", label: "商品与剧情想法", placeholder: "想带什么商品？有哪些卖点，想拍怎样的冲突或反转？" },
+  { kind: "musicFilm", skill: "musicfilm", icon: IconMusic, title: "MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法（选填）", placeholder: "上传歌曲或歌词，补充你想要的情绪与画面感觉。也可以直接粘贴歌词。" },
   { kind: "existing", skill: "story", icon: IconFileImport, title: "已有剧本或素材", desc: "导入剧本、参考片或参考图，整理后继续。", label: "补充说明（选填）", placeholder: "粘贴剧本，或说明参考素材的用途。" },
 ] as const;
 type LaneKind = (typeof creationLanes)[number]["kind"];
@@ -563,12 +613,15 @@ const briefKind = ref<LaneKind>("story");
 const currentLane = computed(() => creationLanes.find((lane) => lane.kind === briefKind.value)!);
 const brief = reactive({ subject: "" });
 const sourceFiles = ref<AgentAttachment[][]>([]);
+const productImages = ref<AgentAttachment[]>([]);
+const productPreparation = ref<"original" | "cutout" | "threeViews">("original");
 const readingSourceFiles = ref(false);
 const sourceFileError = ref("");
 const canStartBrief = computed(() => !!brief.subject.trim()
+  || (["shortDramaCommerce", "creative"].includes(briefKind.value) && productImages.value.length > 0)
   || (briefKind.value !== "musicFilm" && sourceFiles.value.length > 0)
   || (briefKind.value === "musicFilm" && (musicAttachments.value.length > 0 || musicHasLyrics.value)));
-async function addSourceFiles(event: Event) {
+async function addSourceFiles(event: Event, product = false) {
   const input = event.target as HTMLInputElement;
   const files = Array.from(input.files ?? []);
   input.value = "";
@@ -579,9 +632,12 @@ async function addSourceFiles(event: Event) {
   try {
     for (const file of files) {
       try {
+        if (product && !["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new Error("商品图片支持 PNG、JPG、WEBP");
         const attachments = await createSourceAttachments(file);
-        if (sourceFiles.value.flat().length + attachments.length > 20) throw new Error("每条消息最多添加 20 个附件（含文档提取正文）");
-        sourceFiles.value.push(attachments);
+        const productCount = ["shortDramaCommerce", "creative"].includes(briefKind.value) ? productImages.value.length : 0;
+        if (sourceFiles.value.flat().length + productCount + attachments.length > 20) throw new Error("每条消息最多添加 20 个附件（含商品图片与文档提取正文）");
+        if (product) productImages.value.push(...attachments);
+        else sourceFiles.value.push(attachments);
       } catch (cause) {
         errors.push(`${file.name}：${cause instanceof Error ? cause.message : "读取失败，请重试"}`);
       }
@@ -641,6 +697,7 @@ async function startBrief() {
   const defaultSubjects: Record<LaneKind, string> = {
     story: "根据上传的故事资料与参考素材创作故事",
     creative: "根据上传的产品、品牌与参考资料创作广告",
+    shortDramaCommerce: "根据上传的商品与参考素材创作短剧带货视频",
     musicFilm: "根据上传的歌曲与歌词创作 MV",
     existing: "整理上传的剧本与参考素材，在保留原有内容的基础上继续创作",
   };
@@ -649,12 +706,12 @@ async function startBrief() {
   readingMusicFiles.value = true;
   try {
     const reports = isMusic ? await musicAnalysisRef.value?.buildAttachments() ?? [] : [];
-    const attachments = isMusic ? [...musicAttachments.value, ...reports] : sourceFiles.value.flat();
+    const attachments = isMusic ? [...musicAttachments.value, ...reports] : [...(["shortDramaCommerce", "creative"].includes(briefKind.value) ? productImages.value : []), ...sourceFiles.value.flat()];
     if (!accounts && !workspaceDirectory.value) {
       workspaceDirectory.value = (await relocationPicker.value?.chooseDirectory()) ?? "";
       if (!workspaceDirectory.value) return;
     }
-    await createProject(true, message, attachments, { ...newStoryProject().brief, kind: briefKind.value === "creative" ? "adfilm" : isMusic ? "musicFilm" : "story", idea: subject });
+    await createProject(true, message, attachments, { ...newStoryProject().brief, kind: briefKind.value === "creative" ? "adfilm" : isMusic ? "musicFilm" : briefKind.value === "shortDramaCommerce" ? "shortDramaCommerce" : "story", duration: briefKind.value === "shortDramaCommerce" ? 30 : 60, idea: subject });
   } catch (cause) {
     ElMessage.error(cause instanceof Error ? cause.message : "创作准备失败");
   } finally {
@@ -878,6 +935,7 @@ watch(
         gap: 16px;
         margin-top: 20px;
         .creationChoice {
+          &.creationImport { grid-column: 1 / -1; }
           display: flex;
           align-items: center;
           gap: 16px;

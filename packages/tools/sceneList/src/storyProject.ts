@@ -7,9 +7,12 @@ const text = (max = 2000) => z.string().trim().max(max);
 const id = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/);
 export const storyPath = z.string().min(1).max(1024).refine(value => !/^[\\/]/.test(value) && !/[\\:\x00-\x1f]/.test(value) && value.split("/").every(part => part && part !== "." && part !== ".."), "须为工作区内的相对文件路径");
 export const storyBriefSchema = z.strictObject({
-  kind: z.enum(["story", "serial", "adfilm", "brandFilm", "musicFilm"]),
+  kind: z.enum(["story", "serial", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"]),
   serialFormat: z.enum(["short", "medium"]).optional().describe("连载形态：短剧或中剧；duration 为单集目标秒数"),
   episodeCount: z.number().int().min(1).max(100).optional(),
+  cast: z.array(z.strictObject({ assetId: id, libraryId: id, actorName: text(120).min(1), roleName: text(120).min(1) })).max(20).optional().describe("用户从角色库选用并已导入本项目的演员与饰演人物；沿用 assetId 的身份和定妆，不重复建角或重生成"),
+  productImages: z.array(z.strictObject({ name: text(260).min(1), path: storyPath, mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]) })).max(20).optional().describe("商业广告或短剧带货的已上传商品图片；path 为当前工作区相对路径，用于外观、包装与结构参考"),
+  productPreparation: z.enum(["original", "cutout", "threeViews"]).optional().describe("商品准备方式：保留原图、抠图保留原视角，或三视图参考板；实际生成沿用当前模型与授权，不把AI补全的角度当成真实结构"),
   idea: text(10000), audience: text(), channel: text(200), intent: text(), genre: text(200), tone: text(500), ending: text(500), duration: z.number().finite().min(1).max(3600), constraints: text(4000),
 });
 export const storySourceSchema = z.strictObject({
@@ -184,7 +187,7 @@ export const musicFilmWritingGuide = `MV 数据与执行：仅对 brief.kind=mus
 writeStoryDraft 可沿用已有 MV 场面计划、全曲预算分配、动作容量校验与执行修订；这些是执行要求，不能替代技能的创作自检。durationSeconds 是创作预算，不是实测时长；executionNotes 保留未核实的排练和音轨校准项。complete/authorRevisionComplete/executionReviewComplete 不证明实拍或观众效果。
 逐场 text 保留行动、触发与反应，knowledge 区分人物和观众所知，causes 不机械引用紧邻的独立演唱场。采用后的 storyContext 和正文落实到 action/performance/musicVideo.timeline，核对编译预览与实际接戏。`;
 
-export const storyWritingGuide = `MILI MILI 工作台保存协议：创作和审稿标准统一使用本次加载的 story 技能，以下仅说明结构与持久化。
+export const storyWritingGuide = `MILI MILI 工作台保存协议：创作和审稿标准使用本次按作品类型加载的创作方法，以下仅说明结构与持久化。
 资料、参考作品和模型生成的候选不能冒充已确认事实；没有读取的内容保持未知。沿用当前 brief、已选方向和采用版本，不为补流程重写。
 draft 保存 title、outline、scenes、canon、threads。sceneId 稳定；text 是完整正文，goal/obstacle/change/knowledge/causes 对应正文依据。speech 只存实际朗读原句，不含角色名、通道或表演说明。canon/threads 的事实、伏笔和来源场次可追溯。
 审稿只针对指定 revisionId，coverage 记录真实审阅场次，问题含精确原句、依据、类别和最小改法。quality 与 logic 按实际需要填写，不能编造依据。审稿结论供用户或获授权代理采用时参考，未核实不冒充通过。

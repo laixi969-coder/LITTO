@@ -6,6 +6,7 @@ import type { SkillContext, SkillLocation, SkillScope } from "@toonflow/tools-sc
 import conf from "@/utils/conf";
 import { authEnabled, currentTenant } from "@/utils/tenant";
 import { isWithin, lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
+import { readStoryProject } from "@/utils/story";
 
 export function loadAgentSkills(cwd: string, scope?: SkillScope) {
   if (scope !== undefined && scope !== "workspace" && scope !== "global") throw new Error("技能范围无效");
@@ -23,6 +24,12 @@ export function loadAgentSkills(cwd: string, scope?: SkillScope) {
 
 export async function readStoryInstructions(cwd: string, signal?: AbortSignal) {
   const context = createSkillContext(cwd);
+  const project = await readStoryProject(cwd);
+  if (project.brief.kind === "shortDramaCommerce") {
+    const paths = ["references/shortDramaCommerce.md", "references/methods/shortDramaStory.md", ...(project.brief.productImages?.length ? ["references/methods/productReference.md"] : [])];
+    const documents = await Promise.all(paths.map(path => context.read({ name: "workflow", path }, signal)));
+    return documents.map(document => `## ${document.path}\n${document.content}`).join("\n\n");
+  }
   const manifest = await context.read({ name: "story" }, signal);
   // ACT: 只展开主技能直接引用的创作资料，不递归加载参考库或其他技能，避免上下文无限增长。
   const paths = [...new Set([...manifest.content.matchAll(/\]\((references\/[^\s)#?]+\.md)(?:#[^\s)]*)?\)/g)].map(match => match[1]!))];

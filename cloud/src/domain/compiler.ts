@@ -266,7 +266,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }
     if (kind === "video" && extra.startFrameMediaId && !inputs.some((i) => i.role === "START_FRAME")) inputs.unshift({ referenceId: "hero", mediaId: extra.startFrameMediaId, role: "START_FRAME", weight: 1, lockLevel: "LOCK", sent: true });
 
-    if (["story", "serial", "adfilm", "brandFilm", "musicFilm"].includes(s.get("sequences", shot.sequenceId)?.kind ?? "story")) {
+    if (["story", "serial", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"].includes(s.get("sequences", shot.sequenceId)?.kind ?? "story")) {
       for (const asset of assets) {
         if (asset.approvalStatus !== "approved") warnings.push(`创作准备未完成：资产「${asset.name}」尚未采用，请先固定设定再生成正式镜头`);
         if (kind === "video" && extra.startFrameMediaId || !["Character", "Creature", "Wardrobe", "Environment", "Product", "Vehicle", "Prop"].includes(asset.type)) continue;

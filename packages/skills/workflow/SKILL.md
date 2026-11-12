@@ -2,7 +2,7 @@
 name: workflow
 description: 在 MILI MILI 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.17.3"
+  version: "2.18.0"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -13,6 +13,8 @@ metadata:
 从用户已有内容接续，把成果放到当前 MILI MILI 项目。以本次剧本与真实素材组织制作，不要求用户先补齐一套制片文档。这个包包含所需方法，不依赖原来的多岗位 Skill 组。
 
 ## 从哪里开始
+
+当前项目 `brief.kind=shortDramaCommerce` 时，使用[短剧带货](references/shortDramaCommerce.md)及其中的剧情方法，沿用公共摄影、资产与生成链路；本节其他作品的创意路由不适用。该方法及 Su 剧情资料只用于短剧带货板块，不扩散到剧情片、普通连载、商业广告或 MV。
 
 从想法创作故事或剧本时先读取 [story](../story/SKILL.md)，短剧分集按其中的专项选择规则处理。TikTok、Reels、Shorts、带货/UGC、软件推广、纯内容涨粉、Hook 或 hiccai-pop 改用 [adfilm 的原生短视频方法](../adfilm/references/nativeShortVideo.md)；仅要拍摄方案或文字创意时直接交付，不默认调用生成模型。主 Agent 按作品目标选主方法并主动推进已授权阶段，不将电影、剧集、短剧的所有模板同时强制执行；已有定稿继续按制作提取流程，不重新立项。
 
@@ -117,6 +119,7 @@ metadata:
 
 | 当前任务 | 使用资料与时机 |
 | --- | --- |
+| 选择或修改具体布光，涉及逆光、侧光、道具光、舞台或高低调 | 读取[光照方案参考](references/methods/lightingRecipes.md)，将本镜实际光源、受光区域、暗部与变化写入既有 lighting 和时间线；按需取用，不整套叠加 |
 | 准备提交生成、不确定该传哪些参数 | 读取[生成参数手册](references/generationParams.md)；六个参数（shotSpec／cast／styleReference／continueFrom／composeFilm／qc）决定底线质量，人物镜没有身份参考会被直接拒绝 |
 | 定影调、选导演风格、需要可执行的色值比例 | 读取[导演色卡库](../directorPalettes/SKILL.md)；198 位导演的实测主色板（HEX＋画面占比）、情绪色板与光影特征，转成 `shotSpec.lighting` 与 `styleReference`。一镜只用一个导演的色板，主色由环境承载，肤色不被环境色污染 |
 | 需要导演视觉语言、选画风、把口语需求补成规范提示词 | 读取[导演与视觉风格](../gavenDirectImagePrompts/SKILL.md)；按 Dxx 导演／Pxx 摄影／Cxx 胶片／Rxx 印片代码选风格并展开成自然语言。项目已有 Look 时以项目为准，不叠加冲突风格；画风代码只定影调与成像，不改剧情与人物 |
