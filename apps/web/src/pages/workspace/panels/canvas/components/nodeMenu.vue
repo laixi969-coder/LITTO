@@ -129,7 +129,12 @@ const pendingHandle = shallowRef<DraggedHandle>();
 const pendingGroup = shallowRef<GraphNode[]>([]);
 const selectionHandleRef = ref<InstanceType<typeof selectionHandle>>();
 const groupHandleRefs = ref<InstanceType<typeof selectionHandle>[]>([]);
-const groups = computed(() => flow.getNodes.value.filter(node => node.type === "canvasGroup" && !node.hidden));
+const groups = computed(() => {
+  const nodes = flow.getNodes.value;
+  const collapsedChildren = new Set(nodes.filter(node => node.type === "canvasGroup" && node.data.collapsed)
+    .flatMap(group => getSelectionTree([group], nodes).filter(node => node !== group).map(node => node.id)));
+  return nodes.filter(node => node.type === "canvasGroup" && !node.hidden && !collapsedChildren.has(node.id));
+});
 const singleGroupSelected = computed(() => flow.getSelectedNodes.value.length === 1 && flow.getSelectedNodes.value[0]?.type === "canvasGroup");
 const canArrangeSelection = computed(() => {
   const nodes = getSelectionRoots(selectedNodes.value, flow.getNodes.value);
@@ -339,6 +344,7 @@ async function runCommand(command: unknown) {
   }
   if (!handle) return;
   if (!created || flow.findNode(handle.node.id) !== handle.node) {
+    if (created) flow.removeNodes(id, true);
     clearConnection();
     return menu.value?.handleClose();
   }
@@ -359,8 +365,15 @@ async function runCommand(command: unknown) {
         targetNode.connectable !== false &&
         validateConnection(item, { sourceNode, targetNode, nodes: flow.getNodes.value, edges: flow.getEdges.value })
     );
-  if (connection) flow.addEdges(connection);
-  else ElMessage.warning("节点已创建，但没有兼容的端口可连接");
+  if (!connection) {
+    flow.removeNodes(id, true);
+    ElMessage.warning("该节点的端口规则不允许连接，请选择其他节点");
+    return;
+  }
+  flow.addEdges(connection);
+  flow.removeSelectedElements();
+  flow.nodesSelectionActive.value = false;
+  flow.addSelectedNodes([created]);
   clearConnection();
   menu.value?.handleClose();
 }

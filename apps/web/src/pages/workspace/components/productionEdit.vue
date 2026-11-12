@@ -317,7 +317,8 @@ async function trackRender(id: string, targetSequence: string, binding?: { conte
   if (sequenceId.value !== targetSequence) sequenceId.value = targetSequence;
   else await loadRenders();
 }
-defineExpose({ trackRender });
+async function openSequence(id: string) { if (sequenceId.value === id) await load(); else sequenceId.value = id; }
+defineExpose({ trackRender, openSequence });
 async function render(draft: boolean) {
   const [width, height] = exportSize.value.split("x").map(Number);
   const context = getCanvas?.();

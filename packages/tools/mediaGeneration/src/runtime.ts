@@ -218,6 +218,7 @@ export const agentReviewSchema = z.strictObject({
 });
 export const imageGenerationSchema = z.strictObject({
   ...sharedFields,
+  candidateDirection: z.strictObject({ pose: z.string().trim().max(1000), composition: z.string().trim().max(1000) }).optional().describe("镜头候选的姿势与构图变化；不改变镜头规格、身份和已锁定参考。须逐版预览后提交。"),
   localRepair: z.strictObject({
     keyframeId: z.string().min(1), kind: z.enum(["face_artifact", "hand_artifact", "anatomy_failure", "plastic_surface"]),
     target: z.strictObject({ assetId: z.string().min(1).optional(), region: z.string().trim().min(1).max(500) }).optional(),

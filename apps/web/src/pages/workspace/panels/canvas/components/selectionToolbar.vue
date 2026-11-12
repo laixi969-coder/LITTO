@@ -1,6 +1,7 @@
 <template>
   <el-card
     v-if="visible"
+    ref="toolbar"
     class="selectionToolbar nodrag nopan nowheel"
     shadow="never"
     :bodyStyle="{ padding: '4px' }"
@@ -20,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, inject, nextTick, onScopeDispose, ref, watch, type Ref } from "vue";
 import { getRectOfNodes, useVueFlow, type GraphNode, type Node, type XYPosition } from "@vue-flow/core";
 import { ElButton, ElCard, ElMessage } from "element-plus";
 import { IconCopyPlus, IconBoxMultiple, IconDeselect } from "@tabler/icons-vue";
@@ -34,13 +35,40 @@ const props = defineProps<{
 }>();
 const flow = useVueFlow();
 const busy = ref(false);
+const toolbar = ref<InstanceType<typeof ElCard>>();
+const topActions = inject<Ref<HTMLElement | undefined>>("canvasTopActions", ref());
+const toolbarSize = ref({ width: 0, height: 0 });
+const topInset = ref(8);
+const bottomInset = ref(8);
+const resizeObserver = new ResizeObserver(() => {
+  if (toolbar.value) {
+    const { width, height } = toolbar.value.$el.getBoundingClientRect();
+    toolbarSize.value = { width, height };
+  }
+  const flowTop = flow.vueFlowRef.value?.getBoundingClientRect().top ?? 0;
+  topInset.value = Math.max(8, (topActions.value?.getBoundingClientRect().bottom ?? flowTop) - flowTop + 8);
+  const controls = flow.vueFlowRef.value?.querySelector(".canvasControls")?.getBoundingClientRect();
+  bottomInset.value = controls ? Math.max(8, flow.dimensions.value.height - (controls.top - flowTop) + 12) : 8;
+});
+watch([toolbar, topActions], ([value, actions]) => {
+  resizeObserver.disconnect();
+  if (value) resizeObserver.observe(value.$el);
+  if (actions) resizeObserver.observe(actions);
+  const controls = flow.vueFlowRef.value?.querySelector(".canvasControls");
+  if (controls) resizeObserver.observe(controls);
+  if (flow.vueFlowRef.value) resizeObserver.observe(flow.vueFlowRef.value);
+});
+onScopeDispose(() => resizeObserver.disconnect());
 const hasGroup = computed(() => flow.getSelectedNodes.value.some(node => node.type === "canvasGroup"));
 const visible = computed(() => !props.disabled && !flow.userSelectionActive.value && flow.getSelectedNodes.value.length > 0
   && (flow.nodesSelectionActive.value || hasGroup.value));
 const toolbarStyle = computed(() => {
   const bounds = getRectOfNodes(flow.getSelectedNodes.value);
   const { x, y, zoom } = flow.viewport.value;
-  return { left: `${x + (bounds.x + bounds.width / 2) * zoom}px`, top: `${y + bounds.y * zoom - 12 - (hasGroup.value ? 30 * zoom : 0)}px` };
+  const { width, height } = toolbarSize.value;
+  const left = Math.max(width / 2 + 8, Math.min(x + (bounds.x + bounds.width / 2) * zoom, flow.dimensions.value.width - width / 2 - 8));
+  const top = Math.max(height + topInset.value, Math.min(y + bounds.y * zoom - 12 - (hasGroup.value ? 30 * zoom : 0), flow.dimensions.value.height - bottomInset.value));
+  return { left: `${left}px`, top: `${top}px` };
 });
 
 async function duplicateNodes(selection: GraphNode[], signal: AbortSignal, withEdges = true, positions?: Map<string, XYPosition>) {
@@ -246,10 +274,12 @@ defineExpose({ operate, startDragCopy, busy });
   position: absolute;
   z-index: 6;
   width: max-content;
+  max-width: calc(100% - 16px);
   transform: translate(-50%, -100%);
 
   .toolbarActions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 2px;
 

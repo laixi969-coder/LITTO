@@ -131,7 +131,9 @@ export function deleteShot(s: Scope, id: string) {
 
 export function bindReference(s: Scope, projectId: string, target: { type: "shot" | "asset"; id: string }, b: { referenceId: string; role: string; weight?: number; lockLevel?: string; crop?: any; notes?: string }) {
     if (s.get(target.type === "shot" ? "shots" : "assets", target.id)?.projectId !== projectId) throw notFound(target.type);
-    if (s.get("refs", b.referenceId)?.projectId !== projectId) throw notFound("reference");
+    const reference = s.get("refs", b.referenceId);
+    if (reference?.projectId !== projectId) throw notFound("reference");
+    if (b.crop && reference.kind !== "image") throw bad("只有图像参考可以裁剪");
     return s.insert("reference_bindings", { project_id: projectId, target_type: target.type, target_id: target.id, reference_id: b.referenceId, role: b.role, weight: b.weight ?? 1, lock_level: b.lockLevel ?? "CONTROL", crop: b.crop ?? null, notes: b.notes ?? null });
 }
 

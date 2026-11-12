@@ -8,6 +8,7 @@
     </button>
   </nodeSkeleton>
   <sceneEditor v-if="editing" v-model:anchors="anchors" v-model:prompt="prompt" v-model:model="model" v-model:lighting="lighting" v-model:sceneSettings="sceneSettings"
+    :overlayImages="overlayImages" :shots="productionSummary?.shots ?? []" @bindImage="bindImage" @pose="applyPose"
     :scene="scene" :result="selectedPlan" :models="models" :modelsLoading="modelsLoading" :addingMannequin="addingMannequin"
     :plans="plans" :selectedPlanId="data.selectedPlanId ?? ''" :tasks="tasks"
     :exportingVideo="exportingVideo" :exportingImage="exportingImage" :exportProgress="exportProgress"
@@ -21,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, inject, onBeforeUnmount, ref, shallowRef, watch, type Ref } from "vue";
 import { useVueFlow } from "@vue-flow/core";
 import { IconCube3dSphere } from "@tabler/icons-vue";
 import { ElLoading, ElMessage } from "element-plus";
@@ -69,6 +70,9 @@ const data = computed(() => node.data as typeof node.data & {
   selectedPlanId?: string;
 });
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
+const productionSummary = inject<Ref<{ shots: { shotId: string; title: string; order: number }[] }>>("productionSummary");
+const bindPreview = inject<(file: File, shotId: string, sourceId: string) => Promise<void>>("bindDirectorPreview");
+const overlayImages = computed(() => referenceMentions.value.filter((item, index) => refList.value[index]?.dataType === "IMAGE" && item.avatar).map(item => ({ id: item.id, url: item.avatar!, name: item.name })));
 const promptModel = computed({ get: () => data.value.promptModel ?? [], set: (value: PromptModel) => { data.value.promptModel = value; } });
 const anchors = computed({ get: () => data.value.anchors ?? [], set: (value: CameraAnchor[]) => { data.value.anchors = value; } });
 const prompt = computed({ get: () => data.value.prompt ?? "", set: (value: string) => { data.value.prompt = value; } });
@@ -304,6 +308,39 @@ async function exportToCanvas(kind: "image" | "video", key: string, aspect: numb
   }
 }
 
+async function bindImage(anchor: CameraAnchor, aspect: number, time: number, shotId: string) {
+  if (!bindPreview || exportingImage.value) return;
+  exportingImage.value = anchor.id;
+  try {
+    const file = await renderImage(scene.value, anchor, aspect, time, exportController.signal, selectedPlan.value, lighting.value, sceneSettings.value);
+    await bindPreview(new File([file], "3D构图预演.png", { type: file.type }), shotId, node.id);
+    ElMessage.success("已绑定为镜头构图参考，原采用版本保留并须复核");
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : "预演绑定失败"); }
+  finally { exportingImage.value = ""; }
+}
+async function applyPose(id: string, pose: string) {
+  if (addingMannequin.value || exportingVideo.value || exportingImage.value || tasks.value.some(task => !task.error)) return;
+  const presets: Record<string, NonNullable<SceneDocument["objectList"][number]["pose"]>> = {
+    stand: {}, sit: { leftHip: { x: -1.4, y: 0, z: 0 }, rightHip: { x: -1.4, y: 0, z: 0 }, leftKnee: { x: 1.4, y: 0, z: 0 }, rightKnee: { x: 1.4, y: 0, z: 0 } },
+    reach: { rightShoulder: { x: -1.3, y: 0, z: 0 }, rightElbow: { x: -0.25, y: 0, z: 0 } },
+    walk: { leftHip: { x: -0.5, y: 0, z: 0 }, rightHip: { x: 0.5, y: 0, z: 0 }, rightKnee: { x: 0.4, y: 0, z: 0 }, rightShoulder: { x: -0.4, y: 0, z: 0 } },
+  };
+  if (!Object.hasOwn(presets, pose)) return;
+  addingMannequin.value = true;
+  try {
+    const workspaceFiles = files.getWorkspaceFiles();
+    const saving = modelSaving.then(async () => {
+      if (disposed) return;
+      if (!scene.value.objectList.some(item => item.threeJsonId === id && item.objType === "mannequin")) throw new Error("请先选择人偶");
+      if (selectedPlan.value?.tracks.some(track => track.objectId === id && track.joint)) throw new Error("当前方案有关节动画，请在无关节动画的方案设置基础姿势");
+      const value = modelDocumentSchema.parse({ ...modelDocument.value, scene: { ...scene.value, objectList: scene.value.objectList.map(item => item.threeJsonId === id ? { ...item, pose: presets[pose] } : item) } });
+      const path = await writeModel(workspaceFiles, value);
+      if (!disposed) { modelDocument.value = value; data.value.modelPath = path; }
+    });
+    modelSaving = saving.catch(() => {}); await saving;
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : "姿势保存失败"); }
+  finally { addingMannequin.value = false; }
+}
 function exportVideo(aspect: number) {
   const plan = selectedPlan.value;
   if (!plan) return;

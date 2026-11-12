@@ -16,7 +16,7 @@ import { assetDirector, cinematographer, motionDirector, visualDirector, storybo
 import { compileShot } from "../domain/compiler.ts";
 import { lookReferenceBindings } from "../domain/visualDefaults.ts";
 import { mustRoute, resolvePolicy } from "../providers/router.ts";
-import { bad, HttpError, notFound } from "../util.ts";
+import { bad, conflict, HttpError, notFound } from "../util.ts";
 import { importLegacyCanvas } from "../legacy.ts";
 import { mediaView } from "../storage.ts";
 import { estimate, jobView } from "../jobs.ts";
@@ -167,6 +167,31 @@ production.post(`${P}/scenes`, async (c) => {
 });
 
 // ---- Shots ----
+const directorNoteInput = z.object({
+    id: z.string().uuid(), targetType: z.enum(["keyframe", "take"]), targetId: z.string().min(1).max(128),
+    mediaId: z.string().min(1).max(128), note: z.string().trim().min(1).max(2000),
+    point: z.object({ x: z.number().finite().min(0).max(1), y: z.number().finite().min(0).max(1) }).strict().optional(),
+    time: z.number().finite().nonnegative().optional(),
+}).strict();
+production.post("/shots/:id/directorNotes", async (c) => {
+    const { s, a } = ctx(c, "EDITOR");
+    const shot = s.get("shots", c.req.param("id"));
+    if (!shot) throw notFound("shot");
+    const note = await body(c, directorNoteInput);
+    const item = s.get(note.targetType === "keyframe" ? "keyframes" : "takes", note.targetId);
+    const media = item && s.get("media", item.mediaId);
+    if (!item || item.shotId !== shot.id || item.projectId !== shot.projectId || !media || media.projectId !== shot.projectId || media.id !== note.mediaId) throw notFound("shot output");
+    if (!media.mime.startsWith(note.targetType === "take" ? "video/" : "image/")) throw bad("批注对象的媒体类型不匹配");
+    if (note.time !== undefined && (note.targetType !== "take" || !Number.isFinite(media.duration) || note.time > media.duration)) throw bad("批注时间超出视频范围");
+    const reason = JSON.stringify(note), previous = s.get("approval_events", note.id);
+    if (previous) {
+        if (previous.action !== "directorNote" || previous.scopeId !== shot.id || previous.reason !== reason) throw conflict("批注内容已变化，请刷新核对");
+        return c.json({ ...note, createdAt: previous.createdAt });
+    }
+    // ACT: 批注沿用已有版本事件存储，追加记录；不写入质检结果或改变采用状态。
+    const saved = s.insert("approval_events", { id: note.id, project_id: shot.projectId, entity_type: note.targetType, entity_id: item.id, scope_id: shot.id, action: "directorNote", reason, actor_id: a.user.id });
+    return c.json({ ...note, createdAt: saved.createdAt }, 201);
+});
 function adoptedReviewStale(s: Scope, shot: any) {
     return ([["keyframe", shot.heroKeyframeId], ["take", shot.approvedTakeId]] as const).some(([type, id]) => {
         if (!id) return false;
@@ -193,7 +218,8 @@ production.get("/shots/:id", (c) => {
     try { fingerprints = { keyframe: shotFingerprint(s, sh.id, "keyframe"), take: shotFingerprint(s, sh.id, "take") }; }
     catch { /* 无效规格仍须可读取和修正，旧检查不复用。 */ }
     const qc = s.list("qc_reports", { shotId: sh.id }, "created_at, rowid").map(report => ({ ...report, current: !!report.evidence?.fingerprint && report.evidence.fingerprint === fingerprints[report.targetType as "keyframe" | "take"] && report.evidence?.mediaId === s.get(report.targetType === "take" ? "takes" : "keyframes", report.targetId)?.mediaId }));
-    return c.json({ ...withState(s, sh), bindings: s.list("reference_bindings", { targetType: "shot", targetId: sh.id }), keyframes: s.list("keyframes", { shotId: sh.id }).map(keyframeView), takes: s.list("takes", { shotId: sh.id }).map(takeView), issues: s.list("continuity_issues", { shotId: sh.id }), qc, repairs: s.list("repair_actions", { shotId: sh.id }) });
+    const directorNotes = s.list("approval_events", { projectId: sh.projectId, scopeId: sh.id, action: "directorNote" }).map(entry => ({ ...directorNoteInput.parse(JSON.parse(entry.reason)), createdAt: entry.createdAt }));
+    return c.json({ ...withState(s, sh), bindings: s.list("reference_bindings", { targetType: "shot", targetId: sh.id }), keyframes: s.list("keyframes", { shotId: sh.id }).map(keyframeView), takes: s.list("takes", { shotId: sh.id }).map(takeView), issues: s.list("continuity_issues", { shotId: sh.id }), qc, directorNotes, repairs: s.list("repair_actions", { shotId: sh.id }) });
 });
 production.patch("/shots/:id", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, shotPartial.extend({ confirm: z.boolean().optional(), expectedUpdatedAt: z.string().optional() })); const { confirm, expectedUpdatedAt, ...patch } = b; fresh(s, "shots", c.req.param("id"), expectedUpdatedAt ?? c.req.header("if-unmodified-since")); return c.json(updateShot(s, c.req.param("id"), patch, !!confirm)); });
 production.post("/shots/:id/move", async (c) => { const { s } = ctx(c, "EDITOR"); const b = await body(c, z.object({ order: z.number().int() })); return c.json(moveShot(s, c.req.param("id"), b.order)); });

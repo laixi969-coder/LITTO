@@ -23,7 +23,12 @@
     </div>
     <div v-if="data.collapsed" class="groupSummary">
       <template v-if="shot">
-        <img v-if="shot.hero?.media" :src="'/cloud' + shot.hero.media.url" alt="当前主帧" />
+        <video v-if="shot.approvedTake?.media?.mime.startsWith('video/')"
+          class="nodrag nopan nowheel" :src="'/cloud' + shot.approvedTake.media.url"
+          :poster="shot.hero?.media ? '/cloud' + shot.hero.media.url : undefined"
+          controls playsinline preload="metadata" aria-label="当前采用 Take 预览"
+          @pointerdown.stop @mousedown.stop @click.stop @dblclick.stop @keydown.stop />
+        <img v-else-if="shot.hero?.media" :src="'/cloud' + shot.hero.media.url" alt="当前主帧" />
         <strong>{{ shot.order + 1 }} · {{ shot.title }}</strong>
         <span>{{ shot.reviewStale ? '采用版本待复核' : shot.approvedTake ? 'Take 已批准' : shot.hero ? '主帧已选定' : '待选主帧' }}</span>
         <span v-if="shot.activeJobs">{{ shot.activeJobs }} 项生成中</span>
@@ -198,7 +203,7 @@ watch(
     button { padding: 4px 8px; border: 1px solid var(--el-border-color); border-radius: 4px; background: var(--el-bg-color); color: var(--el-text-color-primary); cursor: pointer; }
   }
   .groupSummary { display: flex; flex-direction: column; gap: 6px; padding: 44px 16px 12px; font-size: 12px;
-    img { width: 100%; height: 104px; object-fit: contain; }
+    img, video { width: 100%; height: 104px; object-fit: contain; }
     strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   }
   position: relative;

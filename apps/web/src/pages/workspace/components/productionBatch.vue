@@ -1,18 +1,19 @@
 <template>
   <section class="productionBatch" :aria-busy="working">
     <h3>批量制作与结果核对</h3>
-    <p>使用上方模型设置，逐镜保留已保存的规格、参考与视频时长。系列变体仅改变随机种子；实际差异取决于模型是否支持种子控制。</p>
+    <p>使用上方模型设置，逐镜保留已保存的规格、参考与视频时长。图片候选可分别指定姿势和构图；留空时仅改变随机种子。</p>
     <p v-if="error" class="attention" role="alert">{{ error }}</p>
     <fieldset :disabled="working || disabled">
       <div class="batchChoices">
         <label v-for="shot in shots" :key="shot.id"><input v-model="selectedIds" type="checkbox" :value="shot.id" />{{ shot.ord + 1 }} · {{ shot.title }}</label>
       </div>
       <label>每镜变体数<input v-model.number="count" type="number" min="1" max="8" /></label>
+      <div v-for="(direction, index) in directions.slice(0, Math.min(8, count || 0))" :key="index" class="batchChoices"><span>图片变体 {{ index + 1 }}</span><label>姿势要求<input v-model="direction.pose" maxlength="1000" /></label><label>构图要求<input v-model="direction.composition" maxlength="1000" /></label></div>
       <button type="button" @click="run(compile)">预览选定镜头</button>
       <div v-if="plan.length" class="batchPreview">
-        <p>选定 {{ plan.length }} 个镜头，共 {{ total }} 次提交</p>
-        <article v-for="item in plan" :key="item.shotId">
-          <strong>{{ item.title }} · {{ plannedKind === 'video' ? item.request.duration + ' 秒' : '关键帧' }} · {{ plannedCount }} 个变体</strong>
+        <p>选定 {{ new Set(plan.map(item => item.shotId)).size }} 个镜头，共 {{ total }} 次提交</p>
+        <article v-for="item in plan" :key="item.shotId + ':' + item.variant">
+          <strong>{{ item.title }} · {{ plannedKind === 'video' ? item.request.duration + ' 秒' : '关键帧' }} · 变体 {{ item.variant }}</strong>
           <label v-if="plannedKind === 'image' && item.assetIds?.length">关联出场资产（可选）<select v-model="item.assetId" @change="costAccepted = false"><option value="">仅回到镜头候选</option><option v-for="asset in assets.filter(asset => item.assetIds?.includes(asset.id))" :key="asset.id" :value="asset.id">{{ asset.name }}</option></select></label>
           <p v-if="item.error" class="attention">无法提交：{{ item.error }}</p>
           <template v-else>
@@ -33,7 +34,7 @@
         <p>{{ counts }}。输出自动进入对应镜头的候选版本；失败与中断项不会自动重试。</p>
         <div class="resultGrid"><article v-for="row in record.rows" :key="row.requestId">
           <strong>{{ row.title }} · 变体 {{ row.variant }}</strong><span>{{ rowState(row) }}</span>
-          <small>种子 {{ row.seed }}</small>
+          <small>种子 {{ row.seed }}</small><p v-if="row.direction">姿势：{{ row.direction.pose || '沿用规格' }} · 构图：{{ row.direction.composition || '沿用规格' }}</p>
           <p v-if="jobFor(row)?.error || (!jobFor(row) && row.error)" class="attention">{{ jobFor(row)?.error || row.error }}</p>
           <template v-for="mediaId in jobFor(row)?.outputs ?? []" :key="mediaId">
             <img v-if="media[mediaId]?.mime.startsWith('image/')" :src="'/cloud' + media[mediaId].url" alt="生成候选" loading="lazy" />
@@ -51,24 +52,31 @@
 import { computed, onScopeDispose, reactive, ref, toRaw, watch } from "vue";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 
-type BatchRow = { requestId: string; shotId: string; title: string; variant: number; seed: number; state: "ready" | "submitting" | "submitted" | "failed"; jobId?: string; error?: string };
+type BatchRow = { requestId: string; shotId: string; title: string; variant: number; seed: number; direction?: { pose: string; composition: string }; state: "ready" | "submitting" | "submitted" | "failed"; jobId?: string; error?: string };
 type BatchRecord = { productionBatch: 1; id: string; projectId: string; createdAt: string; kind: "image" | "video"; rows: BatchRow[] };
-type PlanItem = { shotId: string; title: string; request: Record<string, any>; assetIds?: string[]; assetId?: string; preview?: any; error?: string };
+type PlanItem = { variant: number; shotId: string; title: string; request: Record<string, any>; assetIds?: string[]; assetId?: string; preview?: any; error?: string };
 const props = defineProps<{ directory: string; projectId: string; shots: any[]; assets: any[]; active: boolean; disabled: boolean; settingsKey: string; prepare: () => Promise<{ kind: "image" | "video"; request: Record<string, any> }>; request: (path: string, method?: string, body?: unknown) => Promise<any> }>();
 const emit = defineEmits<{ working: [value: boolean]; review: [shotId: string] }>();
 // 固定工作目录；提交与保存跨 await 时不读取当前项目。
 const files = useWorkspaceFiles(props.directory);
 const controller = new AbortController();
 const selectedIds = ref<string[]>([]), count = ref(2), working = ref(false), error = ref(""), costAccepted = ref(false);
-const plan = ref<PlanItem[]>([]), plannedCount = ref(0), plannedKind = ref<"image" | "video">("image");
+const directions = ref(Array.from({ length: 8 }, () => ({ pose: "", composition: "" })));
+const plan = ref<PlanItem[]>([]), plannedKind = ref<"image" | "video">("image");
 const history = ref<BatchRecord[]>([]), recordId = ref(""), jobMap = ref<Record<string, any>>({}), media = ref<Record<string, any>>({});
+const resultShots = ref<any[]>([]);
 const record = computed(() => history.value.find(item => item.id === recordId.value));
-const total = computed(() => plan.value.length * plannedCount.value);
+const total = computed(() => plan.value.length);
 let refreshing = false;
 const jobFor = (row: BatchRow) => jobMap.value[row.jobId || row.requestId];
 const rowState = (row: BatchRow) => {
   const job = jobFor(row), status = job?.status;
   if (status === "SUCCEEDED" && !job.outputs?.length) return "完成但缺少输出";
+  if (status === "SUCCEEDED") {
+    const shot = resultShots.value.find(item => item.id === row.shotId);
+    const adopted = record.value?.kind === "image" ? shot?.heroKeyframe : shot?.approvedTake;
+    if (adopted?.jobId === job.id && adopted.media && job.outputs.includes(adopted.media.id)) return shot.reviewStale ? "已采用 · 镜头待复核" : "已采用";
+  }
   return status ? ({ QUEUED: "排队中", RUNNING: "生成中", SUCCEEDED: "已回流", FAILED: "失败", CANCELLED: "已停止" }[status as string] ?? status)
     : ({ ready: "未提交", submitting: "提交回执待核对", submitted: "任务状态待读取", failed: "提交失败" }[row.state]);
 };
@@ -77,7 +85,7 @@ const counts = computed(() => {
   for (const row of record.value?.rows ?? []) result.set(rowState(row), (result.get(rowState(row)) ?? 0) + 1);
   return [...result].map(([state, number]) => `${number} 项${state}`).join(" · ");
 });
-watch([selectedIds, count, () => props.settingsKey], () => { plan.value = []; costAccepted.value = false; }, { deep: true });
+watch([selectedIds, count, directions, () => props.settingsKey], () => { plan.value = []; costAccepted.value = false; }, { deep: true });
 watch(() => props.shots.map(shot => shot.id), ids => {
   const selected = selectedIds.value.filter(id => ids.includes(id));
   if (selected.length !== selectedIds.value.length) selectedIds.value = selected;
@@ -102,10 +110,12 @@ async function compile() {
   if (!selected.length || !Number.isInteger(count.value) || count.value < 1 || count.value > 8 || selected.length * count.value > 32) throw new Error("请选择镜头，每镜 1–8 个变体，每批最多 32 次提交");
   const options = await props.prepare();
   controller.signal.throwIfAborted();
-  plannedKind.value = options.kind; plannedCount.value = count.value;
+  plannedKind.value = options.kind;
+  if (options.kind !== "image" && directions.value.slice(0, count.value).some(item => item.pose.trim() || item.composition.trim())) throw new Error("姿势和构图变体仅支持图片关键帧，请切换生成类型或清空变体要求");
   const items: PlanItem[] = [];
-  for (const shot of selected) {
-    const item: PlanItem = { shotId: shot.id, title: `${shot.ord + 1} · ${shot.title}`, request: { ...options.request } };
+  for (const shot of selected) for (let index = 0; index < count.value; index++) {
+    const direction = directions.value[index]!;
+    const item: PlanItem = { variant: index + 1, shotId: shot.id, title: `${shot.ord + 1} · ${shot.title}`, request: { ...options.request, ...(direction.pose.trim() || direction.composition.trim() ? { candidateDirection: { pose: direction.pose.trim(), composition: direction.composition.trim() } } : {}) } };
     try {
       const current = await props.request(`/shots/${shot.id}`);
       if (current.projectId !== props.projectId) throw new Error("镜头不属于当前项目");
@@ -120,14 +130,14 @@ async function compile() {
 }
 async function submit() {
   if (!costAccepted.value || !plan.value.length || plan.value.some(item => item.error)) return;
-  const items = structuredClone(toRaw(plan.value)), kind = plannedKind.value, copies = plannedCount.value;
+  const items = structuredClone(toRaw(plan.value)), kind = plannedKind.value;
   costAccepted.value = false;
   // 提交前全量重验：只要有一个镜头规格变化，本批尚未产生任何付费任务。
   for (const item of items) {
     const current = await production(item.shotId, kind, item.request);
     if (current.fingerprint !== item.preview.fingerprint) { plan.value = []; throw new Error(`${item.title} 的规格或参考已变化，请重新预览整批`); }
   }
-  const entry = reactive<BatchRecord>({ productionBatch: 1, id: crypto.randomUUID().replaceAll("-", ""), projectId: props.projectId, kind, createdAt: new Date().toISOString(), rows: items.flatMap(item => Array.from({ length: copies }, (_, index) => ({ requestId: crypto.randomUUID(), shotId: item.shotId, title: item.title, variant: index + 1, seed: crypto.getRandomValues(new Uint32Array(1))[0]! % 2147483647, state: "ready" as const }))) });
+  const entry = reactive<BatchRecord>({ productionBatch: 1, id: crypto.randomUUID().replaceAll("-", ""), projectId: props.projectId, kind, createdAt: new Date().toISOString(), rows: items.map(item => ({ requestId: crypto.randomUUID(), shotId: item.shotId, title: item.title, variant: item.variant, direction: item.request.candidateDirection, seed: crypto.getRandomValues(new Uint32Array(1))[0]! % 2147483647, state: "ready" as const })) });
   const path = `productionBatch${entry.id}.json`;
   await files.writeJson(path, entry, true);
   history.value.unshift(entry); recordId.value = entry.id;
@@ -135,11 +145,12 @@ async function submit() {
   const batches = new Map<string, string>();
   for (const row of entry.rows) {
     controller.signal.throwIfAborted();
-    const item = items.find(item => item.shotId === row.shotId)!;
-    let batchId = batches.get(row.shotId);
+    const item = items.find(item => item.shotId === row.shotId && item.variant === row.variant)!;
+    const batchKey = JSON.stringify([row.shotId, item.preview.fingerprint, item.assetId]);
+    let batchId = batches.get(batchKey);
     if (!batchId) {
       const batch = await props.request(`/projects/${props.projectId}/candidateBatches`, "POST", { kind, shotId: row.shotId, promptFingerprint: item.preview.fingerprint, ...(item.assetId ? { assetId: item.assetId } : {}) });
-      batchId = batch.id as string; batches.set(row.shotId, batchId);
+      batchId = batch.id as string; batches.set(batchKey, batchId);
     }
     row.state = "submitting";
     await files.writeJson(path, entry);
@@ -175,6 +186,7 @@ async function refreshResults() {
   if (!entry || refreshing) return;
   refreshing = true;
   try {
+    resultShots.value = await props.request(`/projects/${props.projectId}/shots`);
     for (const row of entry.rows) {
       controller.signal.throwIfAborted();
       const job = row.jobId ? await props.request(`/generations/${encodeURIComponent(row.jobId)}`) : row.state === "submitting" ? await props.request(`/projects/${props.projectId}/generationReceipt/${encodeURIComponent(row.requestId)}`) : null;
@@ -195,7 +207,11 @@ watch([() => props.active, () => props.disabled], ([active, disabled]) => { if (
 const timer = setInterval(() => {
   if (props.active && !working.value && record.value?.rows.some(row => ["QUEUED", "RUNNING"].includes(jobFor(row)?.status) || (["submitting", "submitted"].includes(row.state) && !jobFor(row)))) void refreshResults().catch(cause => { if (!controller.signal.aborted) error.value = cause.message; });
 }, 3000);
-onScopeDispose(() => { controller.abort(); clearInterval(timer); });
+function refreshAdoption() {
+  if (props.active && !working.value) void refreshResults().catch(cause => { if (!controller.signal.aborted) error.value = cause.message; });
+}
+window.addEventListener("milimiliProductionUpdated", refreshAdoption);
+onScopeDispose(() => { controller.abort(); clearInterval(timer); window.removeEventListener("milimiliProductionUpdated", refreshAdoption); });
 </script>
 
 <style scoped lang="scss">

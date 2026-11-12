@@ -10,6 +10,8 @@
   <panel position="bottom-left">
     <el-card shadow="never" :bodyStyle="{ padding: '4px' }">
       <div class="canvasControls">
+        <el-button text aria-label="查找与导航" @click="emit('search')">查找</el-button>
+        <el-button text aria-label="选区工作流" @click="emit('workflow')">工作流</el-button>
         <el-button class="castingButton" text aria-label="画布选角色" @click="emit('casting')"><icon-users :size="17" />选角色</el-button>
         <el-tooltip :showArrow="false" :content="assetsVisible ? '关闭素材库' : '打开素材库'" placement="top" :hideAfter="0" :enterable="false" :triggerKeys="[]">
           <el-button
@@ -140,7 +142,7 @@ const props = defineProps<{
   directory: string | undefined;
   batchHistory: (action: () => Promise<void>) => Promise<void>;
 }>();
-const emit = defineEmits<{ casting: [] }>();
+const emit = defineEmits<{ casting: []; search: []; workflow: [] }>();
 const snapEnabled = defineModel<boolean>("snapEnabled", { required: true });
 const showEdges = defineModel<boolean>("showEdges", { required: true });
 const assetsVisible = defineModel<boolean>("assetsVisible", { default: false });

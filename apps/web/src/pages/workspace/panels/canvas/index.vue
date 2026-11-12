@@ -74,6 +74,8 @@
         :canvasId="canvasId"
         :directory="project?.directory"
         :batchHistory="canvasHistory.batch"
+        @search="nodeSearchRef?.open()"
+        @workflow="workflowPanelRef?.open()"
         @update:showEdges="edgeDisconnect = undefined"
         @casting="castingVisible = !castingVisible" />
       <canvasCharacters v-if="project?.projectId && project?.directory" v-model="castingVisible" :projectId="project.projectId" :directory="project.directory" :availableNodes="availableNodes" :batchHistory="canvasHistory.batch" :getSignal="getCanvasSignal" />
@@ -98,6 +100,7 @@
         :getSignal="getCanvasSignal"
         :disabled="!canvasId || !project?.directory" />
       <nodeSearch ref="nodeSearchRef" :disabled="!active || settingsVisible || !canvasId || !project?.directory" />
+      <workflowPanel v-if="project?.directory && canvasId" :key="JSON.stringify([project.directory, canvasId])" ref="workflowPanelRef" :directory="project.directory" :insertNodes="insertWorkflow" />
     </vue-flow>
     <shotStrip v-if="shots.length || project?.projectId" :shots="shots" :projectId="project?.projectId" :directory="project?.directory" @select="selectShot" @finalize="finalizeShot" />
     <teleport to="body">
@@ -123,6 +126,7 @@
 <script setup lang="ts">
 import { computed, inject, markRaw, nextTick, onBeforeUnmount, onMounted, onScopeDispose, provide, ref, shallowReactive, shallowRef, watch } from "vue";
 import axios from "axios";
+import workflowPanel from "./components/workflowPanel.vue";
 import { debounce } from "lodash-es";
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
@@ -207,6 +211,7 @@ const canvasMenuRef = ref<InstanceType<typeof canvasMenu>>();
 const canvasControlsRef = ref<InstanceType<typeof canvasControls>>();
 const selectionToolbarRef = ref<InstanceType<typeof selectionToolbar>>();
 const nodeSearchRef = ref<InstanceType<typeof nodeSearch>>();
+const workflowPanelRef = ref<InstanceType<typeof workflowPanel>>();
 const nodeTypes = shallowRef<NodeTypesObject>({ canvasGroup: markRaw(groupNode) });
 const nodeConfigs = shallowRef<Record<string, Record<string, unknown>>>({});
 const nodeOptions = ref<{ type: string; label: string }[]>([]);
@@ -348,6 +353,20 @@ function finalizeShot(id: string, finalized: boolean) {
   flow.updateNodeData(id, { shotFinalizedPath: finalized ? shot.path : undefined });
 }
 provide("canvas", getCanvasContext);
+provide("bindDirectorPreview", async (file: File, shotId: string, sourceId: string) => {
+  const projectId = project.value?.projectId, signal = workspaceController.signal;
+  if (!projectId) throw new Error("请先打开正式项目");
+  async function request(path: string, method = "GET", body?: unknown) {
+    const response = await fetch(`/cloud${path}`, { method, signal, headers: { "Content-Type": body instanceof File ? body.type : "application/json", "x-milimili-csrf": "1" }, body: body instanceof File ? body : body ? JSON.stringify(body) : undefined });
+    const result = await response.json(); if (!response.ok) throw new Error(result.error?.message || result.error || "预演参考保存失败"); return result;
+  }
+  const shot = await request(`/shots/${encodeURIComponent(shotId)}`);
+  if (shot.projectId !== projectId) throw new Error("镜头不属于当前项目");
+  const media = await request(`/media?projectId=${encodeURIComponent(projectId)}`, "POST", file);
+  const reference = await request(`/projects/${projectId}/references`, "POST", { kind: "image", mediaId: media.id, name: file.name, source: "director3d", sourceRef: sourceId });
+  await request(`/shots/${shotId}/bindings`, "POST", { referenceId: reference.id, role: "COMPOSITION", lockLevel: "CONTROL", weight: 1, notes: "3D 构图预演，仅作参考，未经正式画面采用" });
+  window.dispatchEvent(new Event("milimiliProductionUpdated"));
+});
 defineExpose({ canvasId, canvasReady, getCanvasContext, readDocumentNode, saveDocumentNode, flushSave: flushCanvasSave, cancelSave: cancelCanvasSave,
   focusProductionShot,
   getMentionNodes: () => flow.nodes.value, findMentionNode: flow.findNode,
@@ -828,21 +847,7 @@ async function pasteClipboardNode(position: { x: number; y: number }, command?: 
     const snapshot = await readClipboardNodes(command ?? (await readClipboardText()), directory);
     if (canvasSignal.aborted) return false;
     if (!snapshot) throw new Error("剪贴板中没有可粘贴的节点命令");
-    if (snapshot.nodes.some(node => node.type !== "canvasGroup" && !availableNodes.value.some(item => item.type === node.type))) {
-      throw new Error("请先安装并启用对应的节点插件");
-    }
-    const ids = new Map(snapshot.nodes.map(node => [node.id, crypto.randomUUID()]));
-    const roots = snapshot.nodes.filter(node => !node.parentNode);
-    const left = Math.min(...roots.map(node => node.position.x));
-    const top = Math.min(...roots.map(node => node.position.y));
-    await canvasHistory.batch(async () => {
-      flow.removeSelectedElements();
-      addNodes(snapshot.nodes.map(node => ({ ...node, id: ids.get(node.id)!, parentNode: ids.get(node.parentNode ?? ""), selected: true,
-        position: node.parentNode ? node.position : { x: position.x + node.position.x - left, y: position.y + node.position.y - top } })));
-      await nextTick();
-      if (canvasSignal.aborted) return;
-      addEdges(snapshot.edges.map(edge => ({ ...edge, id: crypto.randomUUID(), source: ids.get(edge.source)!, target: ids.get(edge.target)! })));
-    });
+    await insertSnapshot(snapshot, position, canvasSignal);
     return true;
   } catch (error) {
     const pasteShortcut = generalSettings.value.canvasShortcuts.paste;
@@ -855,6 +860,41 @@ async function pasteClipboardNode(position: { x: number; y: number }, command?: 
       );
     return false;
   }
+}
+
+async function insertSnapshot(snapshot: { nodes: Node[]; edges: Edge[] }, position: XYPosition, signal: AbortSignal) {
+  signal.throwIfAborted();
+  if (snapshot.nodes.some(node => node.type !== "canvasGroup" && !availableNodes.value.some(item => item.type === node.type))) throw new Error("请先安装并启用对应的节点插件");
+  const ids = new Map(snapshot.nodes.map(node => [node.id, crypto.randomUUID()]));
+  const roots = snapshot.nodes.filter(node => !node.parentNode);
+  const left = Math.min(...roots.map(node => node.position.x)), top = Math.min(...roots.map(node => node.position.y));
+  await canvasHistory.batch(async () => {
+    flow.removeSelectedElements();
+    addNodes(snapshot.nodes.map(node => ({ ...node, id: ids.get(node.id)!, parentNode: ids.get(node.parentNode ?? ""), selected: true,
+      position: node.parentNode ? node.position : { x: position.x + node.position.x - left, y: position.y + node.position.y - top } })));
+    await nextTick();
+    signal.throwIfAborted();
+    addEdges(snapshot.edges.map(edge => ({ ...edge, id: crypto.randomUUID(), source: ids.get(edge.source)!, target: ids.get(edge.target)! })));
+    // 等待节点首次测量和既有镜头组自适应一起进入本次历史，避免导入被拆成两次撤销。
+    await new Promise<void>((resolve, reject) => {
+      const finish = (error?: unknown) => { stop(); clearTimeout(timer); signal.removeEventListener("abort", abort); error ? reject(error) : resolve(); };
+      const abort = () => finish(signal.reason);
+      const timer = setTimeout(() => finish(new Error("节点初始化超时，可撤销导入后重试")), 10000);
+      const stop = watch(() => [...ids.values()].every(id => {
+        const node = flow.findNode(id);
+        return node?.hidden || !!node?.dimensions.width && !!node.dimensions.height;
+      }), ready => { if (ready) finish(); }, { flush: "post" });
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+      else if ([...ids.values()].every(id => { const node = flow.findNode(id); return node?.hidden || !!node?.dimensions.width && !!node.dimensions.height; })) finish();
+    });
+    await nextTick();
+  });
+}
+async function insertWorkflow(snapshot: { nodes: Node[]; edges: Edge[] }) {
+  if (!props.active || !canvasId.value || !project.value?.directory) throw new Error("请先打开画布");
+  await insertSnapshot(snapshot, nextCanvasPosition(flow), canvasController.signal);
+  await flushCanvasSave();
 }
 
 function zoomCanvas(event: WheelEvent | (Event & { scale: number })) {

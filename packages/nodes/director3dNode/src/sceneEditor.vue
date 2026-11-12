@@ -35,6 +35,7 @@
             @keyup="handleKeyUp"
             @blur="exitControl"
             @wheel.prevent.stop="changeFocalLength" />
+          <img v-if="overlayUrl" class="referenceOverlay" :src="overlayUrl" :style="{ opacity: overlayOpacity }" alt="构图参考叠层" />
           <div v-if="captureFlash" :key="captureFlash" class="captureFlash" aria-hidden="true" @animationend="captureFlash = 0" />
           <div class="viewportInfo">
             <span>{{ playing ? "播放中" : controlling ? "" : "点击画布取景" }}</span>
@@ -120,6 +121,18 @@
           </el-button>
         </div>
         <div class="controlHint">WASD 移动 · 空格上升 · Shift 下降 · 滚轮调焦 · 右键记录 · 左键 / Esc 退出取景</div>
+        <div class="directorTools">
+          <label>参考叠层<select v-model="overlayId"><option value="">关闭</option><option v-for="image in overlayImages" :key="image.id" :value="image.id">{{ image.name }}</option></select></label>
+          <label v-if="overlayUrl">透明度<input v-model.number="overlayOpacity" type="range" min="0" max="1" step="0.05" /></label>
+          <button type="button" :disabled="!ready" @click="setView('top')">俯视</button><button type="button" :disabled="!ready" @click="setView('front')">正面机位</button><button type="button" :disabled="!ready" @click="setView('camera')">恢复机位</button>
+          <label>注视对象<select v-model="followId" @change="setFollow"><option value="">自由机位</option><option v-for="object in scene.objectList" :key="object.threeJsonId" :value="object.threeJsonId">{{ object.name || object.threeJsonId }}</option></select></label>
+          <label><input v-model="followPosition" type="checkbox" @change="setFollow" />跟随位置</label>
+          <label>人偶<select v-model="poseId"><option value="">选择人偶</option><option v-for="object in scene.objectList.filter(item => item.objType === 'mannequin')" :key="object.threeJsonId" :value="object.threeJsonId">{{ object.name || object.threeJsonId }}</option></select></label>
+          <label>基础姿势<select v-model="pose"><option value="stand">站立</option><option value="sit">坐姿</option><option value="reach">伸手</option><option value="walk">迈步</option></select></label>
+          <button type="button" :disabled="!poseId || addingMannequin || exportingVideo || !!exportingImage" @click="emit('pose', poseId, pose)">保存姿势</button>
+          <label>预演参考绑定镜头<select v-model="shotId"><option value="">选择镜头</option><option v-for="shot in shots" :key="shot.shotId" :value="shot.shotId">{{ shot.order + 1 }} · {{ shot.title }}</option></select></label>
+          <small>叠层仅辅助取景，不写入导出图片；跟随机位可记录为关键帧，导出视频沿用已保存方案。</small>
+        </div>
         <div class="referenceHeader">
           <span>
             关键帧
@@ -136,6 +149,7 @@
             </button>
             <el-button class="removeReference" :icon="IconX" text circle :aria-label="'删除关键帧 ' + (index + 1)" @click="removeAnchor(anchor.id)" />
             <el-button class="exportReference" :icon="IconPhotoPlus" text circle size="small" title="导出画布" :disabled="!ready || !!exportingImage" :loading="exportingImage === anchor.id" :aria-label="'导出关键帧 ' + (index + 1) + ' 到画布'" @click="emit('exportImage', anchor, sceneAspect, anchor.time ?? currentTime)" />
+            <button v-if="shotId" type="button" :disabled="!ready || !!exportingImage" @click="emit('bindImage', anchor, sceneAspect, anchor.time ?? currentTime, shotId)">绑定预演参考</button>
           </div>
         </vue-draggable>
       </section>
@@ -172,6 +186,7 @@ import { VueDraggable } from "vue-draggable-plus";
 import { Vector3 } from "three";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import type { SceneRuntime } from "threejson/core";
+import { getObjectByThreeJsonId } from "threejson/core";
 import type { NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
 import { applyLighting, applySceneSettings, captureCamera, createStage, disposeStage, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
 import { anchorSchema, applyCamera, prepareMotion, sampleMotion, type CameraAnchor } from "./motion";
@@ -189,8 +204,10 @@ const props = defineProps<{
   exportingVideo: boolean;
   exportingImage: string;
   exportProgress?: number;
+  overlayImages: { id: string; url: string; name: string }[];
+  shots: { shotId: string; title: string; order: number }[];
 }>();
-const emit = defineEmits<{ editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportTrajectory: []; exportVideo: [aspect: number]; exportImage: [anchor: CameraAnchor, aspect: number, time: number] }>();
+const emit = defineEmits<{ pose: [id: string, pose: string]; bindImage: [anchor: CameraAnchor, aspect: number, time: number, shotId: string]; editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportTrajectory: []; exportVideo: [aspect: number]; exportImage: [anchor: CameraAnchor, aspect: number, time: number] }>();
 const anchors = defineModel<CameraAnchor[]>("anchors", { default: () => [] });
 const lighting = defineModel<LightingSettings>("lighting", { required: true });
 const sceneSettings = defineModel<SceneSettings>("sceneSettings", { required: true });
@@ -213,6 +230,28 @@ const sceneAspect = computed(() => {
   return width! / height!;
 });
 const currentTime = ref(0);
+const overlayId = ref(""), overlayOpacity = ref(0.4), followId = ref(""), followPosition = ref(false), poseId = ref(""), pose = ref("stand"), shotId = ref("");
+const overlayUrl = computed(() => props.overlayImages.find(item => item.id === overlayId.value)?.url);
+const followOffset = new Vector3();
+let savedView: ReturnType<typeof captureCamera> | undefined;
+function objectPosition() { return runtime && followId.value ? getObjectByThreeJsonId(followId.value, runtime.scene)?.getWorldPosition(new Vector3()) : undefined; }
+function setFollow() {
+  if (!runtime) return;
+  const target = objectPosition();
+  if (target) { manualCamera.value = true; followOffset.copy(runtime.camera.position).sub(target); sampleTime(); }
+}
+function setView(mode: string) {
+  if (!runtime) return;
+  pausePlayback(); exitControl(); followId.value = ""; manualCamera.value = true;
+  if (mode === "camera") { if (savedView) applyCamera(runtime.camera, savedView); savedView = undefined; }
+  else {
+    savedView ??= captureCamera(runtime);
+    const target = new Vector3(0, 0.9, 0);
+    runtime.camera.position.copy(target).add(mode === "top" ? new Vector3(0, 10, 0.001) : new Vector3(0, 1, 7));
+    runtime.camera.lookAt(target);
+  }
+  runtime.invalidate();
+}
 const focalLength = ref(0);
 const activeAnchorId = ref("");
 const captureFlash = ref(0);
@@ -335,6 +374,8 @@ function sampleTime() {
   runtime?.invalidate();
   scenePlayer?.setTime(currentTime.value);
   if (runtime && !manualCamera.value && cameraFrames) sampleMotion(runtime.camera, cameraFrames, currentTime.value);
+  const target = objectPosition();
+  if (runtime && target) { if (followPosition.value) runtime.camera.position.copy(target).add(followOffset); runtime.camera.lookAt(target.clone().add(new Vector3(0, 0.9, 0))); }
   if (runtime) focalLength.value = runtime.camera.getFocalLength();
 }
 
@@ -605,6 +646,11 @@ onBeforeUnmount(() => {
   }
 }
 .directorWorkspace {
+  .directorTools { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; align-items: center;
+    label { display: flex; gap: 4px; align-items: center; font-size: 12px; }
+    button, select { font: inherit; color: var(--el-text-color-primary); background: var(--el-bg-color); padding: 6px; border: 1px solid var(--el-border-color); border-radius: 4px; }
+    small { width: 100%; }
+  }
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 24px;
@@ -616,6 +662,7 @@ onBeforeUnmount(() => {
     min-width: 0;
     min-height: 0;
     .viewport {
+      .referenceOverlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
       position: relative;
       display: grid;
       place-items: center;

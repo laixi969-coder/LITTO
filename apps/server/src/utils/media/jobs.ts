@@ -107,6 +107,7 @@ export function workspaceProject(directory: string, create = true) {
 export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string) {
   if (request.purpose === "storyboard" && (kind !== "image" || request.shotId)) throw Object.assign(new Error("多格总览仅用于分镜规划，不绑定正式 shotId；正式镜头请独立生成高清关键帧"), { status: 400 });
   if (request.localRepair && (!request.shotId || kind !== "image")) throw Object.assign(new Error("精修须提供图像镜头 shotId"), { status: 400 });
+  if (request.candidateDirection && (!request.shotId || kind !== "image" || request.localRepair)) throw Object.assign(new Error("系列变体仅支持普通镜头关键帧，不能与局部修改同时使用"), { status: 400 });
   if (!request.shotId && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
   await assertMediaModelSelection(kind, request, directory);
   const tenant = currentTenant();
@@ -319,6 +320,14 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   const result = api.prepareWorkspaceShot({ workspaceId: tenant.workspaceId, projectId: workspaceProject(directory)!, shotId, kind,
     providerId: request.providerId, modelId: request.modelId, mode: kind === "image" ? model.mode : request.mode, cameraTrajectory: model.cameraTrajectory === true, nativeDialogue: model.nativeDialogue === true, audio: model.audio, localRepair: request.localRepair, ...(previewOnly ? { previewOnly: true } : {}) });
+  if (request.candidateDirection) {
+    if (request.localRepair || kind !== "image") throw Object.assign(new Error("系列变体仅支持普通关键帧"), { status: 400 });
+    const direction = request.candidateDirection;
+    if (result.compiled.inputs.some(ref => ref.lockLevel === "LOCK" && ((direction.composition && ref.role === "COMPOSITION") || (direction.pose && ref.role === "PERFORMANCE")))) throw Object.assign(new Error("变体要求与已锁定的构图或表演参考冲突，请先调整参考约束"), { status: 400 });
+    const note = ["候选变化仅在当前镜头规格和参考锁定允许范围内执行；保持身份、服装、商品、场景、光照及镜头动作起态。", direction.pose && `姿势：${direction.pose}`, direction.composition && `构图：${direction.composition}`].filter(Boolean).join("\n");
+    result.compiled.sections.candidateDirection = note;
+    result.compiled.prompt += `\n\nCANDIDATE DIRECTION:\n${note}`;
+  }
   if (kind === "image" && request.providerId === "token01" && (result.compiled.negativePrompt || request.negativePrompt)) {
     result.compiled.warnings.push("Token01 图片接口没有独立负向提示词字段；排除项会作为自然语言附加到提示词，效果须在实际结果中核验。");
   }
