@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
 import type { AudioConvertOptions, ProviderTask, Provider, ProviderTools } from "@toonflow/providers";
 import { mediaProviders } from "@toonflow/providers";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { matchesAspect } from "@toonflow/providers/aspect";
 import { parse, parseExpression } from "@babel/parser";
 import { z } from "zod";
@@ -236,7 +237,8 @@ export async function listMediaProviders() {
       let current = { fileName: file.name, id: file.name.slice(0, -3), source: "", revision: "" };
       try {
         current = await readProvider(path, file.name);
-        return metadata(current.fileName, current.source);
+        const provider = metadata(current.fileName, current.source);
+        return { ...provider, models: provider.models.filter(model => isModelFrom2026(model.id)) };
       } catch (error) {
         // ACT: 元数据损坏不影响其他供应商；仍保留原文版本，允许用户明确删除。
         const { source, ...file } = current;
@@ -257,7 +259,7 @@ export async function addMediaProvider(source: string) {
     throw error;
   }
   finally { release(); }
-  return result;
+  return { ...result, models: result.models.filter(model => isModelFrom2026(model.id)) };
 }
 
 export async function addMediaProviderConnection(input: { templateId: string; id: string; label: string }) {
@@ -306,7 +308,7 @@ export async function saveMediaProvider(fileName: string, models: z.infer<typeof
     const result = metadata(fileName, source);
     if (expectedApiKey !== undefined && getMediaProviderApiKey(result.id) !== expectedApiKey) invalid("供应商配置已变更，请重试", 409);
     await writeWorkspaceFile(join(path, fileName), source);
-    return result;
+    return { ...result, models: result.models.filter(model => isModelFrom2026(model.id)) };
   } finally { release(); }
 }
 
@@ -325,6 +327,8 @@ export async function updateBuiltinMediaProvider(fileName: string, revision: str
     // ACT: 显式更新实现，保留已有模型的用户配置，并补新内置模型；不触碰密钥、默认选择和旧生成记录。
     const models = new Map(parsed.models.map(model => [model.id, model]));
     for (const model of current.models) {
+      // 依据当前模型范围移除旧版内置模型；其余用户配置仍保留。
+      if (id === "runningHub" && ["nanoBananaPro", "nanoBanana", "nanoBananaEconomy", "nanoBananaProEconomy", "nanoBananaProUltra", "gptImage15", "midjourneyV6", "midjourneyV61", "midjourneyV7", "midjourneyNiji6"].includes(model.id)) continue;
       const builtinModel = models.get(model.id);
       // 声音能力须与新适配器协议一致，不能被旧版本的 optional/true 覆盖；其余用户字段保留。
       models.set(model.id, { ...builtinModel, ...model, ...(builtinModel ? { audio: builtinModel.audio, nativeDialogue: builtinModel.nativeDialogue,
@@ -338,7 +342,7 @@ export async function updateBuiltinMediaProvider(fileName: string, revision: str
     await mkdir(backupDirectory, { recursive: true });
     await writeAtomic(join(backupDirectory, `providerBackup${crypto.randomUUID().replaceAll("-", "")}.json`), JSON.stringify({ fileName, source: current.source, revision: current.revision }, null, 2), { mode: 0o600 });
     await writeWorkspaceFile(join(path, fileName), source);
-    return result;
+    return { ...result, models: result.models.filter(model => isModelFrom2026(model.id)) };
   } finally { release(); }
 }
 
@@ -357,7 +361,7 @@ export async function refreshMediaProviderModels(fileName: string, revision?: st
   const config = restoreSecrets(options.config ?? storedConfig ?? {}, storedConfig);
   const runtime = await loadMediaProviderSource(provider.source, config, AbortSignal.timeout(60000));
   if (runtime.fetchModels) {
-    const models = mediaModelsSchema.parse(await runtime.fetchModels(options.modelIds ?? (options.apply === false ? undefined : provider.models.map(model => model.id))));
+    const models = mediaModelsSchema.parse(await runtime.fetchModels(options.modelIds ?? (options.apply === false ? undefined : provider.models.filter(model => isModelFrom2026(model.id)).map(model => model.id)))).filter(model => isModelFrom2026(model.id));
     if (!models.length) invalid("未获取到已适配的媒体模型，保留原有列表");
     if (options.apply === false) return { ...provider, source: undefined, models };
     // ACT: 目录获取不会删掉用户手工模型，只有明确保存选择时才替换列表。
@@ -384,9 +388,10 @@ export async function refreshMediaProviderModels(fileName: string, revision?: st
     return { ...previous, ...model, id, label: model.label ?? previous?.label
       ?? (typeof model.display_name === "string" ? model.display_name : typeof model.displayName === "string" ? model.displayName : id), type };
   });
-  const types = new Set(models.map(model => model.type));
-  if (options.apply === false) return { ...provider, source: undefined, models: options.modelIds ? models.filter(model => options.modelIds!.includes(model.id)) : models };
-  return saveMediaProvider(fileName, [...provider.models.filter(model => !types.has(model.type)), ...models], provider.revision, apiKey);
+  const availableModels = models.filter(model => isModelFrom2026(model.id));
+  const types = new Set(availableModels.map(model => model.type));
+  if (options.apply === false) return { ...provider, source: undefined, models: availableModels.filter(model => !options.modelIds || options.modelIds.includes(model.id)) };
+  return saveMediaProvider(fileName, [...provider.models.filter(model => !types.has(model.type)), ...availableModels], provider.revision, apiKey);
 }
 
 export async function deleteMediaProvider(fileName: string, revision: string) {

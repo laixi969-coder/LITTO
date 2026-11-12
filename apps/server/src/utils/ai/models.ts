@@ -1,6 +1,7 @@
 import { assertPublicHttpUrl } from "@/utils/ssrf";
 import { t } from "@/lib/i18n";
 import { z } from "zod";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import modelFetch from "@/utils/ai/modelFetch";
 
 const modelTimeSchema = z.union([z.number(), z.string().max(128)]).nullish().catch(undefined);
@@ -46,7 +47,7 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
       created: modelTimeSchema, created_at: modelTimeSchema, createdAt: modelTimeSchema,
       release_date: modelTimeSchema, releaseDate: modelTimeSchema,
     })) }).parse(await response.json());
-    return result.data.filter(item => item.display_console && item.type === "Text"
+    return result.data.filter(item => item.display_console && item.type === "Text" && isModelFrom2026(item.model)
       && (!item.supported_protocols || item.supported_protocols.includes("openai.chat.completions")))
       .map(item => ({ id: item.model, label: item.displayName || item.model, contextWindow: item.contextLength, maxOutputTokens: item.maxCompletionTokens,
         createdAt: item.releaseDate ?? item.release_date ?? item.createdAt ?? item.created_at ?? item.created ?? undefined }));
@@ -74,6 +75,7 @@ export async function fetchProviderModels({ apiUrl, protocol, apiKey }: { apiUrl
     for (const item of items) {
       const id = item.id?.trim();
       if (!id) throw new Error("模型列表包含无效的模型 ID");
+      if (!isModelFrom2026(id)) continue;
       if (tokenHub && (item.status && !["online", "pre-offline"].includes(item.status) || /^(?:wand-vega-(?:image|video)|kling-video|vidu-(?:video|image)|pixverse-video|minimax-(?:video|speech|music|voice)|hy-(?:image|video|3d)|yt-video|kinfra-(?:text|vl)-embedding)/i.test(id))) continue;
       const routerModel = openRouter ? openRouterModelSchema.parse(item) : undefined;
       if (routerModel && (!routerModel.architecture?.input_modalities.includes("text")

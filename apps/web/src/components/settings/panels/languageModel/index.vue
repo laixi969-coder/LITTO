@@ -14,7 +14,7 @@
         <div class="providerFooter">
           <div class="providerMeta">
             <el-tag v-if="getProviderVersion(item)" size="small" type="info" effect="plain">v{{ getProviderVersion(item) }}</el-tag>
-            <el-text size="small" type="info">{{ item.models.length }} 个模型</el-text>
+            <el-text size="small" type="info">{{ item.models.filter(model => isModelFrom2026(model.id)).length }} 个模型</el-text>
           </div>
           <el-space class="itemActions" wrap>
             <el-button text @click="reenableProvider('text', item.id).catch(() => ElMessage.error('重新启用失败'))">修复后重新启用</el-button>
@@ -42,6 +42,7 @@ import { ElMessage } from "element-plus";
 import { customProviders, settings, saveSettings, reenableProvider, type CustomProvider } from "@/stores/settings";
 import { IconPlus, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 
 const { visible = true, purpose = "text" } = defineProps<{ visible?: boolean; purpose?: "text" | "videoReview" }>();
 const addCustomProviderDialog = shallowRef<Component>();

@@ -8,6 +8,7 @@
   },
   "exports": {
     ".": "./index.ts",
+    "./modelYear": "./src/modelYear.ts",
     "./aspect": "./src/aspect.ts",
     "./types": "./types.d.ts",
     "./language/deepSeek": "./src/language/deepSeek.ts",
@@ -15,6 +16,7 @@
     "./language/easyRouter": "./src/language/easyRouter.ts",
     "./language/openRouter": "./src/language/openRouter.ts",
     "./language/token01": "./src/language/token01.ts",
+    "./media/runningHub": "./src/media/runningHub.ts",
     "./media/apiMart": "./src/media/apiMart.ts",
     "./media/meta": "./src/media/meta.ts",
     "./media/agnes": "./src/media/agnes.ts",

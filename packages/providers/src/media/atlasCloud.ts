@@ -158,9 +158,15 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 
 export default {
   resumeMedia,
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.3.11", rules,
-  readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.4.1", rules,
+  readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。Midjourney 8.1/8.2 支持文生图、图生图和图生视频，每次返回 4 个结果；节点默认显示第一个。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
+    { id: "midjourney/v8.1/text-to-image", label: "Midjourney 8.1 文生图", type: "image", price: "参考价 $0.086 / 4 张起；2K HD 另计（2026-11-12）", mode: ["text"], imageSizes: ["标准", "2K"], imageRatios: ["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"] },
+    { id: "midjourney/v8.1/image-to-image", label: "Midjourney 8.1 图生图", type: "image", price: "参考价 $0.086 / 4 张起；2K HD 另计（2026-11-12）", mode: ["singleImage"], imageSizes: ["标准", "2K"], imageRatios: ["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"] },
+    { id: "midjourney/v8.1/image-to-video", label: "Midjourney 8.1 图生视频", type: "video", price: "参考价 $0.086 / 秒起；720p 另计（2026-11-12）", mode: ["singleImage"], audio: false, durationResolutionMap: [{ duration: [5], resolution: ["480p", "720p"] }] },
+    { id: "midjourney/v8.2/text-to-image", label: "Midjourney 8.2 文生图", type: "image", price: "参考价 $0.086 / 4 张起；2K HD 另计（2026-11-12）", mode: ["text"], imageSizes: ["标准", "2K"], imageRatios: ["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"] },
+    { id: "midjourney/v8.2/image-to-image", label: "Midjourney 8.2 图生图", type: "image", price: "参考价 $0.086 / 4 张起；2K HD 另计（2026-11-12）", mode: ["singleImage"], imageSizes: ["标准", "2K"], imageRatios: ["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"] },
+    { id: "midjourney/v8.2/image-to-video", label: "Midjourney 8.2 图生视频", type: "video", price: "参考价 $0.086 / 秒起；720p 另计（2026-11-12）", mode: ["singleImage"], audio: false, durationResolutionMap: [{ duration: [5], resolution: ["480p", "720p"] }] },
     { id: "bytedance/seed-audio-1.0", label: "Seed Audio 1.0 · 语音", type: "audio", audioTask: "speech", inputSchema: { properties: { text: { type: "string" }, format: { enum: ["mp3", "wav", "pcm", "ogg_opus"] }, sample_rate: { enum: [8000, 16000, 24000, 32000, 44100, 48000] }, speech_rate: { minimum: -50, maximum: 100 } }, required: ["text"] } },
     { id: "bytedance/seed-audio-1.0-sfx", label: "Seed Audio 1.0 · 音效", type: "audio", audioTask: "soundEffect", inputSchema: { properties: { text: { type: "string" } }, required: ["text"] } },
     { id: "suno/chirp-v6", label: "Suno Chirp v6 · 音乐", type: "audio", audioTask: "music", inputSchema: { properties: { prompt: { type: "string" } }, required: ["prompt"] } },
@@ -180,8 +186,8 @@ export default {
     if (!Array.isArray(result.data)) throw new Error("Atlas Cloud 目录格式错误");
     // ACT: 只导入已映射请求参数的家族，复杂任务和未知新协议需单独适配；reference-to-video、video-edit、sequential 等多参考与分层任务模式暂不导入。
     const catalogue: AtlasModel[] = result.data.filter(item => item.display_console === true && typeof item.model === "string" && (
-      item.type === "Image" && (/^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2(?:\.\d)?(?:-[a-z]+)?\/(text-to-image|edit|image-to-image)$/.test(item.model) || /^google\/nano-banana-[\d.]+(?:-lite|-pro)?(?:-developer)?\/(text-to-image|edit)$/.test(item.model) || /^microsoft\/mai-image-[\d.]+(?:-[a-z]+)?\/(text-to-image|edit)$/.test(item.model))
-      || item.type === "Video" && (/^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || /^bytedance\/seedance-[\w.-]+\/(text|image)-to-video$/.test(item.model) || /^minimax\/h3-[a-z-]+\/(text|image)-to-video$/.test(item.model) || /^alibaba\/wan-[\d.]+(?:-prime)?\/(text|image)-to-video$/.test(item.model) || item.model === "sync/lipsync-v3")
+      item.type === "Image" && (/^midjourney\/v8\.[12]\/(?:text-to-image|image-to-image)$/.test(item.model) || /^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2(?:\.\d)?(?:-[a-z]+)?\/(text-to-image|edit|image-to-image)$/.test(item.model) || /^google\/nano-banana-[\d.]+(?:-lite|-pro)?(?:-developer)?\/(text-to-image|edit)$/.test(item.model) || /^microsoft\/mai-image-[\d.]+(?:-[a-z]+)?\/(text-to-image|edit)$/.test(item.model))
+      || item.type === "Video" && (/^midjourney\/v8\.[12]\/image-to-video$/.test(item.model) || /^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || /^bytedance\/seedance-[\w.-]+\/(text|image)-to-video$/.test(item.model) || /^minimax\/h3-[a-z-]+\/(text|image)-to-video$/.test(item.model) || /^alibaba\/wan-[\d.]+(?:-prime)?\/(text|image)-to-video$/.test(item.model) || item.model === "sync/lipsync-v3")
       || item.type === "Audio" && !/asr|stt|transcri|lyrics-generation|voice-clon|voice-design/i.test(item.model)
     )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(),
       ...(item.price && (item.price.actual?.base_price != null || item.price.origin?.base_price != null) ? { price: JSON.stringify({ actual: item.price.actual?.base_price, origin: item.price.origin?.base_price }) } : {}),
@@ -191,6 +197,16 @@ export default {
     if (!modelIds) return catalogue;
     const models: AtlasModel[] = [];
     for (const model of catalogue.filter(item => modelIds.includes(item.id))) {
+      if (/^midjourney\/v8\.[12]\/(?:text-to-image|image-to-image|image-to-video)$/.test(model.id)) {
+        const video = model.type === "video";
+        model.price = video ? "参考价 $0.086 / 秒起；720p 另计（2026-11-12）" : "参考价 $0.086 / 4 张起；2K HD 另计（2026-11-12）";
+        const editing = model.id.endsWith("/image-to-image");
+        Object.assign(model, video
+          ? { mode: ["singleImage"], audio: false, durationResolutionMap: [{ duration: [5], resolution: ["480p", "720p"] }] }
+          : { mode: editing ? ["singleImage"] : ["text"], imageSizes: ["标准", "2K"], imageRatios: ["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"] });
+        models.push(model);
+        continue;
+      }
       if (model.id === "sync/lipsync-v3") {
         Object.assign(model, { lipSync: true, audio: true, mode: [["videoReference:1", "audioReference:1"]] });
         models.push(model);
@@ -278,6 +294,19 @@ export default {
     return generate(this, "audio", body, signal);
   },
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
+    if (/^midjourney\/v8\.[12]\/(?:text-to-image|image-to-image)$/.test(request.model)) {
+      if (!request.prompt.trim() || request.prompt.length > 1024) throw new Error("Midjourney 提示词须为 1–1024 字符");
+      if (request.mask || request.negativePrompt || request.quality || request.outputFormat || request.n !== undefined && request.n !== 4) throw new Error("Midjourney 每次返回 4 张图片，不支持这些图片参数");
+      const editing = request.model.endsWith("/image-to-image");
+      const images = request.images ?? [];
+      if (images.length !== (editing ? 1 : 0)) throw new Error(editing ? "图生图需要一张参考图" : "文生图不能附带参考图");
+      const size = request.size || "标准";
+      const ratio = request.ratio || "1:1";
+      if (!["标准", "2K"].includes(size) || !["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"].includes(ratio)) throw new Error("Midjourney 不支持此尺寸或画幅");
+      if (request.seed !== undefined && (!Number.isInteger(request.seed) || request.seed < -1)) throw new Error("Midjourney 随机种子无效");
+      const signal = AbortSignal.any([AbortSignal.timeout(10 * 60_000), ...(this.signal ? [this.signal] : [])]);
+      return generate(this, "image", { model: request.model, prompt: request.prompt, aspect_ratio: ratio, hd: size === "2K", ...(editing ? { image: await uploadImage(this, images[0]!, signal) } : {}), ...(request.seed !== undefined ? { seed: request.seed } : {}) }, signal);
+    }
     const synced = this.models?.find(item => item.id === request.model) as AtlasModel | undefined;
     if (synced?.inputSchema) return generateSynced(this, request, "image", synced);
     if (!request.prompt.trim()) throw new Error("请填写提示词");
@@ -312,6 +341,14 @@ export default {
       const audioUrl = await uploadMedia(this, request.audios[0]!, signal, ["audio/wav", "audio/mpeg", "audio/mp4"], 100 * 1024 * 1024);
       // ACT: 官方cut_off仅裁至较短素材，不循环、不变速；保持已生成镜头与原曲节奏。
       return generate(this, "video", { model: request.model, video_url: videoUrl, audio_url: audioUrl, sync_mode: "cut_off" }, signal);
+    }
+    if (/^midjourney\/v8\.[12]\/image-to-video$/.test(request.model)) {
+      if (!request.firstFrame || request.lastFrame || request.images?.length || request.videos?.length || request.audios?.length || request.cameraTrajectory || request.negativePrompt || request.seed !== undefined || request.watermark || request.generateAudio) throw new Error("Midjourney 图生视频仅支持一张首帧，不支持其他参考、声音或水印");
+      if (request.mode !== undefined && request.mode !== "singleImage") throw new Error("Midjourney 仅支持首帧视频");
+      if (request.duration !== undefined && request.duration !== 5 || request.resolution && !["480p", "720p"].includes(request.resolution)) throw new Error("Midjourney 视频时长为 5 秒，分辨率支持 480p 或 720p");
+      if (request.ratio) await this.tool.assertAspectRatio(request.firstFrame, request.ratio);
+      const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+      return generate(this, "video", { model: request.model, prompt: request.prompt, image: await uploadImage(this, request.firstFrame, signal), resolution: request.resolution || "480p" }, signal);
     }
     const synced = this.models?.find(item => item.id === request.model) as AtlasModel | undefined;
     if (synced?.inputSchema) return generateSynced(this, request, "video", synced);

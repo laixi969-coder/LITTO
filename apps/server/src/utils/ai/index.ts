@@ -4,6 +4,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all";
 import type { Context, Model } from "@earendil-works/pi-ai";
 import { z } from "zod";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import conf from "@/utils/conf";
 import { assertPublicHttpUrl, assertPublicUrlLiteral } from "@/utils/ssrf";
 import { readReference } from "@/utils/media/generation";
@@ -80,6 +81,7 @@ export function describeModelError(message: string | undefined) {
 }
 
 export function getConfiguredModel(providerId: string, modelId: string, selectionKind: "text" | "videoReview" = "text") {
+  if (!isModelFrom2026(modelId)) throw Object.assign(new Error("此模型发布时间未核实为 2026 年及以后，无法使用"), { status: 400 });
   assertModelSelection(selectionKind, providerId, modelId);
   if (providerId === cloud()?.trialProviderId) throw Object.assign(new Error("平台积分试用尚未开放，请选择超级管理员配置的模型"), { status: 403 });
   const providers = conf.get("settings", {}).customProviders;
@@ -141,7 +143,7 @@ export function listAiModels(all = false) {
     const parsed = providerSchema.extend({ id: z.string().min(1), label: z.string() }).safeParse(item);
     if (!parsed.success) return [];
     const provider = parsed.data;
-    return provider.models.filter(model => model.id.trim() && !modelAccess("text", provider.id, model.id).reason() && (all || isSelectedModel("text", provider.id, model.id))).map(model => {
+    return provider.models.filter(model => model.id.trim() && isModelFrom2026(model.id) && !modelAccess("text", provider.id, model.id).reason() && (all || isSelectedModel("text", provider.id, model.id))).map(model => {
       const limits = getModelLimits(provider.id, model);
       return {
         providerId: provider.id, providerLabel: provider.label, protocol: provider.protocol, purpose: provider.purpose, modelId: model.id, label: model.label,

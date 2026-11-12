@@ -18,7 +18,7 @@ import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 import { readRelayImage } from "@/utils/media/relay";
 
-const autoInstallProviders = ["apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "xingsuan.ts", "elevenLabs.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
+const autoInstallProviders = ["runningHub.ts", "apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "xingsuan.ts", "elevenLabs.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
 
 export async function createApp({
   webRoot,
@@ -64,6 +64,20 @@ export async function createApp({
       if (["599660ab4dc4a8fe926fa9ededde7963c84a6052c2019c5eea4e7ebe4010411c", "1f5578360ddc77f8f125aa1e1e72f3c84080b666de6ec402c59e21f482c25ef0", "306fdafef99723d9f047b9c8beecbcaf835d2f4f29078ebb9d7b7f15579bcf02"].includes(previous)) {
         await writeAtomic(target, await readFile(resolve(providersRoot, "media/xingsuan.ts")));
       }
+    }
+    const runningHubTarget = resolve(dataDirectory, "providers/runningHub.ts");
+    const runningHubInfo = await lstat(runningHubTarget).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
+    if (runningHubInfo?.isFile() && !runningHubInfo.isSymbolicLink()) {
+      const previous = createHash("sha256").update(await readFile(runningHubTarget)).digest("hex");
+      // ACT: 只升级已知内置版本，保留用户对供应商文件的修改。
+      if (["4c98c9f66fbda37c0b9bfc113163f1b36e1bef3fc5a70d8e3dbd3bcc191f7240", "52158bab91d9bf0cb665f40eca632c26f8174b347ab29a60900648b26064830f", "c17ac72fdb79f25cb88cac5699a423f6cc5bc5cd8af8868850e3c57f1da8616b", "77769ef1563a5a327da84ffdb5baa2bbadf98c77fd858341aaf964ff0ccdcac0"].includes(previous)) await writeAtomic(runningHubTarget, await readFile(resolve(providersRoot, "media/runningHub.ts")));
+    }
+    const atlasCloudTarget = resolve(dataDirectory, "providers/atlasCloud.ts");
+    const atlasCloudInfo = await lstat(atlasCloudTarget).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
+    if (atlasCloudInfo?.isFile() && !atlasCloudInfo.isSymbolicLink()) {
+      const previous = createHash("sha256").update(await readFile(atlasCloudTarget)).digest("hex");
+      // ACT: 仅升级已知内置版本，已编辑过的模型和供应商代码由用户手动更新。
+      if (["55852d16f37843d380c3ccfdf0d46b3c6a4ea2d87558518f3d1be0536b348ba0", "bd646c33ea48d87e34c076826455f2e1d365df3fbd41763b9868fae068c5af90"].includes(previous)) await writeAtomic(atlasCloudTarget, await readFile(resolve(providersRoot, "media/atlasCloud.ts")));
     }
     await initializePlugins(resolve(dataDirectory, "providers"), resolve(providersRoot, "media"), autoInstallProviders);
   }

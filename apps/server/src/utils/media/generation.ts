@@ -5,6 +5,7 @@ import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider, type ProviderTask, type ProviderTools } from "@toonflow/providers";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { matchesAspect } from "@toonflow/providers/aspect";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
 import { cameraTrajectorySchema, validateVideoStoryboard, compileVideoStoryboard, storyboardGenerateAudio } from "@toonflow/tools-scaffold/runtime";
@@ -89,7 +90,7 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
   const installedProviders = await listMediaProviders();
   const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
   return installedProviders.flatMap(provider => provider.models.flatMap(model => {
-    if (provider.loadError || modelAccess("media", provider.id, model.id).reason()) return [];
+    if (provider.loadError || !isModelFrom2026(model.id) || modelAccess("media", provider.id, model.id).reason()) return [];
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
     const selectionKind = model.type === "audio" && model.audioTask === "music" ? "music" : model.type === "audio" && model.audioTask === "soundEffect" ? "soundEffect" : model.type;
     if (!all && !isSelectedModel(selectionKind, provider.id, model.id) && !(model.type === "audio" && isSelectedModel("audio", provider.id, model.id))) return [];
@@ -372,7 +373,10 @@ async function generateMediaUnrecorded(
     if (task.id || task.assets?.length || task.files?.length) submitted = true;
   };
   if (!request.prompt.trim()) invalid("请输入生成提示词");
-  if (!recovery) request = await assertMediaModelSelection(mediaType, request, cwd);
+  if (!recovery) {
+    request = await assertMediaModelSelection(mediaType, request, cwd);
+    if (!isModelFrom2026(request.modelId)) invalid("此模型发布时间未核实为 2026 年及以后，无法使用");
+  }
   const directory = await realpath(cwd);
   // 静音是交付约束，先确认能处理，避免供应商忽略开关后已经付费却无法交付。
   const silentFfmpeg = mediaType === "video" && request.generateAudio === false ? await createWorkspaceFfmpeg(directory, signal, true) : undefined;

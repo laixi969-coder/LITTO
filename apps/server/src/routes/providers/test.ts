@@ -6,6 +6,7 @@ import u from "@/utils";
 import { assertPublicHttpUrl, guardedFetch, UnsafeUpstreamError } from "@/utils/ssrf";
 import modelFetch from "@/utils/ai/modelFetch";
 import { isMasked } from "@/utils/secrets";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 
 /**
  * Connection test for the "connect your models" wizard. Makes the cheapest real, non-generating call it can and answers in plain Chinese.
@@ -15,6 +16,7 @@ const mediaProviders: Record<string, { label: string; customUrl?: boolean; verif
   tencentWand: { label: "腾讯 WAND · TokenHub", customUrl: true, verifyUrl: (_region, baseUrl) => `${(baseUrl?.trim() || "https://tokenhub.tencentmaas.com").replace(/\/+$/, "")}/v1/models` },
   // APIMart is OpenAI-compatible; listing models is an authenticated, free request.
   apiMart: { label: "APIMart", verifyUrl: region => `${region === "2" ? "https://api.apimart.ai/v1" : "https://api.apib.ai/v1"}/models` },
+  runningHub: { label: "RunningHub" },
   meta: { label: "秘塔 MiniMax" },
   agnes: { label: "Agnes AI", verifyUrl: () => "https://apihub.agnes-ai.com/v1/models" },
   volcengine: { label: "火山方舟" },
@@ -66,11 +68,11 @@ async function textTest({ apiUrl, apiKey, protocol, probeModel }: { apiUrl: stri
       message: `OpenRouter 密钥有效，已获取 ${models.length} 个文字模型；具体模型权限和可用额度以实际调用为准。`, models };
     if (publicCatalog && models.length) return { ok: true, verified: false, message: `已获取 ${models.length} 个文字模型；目录为公开列表，密钥和调用权限在首次生成时确认。`, models };
     if (models.length) return { ok: true, verified: true, message: `连接成功，找到 ${models.length} 个模型`, models };
-    if (!probeModel) return failure("连上了，但服务商没有返回任何模型。");
+    if (!probeModel || !isModelFrom2026(probeModel)) return failure("没有获取到已核实为 2026 年及以后发布的模型。");
   } catch (error) {
     const status = /HTTP (\d{3})/.exec(error instanceof Error ? error.message : "")?.[1];
     // Some providers do not expose a model list: fall back to a 1-token chat request with the preset's default model.
-    if (!(status === "404" || status === "405") || !probeModel || protocol === "anthropic-messages") return failure(describeError(error));
+    if (!(status === "404" || status === "405") || !probeModel || !isModelFrom2026(probeModel) || protocol === "anthropic-messages") return failure(describeError(error));
   }
   try {
     const base = new URL(await assertPublicHttpUrl(apiUrl));

@@ -115,9 +115,11 @@ import formCreate, { formCreateForm, type Api, type Options } from "../../formCr
 import { IconFileCode, IconCode, IconFolderOpen, IconCopy } from "@tabler/icons-vue";
 import { ElMessage, type FormInstance, type FormRules } from "element-plus";
 import { mediaProviders } from "@toonflow/providers";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
+import runningHubSource from "@toonflow/providers/media/runningHub?raw";
 import apiMartSource from "@toonflow/providers/media/apiMart?raw";
 import metaSource from "@toonflow/providers/media/meta?raw";
 import agnesSource from "@toonflow/providers/media/agnes?raw";
@@ -140,14 +142,14 @@ import { writeClipboardText } from "@/lib/clipboard";
 const { mode = "connection" } = defineProps<{ mode?: "connection" | "builtin" | "custom" }>();
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ added: [provider: MediaProvider] }>();
-const providerSources: Record<string, string> = { apiMart: apiMartSource, meta: metaSource, agnes: agnesSource, volcengine: volcengineSource, elevenLabs: elevenLabsSource, volcSpeech: volcSpeechSource, bailian: bailianSource, kling: klingSource, vidu: viduSource, atlasCloud: atlasCloudSource, easyRouter: easyRouterSource, qwenSpeech: qwenSpeechSource, museTalk: museTalkSource, tencentWand: tencentWandSource };
+const providerSources: Record<string, string> = { runningHub: runningHubSource, apiMart: apiMartSource, meta: metaSource, agnes: agnesSource, volcengine: volcengineSource, elevenLabs: elevenLabsSource, volcSpeech: volcSpeechSource, bailian: bailianSource, kling: klingSource, vidu: viduSource, atlasCloud: atlasCloudSource, easyRouter: easyRouterSource, qwenSpeech: qwenSpeechSource, museTalk: museTalkSource, tencentWand: tencentWandSource };
 const selectedProvider = ref<string>(mediaProviders[0]?.id ?? "");
 const activeProvider = computed(() => mediaProviders.find(provider => provider.id === selectedProvider.value));
 const hasSavedKey = computed(() => {
   const configs = settings.value.mediaProviderConfigs as Record<string, Record<string, unknown>> | undefined;
   return typeof configs?.[selectedProvider.value]?.apiKey === "string" && !!configs[selectedProvider.value]!.apiKey;
 });
-const models = computed<MediaProvider["models"]>(() => activeProvider.value?.models ?? []);
+const models = computed<MediaProvider["models"]>(() => (activeProvider.value?.models ?? []).filter(model => isModelFrom2026(model.id)));
 const providerReadme = computed(() => {
   const provider = activeProvider.value;
   return provider && "readme" in provider && typeof provider.readme === "string" ? provider.readme : "";

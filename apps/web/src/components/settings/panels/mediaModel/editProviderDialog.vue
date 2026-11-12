@@ -225,7 +225,7 @@ function priceOf(model: MediaProviderModel) {
     if (price.actual == null || price.actual === "") return "";
     const actual = String(price.actual), origin = String(price.origin ?? "");
     return origin && origin !== actual ? `${actual}（原价 ${origin}）` : actual;
-  } catch { return ""; }
+  } catch { return model.price; }
 }
 
 function editModel(index?: number) {

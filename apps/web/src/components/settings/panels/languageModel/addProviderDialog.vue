@@ -48,6 +48,7 @@ import axios from "axios";
 import { IconRefresh } from "@tabler/icons-vue";
 import formCreate, { formCreateForm, type Api, type Options } from "../../formCreate";
 import { languageProviders } from "@toonflow/providers";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { modelIcon } from "@toonflow/model-icons";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import { saveSettings, type CustomProviderModel } from "@/stores/settings";
@@ -87,7 +88,7 @@ watch(
     fetching.value = false;
     if (!isVisible || !provider) return;
     if (provider.models.length) {
-      models.value = structuredClone(provider.models);
+      models.value = structuredClone((provider.models as CustomProviderModel[]).filter(model => isModelFrom2026(model.id)));
       return;
     }
     const apiKey = typeof key === "string" ? key.trim() : "";

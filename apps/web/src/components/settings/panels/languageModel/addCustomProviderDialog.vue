@@ -33,7 +33,7 @@
               <el-button :icon="IconDownload" :loading="fetching" @click="fetchModels()">同步并选择模型</el-button>
             </div>
             <div class="modelList">
-              <div v-for="item in models" :key="item.key" class="modelItem">
+              <div v-for="item in models.filter(model => visibleModelKeys.has(model.key))" :key="item.key" class="modelItem">
                 <div class="modelRow">
                   <el-input v-model="item.id" placeholder="模型 ID" aria-label="模型 ID" />
                   <el-input v-model="item.label" placeholder="显示名称" aria-label="模型显示名称" />
@@ -109,6 +109,7 @@ import {
 } from "@tabler/icons-vue";
 import { saveSettings, type CustomProvider, type CustomProviderModel } from "@/stores/settings";
 import { languageProviders } from "@toonflow/providers";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import modelPicker from "../modelPicker.vue";
 
 const props = withDefaults(defineProps<{ provider?: CustomProvider; syncOnOpen?: boolean; purpose?: "text" | "videoReview" }>(), { purpose: "text" });
@@ -116,6 +117,7 @@ const visible = defineModel<boolean>({ default: false });
 const providerForm = ref<FormInstance>();
 const form = reactive({ id: "", label: "", apiUrl: "", protocol: "openai-completions", apiKey: "" });
 const models = ref<(CustomProviderModel & { key: string })[]>([]);
+const visibleModelKeys = ref(new Set<string>());
 const expandedModels = ref(new Set<string>());
 const fetchedModels = shallowRef<CustomProviderModel[]>([]);
 const selectedIds = ref(new Set<string>());
@@ -159,6 +161,7 @@ watch(visible, async (value) => {
       const { models: providerModels, ...config } = props.provider;
       Object.assign(form, config);
       models.value = providerModels.map((item) => ({ ...item, key: crypto.randomUUID() }));
+      visibleModelKeys.value = new Set(models.value.filter(item => isModelFrom2026(item.id)).map(item => item.key));
     }
     if (props.syncOnOpen) {
       await nextTick();
@@ -175,6 +178,7 @@ function resetForm() {
   optionsOpen.value = props.provider ? ["models"] : [];
   Object.assign(form, { id: "", label: "", apiUrl: "", protocol: "openai-completions", apiKey: "" });
   models.value = [];
+  visibleModelKeys.value = new Set();
   expandedModels.value = new Set();
   fetchedModels.value = [];
   selectedIds.value = new Set();
@@ -198,11 +202,12 @@ async function fetchModels(autoApply = false) {
     if (autoApply) {
       if (!data.data.length) throw new Error("未获取到可用模型，请检查 API Key 后重试");
       models.value = data.data.map((item: CustomProviderModel) => ({ ...item, key: crypto.randomUUID() }));
+      visibleModelKeys.value = new Set(models.value.map(item => item.key));
       return;
     }
     if (!data.data.length) throw new Error("未获取到可用模型，已保留原有列表");
     const remoteIds = new Set(data.data.map((item: CustomProviderModel) => item.id));
-    fetchedModels.value = [...data.data, ...models.value.filter(item => !remoteIds.has(item.id))];
+    fetchedModels.value = [...data.data, ...models.value.filter(item => isModelFrom2026(item.id) && !remoteIds.has(item.id))];
     selectedIds.value = new Set(addedIds.value);
     resultsVisible.value = true;
   } catch (error) {
@@ -222,12 +227,14 @@ function addSelectedModels() {
   models.value = fetchedModels.value.filter(item => selectedIds.value.has(item.id)).map(item => ({
     ...models.value.find(model => model.id === item.id), ...item, key: crypto.randomUUID(),
   }));
+  visibleModelKeys.value = new Set(models.value.map(item => item.key));
   resultsVisible.value = false;
 }
 
 function addManualModel() {
   const key = crypto.randomUUID();
   models.value.push({ key, id: "", label: "" });
+  visibleModelKeys.value.add(key);
 }
 
 async function addProvider() {
@@ -237,6 +244,10 @@ async function addProvider() {
   if (saving.value || !(await providerForm.value?.validate().catch(() => false))) return;
   const providerId = props.provider?.id;
   const ids = models.value.map((item) => item.id.trim());
+  if (models.value.some(item => visibleModelKeys.value.has(item.key) && item.id && !isModelFrom2026(item.id))) {
+    formError.value = "模型发布时间尚未核实为 2026 年及以后，不能添加";
+    return;
+  }
   if (ids.some((id) => !id) || new Set(ids).size !== ids.length) {
     formError.value = "模型 ID 不能为空或重复";
     return;

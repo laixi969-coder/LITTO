@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { loadMediaProviderSource } from "@/utils/media/provider";
 import { t, translateError } from "@/lib/i18n";
 
@@ -13,7 +14,7 @@ export async function inspectProviderSource(source: string) {
     id: provider.id,
     label: provider.label,
     rules: provider.rules ?? [],
-    models: provider.models.filter(model => ["image", "video", "audio"].includes(model.type)),
+    models: provider.models.filter(model => isModelFrom2026(model.id) && ["image", "video", "audio"].includes(model.type)),
   };
 }
 
@@ -84,7 +85,7 @@ export async function runProviderSource(
   try {
     const provider = await loadMediaProviderSource(source, config, signal, fetchRequest);
     for (const [key, value] of Object.entries(provider.config)) if (secretFields.test(key) && typeof value === "string" && value && !secrets.includes(value)) secrets.push(value);
-    const model = provider.models.find(model => model.id === request.model);
+    const model = provider.models.find(model => model.id === request.model && isModelFrom2026(model.id));
     if (!model) throw new Error("模型已变更，请重新选择模型");
     const method = model.type === "image" ? provider.generateImage : model.type === "video" ? provider.generateVideo : model.type === "audio" ? provider.generateAudio : undefined;
     if (!method) throw new Error("供应商没有实现此模型的媒体生成方法");

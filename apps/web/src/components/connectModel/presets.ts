@@ -5,13 +5,13 @@ export type TextPreset = {
 };
 export const textPresets: TextPreset[] = [
   { id: "deepseek", label: "DeepSeek", apiUrl: "https://api.deepseek.com", protocol: "openai-completions", probeModel: "deepseek-flash", defaultModel: "deepseek-flash", keyHelp: "登录 DeepSeek 开放平台，在「API keys」里创建一个 Key。" },
-  { id: "qwen", label: "通义千问", apiUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", protocol: "openai-completions", probeModel: "qwen-plus", defaultModel: "qwen-plus", keyHelp: "登录阿里云百炼控制台，在「API-KEY」里创建一个 Key。" },
-  { id: "kimi", label: "Kimi", apiUrl: "https://api.moonshot.cn/v1", protocol: "openai-completions", probeModel: "moonshot-v1-8k", defaultModel: "kimi-k2-0905-preview", keyHelp: "登录 Moonshot 开放平台，在「API Key 管理」里创建一个 Key。" },
-  { id: "openai", label: "OpenAI", apiUrl: "https://api.openai.com/v1", protocol: "openai-completions", probeModel: "gpt-4o-mini", defaultModel: "gpt-4o", keyHelp: "登录 OpenAI Platform，在「API keys」里创建一个 Key。" },
-  { id: "glm", label: "智谱 GLM", apiUrl: "https://open.bigmodel.cn/api/paas/v4", protocol: "openai-completions", probeModel: "glm-4-flash", defaultModel: "glm-4-plus", keyHelp: "登录智谱开放平台，在「API Keys」里创建一个 Key。" },
-  { id: "atlasCloud", label: "Atlas Cloud", apiUrl: "https://api.atlascloud.ai/v1", protocol: "openai-completions", probeModel: "deepseek-ai/deepseek-v3.2", defaultModel: "deepseek-ai/deepseek-v3.2", keyHelp: "在 Atlas Cloud 控制台创建 API Key。模型目录为公开列表，密钥和模型调用权限在首次生成时确认。" },
+  { id: "qwen", label: "通义千问", apiUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", protocol: "openai-completions", probeModel: "qwen3.8-flash", defaultModel: "qwen3.8-flash", keyHelp: "登录阿里云百炼控制台，在「API-KEY」里创建一个 Key。" },
+  { id: "kimi", label: "Kimi", apiUrl: "https://api.moonshot.cn/v1", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "登录 Moonshot 开放平台，在「API Key 管理」里创建一个 Key。" },
+  { id: "openai", label: "OpenAI", apiUrl: "https://api.openai.com/v1", protocol: "openai-completions", probeModel: "gpt-5.4-nano", defaultModel: "gpt-5.4-nano", keyHelp: "登录 OpenAI Platform，在「API keys」里创建一个 Key。" },
+  { id: "glm", label: "智谱 GLM", apiUrl: "https://open.bigmodel.cn/api/paas/v4", protocol: "openai-completions", probeModel: "glm-5.3", defaultModel: "glm-5.3", keyHelp: "登录智谱开放平台，在「API Keys」里创建一个 Key。" },
+  { id: "atlasCloud", label: "Atlas Cloud", apiUrl: "https://api.atlascloud.ai/v1", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "在 Atlas Cloud 控制台创建 API Key。模型目录为公开列表，密钥和模型调用权限在首次生成时确认。" },
   { id: "easyRouter", label: "EasyRouter", apiUrl: "https://easyrouter.io/v1", protocol: "openai-completions", probeModel: "gpt-5.4-nano", defaultModel: "gpt-5.4-nano", keyHelp: "在 EasyRouter 控制台创建 API Key，文字模型按 Key 可用列表获取。" },
-  { id: "openRouter", label: "OpenRouter", apiUrl: "https://openrouter.ai/api/v1", protocol: "openai-completions", probeModel: "", defaultModel: "openai/gpt-4o-mini", keyHelp: "在 openrouter.ai/settings/keys 创建 API Key；验证密钥后自动获取文字模型，调用费用由 OpenRouter 账户结算。" },
+  { id: "openRouter", label: "OpenRouter", apiUrl: "https://openrouter.ai/api/v1", protocol: "openai-completions", probeModel: "", defaultModel: "openai/gpt-5.4-nano", keyHelp: "在 openrouter.ai/settings/keys 创建 API Key；验证密钥后自动获取文字模型，调用费用由 OpenRouter 账户结算。" },
   { id: "tokenHub", label: "腾讯云 TokenHub", apiUrl: "https://tokenhub.tencentmaas.com/v1", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "在腾讯云 TokenHub 创建广州地域 API Key；其他地域或 Token Plan 请使用自定义地址。" },
   { id: "token01", label: "Token01", apiUrl: "https://www.token01.net/v1", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "在 Token01 控制台创建令牌，并选择对应的模型分组。" },
   { id: "custom", label: "其他（OpenAI 兼容）", apiUrl: "", protocol: "openai-completions", probeModel: "", defaultModel: "", keyHelp: "填写服务商给你的 API 地址和 Key；只要它兼容 OpenAI 的接口就能用。", custom: true },
@@ -19,6 +19,7 @@ export const textPresets: TextPreset[] = [
 
 export type MediaPreset = { id: string; label: string; desc: string; regions?: boolean; keyHelp: string; baseUrl?: string; urlRequired?: boolean; secret?: boolean };
 export const mediaPresets: MediaPreset[] = [
+  { id: "runningHub", label: "RunningHub", desc: "支持 Nano Banana 2、GPT Image 2、Midjourney 和视频模型；2026 年以前发布的模型不列入。", keyHelp: "在 RunningHub 创建 Enterprise-Shared API Key；密钥及模型权限在首次生成时验证。" },
   { id: "vidu", label: "Vidu", desc: "Q4 Preview 图生视频与参考生视频：支持单首帧，或 1–15 张参考图及最多 3 段 MP3 参考音频（每段 3–12 秒）。3–16 秒，540P 至 4K，可选音画同出。", baseUrl: "https://api.vidu.cn", keyHelp: "在 Vidu 开放平台创建 API Key，地址默认已填好。" },
   { id: "apiMart", label: "APIMart / 中转", desc: "一个 Key 同时用 Seedance 视频，以及 Seedream、GPT-Image、Nano Banana 出图、Wan 视频", regions: true, keyHelp: "在 APIMart 控制台创建 API Key；国内用户选「国内」，海外用户选「海外」。" },
   { id: "meta", label: "秘塔 MiniMax", desc: "MiniMax 视频模型，通过秘塔接入", keyHelp: "在秘塔 MiniMax 页面创建 API Key。" },
@@ -28,8 +29,8 @@ export const mediaPresets: MediaPreset[] = [
   { id: "volcSpeech", label: "火山引擎 · 豆包语音", desc: "独立语音合成与已创建复刻音色，支持语速、格式和采样率；凭证与方舟独立。", baseUrl: "https://openspeech.bytedance.com", keyHelp: "在豆包语音控制台创建语音 API Key，并开通相应语音资源；不能使用方舟 Key。" },
   { id: "elevenLabs", label: "ElevenLabs · 配乐与音效", desc: "独立生成配乐和音效，分别选择默认模型。", keyHelp: "在 ElevenLabs 创建 API Key，并确认音乐或音效接口权限和额度。" },
   { id: "bailian", label: "阿里百炼", desc: "同步工作空间模型目录，支持图片、视频及 Qwen-Audio-TTS、CosyVoice、Qwen-TTS 配音。", baseUrl: "", urlRequired: true, keyHelp: "创建同地域 API Key，填写以 /api/v1 结尾的工作空间地址；Qwen-TTS 的独立 DashScope 地址在供应商配置中设置。" },
-  { id: "kling", label: "可灵", desc: "Kling Image 2.1 和 Video 2.6，支持本地图片参考及视频首帧。API Key 或旧 AK/SK 认证均可使用，也支持可灵协议中转。", baseUrl: "https://api-singapore.klingai.com/v1", secret: true, keyHelp: "在可灵开放平台创建 API Key；使用旧认证时在 Key 中填 Access Key，并填写 Secret Key。" },
-  { id: "atlasCloud", label: "Atlas Cloud", desc: "同步图片、视频和音频目录，按官方参数定义接入语音、音乐与音效生成；异步任务自动轮询。", baseUrl: "https://api.atlascloud.ai/api/v1", keyHelp: "在 Atlas Cloud 控制台创建 API Key；图片、视频、音频共用。支持根地址、/v1 或 /api/v1，系统自动识别。" },
+  { id: "kling", label: "可灵", desc: "当前内置模型尚无已核实符合年份要求的版本。", baseUrl: "https://api-singapore.klingai.com/v1", secret: true, keyHelp: "在可灵开放平台创建 API Key；使用旧认证时在 Key 中填 Access Key，并填写 Secret Key。" },
+  { id: "atlasCloud", label: "Atlas Cloud", desc: "同步图片、视频和音频目录，支持 Midjourney 8.1/8.2 文生图、图生图和图生视频；异步任务自动轮询。", baseUrl: "https://api.atlascloud.ai/api/v1", keyHelp: "在 Atlas Cloud 控制台创建 API Key；图片、视频、音频共用。支持根地址、/v1 或 /api/v1，系统自动识别。" },
   { id: "easyRouter", label: "EasyRouter", desc: "同步图片、视频和语音模型，支持 GPT 与 Gemini TTS 配音，以及已适配的图片和视频生成。", baseUrl: "https://easyrouter.io/v1", keyHelp: "在 EasyRouter 控制台创建 API Key，并开通对应模型权限。地址以 /v1 结尾。" },
   { id: "tencentWand", label: "腾讯 WAND · TokenHub", desc: "支持已适配的图片、视频及 MiniMax Speech 2.8 HD 配音；图生图的本地图片通过服务的公网地址临时中转。", baseUrl: "https://tokenhub.tencentmaas.com", keyHelp: "在腾讯云 TokenHub 创建国内站 API Key，并开通对应模型。" },
 ];

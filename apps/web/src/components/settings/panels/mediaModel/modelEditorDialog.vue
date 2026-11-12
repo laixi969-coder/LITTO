@@ -99,6 +99,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { IconArrowRight, IconPlus, IconTrash } from "@tabler/icons-vue";
 import type { MediaProviderModel } from "./types";
 
@@ -204,6 +205,7 @@ function confirmModel() {
     const id = draft.value.id.trim();
     const label = draft.value.label.trim();
     if (!label || !id) throw new Error("请填写显示名称和模型 ID");
+    if (!isModelFrom2026(id)) throw new Error("模型发布时间尚未核实为 2026 年及以后，不能添加");
     if (models.some(item => item !== model && item.id.trim() === id)) throw new Error(`模型 ID 已存在：${id}`);
     let extra: Record<string, unknown>;
     try { extra = JSON.parse(options.value); }
