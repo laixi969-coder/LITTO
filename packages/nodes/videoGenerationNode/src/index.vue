@@ -64,6 +64,7 @@
             v-model:mode="data.mode"
             v-model:generateAudio="data.generateAudio"
             :ratios="ratioOptions"
+            :resolutions="resolutionOptions"
             :model="selectedModel"
             :disabled="generating || deleting || !selectedModel" />
           <el-button
@@ -125,9 +126,9 @@ const generationState = useNodeGeneration(outputs, () => { void cancelGeneration
 const { generating } = generationState;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
-// ACT: 供应商未声明视频比例范围，沿用界面的通用比例，具体支持范围由供应商校验。
-const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "20:11"];
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));
+const ratioOptions = computed(() => getRatios(selectedModel.value));
+const resolutionOptions = computed(() => selectedModel.value ? getResolutions(selectedModel.value) : []);
 const selectedMode = computed(() => selectedModel.value?.mode?.find((item) => JSON.stringify(item) === data.value.mode) as NodeVideoRequest["mode"]);
 const frameMode = computed(() => ["startEndRequired", "endFrameOptional", "startFrameOptional"].includes(String(selectedMode.value)));
 const mediaCounts = computed(() => ({
@@ -152,10 +153,13 @@ function getMatchingModes(choice?: NodeMediaModel) {
   });
 }
 
+function getRatios(choice?: NodeMediaModel) {
+  // ACT: 未声明比例时保留原有通用选项，最终仍由供应商核验。
+  return choice?.videoRatios?.length ? choice.videoRatios : ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "20:11"];
+}
 function getResolutions(choice: NodeMediaModel, duration?: number) {
-  // ACT: 当前视频分辨率使用 p 单位；出现其他单位时再统一换算。
-  return [...new Set((choice.durationResolutionMap ?? []).filter((item) => duration === undefined || item.duration.includes(duration)).flatMap((item) => item.resolution))]
-    .sort((left, right) => (Number.parseFloat(left) || Infinity) - (Number.parseFloat(right) || Infinity));
+  // ACT: 保留供应商档位顺序，不把 2K 当作数字 2 排在 480P 前面。
+  return [...new Set((choice.durationResolutionMap ?? []).filter((item) => duration === undefined || item.duration.includes(duration)).flatMap((item) => item.resolution))];
 }
 // ACT: 引用改变时只替换不适用的模式；普通媒体优先作为参考，避免自动变成首尾帧。
 watch([selectedModel, matchingModes, () => data.value.mode], ([choice, matches]) => {
@@ -263,6 +267,8 @@ async function startGeneration(manual = false) {
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择视频模型");
   if (!data.value.duration) throw new Error("请先按完整剧情段落选择生成时长");
+  if (!getResolutions(choice, data.value.duration).includes(data.value.resolution)) throw new Error("当前模型不支持所选时长与分辨率组合，请重新选择");
+  if (!ratioOptions.value.includes(data.value.ratio)) throw new Error(`当前模型不支持比例 ${data.value.ratio}，可选：${ratioOptions.value.join("、")}`);
   if (choice.cameraTrajectory && (!data.value.cameraTrajectory || !data.value.imageAndCameraOnly)) throw new Error("请先通过 setCameraTrajectory 配置并校准轨迹，或在镜头制作面板导入轨迹");
   if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
   if (!data.value.production && /\{\{ref \d+\}\}/.test(generationPrompt.value)) throw new Error("提示词含未绑定的参考标记，请重新连接资产并写入提示词");
@@ -392,7 +398,7 @@ function getConfig() {
       imageAndCameraOnly: data.value.imageAndCameraOnly,
     },
     models: models.value,
-    ratios: ratioOptions,
+    ratios: ratioOptions.value,
     matchingModes: matchingModes.value,
     maxSingleGenerationDuration: selectedModel.value ? videoDurations(selectedModel.value, data.value.resolution).at(-1) : undefined,
   };
@@ -419,7 +425,7 @@ nodeTools.register({
     duration: z.number().positive().optional(),
     durationReason: z.string().trim().min(3).max(500).optional(),
     resolution: z.string().min(1).optional(),
-    ratio: z.enum(ratioOptions).optional(),
+    ratio: z.string().regex(/^[1-9]\d{0,3}:[1-9]\d{0,3}$/).optional(),
     mode: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     generateAudio: z.boolean().optional(),
     production: z.strictObject({ shotId: z.string().min(1), productionFingerprint: z.string().min(1) }).optional(),
@@ -433,6 +439,8 @@ nodeTools.register({
     const choice = args.modelId === undefined ? selectedModel.value
       : models.value.find((item) => item.providerId === args.providerId && item.modelId === args.modelId);
     if (!choice) throw new Error("请选择 getConfig 返回的有效视频模型");
+    const ratios = getRatios(choice);
+    if (!ratios.includes(args.ratio ?? data.value.ratio)) throw new Error(`当前模型不支持比例 ${args.ratio ?? data.value.ratio}，可选：${ratios.join("、")}`);
     const targetResolution = args.resolution ?? (getResolutions(choice).includes(data.value.resolution) ? data.value.resolution : undefined);
     const durations = videoDurations(choice, targetResolution);
     if (args.duration !== undefined && !durations.includes(args.duration)) throw new Error(`当前模型不支持时长 ${args.duration}，可选：${durations.join("、")}`);

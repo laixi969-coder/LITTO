@@ -65,7 +65,7 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function imageOptions(value: unknown, pattern: RegExp) {
+function mediaOptions(value: unknown, pattern: RegExp) {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === "string" && item.length <= 64 && item === item.trim() && pattern.test(item)))] : undefined;
 }
 
@@ -78,15 +78,19 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
     const selectionKind = model.type === "audio" && model.audioTask === "music" ? "music" : model.type === "audio" && model.audioTask === "soundEffect" ? "soundEffect" : model.type;
     if (!all && !isSelectedModel(selectionKind, provider.id, model.id) && !(model.type === "audio" && isSelectedModel("audio", provider.id, model.id))) return [];
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
+    const input = record(record(model.inputSchema).properties);
     return [{
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
       cameraTrajectory: model.cameraTrajectory === true, promptControl: model.promptControl === "imageAndCameraOnly" ? "imageAndCameraOnly" : undefined,
-      mode: model.mode, durationResolutionMap: model.durationResolutionMap, audio: model.audio, nativeDialogue: model.nativeDialogue === true, lipSync: model.lipSync === true, speechInstructions: model.speechInstructions === true,
-      ...(model.type === "video" ? { multiShotCapabilities: readMultiShotCapabilities(provider, model, record(configurations[provider.id]).baseUrl) } : {}),
+      mode: model.mode, durationResolutionMap: model.durationResolutionMap ?? builtIn?.durationResolutionMap, audio: model.audio, nativeDialogue: model.nativeDialogue === true, lipSync: model.lipSync === true, speechInstructions: model.speechInstructions === true,
+      ...(model.type === "video" ? {
+        videoRatios: mediaOptions(model.videoRatios ?? record(input.aspect_ratio ?? input.ratio).enum ?? builtIn?.videoRatios, /^[1-9]\d{0,3}:[1-9]\d{0,3}$/),
+        multiShotCapabilities: readMultiShotCapabilities(provider, model, record(configurations[provider.id]).baseUrl),
+      } : {}),
       ...(model.type === "audio" ? { voices: model.voices, audioTask: model.audioTask, audioParameterSchema: record(model.inputSchema).properties } : {}),
       ...(model.type === "image" ? {
-        imageSizes: imageOptions(Array.isArray(model.imageSizes) ? model.imageSizes : builtIn?.imageSizes, /^[^\u0000-\u001f\u007f]+$/),
-        imageRatios: imageOptions(Array.isArray(model.imageRatios) ? model.imageRatios : builtIn?.imageRatios, /^[1-9]\d{0,3}:[1-9]\d{0,3}$/),
+        imageSizes: mediaOptions(Array.isArray(model.imageSizes) ? model.imageSizes : builtIn?.imageSizes, /^[^\u0000-\u001f\u007f]+$/),
+        imageRatios: mediaOptions(Array.isArray(model.imageRatios) ? model.imageRatios : builtIn?.imageRatios, /^[1-9]\d{0,3}:[1-9]\d{0,3}$/),
       } : {}),
     } as MediaModel];
   }));

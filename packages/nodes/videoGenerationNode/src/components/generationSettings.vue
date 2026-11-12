@@ -26,7 +26,7 @@
           </el-select>
         </div>
       </div>
-      <div class="sectionLabel">通用比例</div>
+      <div class="sectionLabel">比例</div>
       <div class="ratioOptions" role="group" aria-label="视频比例">
         <el-button v-for="item in ratios" :key="item" class="ratioButton" :disabled="disabled" :aria-label="`比例 ${item}`" :aria-pressed="ratio === item" @click="ratio = item">
           <span class="ratioContent">
@@ -49,9 +49,9 @@
 import { computed } from "vue";
 import { ElButton, ElPopover, ElSelect, ElOption, ElSwitch } from "element-plus";
 import { IconChevronUp } from "@tabler/icons-vue";
-import type { NodeMediaModel } from "@toonflow/nodes-scaffold/runtime";
+import { videoDurations, type NodeMediaModel } from "@toonflow/nodes-scaffold/runtime";
 
-const props = defineProps<{ model?: NodeMediaModel; disabled?: boolean; ratios: string[] }>();
+const props = defineProps<{ model?: NodeMediaModel; disabled?: boolean; ratios: string[]; resolutions: string[] }>();
 const duration = defineModel<number | undefined>("duration", { required: true });
 const resolution = defineModel<string>("resolution", { required: true });
 const ratio = defineModel<string>("ratio", { required: true });
@@ -64,13 +64,7 @@ const modes = computed(() => (props.model?.mode ?? []).map(item => ({
   value: JSON.stringify(item),
   label: Array.isArray(item) ? "混合参考" : modeLabels[item] ?? item,
 })));
-const mappings = computed(() => props.model?.durationResolutionMap ?? []);
-const durations = computed(() => [...new Set(mappings.value.flatMap(item => item.duration))].sort((a, b) => a - b));
-const resolutions = computed(() => resolutionsFor(duration.value));
-
-function resolutionsFor(value: number | undefined) {
-  return [...new Set(mappings.value.filter(item => value === undefined || item.duration.includes(value)).flatMap(item => item.resolution))];
-}
+const durations = computed(() => props.model ? videoDurations(props.model, resolution.value) : []);
 
 function ratioStyle(value: string) {
   const [width = 1, height = 1] = value.split(":").map(Number);

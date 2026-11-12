@@ -26,6 +26,7 @@ interface ProviderModel {
   nativeDialogue?: boolean;
   imageSizes?: string[];
   imageRatios?: string[];
+  videoRatios?: string[];
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   voices?: { title: string; voice: string }[];
   speechInstructions?: boolean;
