@@ -17,8 +17,23 @@
     <span v-else class="groupLabel" tabindex="0" :title="`${data.label || '分组'}（双击编辑名称）`" @dblclick.stop="editLabel" @keydown.enter.stop.prevent="editLabel">
       {{ data.label || "分组" }}
     </span>
+    <div class="groupActions nodrag nopan" @dblclick.stop @pointerdown.stop>
+      <button v-if="shotId" type="button" @click.stop="openProduction?.(shotId)">镜头制作</button>
+      <button type="button" :aria-expanded="!data.collapsed" @click.stop="toggleCollapsed">{{ data.collapsed ? '展开' : '折叠' }}</button>
+    </div>
+    <div v-if="data.collapsed" class="groupSummary">
+      <template v-if="shot">
+        <img v-if="shot.hero?.media" :src="'/cloud' + shot.hero.media.url" alt="当前主帧" />
+        <strong>{{ shot.order + 1 }} · {{ shot.title }}</strong>
+        <span>{{ shot.reviewStale ? '采用版本待复核' : shot.approvedTake ? 'Take 已批准' : shot.hero ? '主帧已选定' : '待选主帧' }}</span>
+        <span v-if="shot.activeJobs">{{ shot.activeJobs }} 项生成中</span>
+        <span v-if="shot.failedJobs">{{ shot.failedJobs }} 项生成失败 · 到镜头制作查看</span>
+      </template>
+      <span v-else>{{ childCount }} 个节点</span>
+      <span v-if="summary?.error" role="status">{{ summary.error }}</span>
+    </div>
     <button
-      v-for="corner in resizeCorners"
+      v-for="corner in data.collapsed ? [] : resizeCorners"
       :key="corner.name"
       class="resizeCorner nodrag nopan"
       :class="corner.name"
@@ -36,12 +51,40 @@
 </template>
 
 <script setup lang="ts">
-import { inject, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref, shallowRef, watch, type ShallowRef } from "vue";
+import { productionShotId, type ProductionSummary } from "@/lib/productionShots";
+import { fitGroupBounds, getSelectionTree } from "../selectionNodes";
 import { useVueFlow, type GraphNode, type NodeProps } from "@vue-flow/core";
 import { ElMessage } from "element-plus";
 
 const props = defineProps<NodeProps>();
+const shotId = computed(() => productionShotId(props));
+const openProduction = inject<(id: string) => void>("openProductionShot");
 const flow = useVueFlow();
+const summary = inject<ShallowRef<ProductionSummary>>("productionSummary");
+const shot = computed(() => summary?.value.shots.find(item => item.shotId === shotId.value));
+const childCount = computed(() => flow.getNodes.value.filter(node => node.parentNode === props.id).length);
+async function toggleCollapsed() {
+  const action = async () => {
+    const node = flow.findNode(props.id);
+    if (!node) return;
+    if (!node.dimensions.width || !node.dimensions.height) throw new Error("分组尺寸尚未就绪，请稍后再试");
+    const collapsed = !node.data.collapsed;
+    const size = collapsed ? { width: 300, height: 280 } : node.data.expandedSize ?? { width: 520, height: 360 };
+    if (collapsed) {
+      node.data.expandedSize = { ...node.dimensions };
+      flow.removeSelectedNodes(getSelectionTree([node], flow.getNodes.value).filter(child => child.id !== node.id));
+    }
+    node.data.collapsed = collapsed;
+    node.style = { ...(typeof node.style === "object" ? node.style : {}), width: `${size.width}px`, height: `${size.height}px` };
+    node.dimensions = { ...size };
+    if (!collapsed && flow.getNodes.value.some(child => child.parentNode === node.id && (child.position.x < 0 || child.position.y < 0 || child.position.x + child.dimensions.width > size.width || child.position.y + child.dimensions.height > size.height))) fitGroupBounds(flow.getNodes.value, new Set([node]));
+    await nextTick();
+    flow.updateNodeInternals([props.id]);
+  };
+  try { await (batchHistory ? batchHistory(action) : action()); }
+  catch (error) { ElMessage.error(error instanceof Error ? error.message : "折叠失败"); }
+}
 const batchHistory = inject<((action: () => Promise<void>) => Promise<void>) | undefined>("batchCanvasHistory", undefined);
 const editingLabel = ref(false);
 const labelDraft = ref("");
@@ -151,6 +194,13 @@ watch(
 
 <style lang="scss" scoped>
 .groupNode {
+  .groupActions { position: absolute; top: 6px; right: 16px; display: flex; gap: 6px;
+    button { padding: 4px 8px; border: 1px solid var(--el-border-color); border-radius: 4px; background: var(--el-bg-color); color: var(--el-text-color-primary); cursor: pointer; }
+  }
+  .groupSummary { display: flex; flex-direction: column; gap: 6px; padding: 44px 16px 12px; font-size: 12px;
+    img { width: 100%; height: 104px; object-fit: contain; }
+    strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
   position: relative;
   box-sizing: border-box;
   width: 100%;

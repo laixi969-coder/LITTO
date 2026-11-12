@@ -7,12 +7,12 @@
       <span v-if="loadError" role="status">{{ loadError }}</span>
     </header>
     <div class="shotItems">
-      <article v-for="shot in productionShots" :key="shot.shotId" class="shotItem">
+      <article v-for="shot in productionShots" :key="shot.shotId" class="shotItem" :class="{ selected: workspaceStore.selectedProductionShotId === shot.shotId }">
         <button type="button" class="shotSelect" @click="openProduction?.(shot.shotId)">
           <img v-if="shot.hero?.media" :src="'/cloud' + shot.hero.media.url" :alt="shot.title" style="width:100%;aspect-ratio:2.6;object-fit:cover" />
           <span class="shotLabel">{{ shot.order + 1 }} · {{ shot.title }}</span>
         </button>
-        <div class="shotState"><span :class="{ done: shot.approvedTake, attention: shot.highIssues }">{{ shot.highIssues ? '连续性待处理' : shot.approvedTake ? 'Take 已批准' : shot.hero ? '主帧已选定' : '待选主帧' }}</span></div>
+        <div class="shotState"><span :class="{ done: shot.approvedTake && !shot.reviewStale, attention: shot.highIssues || shot.reviewStale }">{{ shot.reviewStale ? '采用版本待复核' : shot.highIssues ? '连续性待处理' : shot.approvedTake ? 'Take 已批准' : shot.hero ? '主帧已选定' : '待选主帧' }}</span></div>
         <p class="shotWarning" v-if="shot.openIssues">{{ shot.openIssues }} 项连续性提示</p>
       </article>
       <article v-for="(shot, index) in productionShots.length ? [] : shots" :key="shot.id" class="shotItem">
@@ -53,25 +53,14 @@
 <script setup lang="ts">
 import type { CanvasShot } from "@/lib/canvasShots";
 import workspacePreview from "@/components/workspacePreview.vue";
-import { inject, onScopeDispose, ref, watch } from "vue";
+import { computed, inject, type ShallowRef } from "vue";
+import type { ProductionSummary } from "@/lib/productionShots";
+import { useWorkspaceStore } from "@/stores/workspace";
+const workspaceStore = useWorkspaceStore();
 const props = defineProps<{ shots: CanvasShot[]; directory?: string; projectId?: string }>();
-const productionShots = ref<any[]>([]), loadError = ref("");
+const summary = inject<ShallowRef<ProductionSummary>>("productionSummary");
+const productionShots = computed(() => summary?.value.shots ?? []), loadError = computed(() => summary?.value.error ?? "");
 const openProduction = inject<(id: string) => void>("openProductionShot");
-const controller = new AbortController();
-let revision = 0;
-async function refresh() {
-  const current = ++revision;
-  if (!props.projectId) { productionShots.value = []; return; }
-  try {
-    const response = await fetch(`/cloud/projects/${encodeURIComponent(props.projectId)}/shot-strip`, { signal: controller.signal });
-    if (!response.ok) throw new Error("镜头状态读取失败");
-    const data = await response.json();
-    if (current === revision) { productionShots.value = data; loadError.value = ""; }
-  } catch { if (!controller.signal.aborted) loadError.value = "镜头状态暂时不可用"; }
-}
-watch(() => props.projectId, refresh, { immediate: true });
-window.addEventListener("milimiliProductionUpdated", refresh);
-onScopeDispose(() => { controller.abort(); window.removeEventListener("milimiliProductionUpdated", refresh); });
 const emit = defineEmits<{ select: [id: string]; finalize: [id: string, finalized: boolean] }>();
 </script>
 
@@ -107,6 +96,7 @@ const emit = defineEmits<{ select: [id: string]; finalize: [id: string, finalize
     .shotItem {
       flex: 0 0 144px;
       min-width: 0;
+      &.selected .shotSelect { border-color: var(--el-color-primary); }
       .shotSelect {
         display: block;
         padding: 0;

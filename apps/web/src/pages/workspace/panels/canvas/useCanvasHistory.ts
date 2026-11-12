@@ -14,6 +14,7 @@ export function useCanvasHistory(flow: ReturnType<typeof useVueFlow>, binding: (
   const edgeReferences = new Map<string, Edge>();
   const nodeRuntimeFields = new Set(["data", "computedPosition", "handleBounds", "selected", "dimensions", "isParent", "resizing", "dragging", "events", "initialized"]);
   const edgeRuntimeFields = new Set(["data", "selected", "sourceNode", "targetNode", "sourceX", "sourceY", "targetX", "targetY", "events", "initialized"]);
+  const historyDataFields = ["label", "collapsed", "expandedSize"];
   let revision = 0;
   let dragging = false;
   const canUndo = computed(() => !!binding() && !applying.value && !grouping.value && cursor.value > 0);
@@ -25,9 +26,9 @@ export function useCanvasHistory(flow: ReturnType<typeof useVueFlow>, binding: (
     const fields = (element: Node | Edge, runtimeFields: Set<string>) => Object.fromEntries(
       Object.entries(element).filter(([key]) => !runtimeFields.has(key)),
     );
-    // ACT: 只复制结构和名称；删除后恢复内容由上面的节点、连线引用保留。
+    // ACT: 只复制结构、名称和折叠状态；生成结果由节点引用保留。
     const key = JSON.stringify({
-      nodes: flow.getNodes.value.map(node => ({ ...fields(node, nodeRuntimeFields), data: { label: node.data?.label } })),
+      nodes: flow.getNodes.value.map(node => ({ ...fields(node, nodeRuntimeFields), data: Object.fromEntries(historyDataFields.map(key => [key, node.data?.[key]])) })),
       edges: flow.getEdges.value.map(edge => fields(edge, edgeRuntimeFields)),
     });
     return { ...JSON.parse(key), key };
@@ -81,13 +82,17 @@ export function useCanvasHistory(flow: ReturnType<typeof useVueFlow>, binding: (
         const node = flow.findNode(saved.id);
         if (node) {
           restoreFields(node, saved, nodeRuntimeFields);
-          if (Object.hasOwn(saved.data ?? {}, "label")) node.data.label = saved.data!.label;
-          else delete node.data.label;
+          for (const key of historyDataFields) {
+            if (Object.hasOwn(saved.data ?? {}, key)) node.data[key] = saved.data![key];
+            else delete node.data[key];
+          }
           return node;
         }
         const data = JSON.parse(JSON.stringify(nodeReferences.get(saved.id)?.data ?? saved.data ?? {}));
-        if (Object.hasOwn(saved.data ?? {}, "label")) data.label = saved.data!.label;
-        else delete data.label;
+        for (const key of historyDataFields) {
+          if (Object.hasOwn(saved.data ?? {}, key)) data[key] = saved.data![key];
+          else delete data[key];
+        }
         const restored = { ...saved, data };
         Reflect.deleteProperty(restored, "initialized");
         return restored;

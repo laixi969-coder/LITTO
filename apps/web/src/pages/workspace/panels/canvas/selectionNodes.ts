@@ -38,7 +38,7 @@ export function getSelectionTree(selection: GraphNode[], nodes: GraphNode[]) {
 
 export function fitGroupBounds(nodes: GraphNode[], groups: Set<GraphNode>) {
   for (const group of getSelectionTree([...groups], nodes).reverse()) {
-    if (!groups.has(group)) continue;
+    if (!groups.has(group) || group.data?.collapsed) continue;
     const children = nodes.filter(node => node.parentNode === group.id);
     if (!children.length || children.some(node => !node.dimensions.width || !node.dimensions.height)) continue;
     const left = Math.min(...children.map(node => node.position.x)) - 24;
@@ -75,7 +75,7 @@ export function finishGroupDrag(nodes: GraphNode[], draggedNodes: GraphNode[]) {
     const position = parents.reduce((point, parent) => ({ x: point.x + parent.position.x, y: point.y + parent.position.y }), { ...node.position });
     return [node.id, { ...position, ...node.dimensions, depth: parents.length }];
   }));
-  const groups = nodes.filter(node => node.type === "canvasGroup" && !node.hidden).sort((a, b) => {
+  const groups = nodes.filter(node => node.type === "canvasGroup" && !node.hidden && !node.data?.collapsed && !ancestors(node).some(parent => parent.data?.collapsed)).sort((a, b) => {
     const first = rectangles.get(a.id)!;
     const second = rectangles.get(b.id)!;
     return second.depth - first.depth || first.width * first.height - second.width * second.height;

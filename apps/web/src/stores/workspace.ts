@@ -12,6 +12,7 @@ export type Project = {
 
 export const useWorkspaceStore = defineStore("workspace", () => {
   const project = ref<Project | null>(null);
+  const selectedProductionShotId = ref("");
   const projectList = ref<Project[]>([]);
   const pendingAgentMessage = ref<{ directory: string; prompt: string; attachments?: AgentAttachment[]; model: string; reasoningEffort: string } | null>(null);
   let openRequest = 0;
@@ -25,6 +26,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     if (request !== openRequest) throw new Error("已选择其他项目，本次打开已取消");
     if (data.code !== 200 || !data.data?.directory) throw new Error(data.message || "工作目录校验失败");
     const checkedDirectory = data.data.directory;
+    selectedProductionShotId.value = "";
     pendingAgentMessage.value = null;
     const existing = projectList.value.find(project => project.directory === previousDirectory)
       ?? projectList.value.find(project => project.directory === checkedDirectory);
@@ -44,10 +46,10 @@ export const useWorkspaceStore = defineStore("workspace", () => {
 
   function removeProject(path: string) {
     projectList.value = projectList.value.filter(item => item.directory !== path);
-    if (project.value?.directory === path) project.value = null;
+    if (project.value?.directory === path) { project.value = null; selectedProductionShotId.value = ""; }
   }
 
-  return { project, projectList, pendingAgentMessage, openProject, renameProject, removeProject };
+  return { project, projectList, selectedProductionShotId, pendingAgentMessage, openProject, renameProject, removeProject };
 }, {
   persist: {
     key: "milimili.projectList",

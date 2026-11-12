@@ -25,6 +25,7 @@ import { waitForControlValue } from "@/lib/mcpControl";
 import canvasPanel from "./index.vue";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { useWorkspaceStore } from "@/stores/workspace";
+import { productionShotId, type ProductionNode, type ProductionSummary } from "@/lib/productionShots";
 import { createCanvasMention, mentionNodeOutputs, queryMentionNodes, type MentionCanvasSource } from "@toonflow/server/agent/mentionSources";
 
 const props = withDefaults(defineProps<{ active?: boolean; settingsVisible?: boolean }>(), { active: true, settingsVisible: false });
@@ -38,6 +39,27 @@ const canvasReady = computed(() => activeInstance.value?.canvasReady ?? false);
 const lifetime = new AbortController();
 const workspaceStore = useWorkspaceStore();
 const projectDirectory = workspaceStore.project?.directory;
+const projectId = workspaceStore.project?.projectId;
+const productionSummary = shallowRef<ProductionSummary>({ shots: [], error: "" });
+provide("productionSummary", productionSummary);
+let summaryRevision = 0;
+async function refreshProductionSummary() {
+  if (!projectId) return;
+  const revision = ++summaryRevision;
+  try {
+    const responses = await Promise.all([`/projects/${encodeURIComponent(projectId)}/shot-strip`, `/generations?projectId=${encodeURIComponent(projectId)}`].map(path => fetch(`/cloud${path}`, { signal: lifetime.signal })));
+    if (responses.some(response => !response.ok)) throw new Error("镜头状态暂时不可用");
+    const [shots, jobs] = await Promise.all(responses.map(response => response.json()));
+    if (revision !== summaryRevision) return;
+    productionSummary.value = { shots: shots.map((shot: any) => ({ ...shot, activeJobs: jobs.filter((job: any) => job.targetId === shot.shotId && ["QUEUED", "RUNNING"].includes(job.status)).length, failedJobs: jobs.filter((job: any) => job.targetId === shot.shotId && job.status === "FAILED").length })), error: "" };
+  } catch (error) {
+    if (!lifetime.signal.aborted && revision === summaryRevision) productionSummary.value = { ...productionSummary.value, error: error instanceof Error ? error.message : "镜头状态读取失败" };
+  }
+}
+void refreshProductionSummary();
+window.addEventListener("milimiliProductionUpdated", refreshProductionSummary);
+const summaryTimer = setInterval(() => { if (props.active) void refreshProductionSummary(); }, 10000);
+onScopeDispose(() => { clearInterval(summaryTimer); window.removeEventListener("milimiliProductionUpdated", refreshProductionSummary); });
 provide("projectCanvasFiles", useWorkspaceFiles(() => projectDirectory));
 const canvases = shallowRef<{ id: string }[]>([]);
 provide("canvasList", canvases);
@@ -93,6 +115,33 @@ function resolveCanvasContext(fileName: string): CanvasContext | undefined {
 
 function getCanvasContext() {
   return props.active ? activeInstance.value?.getCanvasContext() : undefined;
+}
+
+async function focusProductionShot(id: string, label: string, create = false) {
+  lifetime.signal.throwIfAborted();
+  if (!projectDirectory) throw new Error("请先选择工作目录");
+  const files = useWorkspaceFiles(projectDirectory);
+  // 优先当前画布，其次已加载画布，最后检查同项目尚未打开的画布。
+  const ordered = [...instances.values()].sort((left, right) => Number(right === activeInstance.value) - Number(left === activeInstance.value));
+  for (const panel of ordered) {
+    if (!panel.getMentionNodes().some(node => productionShotId(node) === id)) continue;
+    await activateCanvas(panel.canvasId);
+    return panel.focusProductionShot(id, label);
+  }
+  for (const canvas of canvases.value) {
+    if (ordered.some(panel => panel.canvasId === canvas.id)) continue;
+    const data = await files.readJson<{ milimiliCanvas?: boolean; toonflowCanvas?: boolean; littoCanvas?: boolean; nodes?: ProductionNode[] }>(canvas.id);
+    lifetime.signal.throwIfAborted();
+    if (!data || !(data.milimiliCanvas || data.toonflowCanvas || data.littoCanvas) || !Array.isArray(data.nodes)) continue;
+    if (!data.nodes.some(node => node && productionShotId(node) === id)) continue;
+    await activateCanvas(canvas.id);
+    return activeInstance.value!.focusProductionShot(id, label);
+  }
+  if (create) {
+    if (!activeInstance.value?.canvasReady) throw new Error("请先打开目标画布");
+    return activeInstance.value.focusProductionShot(id, label, true);
+  }
+  return false;
 }
 
 async function flushSave(action?: () => Promise<void>) {
@@ -160,6 +209,7 @@ const mentionSource: MentionCanvasSource = {
 };
 
 defineExpose({ canvasId, canvasReady, getCanvasContext, readDocumentNode, saveDocumentNode, flushSave, cancelSave,
+  focusProductionShot,
   mentionSource,
   get saveBusy() { return [...instances.values()].some(panel => panel.saveBusy); },
 });

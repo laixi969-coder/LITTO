@@ -2,6 +2,7 @@
   <div
     ref="canvasElement"
     class="canvas"
+    :data-canvas-runtime="flow.id"
     :class="{ edgesHidden: !showEdges, handMode, compositingEnabled: generalSettings.canvasCompositingEnabled }"
     :style="{ '--canvasEdgeColor': generalSettings.canvasEdgeColorMode === 'custom' ? generalSettings.canvasEdgeColor : 'var(--el-color-primary)' }"
     @dblclick="openNodeMenu"
@@ -13,6 +14,7 @@
     @pointerleave="pointerPosition = undefined"
     @dragover="dragFilesOver"
     @drop="dropFiles">
+    <component :is="'style'">{{ collapsedStyles }}</component>
     <vue-flow
       class="flowViewport"
       :id="runtimeKey"
@@ -150,6 +152,9 @@ import { Background } from "@vue-flow/background";
 import { getCanvasShots } from "@/lib/canvasShots";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import shotStrip from "./components/shotStrip.vue";
+import { productionShotId } from "@/lib/productionShots";
+import { waitForControlValue } from "@/lib/mcpControl";
+import { nextCanvasPosition } from "./arrangeCanvas";
 import { useCanvasTools } from "./useCanvasTools";
 import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 import { loadNodeComponent } from "./loadNodeComponent";
@@ -189,7 +194,8 @@ const props = withDefaults(defineProps<{
   resolveCanvasContext?: (canvasId: string) => CanvasContext | undefined;
   flushCanvases?: (action?: () => Promise<void>) => Promise<void>;
 }>(), { active: true, settingsVisible: false });
-const { project } = storeToRefs(useWorkspaceStore());
+const workspaceStore = useWorkspaceStore();
+const { project } = storeToRefs(workspaceStore);
 const canvasDirectory = project.value?.directory;
 const canvasFiles = inject<ReturnType<typeof useWorkspaceFiles>>("projectCanvasFiles") ?? useWorkspaceFiles(() => canvasDirectory);
 
@@ -229,6 +235,26 @@ const castingVisible = ref(false);
 const assetLibraryRef = ref<InstanceType<typeof assetLibrary>>();
 const edgeDisconnect = ref<{ id: string; x: number; y: number }>();
 const flow = useVueFlow(props.runtimeKey);
+const collapsedChildren = computed(() => {
+  const nodes = flow.getNodes.value;
+  const hidden = new Set<string>();
+  for (const group of nodes.filter(node => node.type === "canvasGroup" && node.data?.collapsed)) {
+    for (const child of getSelectionTree([group], nodes)) if (child.id !== group.id) hidden.add(child.id);
+  }
+  return hidden;
+});
+// ACT: 仅隐藏显示与命中区域，不卸载节点；后台生成仍运行，展开后保留实例与尺寸。
+const collapsedStyles = computed(() => {
+  const prefix = `[data-canvas-runtime="${CSS.escape(flow.id)}"]`;
+  const selectors = [...collapsedChildren.value].map(id => `${prefix} .vue-flow__node[data-id="${CSS.escape(id)}"]`);
+  for (const edge of flow.getEdges.value) {
+    if (collapsedChildren.value.has(edge.source) || collapsedChildren.value.has(edge.target)) selectors.push(`${prefix} .vue-flow__edge[data-id="${CSS.escape(edge.id)}"]`);
+  }
+  return selectors.length ? `${selectors.join(",")} { visibility: hidden !important; pointer-events: none !important; }` : "";
+});
+watch(() => flow.getSelectedNodes.value.filter(node => collapsedChildren.value.has(node.id)), nodes => {
+  if (nodes.length) flow.removeSelectedNodes(nodes);
+}, { flush: "post" });
 onScopeDispose(anonymousData.observeCanvas(() => props.active && canvasId.value
   ? { nodes: flow.nodes.value, edgeCount: flow.edges.value.length }
   : undefined));
@@ -280,6 +306,38 @@ function getCanvasContext() {
 }
 const canvasReady = computed(() => !!canvasId.value && !nodeListLoading.value && nodeLoads.size === 0);
 const shots = computed(() => getCanvasShots(flow.nodes.value));
+flow.onNodeClick(({ node }) => {
+  const id = productionShotId(node);
+  if (props.active && id) workspaceStore.selectedProductionShotId = id;
+});
+async function focusProductionShot(id: string, label: string, create = false) {
+  const signal = AbortSignal.any([canvasController.signal, workspaceController.signal, AbortSignal.timeout(15000)]);
+  signal.throwIfAborted();
+  let nodes = flow.nodes.value.filter(node => productionShotId(node) === id);
+  if (!nodes.length && create) {
+    await canvasHistory.batch(async () => {
+      const position = nextCanvasPosition(flow);
+      const nodeId = crypto.randomUUID();
+      flow.addNodes({ id: nodeId, type: "canvasGroup", position, style: { width: "520px", height: "360px" }, connectable: false, data: { label, productionUnitId: `shot${id}` } });
+      await nextTick();
+      nodes = flow.nodes.value.filter(node => node.id === nodeId);
+    });
+    await flushCanvasSave();
+  }
+  if (!nodes.length) return false;
+  const visibleNodes = nodes.filter(node => !collapsedChildren.value.has(node.id));
+  // 内层镜头被外层折叠时定位其可见外层组，避免误判缺失并创建重复组。
+  nodes = visibleNodes.length ? visibleNodes : flow.getNodes.value.filter(node => node.type === "canvasGroup" && node.data?.collapsed && !collapsedChildren.value.has(node.id) && getSelectionTree([node], flow.getNodes.value).some(child => nodes.includes(child)));
+  await nextTick();
+  flow.updateNodeInternals(nodes.map(node => node.id));
+  await waitForControlValue(() => nodes.every(node => node.dimensions.width > 0 && node.dimensions.height > 0) && flow.dimensions.value.width > 0 && flow.dimensions.value.height > 0 ? true : undefined, signal);
+  flow.removeSelectedNodes(flow.getSelectedNodes.value);
+  flow.addSelectedNodes(nodes);
+  workspaceStore.selectedProductionShotId = id;
+  if (!(await flow.fitView({ nodes: nodes.map(node => node.id), padding: 1, maxZoom: 1, duration: 0 }))) throw new Error("镜头节点尚未就绪，请重试定位");
+  signal.throwIfAborted();
+  return true;
+}
 function selectShot(id: string) {
   void flow.fitView({ nodes: [id], padding: 0.6, duration: 0 });
 }
@@ -291,6 +349,7 @@ function finalizeShot(id: string, finalized: boolean) {
 }
 provide("canvas", getCanvasContext);
 defineExpose({ canvasId, canvasReady, getCanvasContext, readDocumentNode, saveDocumentNode, flushSave: flushCanvasSave, cancelSave: cancelCanvasSave,
+  focusProductionShot,
   getMentionNodes: () => flow.nodes.value, findMentionNode: flow.findNode,
   getRetainedNodes: canvasHistory.getRetainedNodes,
   get saveBusy() { return savePaused; }, get loadError() { return canvasMenuRef.value?.loadError ?? ""; },
@@ -600,7 +659,7 @@ watch(
       const stopData = watch(() => element.data, scheduleCanvasSave, { deep: true, flush: "post" });
       const stopName = isNode(element)
         ? watch(
-            () => element.data?.label,
+            () => [element.data?.label, element.data?.collapsed, element.data?.expandedSize],
             () => canvasHistory.record(),
             { flush: "post" }
           )

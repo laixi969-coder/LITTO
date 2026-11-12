@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { all, get, run } from "../db.ts";
+import { all, get, run, type Scope } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { ASSET_TYPES, PERSONA_AXES, assetInput, bindingInput, lookSchema, personaTagSchema, worldSchema, shotInput } from "../domain/schema.ts";
 import { approveAsset, assetVersions, createAsset, createVariant, newAssetVersion, rollbackAsset, updateAsset } from "../domain/assets.ts";
@@ -19,7 +19,7 @@ import { mustRoute, resolvePolicy } from "../providers/router.ts";
 import { bad, HttpError, notFound } from "../util.ts";
 import { importLegacyCanvas } from "../legacy.ts";
 import { mediaView } from "../storage.ts";
-import { estimate } from "../jobs.ts";
+import { estimate, jobView } from "../jobs.ts";
 import { autoObserve } from "../domain/qc-vision.ts";
 import { inspectProductionQuality } from "../domain/qualityInspection.ts";
 import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema, motionReviewSchema } from "../domain/realism.ts";
@@ -56,6 +56,40 @@ production.put(`${P}/looks/:scope/:scopeId?`, async (c) => {
 production.get(`${P}/assetImages`, (c) => {
     const { s } = project(c, c.req.param("pid"));
     return c.json(s.list("media", { projectId: c.req.param("pid") }, "created_at DESC").filter(media => media.mime.startsWith("image/")).map(mediaView));
+});
+production.get(`${P}/media`, (c) => {
+  const { s } = project(c, c.req.param("pid"));
+  const projectId = c.req.param("pid");
+  const versions = [...s.list("keyframes", { projectId }), ...s.list("takes", { projectId })];
+  const shots = new Map(s.list("shots", { projectId }).map(shot => [shot.id, shot.title]));
+  return c.json(s.list("media", { projectId }, "created_at DESC").map(media => ({ ...mediaView(media), versions: versions.filter(item => item.mediaId === media.id).map(item => ({ id: item.id, shotId: item.shotId, title: shots.get(item.shotId), jobId: item.jobId, status: item.status })) })));
+});
+production.get(`${P}/generationReceipt/:requestId`, (c) => {
+  const { s } = project(c, c.req.param("pid"));
+  const requestId = z.string().uuid().safeParse(c.req.param("requestId"));
+  if (!requestId.success) throw bad("生成请求 ID 无效");
+  const receipt = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", s.workspaceId, `workspaceMedia:${requestId.data}`);
+  const saved = receipt && JSON.parse(receipt.response);
+  const job = typeof saved?.id === "string" ? s.get("generation_jobs", saved.id) : undefined;
+  return c.json(job?.projectId === c.req.param("pid") ? jobView(job) : null);
+});
+production.post("/shots/:id/importMedia", async (c) => {
+  const { s } = ctx(c, "EDITOR");
+  const b = await body(c, z.object({ mediaId: z.string().min(1) }));
+  const shot = s.get("shots", c.req.param("id"));
+  if (!shot) throw notFound("shot");
+  const media = s.get("media", b.mediaId);
+  if (!media || media.projectId !== shot.projectId) throw notFound("project media");
+  const image = media.mime.startsWith("image/");
+  if (!image && !media.mime.startsWith("video/")) throw bad("只有图片或视频可以加入镜头候选");
+  const table = image ? "keyframes" : "takes";
+  const existing = s.list(table, { shotId: shot.id, mediaId: media.id })[0];
+  if (existing) return c.json(image ? keyframeView(existing) : takeView(existing));
+  const source = s.list(table, { projectId: shot.projectId, mediaId: media.id })[0];
+  // 复用素材只新增候选；来源记录保留，原镜头的采用与检查结论不转移。
+  const item = s.insert(table, { project_id: shot.projectId, shot_id: shot.id, media_id: media.id, status: image ? "variant" : "candidate", ...(image ? {} : { keyframe_id: null }), meta: { source: "mediaReuse", importedFrom: { mediaId: media.id, versionId: source?.id, shotId: source?.shotId, jobId: source?.jobId } } });
+  if (shot.status === "planned") s.update("shots", shot.id, { status: image ? "keyframing" : "taking" });
+  return c.json(image ? keyframeView(item) : takeView(item), 201);
 });
 production.get(`${P}/assets`, (c) => { const { s } = project(c, c.req.param("pid")); return c.json(s.list("assets", { projectId: c.req.param("pid") })); });
 production.post(`${P}/assets`, async (c) => {
@@ -108,7 +142,8 @@ production.get(`${P}/references`, (c) => {
 production.post(`${P}/references`, async (c) => {
     const { s } = project(c, c.req.param("pid"), "EDITOR");
     const b = await body(c, z.object({ kind: z.enum(["image", "video", "audio", "text"]), name: z.string().optional(), mediaId: z.string().optional(), text: z.string().optional(), source: z.string().default("upload"), sourceRef: z.string().optional() }));
-    if (b.mediaId && !s.get("media", b.mediaId)) throw notFound("media");
+    if (b.mediaId && s.get("media", b.mediaId)?.projectId !== c.req.param("pid")) throw notFound("project media");
+    if (b.mediaId && s.get("media", b.mediaId)?.mime.split("/")[0] !== b.kind) throw bad("参考类型与媒体不一致");
     if (b.kind === "text" ? !b.text : !b.mediaId) throw bad(b.kind === "text" ? "text required" : "mediaId required");
     return c.json(s.insert("refs", { project_id: c.req.param("pid"), kind: b.kind, name: b.name ?? null, media_id: b.mediaId ?? null, text: b.text ?? null, source: b.source, source_ref: b.sourceRef ?? null }), 201);
 });
@@ -132,13 +167,22 @@ production.post(`${P}/scenes`, async (c) => {
 });
 
 // ---- Shots ----
+function adoptedReviewStale(s: Scope, shot: any) {
+    return ([["keyframe", shot.heroKeyframeId], ["take", shot.approvedTakeId]] as const).some(([type, id]) => {
+        if (!id) return false;
+        const item = s.get(type === "keyframe" ? "keyframes" : "takes", id);
+        const report = s.list("qc_reports", { targetType: type, targetId: id }, "created_at DESC, rowid DESC")[0];
+        try { return !item || report?.evidence?.mediaId !== item.mediaId || report?.evidence?.fingerprint !== shotFingerprint(s, shot.id, type); }
+        catch { return true; }
+    });
+}
 const withState = (s: any, sh: any) => ({ ...sh, state: statesOf(s, sh.id) });
 production.get(`${P}/shots`, (c) => {
     const { s } = project(c, c.req.param("pid"));
     const seq = c.req.query("sequenceId");
     const shots = s.list("shots", { projectId: c.req.param("pid"), ...(seq ? { sequenceId: seq } : {}) }, "sequence_id, ord");
     const bindings = s.list("reference_bindings", { projectId: c.req.param("pid"), targetType: "shot" });
-    return c.json(shots.map((sh: any) => ({ ...withState(s, sh), bindings: bindings.filter((b: any) => b.targetId === sh.id), heroKeyframe: sh.heroKeyframeId ? keyframeView(s.get("keyframes", sh.heroKeyframeId)) : null, approvedTake: sh.approvedTakeId ? takeView(s.get("takes", sh.approvedTakeId)) : null, issues: s.list("continuity_issues", { shotId: sh.id, status: "open" }) })));
+    return c.json(shots.map((sh: any) => ({ ...withState(s, sh), reviewStale: adoptedReviewStale(s, sh), bindings: bindings.filter((b: any) => b.targetId === sh.id), heroKeyframe: sh.heroKeyframeId ? keyframeView(s.get("keyframes", sh.heroKeyframeId)) : null, approvedTake: sh.approvedTakeId ? takeView(s.get("takes", sh.approvedTakeId)) : null, issues: s.list("continuity_issues", { shotId: sh.id, status: "open" }) })));
 });
 production.post(`${P}/shots`, async (c) => { const { s } = project(c, c.req.param("pid"), "EDITOR"); return c.json(createShot(s, c.req.param("pid"), await body(c, shotInput)), 201); });
 production.get("/shots/:id", (c) => {
@@ -305,7 +349,7 @@ production.get(`${P}/shot-strip`, (c) => {
         const take = sh.approvedTakeId ? s.get("takes", sh.approvedTakeId) : null;
         const issues = s.list("continuity_issues", { shotId: sh.id, status: "open" });
         const qc = s.list("qc_reports", { shotId: sh.id }, "created_at DESC")[0];
-        return { shotId: sh.id, order: sh.ord, sequenceId: sh.sequenceId, title: sh.title, status: sh.status, narrativeFunction: sh.narrativeFunction, hero: hero && keyframeView(hero), approvedTake: take && takeView(take), openIssues: issues.length, highIssues: issues.filter((i: any) => i.severity === "high").length, qcScore: qc?.score ?? null };
+        return { shotId: sh.id, reviewStale: adoptedReviewStale(s, sh), order: sh.ord, sequenceId: sh.sequenceId, title: sh.title, status: sh.status, narrativeFunction: sh.narrativeFunction, hero: hero && keyframeView(hero), approvedTake: take && takeView(take), openIssues: issues.length, highIssues: issues.filter((i: any) => i.severity === "high").length, qcScore: qc?.score ?? null };
     });
     return c.json(out);
 });

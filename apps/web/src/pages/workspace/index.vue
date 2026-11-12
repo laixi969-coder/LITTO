@@ -124,6 +124,11 @@ const documentPanelRef = ref<InstanceType<typeof documentPanel>>();
 provide("canvas", () => canvasPanelRef.value?.getCanvasContext());
 provide("mentionCanvas", () => canvasPanelRef.value?.mentionSource);
 provide("activateCanvasPanel", () => switchPanel("canvas"));
+provide("focusProductionShot", async (id: string, title: string, create = false) => {
+  if (!(await switchPanel("canvas"))) throw new Error("画布面板无法打开");
+  if (!canvasPanelRef.value) throw new Error("画布尚未就绪");
+  return canvasPanelRef.value.focusProductionShot(id, title, create);
+});
 
 const controlLifetime = new AbortController();
 onScopeDispose(() => controlLifetime.abort(new Error("工作区已关闭")));
