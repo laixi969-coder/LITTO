@@ -8,7 +8,7 @@ import { mediaProviders, type Provider, type ProviderTask, type ProviderTools } 
 import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { matchesAspect } from "@toonflow/providers/aspect";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
-import { cameraTrajectorySchema, validateVideoStoryboard, compileVideoStoryboard, storyboardGenerateAudio } from "@toonflow/tools-scaffold/runtime";
+import { cameraTrajectorySchema, compileVisualModifiers, validateVideoStoryboard, compileVideoStoryboard, storyboardGenerateAudio } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { modelAccess } from "@/utils/modelAvailability";
@@ -22,6 +22,14 @@ import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { inspectVideoPrompt, isDirectorPrompt, positivePromptText } from "@/utils/media/videoPrompt";
 import { autoFilmScope } from "@/utils/autoFilm/scope";
 import { readMultiShotCapabilities, assertMultiShotCapability } from "@/utils/media/shotCapabilities";
+
+export function prepareVisualModifiers(request: MediaGenerationRequest, model: MediaModel) {
+  if (!request.visualModifiers) return request;
+  if (model.promptControl === "imageAndCameraOnly" || model.lipSync) invalid("当前模型不执行文字修饰，请恢复自动或更换模型");
+  if (model.type !== "video" && request.visualModifiers.motions.length) invalid("图片模型不能执行有顺序的运镜");
+  try { return { ...request, visualModifiers: undefined, prompt: compileVisualModifiers(request.prompt, request.visualModifiers, request.storyboard?.shots) }; }
+  catch (cause) { throw Object.assign(cause instanceof Error ? cause : new Error(String(cause)), { status: 400 }); }
+}
 
 export function prepareVideoStoryboard(request: MediaGenerationRequest, model: MediaModel) {
   if (!request.storyboard) return request;
@@ -683,7 +691,7 @@ export async function generateMedia(cwd: string, mediaType: "image" | "video" | 
       const model = (await listMediaModels()).find(model => model.type === mediaType && model.providerId === request.providerId && model.modelId === request.modelId);
       if (!model) invalid("所选媒体模型不存在或类型不匹配");
       request = await applyMediaQuality(cwd, mediaType, request, model);
-      request = prepareVideoStoryboard(request, model);
+      request = prepareVideoStoryboard(prepareVisualModifiers(request, model), model);
       const blocking = request.prompt.includes("BLOCKING:") ? "" : await blockingLine(cwd, request.outputName);
       if (blocking) request = { ...request, prompt: `${blocking}\n\n${request.prompt}` };
     }

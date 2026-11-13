@@ -64,11 +64,11 @@
             :disabled="generating || deleting || !selectedModel"
             @update:size="setImageSize"
             @update:ratio="setImageRatio" />
-          <promptTools :text="data.prompt" mediaType="image" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
+          <promptTools :text="data.prompt" mediaType="image" :request="generationInput" :preview="baseGenerationPrompt" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
-            :disabled="deleting || uploading || toolsBusy || (!generating && (!generationPrompt || !selectedModel))"
+            :disabled="deleting || uploading || toolsBusy || (!generating && ((!data.production && !generationPrompt) || !selectedModel))"
             :title="generating ? '停止生成' : '生成图片'"
             :aria-label="generating ? '停止生成' : '生成图片'"
             @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration().catch((error) => showNodeError(error, '图片生成失败'))" />
@@ -87,7 +87,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImageViewer } from "element-plus";
 import { IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeImageRequest, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { compileVisualModifiers, type VisualModifiers, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeImageRequest, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import promptTools from "@toonflow/nodes-scaffold/promptTools";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
@@ -109,7 +109,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "图片生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { purpose?: "asset" | "standalone" | "storyboard"; production?: { shotId: string; productionFingerprint: string }; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeImageRequest }; prompt: string; promptModel: PromptModel; model: string; size: string; ratio: string });
+const data = computed(() => node.data as { visualModifiers?: VisualModifiers; purpose?: "asset" | "standalone" | "storyboard"; production?: { shotId: string; productionFingerprint: string }; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeImageRequest }; prompt: string; promptModel: PromptModel; model: string; size: string; ratio: string });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -168,7 +168,7 @@ watch(
   { flush: "sync" }
 );
 const modelGroups = computed(() => groupNodeModels(models.value));
-const generationPrompt = computed(() =>
+const baseGenerationPrompt = computed(() =>
   [
     data.value.prompt.trim(),
     ...refList.value.flatMap((item, index) => (item.dataType === "STRING" && item.value?.trim() ? [`参考 ${index + 1}：\n${item.value.trim()}`] : [])),
@@ -176,6 +176,7 @@ const generationPrompt = computed(() =>
     .filter(Boolean)
     .join("\n\n")
 );
+const generationPrompt = computed(() => compileVisualModifiers(baseGenerationPrompt.value, data.value.visualModifiers));
 const outputFile = computed(() => outputs.value.image?.dataType === "IMAGE" ? outputs.value.image.value : undefined);
 const previewUrl = files.useFileUrl(
   outputFile,
@@ -252,17 +253,7 @@ async function startGeneration() {
   if (!data.value.production && refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
-  const input = {
-    providerId: choice.providerId,
-    modelId: choice.modelId,
-    prompt: generationPrompt.value,
-    ...data.value.production,
-    purpose: data.value.purpose,
-    size: data.value.size,
-    ratio: data.value.ratio,
-    outputDirectory: `assets/${id}`,
-    images: refList.value.flatMap((item) => (item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : [])),
-  };
+  const input = generationInput();
   generationController = controller;
   data.value.generationPending = true;
   data.value.generationJobId = undefined;
@@ -273,6 +264,23 @@ async function startGeneration() {
     return ai.generateImage(pending.input, controller.signal, rememberJob, pending.requestId);
   }), controller);
   return { status: "generating" };
+}
+
+function generationInput(): Omit<NodeImageRequest, "directory"> {
+  const choice = selectedModel.value;
+  if (!choice) throw new Error("请先选择图片模型");
+  return {
+    providerId: choice.providerId,
+    modelId: choice.modelId,
+    prompt: baseGenerationPrompt.value,
+    visualModifiers: data.value.visualModifiers,
+    ...data.value.production,
+    purpose: data.value.purpose,
+    size: data.value.size,
+    ratio: data.value.ratio,
+    outputDirectory: `assets/${id}`,
+    images: (data.value.production ? [] : refList.value).flatMap((item) => (item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : [])),
+  };
 }
 
 function rememberJob(jobId: string) {
@@ -341,6 +349,7 @@ async function resizeImage(event: Event) {
 function getConfig() {
   return {
     config: {
+      visualModifiers: data.value.visualModifiers,
       production: data.value.production,
       purpose: data.value.purpose,
       providerId: selectedModel.value?.providerId ?? "",

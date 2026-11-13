@@ -47,6 +47,7 @@
     "@form-create/element-ui": "^3",
     "typescript": "~6.0.3",
     "vue-tsc": "^3.3.11",
-    "@toonflow/tools-scaffold": "*"
+    "@toonflow/tools-scaffold": "*",
+    "@toonflow/tool-media-generation": "*"
   }
 }

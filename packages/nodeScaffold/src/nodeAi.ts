@@ -19,6 +19,7 @@ export type NodeMediaModel = Omit<MediaModel, "mode"> & {
   mode?: (string | string[])[];
 };
 export type NodeImageRequest = {
+  visualModifiers?: MediaGenerationRequest["visualModifiers"];
   purpose?: "asset" | "standalone" | "storyboard";
   shotId?: string;
   productionFingerprint?: string;

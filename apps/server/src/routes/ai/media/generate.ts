@@ -5,7 +5,7 @@ import type { FfprobeData } from "@toonflow/ffmpeg/types";
 import { Router } from "express";
 import { z } from "zod";
 import { audioGenerationSchema, imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
-import { videoStoryboardSchema, compileVideoStoryboard } from "@toonflow/tools-scaffold/runtime";
+import { videoStoryboardSchema, compileVideoStoryboard, visualModifiersSchema, compileVisualModifiers } from "@toonflow/tools-scaffold/runtime";
 import { validateFields } from "@/lib/middleware";
 import { success, error } from "@/lib/responseFormat";
 import u from "@/utils";
@@ -210,7 +210,9 @@ export default Router().post("/", validateFields({
   const plan = raw.storyboard === undefined ? undefined : videoStoryboardSchema.safeParse(raw.storyboard);
   if (plan && (!plan.success || mediaType !== "video")) return res.status(400).json(error("视频分镜编排无效", plan.success ? null : plan.error.issues, 400));
   // 分镜也进入现有年代、人物与服装检查；实际正文仍由提交层统一编译一次。
-  const authoredPrompt = compileVideoStoryboard(String(raw.prompt ?? ""), plan?.success ? plan.data : undefined);
+  const modifiers = raw.visualModifiers === undefined ? undefined : visualModifiersSchema.safeParse(raw.visualModifiers);
+  if (modifiers && !modifiers.success) return res.status(400).json(error("生成修饰无效", modifiers.error.issues, 400));
+  const authoredPrompt = compileVisualModifiers(compileVideoStoryboard(String(raw.prompt ?? ""), plan?.success ? plan.data : undefined), modifiers?.success ? modifiers.data : undefined, plan?.success ? plan.data.shots : []);
   const hasIdentityReference = (Array.isArray(raw.images) && raw.images.length > 0) || Boolean(raw.firstFrame) || typeof continueFrom === "string";
 
   // 肤质路径：资产与定妆固定 clean，其余按项目 assets/visual.json，请求可覆盖。

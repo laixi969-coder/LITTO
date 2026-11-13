@@ -16,16 +16,16 @@
   <teleport to="body">
     <div v-if="selecting" class="referencePicker" role="status">点击画布中的图片、视频或文本节点添加参考。<el-button @click="stopSelecting">完成</el-button><span>{{ referenceMessage }}</span></div>
   </teleport>
-  <el-dialog v-model="workshopVisible" title="镜头工坊" width="min(720px, 94vw)" appendToBody :closeOnClickModal="false">
-    <div class="cameraWorkshop nodrag nopan nowheel" @pointerdown.stop>
-      <div class="cameraFields"><label v-for="option in cameraOptions" :key="option.key">{{ option.label }}<el-select v-model="camera[option.key]" :aria-label="option.label"><el-option v-for="value in option.values" :key="value" :label="value" :value="value" /></el-select></label></div>
+  <el-dialog v-model="workshopVisible" title="镜头工坊" width="min(720px, 94vw)" top="4vh" appendToBody :closeOnClickModal="false" :showClose="!savingWorkshop" :closeOnPressEscape="!savingWorkshop">
+    <div class="cameraWorkshop nodrag nopan nowheel" :inert="savingWorkshop" @pointerdown.stop>
+      <div class="cameraFields"><label v-for="option in cameraOptions" :key="option.key">{{ option.label }}<el-select v-model="camera[option.key]" :aria-label="option.label"><el-option v-for="value in option.values" :key="value" :label="value" :value="value === '自动' ? '' : value" /></el-select></label></div>
       <label>配色<el-select v-model="color" aria-label="配色"><el-option label="自动" value="" /><el-option v-for="item in colorPresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
       <div class="colorPalette" aria-label="配色示意"><span v-for="hex in colorPresets.find(item => item.text === color)?.colors" :key="hex" :style="{ background: hex }" :title="hex" /></div>
       <label>风格<el-select v-model="style" aria-label="风格"><el-option label="自动" value="" /><el-option v-for="item in stylePresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
-      <label>将追加到提示词的内容<el-input :modelValue="workshopText" type="textarea" :rows="5" readonly aria-label="镜头工坊提示词预览" /></label>
-      <p>这些描述用于引导生成效果，实际表现取决于所选模型。</p>
+      <label>生成内容预览<el-input :modelValue="compiledPreview || workshopText" type="textarea" :rows="5" readonly aria-label="镜头工坊提示词预览" /></label>
+      <template v-if="mediaType === 'video'"><label>全局运镜（最多 5 项，按列表顺序执行）<el-select modelValue="" aria-label="添加全局运镜" :disabled="draft.motions.length >= 5" @change="addMotion"><el-option v-for="item in motionOptions" :key="item.id" :label="item.label" :value="item.id" :disabled="draft.motions.some(value => value.id === item.id)" /></el-select></label><ol class="motionList"><li v-for="(item, index) in draft.motions" :key="item.id"><span>{{ index + 1 }}. {{ item.label }}</span><el-button :disabled="!index" @click="moveMotion(index, -1)">上移</el-button><el-button :disabled="index === draft.motions.length - 1" @click="moveMotion(index, 1)">下移</el-button><el-button @click="draft.motions.splice(index, 1)">移除</el-button></li></ol></template><p>修饰独立保存，不改写正文。逐镜焦距、光圈和运镜优先，全局对应设置仅用于未指定该字段的分镜。风格和配色作用于整段，沿用人物与资产约束。文字引导效果须看生成结果。</p><p v-if="workshopError" role="alert">{{ workshopError }}</p>
     </div>
-    <template #footer><el-button @click="resetWorkshop">恢复自动</el-button><el-button @click="workshopVisible = false">取消</el-button><el-button type="primary" :disabled="disabled || !workshopText" @click="append(workshopText); workshopVisible = false">追加到提示词</el-button></template>
+    <template #footer><el-button :disabled="savingWorkshop" @click="resetWorkshop">恢复自动</el-button><el-button :disabled="savingWorkshop" @click="workshopVisible = false">关闭</el-button><el-button type="primary" :disabled="disabled || savingWorkshop" :loading="savingWorkshop" @click="saveWorkshop">保存设置并预览</el-button></template>
   </el-dialog>
   <el-dialog v-model="enhanceVisible" title="审阅增强后的提示词" width="min(720px, 94vw)" appendToBody :closeOnClickModal="false" @closed="enhanceController?.abort()">
     <div class="promptEnhancement"><label v-if="models.length > 1">增强模型<el-select v-model="languageModel" aria-label="提示词增强模型"><el-option v-for="model in models" :key="JSON.stringify([model.providerId, model.modelId])" :label="model.label" :value="JSON.stringify([model.providerId, model.modelId])" /></el-select></label><el-button v-if="models.length > 1 && !enhancedText && !enhancing" @click="runEnhancement">开始增强</el-button><p v-if="enhancing" role="status">正在增强，可取消；原提示词保留。</p><el-input v-model="enhancedText" type="textarea" :rows="12" :disabled="enhancing" aria-label="增强后的提示词" /></div>
@@ -42,9 +42,11 @@ import { useNodeAi, type NodeAiModel } from "../nodeAi";
 import { useNodeFiles } from "../workspaceFiles";
 import { validateConnection } from "../connection";
 import { isNodeOutput } from "../values";
+import { filmTechniques } from "@toonflow/tool-media-generation/filmTechniques";
+import { visualModifiersSchema, compileVisualModifiers, type VisualModifiers, type MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
 import { promptPresets, cameraOptions, colorPresets, stylePresets } from "../promptPresets";
 
-const props = defineProps<{ text: string; mediaType: "image" | "video"; disabled?: boolean }>();
+const props = defineProps<{ text: string; mediaType: "image" | "video"; disabled?: boolean; request?: () => Omit<MediaGenerationRequest, "directory">; preview?: string }>();
 const emit = defineEmits<{ append: [text: string]; replace: [text: string]; expand: []; busy: [value: boolean] }>();
 const { id, node } = useNode();
 const flow = useVueFlow();
@@ -83,10 +85,43 @@ watch(selecting, value => {
 });
 
 const workshopVisible = ref(false);
-const camera = ref<Record<string, string>>({}), color = ref(""), style = ref("");
-const workshopText = computed(() => [...cameraOptions.map(item => camera.value[item.key]).filter(value => value && value !== "自动"), color.value, style.value].filter(Boolean).join("；"));
-function resetWorkshop() { camera.value = Object.fromEntries(cameraOptions.map(item => [item.key, "自动"])); color.value = ""; style.value = ""; }
-function openWorkshop() { resetWorkshop(); workshopVisible.value = true; }
+const emptyWorkshop = (): VisualModifiers => ({ camera: { camera: "", lens: "", focal: "", aperture: "" }, motions: [], color: "", style: "" });
+const draft = ref<VisualModifiers>(emptyWorkshop());
+const camera = computed(() => draft.value.camera as Record<string, string>);
+const color = computed({ get: () => draft.value.color, set: value => { draft.value.color = value; } });
+const style = computed({ get: () => draft.value.style, set: value => { draft.value.style = value; } });
+const motionOptions = filmTechniques.filter(item => item.category === "camera" && item.stages.includes("video"));
+const compiledPreview = ref(""), workshopError = ref(""), savingWorkshop = ref(false);
+const workshopText = computed(() => compileVisualModifiers(props.preview ?? props.text, draft.value, node.data.storyboard?.shots));
+function resetWorkshop() { draft.value = emptyWorkshop(); }
+function openWorkshop() { draft.value = visualModifiersSchema.parse(node.data.visualModifiers ?? emptyWorkshop()); compiledPreview.value = ""; workshopError.value = ""; workshopVisible.value = true; }
+function addMotion(id: string) { const item = motionOptions.find(value => value.id === id); if (item && draft.value.motions.length < 5 && !draft.value.motions.some(value => value.id === id)) draft.value.motions.push({ id, label: item.label, instruction: item.instruction }); }
+function moveMotion(index: number, offset: number) { const [item] = draft.value.motions.splice(index, 1); draft.value.motions.splice(index + offset, 0, item!); }
+watch(draft, () => { compiledPreview.value = ""; }, { deep: true });
+async function saveWorkshop() {
+  if (props.disabled || savingWorkshop.value) return;
+  savingWorkshop.value = true; workshopError.value = "";
+  try {
+    const value = visualModifiersSchema.parse(draft.value);
+    const request = props.request?.();
+    if (!request) throw new Error("当前节点尚未提供生成参数");
+    const signature = JSON.stringify(request);
+    let compiled: { fingerprint: string; compiled: { prompt: string } } | undefined;
+    if (node.data.production) {
+      const { directory } = await files.getWorkspaceFiles().list();
+      const response = await fetch("/api/ai/media/production", { method: "POST", headers: { "Content-Type": "application/json", "x-milimili-csrf": "1" }, body: JSON.stringify({ directory, shotId: node.data.production.shotId, kind: props.mediaType, request: { ...request, visualModifiers: value, productionFingerprint: undefined } }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "镜头编译失败");
+      compiled = result.data;
+    }
+    if (disposed || props.disabled || JSON.stringify(props.request?.()) !== signature) throw new Error("节点配置已变化，请重新保存");
+    node.data.visualModifiers = value;
+    if (compiled) { node.data.production.productionFingerprint = compiled.fingerprint; compiledPreview.value = compiled.compiled.prompt; }
+    else compiledPreview.value = workshopText.value;
+    ElMessage.success("设置已保存，生成时采用当前修饰");
+  } catch (cause) { workshopError.value = cause instanceof Error ? cause.message : String(cause); }
+  finally { savingWorkshop.value = false; }
+}
 
 const enhanceVisible = ref(false), enhancing = ref(false), enhancedText = ref("");
 const models = ref<NodeAiModel[]>([]), languageModel = ref("");
@@ -144,7 +179,7 @@ function toggleSpeech() {
 }
 watch(() => props.disabled, value => { if (value) { speech?.abort(); selecting.value = false; enhanceController?.abort(); } });
 watch(() => node.selected, selected => { if (!selected) speech?.abort(); });
-watch([enhancing, listening], () => emit("busy", enhancing.value || listening.value));
+watch([enhancing, listening, workshopVisible], () => emit("busy", enhancing.value || listening.value || workshopVisible.value), { flush: "sync" });
 onScopeDispose(() => { disposed = true; window.removeEventListener("keydown", escapeSelection); for (const event of ["pointerdown", "mousedown", "click"] as const) window.removeEventListener(event, pickReference, true); speech?.abort(); enhanceController?.abort(); emit("busy", false); });
 </script>
 
@@ -152,6 +187,6 @@ onScopeDispose(() => { disposed = true; window.removeEventListener("keydown", es
 .promptTools { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; :deep(.el-button) { margin-left: 0; padding: 7px; min-height: 32px; } }
 .promptLibrary { display: grid; gap: 8px; max-height: 360px; overflow: auto; button { text-align: left; border: 1px solid var(--el-border-color); border-radius: 8px; padding: 10px; background: var(--el-fill-color-light); color: var(--el-text-color-primary); cursor: pointer; strong, span { display: block; } span { margin-top: 5px; font-size: 12px; line-height: 1.5; color: var(--el-text-color-secondary); } &:focus-visible { outline: 2px solid var(--el-color-primary); } } }
 .referencePicker { position: fixed; top: 72px; left: 50%; transform: translateX(-50%); z-index: 3000; max-width: 90vw; padding: 12px 20px; border: 1px solid var(--el-border-color); border-radius: 12px; background: var(--el-bg-color-overlay); color: var(--el-text-color-primary); box-shadow: var(--el-box-shadow-light); span { display: block; font-size: 12px; margin-top: 6px; } }
-.cameraWorkshop { display: grid; gap: 14px; label { display: grid; gap: 7px; } .cameraFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .colorPalette { display: flex; gap: 6px; span { width: 44px; height: 26px; border-radius: 4px; border: 1px solid var(--el-border-color); } } p { color: var(--el-text-color-secondary); margin: 0; } }
+.cameraWorkshop { max-height: 65vh; overflow-y: auto; .motionList { list-style: none; padding: 0; li { display: flex; align-items: center; gap: 8px; margin: 6px 0; span { margin-right: auto; } } } display: grid; gap: 14px; label { display: grid; gap: 7px; } .cameraFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .colorPalette { display: flex; gap: 6px; span { width: 44px; height: 26px; border-radius: 4px; border: 1px solid var(--el-border-color); } } p { color: var(--el-text-color-secondary); margin: 0; } }
 .promptEnhancement { label { display: grid; gap: 8px; margin-bottom: 12px; } }
 </style>

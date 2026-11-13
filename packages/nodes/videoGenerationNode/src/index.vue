@@ -67,7 +67,7 @@
             :resolutions="resolutionOptions"
             :model="selectedModel"
             :disabled="generating || deleting || !selectedModel" />
-          <promptTools :text="data.prompt" mediaType="video" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
+          <promptTools :text="data.prompt" mediaType="video" :request="generationInput" :preview="workshopBasePrompt" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
           <storyboardEditor :count="data.storyboard?.shots.length" :duration="data.duration" :production="!!data.production" :disabled="generating || deleting || uploading || toolsBusy" :references="storyboard.mentions.value" :load="storyboard.load" :save="saveStoryboard" :clear="!data.production && data.storyboard ? clearStoryboard : undefined" :validate="storyboard.validate" :preview="storyboard.textPreview" @busy="storyboardBusy = $event" />
           <el-button
             class="sendButton"
@@ -89,7 +89,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { cameraTrajectorySchema, videoDurations, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, videoStoryboardSchema, compileVideoStoryboard, storyboardGenerateAudio, type VideoStoryboard, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { compileVisualModifiers, type VisualModifiers, cameraTrajectorySchema, videoDurations, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, videoStoryboardSchema, compileVideoStoryboard, storyboardGenerateAudio, type VideoStoryboard, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import promptTools from "@toonflow/nodes-scaffold/promptTools";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
@@ -115,7 +115,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "视频生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { storyboard?: VideoStoryboard; storyboardReferences?: { source: string; sourceHandle: string }[]; storyboardTimeline?: string; purpose?: "asset" | "standalone"; production?: { shotId: string; productionFingerprint: string }; cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; durationReason?: string; resolution: string; ratio: string; mode: string; generateAudio: boolean });
+const data = computed(() => node.data as { visualModifiers?: VisualModifiers; storyboard?: VideoStoryboard; storyboardReferences?: { source: string; sourceHandle: string }[]; storyboardTimeline?: string; purpose?: "asset" | "standalone"; production?: { shotId: string; productionFingerprint: string }; cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; durationReason?: string; resolution: string; ratio: string; mode: string; generateAudio: boolean });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -213,8 +213,9 @@ const baseGenerationPrompt = computed(() =>
 const storyboard = useStoryboard({ data, references: refList, mentions: referenceMentions, model: selectedModel, duration: computed(() => data.value.duration), mode: selectedMode,
   basePrompt: baseGenerationPrompt, resolveText: resolveReferenceText, request: () => generationInput(), directory: async () => (await files.getWorkspaceFiles().list()).directory });
 const storyboardError = computed(() => { try { if (data.value.storyboard) storyboard.validate(data.value.storyboard); return ""; } catch (error) { return error instanceof Error ? error.message : String(error); } });
-const generationPrompt = computed(() => { try { return data.value.production ? storyboard.preview.value || baseGenerationPrompt.value : compileVideoStoryboard(baseGenerationPrompt.value, data.value.storyboard ? storyboard.resolve(data.value.storyboard) : undefined); } catch { return ""; } });
-watch(() => [data.value.model, data.value.duration, data.value.resolution, data.value.ratio, data.value.mode, data.value.generateAudio, data.value.production?.shotId], () => { storyboard.preview.value = ""; }, { flush: "sync" });
+const workshopBasePrompt = computed(() => compileVideoStoryboard(baseGenerationPrompt.value, data.value.storyboard ? storyboard.resolve(data.value.storyboard) : undefined));
+const generationPrompt = computed(() => { try { return data.value.production ? storyboard.preview.value || baseGenerationPrompt.value : compileVisualModifiers(workshopBasePrompt.value, data.value.visualModifiers, data.value.storyboard?.shots); } catch { return ""; } });
+watch(() => [data.value.model, data.value.duration, data.value.resolution, data.value.ratio, data.value.mode, data.value.generateAudio, data.value.production?.shotId, JSON.stringify(data.value.visualModifiers)], () => { storyboard.preview.value = ""; }, { flush: "sync" });
 async function saveStoryboard(plan: VideoStoryboard) {
   await storyboard.save(plan);
   const preview = storyboard.preview.value;
@@ -329,6 +330,7 @@ function generationInput(manual = false): Omit<NodeVideoRequest, "directory"> {
     modelId: choice.modelId,
     prompt: baseGenerationPrompt.value,
     storyboard: storyboard.generationPlan(),
+    visualModifiers: data.value.visualModifiers,
     ...data.value.production,
     purpose: data.value.purpose,
     mode: selectedMode.value,
@@ -426,6 +428,7 @@ function getConfig() {
       ready: item.value !== undefined,
     })),
     config: {
+      visualModifiers: data.value.visualModifiers,
       production: data.value.production,
       purpose: data.value.purpose,
       providerId: selectedModel.value?.providerId ?? "",

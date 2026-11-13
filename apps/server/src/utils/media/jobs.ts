@@ -1,4 +1,5 @@
 import { basename, join } from "node:path";
+import { compileVisualModifiers } from "@toonflow/tools-scaffold/runtime";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, realpathSync } from "@toonflow/file";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
@@ -9,7 +10,7 @@ import { cloud } from "@/lib/cloud";
 import { currentTenant, tenantStore } from "@/utils/tenant";
 import { resolveWorkspaceDirectory } from "@/utils/workspace";
 import { resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
-import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline, withHumanPerformance, prepareVideoStoryboard } from "@/utils/media/generation";
+import { assertPromptPolicy, compileShotSpec, generateMediaDirect, listMediaModels, readReference, validateCameraRequest, withPhotographicBaseline, withHumanPerformance, prepareVisualModifiers, prepareVideoStoryboard } from "@/utils/media/generation";
 import { assertMediaModelSelection, assertModelSelection, isSelectedModel, routeImageEditModel } from "@/utils/modelSelection";
 import { applyMediaQuality } from "@/utils/media/quality";
 import { assertMultiShotCapability } from "@/utils/media/shotCapabilities";
@@ -51,6 +52,7 @@ export async function optimizeCompiledPrompt(directory: string, sections: Record
   if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
   const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotConnection", "continuityContext", "shotExecution", "startingFrame", "staging", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding", "Objective", "Immutable locks", "Target duration", "Timeline", "Audio direction", "Shot execution", "Avoid"]);
   protectedKeys.add("humanPerformance");
+  protectedKeys.add("visualModifiers");
   // ACT: 优先原文保留已写明的质感与参考职责；空间不足时仍交给视觉背景压缩，避免仅因保护项过长阻塞制作。
   for (const key of ["look", "realism", "opticalTexture", "appearance", "referenceIntent", "references"]) {
     const protectedLength = Object.entries(sections).filter(([name, value]) => value && (protectedKeys.has(name) || name === key)).reduce((sum, [name, value]) => sum + name.length + value.length + 3, 0);
@@ -139,7 +141,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
       throw Object.assign(new Error("所选媒体模型不存在或类型不匹配"), { status: 400 });
     }
     request = await applyMediaQuality(directory, kind, request, model);
-    request = prepareVideoStoryboard(request, model);
+    request = prepareVideoStoryboard(prepareVisualModifiers(request, model), model);
     if (kind === "video" && model.lipSync) speechSyncInputs = await validateSpeechInputs(directory, request);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
     const spec = isDirectorPrompt(request.prompt) ? "" : compileShotSpec(request.shotSpec);
@@ -368,6 +370,14 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     result.compiled.prompt = withHumanPerformance(result.compiled.prompt);
     const direction = /^HUMANPERFORMANCE: (.+)$/m.exec(result.compiled.prompt)?.[1];
     if (direction) result.compiled.sections.humanPerformance = direction;
+  }
+  if (request.visualModifiers) {
+    const shot = api.scoped(tenant.workspaceId).get("shots", shotId)!;
+    const timeline = kind === "video" ? shot.camera?.design?.timeline ?? shot.musicVideo?.timeline ?? [] : [];
+    prepareVisualModifiers({ ...request, prompt: result.compiled.prompt, storyboard: undefined }, model);
+    // 正式请求保留结构化修饰供指纹重算；后台发送的是编译后的正文。
+    result.compiled.prompt = compileVisualModifiers(result.compiled.prompt, request.visualModifiers, timeline);
+    result.compiled.sections.visualModifiers = compileVisualModifiers("", request.visualModifiers, timeline);
   }
   const limit = promptLimit(kind, request.providerId, request.modelId, request.mode, request.generateAudio);
   if (limit) {
