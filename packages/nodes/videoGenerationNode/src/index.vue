@@ -89,7 +89,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { compileVisualModifiers, type VisualModifiers, cameraTrajectorySchema, videoDurations, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, videoStoryboardSchema, compileVideoStoryboard, storyboardGenerateAudio, type VideoStoryboard, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { compileImageViews, collectReferenceViews, compileVisualModifiers, type VisualModifiers, cameraTrajectorySchema, videoDurations, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, videoStoryboardSchema, compileVideoStoryboard, storyboardGenerateAudio, type VideoStoryboard, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import promptTools from "@toonflow/nodes-scaffold/promptTools";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
@@ -223,7 +223,7 @@ const baseGenerationPrompt = computed(() =>
 const storyboard = useStoryboard({ data, references: refList, mentions: referenceMentions, model: selectedModel, duration: computed(() => data.value.duration), mode: selectedMode,
   basePrompt: baseGenerationPrompt, resolveText: resolveReferenceText, request: () => generationInput(), directory: async () => (await files.getWorkspaceFiles().list()).directory });
 const storyboardError = computed(() => { try { if (!editing.value && data.value.storyboard) storyboard.validate(data.value.storyboard); return ""; } catch (error) { return error instanceof Error ? error.message : String(error); } });
-const workshopBasePrompt = computed(() => compileVideoStoryboard(baseGenerationPrompt.value, !editing.value && data.value.storyboard ? storyboard.resolve(data.value.storyboard) : undefined));
+const workshopBasePrompt = computed(() => compileVideoStoryboard(compileImageViews(baseGenerationPrompt.value, data.value.production ? undefined : collectReferenceViews(refList.value, frameMode.value ? frames.value : undefined)), !editing.value && data.value.storyboard ? storyboard.resolve(data.value.storyboard) : undefined));
 const generationPrompt = computed(() => { try { return data.value.production ? storyboard.preview.value || baseGenerationPrompt.value : compileVisualModifiers(workshopBasePrompt.value, data.value.visualModifiers, editing.value ? [] : data.value.storyboard?.shots); } catch { return ""; } });
 watch(() => [data.value.model, data.value.duration, data.value.resolution, data.value.ratio, data.value.mode, data.value.generateAudio, data.value.production?.shotId, JSON.stringify(data.value.visualModifiers)], () => { storyboard.preview.value = ""; }, { flush: "sync" });
 async function saveStoryboard(plan: VideoStoryboard) {
@@ -342,6 +342,7 @@ function generationInput(manual = false): Omit<NodeVideoRequest, "directory"> {
     prompt: baseGenerationPrompt.value,
     storyboard: editing.value ? undefined : storyboard.generationPlan(),
     visualModifiers: data.value.visualModifiers,
+    referenceViews: data.value.production ? undefined : collectReferenceViews(references, frameMode.value ? frames.value : undefined),
     ...data.value.production,
     purpose: data.value.purpose,
     mode: selectedMode.value,

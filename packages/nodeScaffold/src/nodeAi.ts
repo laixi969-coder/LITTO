@@ -20,6 +20,7 @@ export type NodeMediaModel = Omit<MediaModel, "mode"> & {
 };
 export type NodeImageRequest = {
   visualModifiers?: MediaGenerationRequest["visualModifiers"];
+  referenceViews?: MediaGenerationRequest["referenceViews"];
   purpose?: "asset" | "standalone" | "storyboard";
   shotId?: string;
   productionFingerprint?: string;

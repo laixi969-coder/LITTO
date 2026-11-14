@@ -8,6 +8,7 @@
     @fullscreen="previewVisible = true"
     :style="{ width: previewUrl && imageWidth ? `${imageWidth + 18}px` : undefined }">
     <template #topActions>
+      <imageViewTools :image="outputFile" :previewUrl="previewUrl" sourceHandle="image" :disabled="uploading" @apply="applyImageView" />
       <el-button
         :icon="IconTransfer"
         :loading="uploading"
@@ -48,6 +49,8 @@
 </template>
 
 <script setup lang="ts">
+import imageViewTools from "@toonflow/nodes-scaffold/imageViewTools";
+import type { ImageView } from "@toonflow/tools-scaffold/runtime";
 import { computed, nextTick, ref } from "vue";
 import { IconPhoto, IconUpload, IconTransfer } from "@tabler/icons-vue";
 import { ElButton, ElImageViewer, ElMessage } from "element-plus";
@@ -66,6 +69,7 @@ const uploading = ref(false);
 const previewVisible = ref(false);
 const imageWidth = ref(0);
 
+function applyImageView(view: ImageView | undefined) { if (outputs.value.image?.dataType === "IMAGE") outputs.value.image.value = { ...outputs.value.image.value, view }; }
 const outputFile = computed(() => outputs.value.image?.dataType === "IMAGE" ? outputs.value.image.value : undefined);
 const previewUrl = files.useFileUrl(
   outputFile,

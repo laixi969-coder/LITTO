@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from "vue";
+import { inject, ref, watch, type Ref } from "vue";
 import { useNode, useNodeId } from "@vue-flow/core";
 
 const previewObserverKey = Symbol.for("toonflow.nodePreviewObserver");
@@ -6,6 +6,9 @@ type PreviewObserver = { observer: IntersectionObserver; targets: Map<Element, S
 
 export function useNodePreviewReady() {
   const ready = ref(!useNodeId() || typeof IntersectionObserver === "undefined");
+  const active = inject<Ref<boolean> | undefined>("nodePreviewActive", undefined);
+  // ACT: 节点外的编辑弹窗打开时也需加载引用，不受画布视口位置限制。
+  if (active) watch(active, value => { if (value) ready.value = true; }, { immediate: true });
   if (ready.value) return ready;
   const { nodeEl } = useNode();
   const host = globalThis as typeof globalThis & { [previewObserverKey]?: PreviewObserver };

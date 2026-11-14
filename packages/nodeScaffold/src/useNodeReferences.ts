@@ -53,3 +53,8 @@ export function useNodeReferences(handleId = "in") {
 function referenceKey(item: NodeInputValue) {
   return encodeURIComponent(JSON.stringify([item.source, item.sourceHandle]));
 }
+
+export function collectReferenceViews(values: NodeInputValue[], frames?: { first?: NodeInputValue; last?: NodeInputValue }) {
+  const items = frames ? [{ item: frames.first, role: "firstFrame" as const, index: 0 }, { item: frames.last, role: "lastFrame" as const, index: 0 }] : values.filter(item => item.dataType === "IMAGE").map((item, index) => ({ item, role: "image" as const, index }));
+  return items.flatMap(({ item, role, index }) => item?.dataType === "IMAGE" && item.value?.view ? [{ role, index, view: item.value.view }] : []);
+}

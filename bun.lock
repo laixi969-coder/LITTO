@@ -230,6 +230,7 @@
       "devDependencies": {
         "@form-create/element-ui": "^3",
         "@toonflow/tool-media-generation": "*",
+        "@toonflow/tool-scene-list": "*",
         "@toonflow/tools-scaffold": "*",
         "typescript": "~6.0.3",
         "vue-tsc": "^3.3.11",

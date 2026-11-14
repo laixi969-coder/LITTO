@@ -8,7 +8,7 @@ import { mediaProviders, type Provider, type ProviderTask, type ProviderTools } 
 import { isModelFrom2026 } from "@toonflow/providers/modelYear";
 import { matchesAspect } from "@toonflow/providers/aspect";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, MediaShotSpec } from "@toonflow/tools-scaffold/runtime";
-import { cameraTrajectorySchema, compileVisualModifiers, validateVideoStoryboard, compileVideoStoryboard, storyboardGenerateAudio } from "@toonflow/tools-scaffold/runtime";
+import { cameraTrajectorySchema, referenceViewsSchema, compileImageViews, compileVisualModifiers, validateVideoStoryboard, compileVideoStoryboard, storyboardGenerateAudio } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { modelAccess } from "@/utils/modelAvailability";
@@ -24,6 +24,17 @@ import { autoFilmScope } from "@/utils/autoFilm/scope";
 import { readMultiShotCapabilities, assertMultiShotCapability } from "@/utils/media/shotCapabilities";
 
 export function prepareVisualModifiers(request: MediaGenerationRequest, model: MediaModel) {
+  if (request.referenceViews?.length) {
+    if (request.shotId) invalid("正式镜头的机位参考请先绑定到镜头制作规格");
+    if (model.promptControl === "imageAndCameraOnly" || model.lipSync) invalid("当前模型不执行文字机位指令，请使用原生轨迹或移除机位");
+    try {
+      const views = referenceViewsSchema.parse(request.referenceViews);
+      views.forEach(item => {
+        if (item.role === "image" ? !request.images?.[item.index] : item.index !== 0 || !request[item.role]) invalid("机位指令未绑定实际图片参考");
+      });
+      request = { ...request, referenceViews: undefined, prompt: compileImageViews(request.prompt, views) };
+    } catch (cause) { throw Object.assign(cause instanceof Error ? cause : new Error(String(cause)), { status: 400 }); }
+  }
   if (!request.visualModifiers) return request;
   if (model.promptControl === "imageAndCameraOnly" || model.lipSync) invalid("当前模型不执行文字修饰，请恢复自动或更换模型");
   if (model.type !== "video" && request.visualModifiers.motions.length) invalid("图片模型不能执行有顺序的运镜");

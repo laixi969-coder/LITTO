@@ -20,7 +20,8 @@
     "./promptTools": "./src/components/promptTools.vue",
     "./videoPlayer": "./src/components/videoPlayer.vue",
     "./mediaHistory": "./src/components/mediaHistory.vue",
-    "./referenceItem": "./src/components/referenceItem.vue"
+    "./referenceItem": "./src/components/referenceItem.vue",
+    "./imageViewTools": "./src/components/imageViewTools.vue"
   },
   "scripts": {
     "typecheck": "vue-tsc --noEmit"
@@ -48,6 +49,7 @@
     "typescript": "~6.0.3",
     "vue-tsc": "^3.3.11",
     "@toonflow/tools-scaffold": "*",
-    "@toonflow/tool-media-generation": "*"
+    "@toonflow/tool-media-generation": "*",
+    "@toonflow/tool-scene-list": "*"
   }
 }

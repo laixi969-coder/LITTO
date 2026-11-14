@@ -10,6 +10,7 @@
     :bottomWidth="660"
     :style="{ width: previewUrl && imageWidth ? `${imageWidth + 18}px` : undefined }">
     <template #topActions>
+      <imageViewTools :image="outputFile" :previewUrl="previewUrl" sourceHandle="image" :disabled="generating || deleting || uploading" @apply="applyImageView" />
       <mediaHistory mediaType="image" :current="outputFile" :disabled="generating || deleting || uploading" @select="outputs.image = { dataType: 'IMAGE', value: $event }" />
       <el-button :icon="IconTransfer" :loading="uploading" :disabled="generating || deleting" text title="替换图片" aria-label="替换图片" @click.stop="fileInput?.click()" />
       <input ref="fileInput" type="file" accept="image/*" hidden aria-label="选择替换图片" :disabled="generating || deleting || uploading" @change="replaceOutput" />
@@ -64,7 +65,7 @@
             :disabled="generating || deleting || !selectedModel"
             @update:size="setImageSize"
             @update:ratio="setImageRatio" />
-          <promptTools :text="data.prompt" mediaType="image" :request="generationInput" :preview="baseGenerationPrompt" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
+          <promptTools :text="data.prompt" mediaType="image" :request="generationInput" :preview="workshopBasePrompt" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -84,10 +85,12 @@
 </template>
 
 <script setup lang="ts">
+import imageViewTools from "@toonflow/nodes-scaffold/imageViewTools";
+import type { ImageView } from "@toonflow/tools-scaffold/runtime";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImageViewer } from "element-plus";
 import { IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { compileVisualModifiers, type VisualModifiers, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeImageRequest, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { compileImageViews, collectReferenceViews, compileVisualModifiers, type VisualModifiers, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeImageRequest, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import promptTools from "@toonflow/nodes-scaffold/promptTools";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
@@ -176,7 +179,9 @@ const baseGenerationPrompt = computed(() =>
     .filter(Boolean)
     .join("\n\n")
 );
-const generationPrompt = computed(() => compileVisualModifiers(baseGenerationPrompt.value, data.value.visualModifiers));
+const workshopBasePrompt = computed(() => compileImageViews(baseGenerationPrompt.value, data.value.production ? undefined : collectReferenceViews(refList.value)));
+const generationPrompt = computed(() => compileVisualModifiers(workshopBasePrompt.value, data.value.visualModifiers));
+function applyImageView(view: ImageView | undefined) { if (outputs.value.image?.dataType === "IMAGE") outputs.value.image.value = { ...outputs.value.image.value, view }; }
 const outputFile = computed(() => outputs.value.image?.dataType === "IMAGE" ? outputs.value.image.value : undefined);
 const previewUrl = files.useFileUrl(
   outputFile,
@@ -274,6 +279,7 @@ function generationInput(): Omit<NodeImageRequest, "directory"> {
     modelId: choice.modelId,
     prompt: baseGenerationPrompt.value,
     visualModifiers: data.value.visualModifiers,
+    referenceViews: data.value.production ? undefined : collectReferenceViews(refList.value),
     ...data.value.production,
     purpose: data.value.purpose,
     size: data.value.size,

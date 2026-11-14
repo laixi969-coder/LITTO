@@ -1,6 +1,6 @@
 export { default as nodeSkeleton } from "./nodeSkeleton.vue";
 export { useNode, type NodeOptions } from "./useNode";
-export { useNodeReferences } from "./useNodeReferences";
+export { useNodeReferences, collectReferenceViews } from "./useNodeReferences";
 export { useNodeGeneration } from "./useNodeGeneration";
 export { showNodeError } from "./showNodeError";
 export * from "./connection";
@@ -15,3 +15,5 @@ export { videoStoryboardSchema, validateVideoStoryboard, compileVideoStoryboard,
 export * from "./nodeFfmpeg";
 
 export { visualModifiersSchema, compileVisualModifiers, type VisualModifiers } from "@toonflow/tools-scaffold/runtime";
+
+export { compileImageViews, type ImageView } from "@toonflow/tools-scaffold/runtime";

@@ -35,6 +35,7 @@
       @dblclick.stop
       @click.stop="emit('remove')" />
     <span class="indexBadge" aria-hidden="true">{{ index }}</span>
+    <span v-if="item.dataType === 'IMAGE' && item.value?.view" class="viewBadge">机位 {{ item.value.view.yaw }}° / {{ item.value.view.pitch }}°</span>
     <div v-if="item.dataType === 'VIDEO' && previewUrl && !previewError" class="videoInfo" aria-hidden="true">
       <icon-player-play :size="12" />
       <span v-if="duration">{{ duration }}</span>
@@ -59,7 +60,8 @@ const media = computed(() => props.item.value !== undefined && (props.item.dataT
 const itemIcon = computed(() => props.item.dataType === "IMAGE" ? IconPhoto : props.item.dataType === "VIDEO" ? IconVideo : props.item.dataType === "AUDIO" ? IconMusic : IconFileText);
 const title = computed(() => {
   const content = props.item.value === undefined ? "暂无内容" : props.item.dataType === "STRING" ? props.item.value : props.item.dataType === "VIDEO" ? "视频" : props.item.dataType === "AUDIO" ? "音频" : "图片";
-  return `引用 ${props.index}：${content}${previewError.value ? `（${previewError.value}）` : ""}`;
+  const view = props.item.dataType === "IMAGE" ? props.item.value?.view : undefined;
+  return `引用 ${props.index}：${content}${view ? `；机位水平 ${view.yaw}°、俯仰 ${view.pitch}°，距离 ${view.distance}，视场角 ${view.fov}°` : ""}${previewError.value ? `（${previewError.value}）` : ""}`;
 });
 
 watch(media, () => {
@@ -160,6 +162,8 @@ function readDuration(event: Event) {
     line-height: 13px;
     text-align: center;
   }
+
+  .viewBadge { position: absolute; bottom: 0; left: 0; right: 0; background: var(--el-bg-color-overlay); font-size: 8px; line-height: 12px; text-align: center; }
 
   .videoInfo {
     position: absolute;

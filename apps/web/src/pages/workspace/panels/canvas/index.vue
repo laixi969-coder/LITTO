@@ -177,6 +177,7 @@ import nodeSearch from "./components/nodeSearch.vue";
 import { finishGroupDrag, getSelectionTree } from "./selectionNodes";
 import type { NodeOutput } from "@toonflow/nodes-scaffold/values";
 import type { NodeConnectionFeedback, NodeHandle } from "@toonflow/nodes-scaffold/connection";
+import { imageViewSchema, type ImageView } from "@toonflow/tools-scaffold/runtime";
 import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
 import { useNodeToolsContext } from "@toonflow/nodes-scaffold/nodeTools";
 import { useWorkspaceStore } from "@/stores/workspace";
@@ -288,6 +289,18 @@ provide("batchCanvasHistory", canvasHistory.batch);
 const getNodeTools = useNodeToolsContext();
 const { addNodes, addEdges, removeEdges, findEdge, findNode, toObject, viewport, screenToFlowCoordinate } = flow;
 provide("copyNodeToClipboard", (node: Parameters<typeof copyNodeToClipboard>[0]) => copyNodeToClipboard(node, project.value?.directory ?? ""));
+provide("openImageDirector", async (source: string, handle: string, value: ImageView) => {
+  const view = imageViewSchema.parse(value), sourceNode = findNode(source), output = sourceNode?.data.outputs?.[handle];
+  if (!sourceNode || output?.dataType !== "IMAGE") throw new Error("来源图片已不可用");
+  const type = "remote-director3dNode";
+  if (!nodeTypes.value[type]) throw new Error("请先启用已有的3D导演台节点");
+  let target = flow.getNodes.value.find(item => item.type === type && item.data.imageSource?.source === source && item.data.imageSource?.sourceHandle === handle);
+  if (!target) { const id = crypto.randomUUID(); addNodes([{ id, type, position: nextCanvasPosition(flow, 320, 240), data: { label: "图片机位导演台" } }]); target = findNode(id)!; }
+  target.data.imageSource = { source, sourceHandle: handle, path: output.value.url };
+  if (!flow.getEdges.value.some(edge => edge.source === source && edge.sourceHandle === handle && edge.target === target!.id)) addEdges([{ id: crypto.randomUUID(), source, sourceHandle: handle, target: target.id, targetHandle: "in" }]);
+  target.data.imageViewRequest = { id: crypto.randomUUID(), view };
+  flow.removeSelectedElements(); flow.addSelectedNodes([target]);
+});
 provide("retainNodeFiles", true);
 provide("nodeMarkdown", markRaw(messageMarkdown));
 provide("selectionConnection", shallowRef<NodeConnectionFeedback>());
@@ -871,7 +884,7 @@ async function insertSnapshot(snapshot: { nodes: Node[]; edges: Edge[] }, positi
   await canvasHistory.batch(async () => {
     flow.removeSelectedElements();
     addNodes(snapshot.nodes.map(node => ({ ...node, id: ids.get(node.id)!, parentNode: ids.get(node.parentNode ?? ""), selected: true,
-      data: { ...node.data, ...(node.data.videoFrames ? { videoFrames: Object.fromEntries(Object.entries(node.data.videoFrames).map(([key, value]) => { const binding = value as { source: string; sourceHandle: string } | null; return [key, binding ? { ...binding, source: ids.get(binding.source) ?? binding.source } : null]; })) } : {}), ...(Array.isArray(node.data.storyboardReferences) ? { storyboardReferences: node.data.storyboardReferences.map((item: { source: string; sourceHandle: string }) => ({ ...item, source: ids.get(item.source) ?? item.source })) } : {}) },
+      data: { ...node.data, ...(node.data.imageSource ? { imageSource: { ...node.data.imageSource, source: ids.get(node.data.imageSource.source) ?? node.data.imageSource.source } } : {}), ...(node.data.videoFrames ? { videoFrames: Object.fromEntries(Object.entries(node.data.videoFrames).map(([key, value]) => { const binding = value as { source: string; sourceHandle: string } | null; return [key, binding ? { ...binding, source: ids.get(binding.source) ?? binding.source } : null]; })) } : {}), ...(Array.isArray(node.data.storyboardReferences) ? { storyboardReferences: node.data.storyboardReferences.map((item: { source: string; sourceHandle: string }) => ({ ...item, source: ids.get(item.source) ?? item.source })) } : {}) },
       position: node.parentNode ? node.position : { x: position.x + node.position.x - left, y: position.y + node.position.y - top } })));
     await nextTick();
     signal.throwIfAborted();

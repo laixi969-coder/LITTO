@@ -110,7 +110,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   if (request.purpose === "storyboard" && (kind !== "image" || request.shotId)) throw Object.assign(new Error("多格总览仅用于分镜规划，不绑定正式 shotId；正式镜头请独立生成高清关键帧"), { status: 400 });
   if (request.localRepair && (!request.shotId || kind !== "image")) throw Object.assign(new Error("精修须提供图像镜头 shotId"), { status: 400 });
   if (request.candidateDirection && (!request.shotId || kind !== "image" || request.localRepair)) throw Object.assign(new Error("系列变体仅支持普通镜头关键帧，不能与局部修改同时使用"), { status: 400 });
-  if (!request.shotId && !request.storyboard && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
+  if (!request.shotId && !request.storyboard && !request.referenceViews?.length && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
   if (request.storyboard && (kind !== "video" || request.shotId)) throw Object.assign(new Error("正式镜头请先将分镜编排保存到镜头时间线并重新编译"), { status: 400 });
   await assertMediaModelSelection(kind, request, directory);
   const tenant = currentTenant();
@@ -273,6 +273,7 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
 }
 
 export async function prepareShot(directory: string, kind: "image" | "video", shotId: string, request: MediaGenerationRequest, previewOnly = false) {
+  if (request.referenceViews?.length) throw Object.assign(new Error("正式镜头的机位参考须先绑定到镜头制作规格，不能仅在生成请求中附加"), { status: 400 });
   if (request.images?.length || request.videos?.length || request.audios?.length || request.firstFrame || request.lastFrame) {
     throw Object.assign(new Error("正式镜头的参考素材须先绑定到镜头或资产，首帧须采用为主关键帧；不能在生成请求中直接传入参考文件，否则不会进入编译结果"), { status: 400 });
   }

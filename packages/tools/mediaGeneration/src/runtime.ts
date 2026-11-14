@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cameraTrajectorySchema, videoStoryboardSchema, visualModifiersSchema } from "@toonflow/tools-scaffold/runtime";
+import { cameraTrajectorySchema, videoStoryboardSchema, visualModifiersSchema, referenceViewsSchema } from "@toonflow/tools-scaffold/runtime";
 import { techniquePlan } from "./filmTechniques";
 
 export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia, MediaContext } from "@toonflow/tools-scaffold/runtime";
@@ -65,6 +65,7 @@ const shotSpecSchema = z.strictObject({
 
 const sharedFields = {
   visualModifiers: visualModifiersSchema.optional(),
+  referenceViews: referenceViewsSchema.optional(),
   shotSpec: shotSpecSchema.describe("镜头规格。填了就不再靠散文猜景别与运镜；留空则只用 prompt"),
   purpose: z.enum(["asset", "standalone"]).optional().describe("仅无 shotId 时使用：asset 为基础资产，standalone 为用户明确要求的独立画面。已有镜头项目的正式分镜必须使用 shotId，不能标为独立图绕过规格。"),
   shotId: z.string().min(1).max(128).optional(),

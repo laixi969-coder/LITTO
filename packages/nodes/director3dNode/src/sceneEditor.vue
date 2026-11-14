@@ -122,6 +122,7 @@
         </div>
         <div class="controlHint">WASD 移动 · 空格上升 · Shift 下降 · 滚轮调焦 · 右键记录 · 左键 / Esc 退出取景</div>
         <div class="directorTools">
+          <el-button v-if="imageSource" :disabled="!ready" @click="runtime && emit('applyImageView', captureCamera(runtime))">将当前机位应用到来源图片</el-button>
           <label>参考叠层<select v-model="overlayId"><option value="">关闭</option><option v-for="image in overlayImages" :key="image.id" :value="image.id">{{ image.name }}</option></select></label>
           <label v-if="overlayUrl">透明度<input v-model.number="overlayOpacity" type="range" min="0" max="1" step="0.05" /></label>
           <button type="button" :disabled="!ready" @click="setView('top')">俯视</button><button type="button" :disabled="!ready" @click="setView('front')">正面机位</button><button type="button" :disabled="!ready" @click="setView('camera')">恢复机位</button>
@@ -204,10 +205,11 @@ const props = defineProps<{
   exportingVideo: boolean;
   exportingImage: string;
   exportProgress?: number;
+  imageSource?: boolean;
   overlayImages: { id: string; url: string; name: string }[];
   shots: { shotId: string; title: string; order: number }[];
 }>();
-const emit = defineEmits<{ pose: [id: string, pose: string]; bindImage: [anchor: CameraAnchor, aspect: number, time: number, shotId: string]; editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportTrajectory: []; exportVideo: [aspect: number]; exportImage: [anchor: CameraAnchor, aspect: number, time: number] }>();
+const emit = defineEmits<{ applyImageView: [camera: ReturnType<typeof captureCamera>]; pose: [id: string, pose: string]; bindImage: [anchor: CameraAnchor, aspect: number, time: number, shotId: string]; editInstruction: [value: string]; selectPlan: [id: string]; generate: []; loadModels: []; close: []; addMannequin: []; exportTrajectory: []; exportVideo: [aspect: number]; exportImage: [anchor: CameraAnchor, aspect: number, time: number] }>();
 const anchors = defineModel<CameraAnchor[]>("anchors", { default: () => [] });
 const lighting = defineModel<LightingSettings>("lighting", { required: true });
 const sceneSettings = defineModel<SceneSettings>("sceneSettings", { required: true });
@@ -231,6 +233,8 @@ const sceneAspect = computed(() => {
 });
 const currentTime = ref(0);
 const overlayId = ref(""), overlayOpacity = ref(0.4), followId = ref(""), followPosition = ref(false), poseId = ref(""), pose = ref("stand"), shotId = ref("");
+let initialOverlay = false;
+watch(() => props.overlayImages, images => { if (!initialOverlay && images.length) { overlayId.value = images[0]!.id; initialOverlay = true; } }, { immediate: true });
 const overlayUrl = computed(() => props.overlayImages.find(item => item.id === overlayId.value)?.url);
 const followOffset = new Vector3();
 let savedView: ReturnType<typeof captureCamera> | undefined;

@@ -1,4 +1,5 @@
-export type NodeMediaValue = { url: string; mimeType: string };
+import type { ImageView } from "@toonflow/tools-scaffold/runtime";
+export type NodeMediaValue = { url: string; mimeType: string; view?: ImageView };
 
 export type NodeValueMap = {
   STRING: string;

@@ -8,6 +8,7 @@
     </button>
   </nodeSkeleton>
   <sceneEditor v-if="editing" v-model:anchors="anchors" v-model:prompt="prompt" v-model:model="model" v-model:lighting="lighting" v-model:sceneSettings="sceneSettings"
+    :imageSource="!!data.imageSource" @applyImageView="applyImageView"
     :overlayImages="overlayImages" :shots="productionSummary?.shots ?? []" @bindImage="bindImage" @pose="applyPose"
     :scene="scene" :result="selectedPlan" :models="models" :modelsLoading="modelsLoading" :addingMannequin="addingMannequin"
     :plans="plans" :selectedPlanId="data.selectedPlanId ?? ''" :tasks="tasks"
@@ -22,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, ref, shallowRef, watch, type Ref } from "vue";
+import { computed, inject, onBeforeUnmount, provide, ref, shallowRef, watch, type Ref } from "vue";
 import { useVueFlow } from "@vue-flow/core";
 import { IconCube3dSphere } from "@tabler/icons-vue";
 import { ElLoading, ElMessage } from "element-plus";
@@ -30,6 +31,7 @@ import { nodeSkeleton, nodeTools, useNode, useNodeFiles, useNodeReferences, z, t
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import sceneEditor from "./sceneEditor.vue";
+import { imageViewSchema, imageViewCamera, imageViewFromCamera, type ImageView } from "@toonflow/tools-scaffold/runtime";
 import { capturePreview, sceneSchema, createEmptyScene, createMannequinObject, createStage, disposeStage, getSceneLighting, type LightingSettings, type SceneDocument, type SceneSettings } from "./scene";
 import { createDirectorDraft } from "./agentTools";
 import { directorPrompt } from "./agentPrompt";
@@ -59,6 +61,8 @@ const exportProgress = ref(0);
 const exportController = new AbortController();
 nodeEvent.on("delete", () => { if (exportingVideo.value || exportingImage.value) throw new Error("正在导出，请完成后再删除导演节点"); });
 const data = computed(() => node.data as typeof node.data & {
+  imageSource?: { source: string; sourceHandle: string; path: string };
+  imageViewRequest?: { id: string; view: ImageView };
   modelPath?: string;
   modelSnapshot?: ModelDocument;
   lighting?: LightingSettings;
@@ -85,6 +89,7 @@ const scene = computed(() => modelDocument.value.scene);
 const lighting = computed({ get: () => ({ ...getSceneLighting(scene.value), ...data.value.lighting }), set: (value: LightingSettings) => { data.value.lighting = value; } });
 const sceneSettings = computed({ get: () => ({ gridVisible: true, skyVisible: true, ...data.value.sceneSettings }), set: (value: SceneSettings) => { data.value.sceneSettings = value; } });
 const editing = ref(false);
+provide("nodePreviewActive", editing);
 const tasks = ref<DirectorGeneration[]>([]);
 const modelsLoading = ref(false);
 const models = ref<NodeAiModel[]>([]);
@@ -132,7 +137,7 @@ async function loadModel() {
       delete data.value.modelSnapshot;
     }
     modelDocument.value = value;
-    if (!selectedPlan.value) data.value.selectedPlanId = value.plans[0]?.id;
+    if (!selectedPlan.value && !(data.value.imageSource && data.value.selectedPlanId === "")) data.value.selectedPlanId = value.plans[0]?.id;
   } catch (error) {
     modelError.value = error instanceof Error ? error.message : "模型文件读取失败";
     if (!disposed) ElMessage.error(`导演台加载失败：${modelError.value}`);
@@ -185,6 +190,32 @@ async function openEditor() {
   if (!disposed && !modelError.value) editing.value = true;
 }
 
+watch(() => data.value.imageViewRequest, async request => {
+  if (!request) return;
+  try {
+    await modelReady;
+    if (disposed || modelError.value) throw new Error(modelError.value || "导演台已关闭");
+    const camera = imageViewCamera(imageViewSchema.parse(request.view)), workspace = files.getWorkspaceFiles();
+    const saving = modelSaving.then(async () => {
+      const value = modelDocumentSchema.parse({ ...modelDocument.value, scene: { ...scene.value, sceneConfig: { ...scene.value.sceneConfig, ...camera }, objectList: scene.value.objectList.length ? scene.value.objectList : [createMannequinObject(crypto.randomUUID())] } });
+      const path = await writeModel(workspace, value);
+      if (disposed) return;
+      modelDocument.value = value; data.value.modelPath = path; data.value.selectedPlanId = "";
+      anchors.value = [...anchors.value, anchorSchema.parse({ ...camera, time: 0 })];
+      if (data.value.imageViewRequest?.id === request.id) delete data.value.imageViewRequest;
+      editing.value = true;
+    });
+    modelSaving = saving.catch(() => {}); await saving;
+  } catch (cause) { if (!disposed) ElMessage.error(cause instanceof Error ? cause.message : String(cause)); }
+}, { immediate: true });
+function applyImageView(camera: { camera: { position: { x: number; y: number; z: number }; fov: number } }) {
+  try {
+    const source = data.value.imageSource, output = source && findNode(source.source)?.data.outputs?.[source.sourceHandle];
+    if (output?.dataType !== "IMAGE" || output.value.url !== source?.path) throw new Error("来源图片已变化，请从当前图片重新打开导演台");
+    output.value = { ...output.value, view: imageViewFromCamera(camera) };
+    ElMessage.success("机位已应用，连接此图片的生成节点将采用对应指令");
+  } catch (cause) { ElMessage.error(cause instanceof Error ? cause.message : "机位超出轻量范围，请将相机移到距人偶1～20单位内"); }
+}
 async function addMannequin() {
   if (modelLoading.value || modelError.value || addingMannequin.value || exportingVideo.value || exportingImage.value || tasks.value.some(task => !task.error)) return;
   addingMannequin.value = true;

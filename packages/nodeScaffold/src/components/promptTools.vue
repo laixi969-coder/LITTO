@@ -16,16 +16,17 @@
   <teleport to="body">
     <div v-if="selecting" class="referencePicker" role="status">点击画布中的图片、视频或文本节点添加参考。<el-button @click="stopSelecting">完成</el-button><span>{{ referenceMessage }}</span></div>
   </teleport>
-  <el-dialog v-model="workshopVisible" title="镜头工坊" width="min(720px, 94vw)" top="4vh" appendToBody :closeOnClickModal="false" :showClose="!savingWorkshop" :closeOnPressEscape="!savingWorkshop">
+  <el-dialog v-model="workshopVisible" title="镜头工坊" width="min(720px, 94vw)" top="4vh" appendToBody :closeOnClickModal="false" :showClose="!savingWorkshop && !assetBusy" :closeOnPressEscape="!savingWorkshop && !assetBusy">
     <div class="cameraWorkshop nodrag nopan nowheel" :inert="savingWorkshop" @pointerdown.stop>
       <div class="cameraFields"><label v-for="option in cameraOptions" :key="option.key">{{ option.label }}<el-select v-model="camera[option.key]" :aria-label="option.label"><el-option v-for="value in option.values" :key="value" :label="value" :value="value === '自动' ? '' : value" /></el-select></label></div>
-      <label>配色<el-select v-model="color" aria-label="配色"><el-option label="自动" value="" /><el-option v-for="item in colorPresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
-      <div class="colorPalette" aria-label="配色示意"><span v-for="hex in colorPresets.find(item => item.text === color)?.colors" :key="hex" :style="{ background: hex }" :title="hex" /></div>
+      <visualAssetPicker v-model="draft" :active="workshopVisible" :disabled="savingWorkshop || assetBusy" @busy="assetBusy = $event" />
+      <label>配色<el-select v-model="color" aria-label="配色"><el-option label="自动" value="" /><el-option v-if="draft.palette" :label="draft.palette.name" :value="draft.color" /><el-option v-for="item in colorPresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
+      <div class="colorPalette" aria-label="配色示意"><span v-for="hex in draft.palette?.colors ?? colorPresets.find(item => item.text === color)?.colors" :key="hex" :style="{ background: hex }" :title="hex" /></div>
       <label>风格<el-select v-model="style" aria-label="风格"><el-option label="自动" value="" /><el-option v-for="item in stylePresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
       <label>生成内容预览<el-input :modelValue="compiledPreview || workshopText" type="textarea" :rows="5" readonly aria-label="镜头工坊提示词预览" /></label>
       <template v-if="mediaType === 'video'"><label>全局运镜（最多 5 项，按列表顺序执行）<el-select modelValue="" aria-label="添加全局运镜" :disabled="draft.motions.length >= 5" @change="addMotion"><el-option v-for="item in motionOptions" :key="item.id" :label="item.label" :value="item.id" :disabled="draft.motions.some(value => value.id === item.id)" /></el-select></label><ol class="motionList"><li v-for="(item, index) in draft.motions" :key="item.id"><span>{{ index + 1 }}. {{ item.label }}</span><el-button :disabled="!index" @click="moveMotion(index, -1)">上移</el-button><el-button :disabled="index === draft.motions.length - 1" @click="moveMotion(index, 1)">下移</el-button><el-button @click="draft.motions.splice(index, 1)">移除</el-button></li></ol></template><p>修饰独立保存，不改写正文。逐镜焦距、光圈和运镜优先，全局对应设置仅用于未指定该字段的分镜。风格和配色作用于整段，沿用人物与资产约束。文字引导效果须看生成结果。</p><p v-if="workshopError" role="alert">{{ workshopError }}</p>
     </div>
-    <template #footer><el-button :disabled="savingWorkshop" @click="resetWorkshop">恢复自动</el-button><el-button :disabled="savingWorkshop" @click="workshopVisible = false">关闭</el-button><el-button type="primary" :disabled="disabled || savingWorkshop" :loading="savingWorkshop" @click="saveWorkshop">保存设置并预览</el-button></template>
+    <template #footer><el-button :disabled="savingWorkshop || assetBusy" @click="resetWorkshop">恢复自动</el-button><el-button :disabled="savingWorkshop || assetBusy" @click="workshopVisible = false">关闭</el-button><el-button type="primary" :disabled="disabled || savingWorkshop || assetBusy" :loading="savingWorkshop" @click="saveWorkshop">保存设置并预览</el-button></template>
   </el-dialog>
   <el-dialog v-model="enhanceVisible" title="审阅增强后的提示词" width="min(720px, 94vw)" appendToBody :closeOnClickModal="false" @closed="enhanceController?.abort()">
     <div class="promptEnhancement"><label v-if="models.length > 1">增强模型<el-select v-model="languageModel" aria-label="提示词增强模型"><el-option v-for="model in models" :key="JSON.stringify([model.providerId, model.modelId])" :label="model.label" :value="JSON.stringify([model.providerId, model.modelId])" /></el-select></label><el-button v-if="models.length > 1 && !enhancedText && !enhancing" @click="runEnhancement">开始增强</el-button><p v-if="enhancing" role="status">正在增强，可取消；原提示词保留。</p><el-input v-model="enhancedText" type="textarea" :rows="12" :disabled="enhancing" aria-label="增强后的提示词" /></div>
@@ -34,6 +35,7 @@
 </template>
 
 <script setup lang="ts">
+import visualAssetPicker from "./visualAssetPicker.vue";
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
 import { ElButton, ElDialog, ElInput, ElMessage, ElOption, ElPopover, ElSelect } from "element-plus";
@@ -84,11 +86,11 @@ watch(selecting, value => {
   }
 });
 
-const workshopVisible = ref(false);
+const workshopVisible = ref(false), assetBusy = ref(false);
 const emptyWorkshop = (): VisualModifiers => ({ camera: { camera: "", lens: "", focal: "", aperture: "" }, motions: [], color: "", style: "" });
 const draft = ref<VisualModifiers>(emptyWorkshop());
 const camera = computed(() => draft.value.camera as Record<string, string>);
-const color = computed({ get: () => draft.value.color, set: value => { draft.value.color = value; } });
+const color = computed({ get: () => draft.value.color, set: value => { draft.value.color = value; delete draft.value.palette; } });
 const style = computed({ get: () => draft.value.style, set: value => { draft.value.style = value; } });
 const motionOptions = filmTechniques.filter(item => item.category === "camera" && item.stages.includes("video"));
 const compiledPreview = ref(""), workshopError = ref(""), savingWorkshop = ref(false);
@@ -99,7 +101,7 @@ function addMotion(id: string) { const item = motionOptions.find(value => value.
 function moveMotion(index: number, offset: number) { const [item] = draft.value.motions.splice(index, 1); draft.value.motions.splice(index + offset, 0, item!); }
 watch(draft, () => { compiledPreview.value = ""; }, { deep: true });
 async function saveWorkshop() {
-  if (props.disabled || savingWorkshop.value) return;
+  if (props.disabled || savingWorkshop.value || assetBusy.value) return;
   savingWorkshop.value = true; workshopError.value = "";
   try {
     const value = visualModifiersSchema.parse(draft.value);
