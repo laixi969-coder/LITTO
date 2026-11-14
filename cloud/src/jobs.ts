@@ -21,8 +21,11 @@ export type JobSpec = {
 
 export function estimate(modelId: string, kind: string, params: Record<string, any>) {
     const m = modelView(get("SELECT * FROM models WHERE id=?", modelId)!);
-    const rate = kind === "video" ? m.price.perSecond : m.price.perImage;
-    const usd = typeof rate === "number" && Number.isFinite(rate) && rate >= 0 ? rate * Number(kind === "video" ? params.duration ?? 4 : params.count ?? 1) : null;
+    const unitRate = kind === "video" ? m.price.perSecond : m.price.perImage;
+    const rate = unitRate ?? m.price.perCall;
+    const units = unitRate === undefined ? 1 : Number(kind === "video" ? params.duration ?? 4 : params.count ?? 1);
+    const cost = typeof rate === "number" && Number.isFinite(rate) && rate >= 0 && Number.isFinite(units) && units > 0 ? rate * units : null;
+    const usd = cost !== null && Number.isFinite(cost) ? cost : null;
     return { usd, credits: creditsFor(usd) };
 }
 
@@ -64,7 +67,9 @@ export function enqueue(spec: JobSpec) {
         if (spec.parameters.fingerprint && batch.promptFingerprint !== spec.parameters.fingerprint) throw conflict("镜头规格已改变，请新建候选批次", "candidate_batch_changed");
     }
     const prov = get("SELECT * FROM providers WHERE id=?", model.provider_id)!;
-    const est = estimate(spec.modelId, spec.kind, spec.parameters);
+    const pricingParams = prov.id === "workspaceMedia" ? spec.parameters.request ?? spec.parameters : spec.parameters;
+    const est = estimate(spec.modelId, spec.kind, pricingParams);
+    if (prov.id === "workspaceMedia" && (!setting("billingEnabled", false) || est.usd === null || !Number.isFinite(est.usd) || est.usd <= 0 || !Number.isFinite(est.credits) || est.credits <= 0)) throw bad("共享媒体模型须先由管理员开启积分计费并配置有效单价，未提交生成");
     const id = ulid();
     const retry = JSON.parse(prov.retry_policy);
     const seed = spec.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -205,6 +210,7 @@ async function execute(jobId: string) {
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
+        if (job.providerId === "workspaceMedia" && !p.remoteTask && !(job.held > 0)) throw Object.assign(bad("此任务没有预占生成额度，请配置计费后重新创建"), { retryable: false, fallbackAllowed: false });
         let narrativeUnchanged: (() => Promise<void>) | undefined;
         if (job.projectId && (job.kind === "video" || job.targetType === "shot") && !raw.provider_task_id && (!p.remoteTask || ["failed", "rejected"].includes(p.remoteTask.status))) {
             try {
@@ -292,7 +298,8 @@ async function finish(job: any, result: GenResult, durationMs: number) {
         mediaIds.push(m.id);
         s.insert("generation_outputs", { job_id: job.id, media_id: m.id, idx: i, meta: { seed: job.seed, model: job.modelId, workspacePath: o.workspacePath, mime: o.mime } });
     }
-    const userCharge = creditsFor(result.costUsd);
+    // 工作区供应商没有账单回执，按提交时冻结的管理员报价结算，不冒充供应商实际成本。
+    const userCharge = job.providerId === "workspaceMedia" ? job.held : creditsFor(result.costUsd);
     tx(() => {
         // A cancel may have raced us; the guard keeps the ledger consistent.
         const cur = get("SELECT status,held FROM generation_jobs WHERE id=?", job.id)!;
@@ -372,6 +379,7 @@ async function fail(job: any, err: Error & { retryable?: boolean; timeout?: bool
 export function cancelJob(workspaceId: string, id: string, actor: string) {
     const j0 = scoped(workspaceId).get("generation_jobs", id, true);
     if (!j0) throw bad("job not found");
+    if (j0.providerTaskId || j0.parameters?.remoteTask && !["failed", "rejected"].includes(j0.parameters.remoteTask.status)) throw conflict("任务已提交或受理状态不明，请先核对供应商结果；冻结额度保留", "remote_result_unresolved");
     if (!["QUEUED", "RUNNING"].includes(j0.status)) throw conflict(`job already ${j0.status}`);
     tx(() => {
         run("UPDATE generation_jobs SET status='CANCELLED', finished_at=?, held=0 WHERE id=?", now(), id);
@@ -395,7 +403,7 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     if (o.providerTaskId || workspaceRecovery) {
         tx(() => {
             const settled = get("SELECT id FROM credit_ledger WHERE workspace_id=? AND job_id=? AND type='GENERATION_CHARGE'", workspaceId, id);
-            const held = o.held || (settled ? 0 : estimate(o.modelId, o.kind, o.parameters).credits);
+            const held = o.held || (settled ? 0 : o.providerId === "workspaceMedia" ? creditsFor(o.estimatedCost) : estimate(o.modelId, o.kind, o.parameters).credits);
             if (!o.held) hold(workspaceId, id, held);
             const parameters = workspaceRecovery ? { ...o.parameters, recoveryFailures: 0, remoteTask: { ...task, status: "recovering" } } : o.parameters;
             run("UPDATE generation_jobs SET status='QUEUED', attempts=?, held=?, run_after=?, finished_at=NULL,error=NULL,parameters=? WHERE id=?", workspaceRecovery ? o.attempts : 0, held, now(), j(parameters), id);

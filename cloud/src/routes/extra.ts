@@ -137,7 +137,7 @@ extra.get("/billing", (c) => {
 extra.post("/billing/checkout", async (c) => {
     const { a } = ctx(c, "OWNER");
     const b = await body(c, z.object({ kind: z.enum(["pack", "plan"]), id: z.string() }));
-    return c.json(await checkout(a.workspaceId, b.kind, b.id, `${config.publicUrl}/studio/settings`));
+    return c.json(await checkout(a.workspaceId, b.kind, b.id, `${config.publicUrl}/studio/settings`, c.req.header("idempotency-key") ?? ""));
 });
 /** Stripe webhook: signature verified over the raw body; fulfilment is idempotent. */
 extra.post("/webhooks/stripe", async (c) => {

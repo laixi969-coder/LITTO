@@ -1,11 +1,25 @@
-import { constants, copyFile, lstat, rename, unlink, realpath, writeAtomic } from "@toonflow/file";
+import { constants, lstatSync, copyFile, lstat, rename, unlink, realpath, writeAtomic } from "@toonflow/file";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Request } from "express";
+import { cloud } from "@/lib/cloud";
+import { currentTenant, authEnabled } from "@/utils/tenant";
 import { resolveWorkspace } from "@/utils/workspace";
 
 export async function writeWorkspaceFile(path: string, content: string | Uint8Array, exclusive = false) {
   protectStoryProject(path);
-  await writeAtomic(path, content, { exclusive });
+  const tenant = currentTenant();
+  let release: (() => void) | undefined;
+  if (authEnabled()) {
+    const api = cloud();
+    if (!tenant || !api) throw Object.assign(new Error("缺少文件写入身份"), { status: 403 });
+    let previousSize = 0;
+    try { previousSize = lstatSync(path).size; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    const size = typeof content === "string" ? Buffer.byteLength(content) : content.byteLength;
+    release = api.reserveWorkspaceStorage(tenant.workspaceId, Math.max(0, size - previousSize));
+  }
+  try { await writeAtomic(path, content, { exclusive }); }
+  finally { release?.(); }
 }
 function protectStoryProject(path: string) {
   if (basename(path).toLowerCase() === "storyproject.json") throw Object.assign(new Error("故事项目请通过故事工具更新，选择与采用可在聊天中完成，以保留版本与采用记录"), { status: 403 });

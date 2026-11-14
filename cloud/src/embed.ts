@@ -14,6 +14,7 @@ import { sweepWorkspacePurges } from "./storage.ts";
 import { recoverInterruptedRenders } from "./domain/nle-render.ts";
 export { configureWorkspacePurge } from "./storage.ts";
 export { configureNarrativeGate } from "./domain/narrativeGate.ts";
+export { configureWorkspaceStorage, reserveWorkspaceStorage } from "./storage.ts";
 export { storage, mediaView, saveMedia, sniff } from "./storage.ts";
 
 export { resolveSession, modelPermissions, requireModelAccess } from "./auth.ts";

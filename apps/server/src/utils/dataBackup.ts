@@ -103,12 +103,22 @@ export async function restoreDataBackup(backup: string, destination: string) {
 export function startDataBackups(dataRoot: string) {
   const backupRoot = process.env.MILIMILI_BACKUP_DIR || join(dirname(dataRoot), "dataBackups");
   let running = false;
-  const interval = setInterval(async () => {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout>;
+  const execute = async () => {
     if (running) return;
     running = true;
+    let delay = 15 * 60_000;
     try {
+      const statusText = await readFile(join(backupRoot, "status.json"), "utf8").catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return "{}"; throw error; });
+      let previousStatus: { ok?: boolean; completedAt?: string } = {};
+      try { previousStatus = JSON.parse(statusText) ?? {}; }
+      catch (error) { if (!(error instanceof SyntaxError)) throw error; }
+      const remaining = Date.parse(previousStatus.completedAt ?? "") + 24 * 3600_000 - Date.now();
+      if (previousStatus.ok && remaining > 0) { delay = remaining; return; }
       const dbPath = process.env.MILIMILI_DB || join(process.env.MILIMILI_DATA_DIR || join(dataRoot, "cloud"), "milimili.db");
       const destination = await createDataBackup(dataRoot, backupRoot, relative(dataRoot, dbPath));
+      delay = 24 * 3600_000;
       await writeAtomic(join(backupRoot, "status.json"), JSON.stringify({ ok: true, completedAt: new Date().toISOString(), backup: basename(destination) }), { mode: 0o600 });
       // ACT: 默认保留最近三份本机验证通过的备份；异地副本仍需运维配置。
       const previous = (await readdir(backupRoot)).filter(name => /^backup\d+[a-f0-9]+$/.test(name)).sort().reverse();
@@ -117,12 +127,16 @@ export function startDataBackups(dataRoot: string) {
         await rm(join(backupRoot, name), { recursive: true });
       }
     } catch (error) {
+      delay = 15 * 60_000;
       console.error("数据备份失败：", error instanceof Error ? error.message : String(error));
       await mkdir(backupRoot, { recursive: true, mode: 0o700 })
         .then(() => writeAtomic(join(backupRoot, "status.json"), JSON.stringify({ ok: false, failedAt: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) }), { mode: 0o600 }))
         .catch(cause => console.error("备份状态保存失败", cause));
-    } finally { running = false; }
-  }, 24 * 3600_000);
-  interval.unref();
-  return () => clearInterval(interval);
+    } finally {
+      running = false;
+      if (!stopped) { timer = setTimeout(() => void execute(), delay); timer.unref(); }
+    }
+  };
+  void execute();
+  return () => { stopped = true; clearTimeout(timer); };
 }

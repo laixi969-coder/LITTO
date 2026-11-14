@@ -62,18 +62,30 @@ export const paymentProvider = (): PaymentProvider => {
     return id === "stripe" ? stripe : mockPay;
 };
 
-export async function checkout(ws: string, kind: "pack" | "plan", itemId: string, returnUrl: string) {
+export async function checkout(ws: string, kind: "pack" | "plan", itemId: string, returnUrl: string, requestKey: string) {
+    if (!/^[a-zA-Z0-9_-]{16,128}$/.test(requestKey)) throw bad("购买请求标识无效");
+    const key = `checkout:${requestKey}`;
+    const previous = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", ws, key);
+    const saved = previous ? JSON.parse(previous.response) : null;
+    if (saved && (saved.kind !== kind || saved.itemId !== itemId)) throw bad("购买请求标识不能用于不同商品");
+    if (saved?.result) return saved.result;
     const item: any = kind === "pack" ? packs().find((p) => p.id === itemId) : plans().find((p) => p.id === itemId);
     if (!item) throw notFound(kind);
     if (kind === "plan" && item.period === "free") { setPlan(ws, item, false, "downgrade"); return { completed: true }; }
     if (kind === "plan" && item.period === "custom") throw bad("custom plans are arranged with sales (admin sets them)");
-    const prov = paymentProvider();
-    const id = ulid();
-    run("INSERT INTO payments VALUES(?,?,?,?,?,?,?,?,?,?,?)", id, ws, kind, itemId, item.priceUsd, item.credits, prov.id, null, "pending", now(), now());
-    const r = await prov.checkout({ paymentId: id, title: item.name, amountUsd: item.priceUsd, returnUrl });
+    const prov = saved ? (saved.provider === "stripe" ? stripe : mockPay) : paymentProvider();
+    const id = saved?.paymentId ?? ulid();
+    const intent = saved ?? { kind, itemId, paymentId: id, provider: prov.id, title: item.name, amountUsd: item.priceUsd };
+    if (!saved) tx(() => {
+      run("INSERT INTO payments VALUES(?,?,?,?,?,?,?,?,?,?,?)", id, ws, kind, itemId, item.priceUsd, item.credits, prov.id, null, "pending", now(), now());
+      run("INSERT INTO idempotency_keys VALUES(?,?,?,?)", key, ws, JSON.stringify(intent), now());
+    });
+    const r = await prov.checkout({ paymentId: id, title: intent.title, amountUsd: intent.amountUsd, returnUrl });
     run("UPDATE payments SET provider_ref=? WHERE id=?", r.ref ?? null, id);
     if (r.completed) fulfil(id);
-    return { paymentId: id, url: r.url ?? null, completed: !!r.completed };
+    const result = { paymentId: id, url: r.url ?? null, completed: !!r.completed };
+    run("UPDATE idempotency_keys SET response=? WHERE workspace_id=? AND key=?", JSON.stringify({ ...intent, result }), ws, key);
+    return result;
 }
 
 /** Idempotent: a payment is fulfilled exactly once (webhook retries are safe). */

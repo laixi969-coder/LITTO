@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { get, run, scoped, tx } from "./db.ts";
+import { get, run, scoped, setting, tx } from "./db.ts";
 import { createProject } from "./routes/platform.ts";
 import { enqueue, jobView } from "./jobs.ts";
 import { ADAPTERS, upsertModel, upsertProvider } from "./providers/registry.ts";
@@ -92,7 +92,7 @@ export function enqueueWorkspaceMedia(input: {
     name: input.request.modelId,
     type: input.kind,
     limits: { workspaceId: input.workspaceId, workspaceExecution: true },
-    price: {},
+    price: setting<Record<string, Record<string, number>>>("pricing", {})[`${input.request.providerId}/${input.request.modelId}`] ?? {},
     capabilities: input.production?.capabilities ?? {},
   });
   const prompt = input.production ? input.request.prompt : compileWorkspacePrompt(scoped(input.workspaceId), input.projectId, input.request.prompt, input.request.purpose, input.kind);

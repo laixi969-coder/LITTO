@@ -63,10 +63,11 @@ export const openaiAdapter: ProviderAdapter = {
     },
     async poll(taskId, ctx): Promise<PollResult> {
         const r = await fetch(url(ctx.baseUrl, `/videos/${taskId}`), { headers: hdr(ctx.apiKey), signal: ctx.signal });
-        if (!r.ok) return { status: "failed", error: `poll HTTP ${r.status}`, retryable: r.status >= 500 };
+        if (!r.ok) throw new ProviderError(`poll HTTP ${r.status}`, r.status >= 500 || r.status === 429);
         const b: any = await r.json();
         if (["queued", "in_progress", "processing", "running"].includes(b.status)) return { status: "running" };
-        if (b.status !== "completed" && b.status !== "succeeded") return { status: "failed", error: String(b.error?.message ?? b.status) };
+        if (["failed", "cancelled", "canceled"].includes(b.status)) return { status: "failed", error: String(b.error?.message ?? b.status), retryable: false };
+        if (b.status !== "completed" && b.status !== "succeeded") throw new ProviderError("无法确认远端任务状态", false);
         const out = await fetchBytes(url(ctx.baseUrl, `/videos/${taskId}/content`), ctx.apiKey, ctx.signal);
         return { status: "done", result: { outputs: [{ ...out, duration: Number(b.seconds ?? 4) }], costUsd: reportedCost(b.usage?.cost) } };
     },

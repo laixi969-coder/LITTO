@@ -1,3 +1,7 @@
+import { bodyLimit } from "hono/body-limit";
+import { createReadStream, stat } from "@toonflow/file";
+import { join } from "node:path";
+import { Readable } from "node:stream";
 import { Hono, type Context } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { authenticate } from "./auth.ts";
@@ -13,12 +17,14 @@ import { nle } from "./routes/nle.ts";
 import { market, marketAdmin } from "./routes/market.ts";
 import { HttpError, log } from "./util.ts";
 import { get, setting } from "./db.ts";
-import { checkSignedUrl, storage } from "./storage.ts";
+import { checkSignedUrl } from "./storage.ts";
 import { inc, observe } from "./metrics.ts";
 import { config } from "./config.ts";
 
 export const app = new Hono();
 
+app.use("/webhooks/*", bodyLimit({ maxSize: 2 * 1024 * 1024, onError: c => c.json({ error: "请求过大" }, 413) }));
+app.use("/auth/*", bodyLimit({ maxSize: 16 * 1024, onError: c => c.json({ error: "请求过大" }, 413) }));
 app.use("*", secureHeaders({ contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "blob:"], mediaSrc: ["'self'", "blob:"], styleSrc: ["'self'", "'unsafe-inline'"] } }));
 
 // Dev CORS for the Vite app (cookie auth needs an explicit origin).
@@ -81,23 +87,24 @@ app.get("/media/:id/file", async (c) => {
     const variant = c.req.query("variant");
     const key = variant === "thumb" && m.thumbnail_key ? m.thumbnail_key : variant === "proxy" && m.proxy_key ? m.proxy_key : m.storage_key;
     const mime = key === m.thumbnail_key ? "image/jpeg" : key === m.proxy_key ? "video/mp4" : m.mime;
-    const buf = await storage.get(key);
+    const path = join(config.mediaDir, key);
+    const size = (await stat(path)).size;
     // SVG could carry script: serve it inert.
     const headers: Record<string, string> = { "content-type": mime, "cache-control": "private, max-age=300", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff", "accept-ranges": "bytes" };
     const range = c.req.header("range");
     if (range) {
         const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-        const start = match && (match[1] ? Number(match[1]) : match[2] ? Math.max(0, buf.length - Number(match[2])) : NaN);
-        const end = match && (match[1] && match[2] ? Math.min(Number(match[2]), buf.length - 1) : buf.length - 1);
-        if (start === null || end === null || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= buf.length) {
-            return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${buf.length}` } });
+        const start = match && (match[1] ? Number(match[1]) : match[2] ? Math.max(0, size - Number(match[2])) : NaN);
+        const end = match && (match[1] && match[2] ? Math.min(Number(match[2]), size - 1) : size - 1);
+        if (start === null || end === null || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start > end || start >= size) {
+            return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${size}` } });
         }
-        headers["content-range"] = `bytes ${start}-${end}/${buf.length}`;
+        headers["content-range"] = `bytes ${start}-${end}/${size}`;
         headers["content-length"] = String(end - start + 1);
-        return new Response(new Uint8Array(buf.subarray(start, end + 1)), { status: 206, headers });
+        return new Response(Readable.toWeb(createReadStream(path, { start, end })) as unknown as ReadableStream<Uint8Array>, { status: 206, headers });
     }
-    headers["content-length"] = String(buf.length);
-    return new Response(new Uint8Array(buf), { headers });
+    headers["content-length"] = String(size);
+    return new Response(Readable.toWeb(createReadStream(path)) as unknown as ReadableStream<Uint8Array>, { headers });
 });
 
 app.route("/auth", authPublic);

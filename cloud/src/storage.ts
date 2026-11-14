@@ -76,8 +76,19 @@ export function sniff(buf: Buffer): Sniffed | null {
     return null;
 }
 
+let workspaceFileBytes = (_workspaceId: string) => 0;
+const workspaceReservations = new Map<string, number>();
+export function configureWorkspaceStorage(readBytes: (workspaceId: string) => number) { workspaceFileBytes = readBytes; }
+export function reserveWorkspaceStorage(workspaceId: string, bytes: number) {
+    const quota = get("SELECT quota_bytes FROM workspaces WHERE id=? AND deleted_at IS NULL", workspaceId);
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || !quota || bytes > 0 && usage(workspaceId).bytes + reservedUploadBytes(workspaceId) + bytes > quota.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
+    workspaceReservations.set(workspaceId, (workspaceReservations.get(workspaceId) ?? 0) + bytes);
+    let released = false;
+    return () => { if (!released) { released = true; const remaining = (workspaceReservations.get(workspaceId) ?? 0) - bytes; if (remaining) workspaceReservations.set(workspaceId, remaining); else workspaceReservations.delete(workspaceId); } };
+}
 export function usage(workspaceId: string) {
-    return get("SELECT COALESCE(SUM(size),0) AS bytes, COUNT(*) AS files FROM media WHERE workspace_id=? AND deleted_at IS NULL", workspaceId)!;
+    const media = get("SELECT COALESCE(SUM(size),0) AS bytes, COUNT(*) AS files FROM media WHERE workspace_id=?", workspaceId)!;
+    return { bytes: media.bytes + workspaceFileBytes(workspaceId) + (workspaceReservations.get(workspaceId) ?? 0), files: media.files };
 }
 
 export async function saveMedia(workspaceId: string, projectId: string | null, data: Buffer, opts: { source: string; uploadId?: string; mime?: string; duration?: number; allowUnsniffed?: boolean; signal?: AbortSignal }) {

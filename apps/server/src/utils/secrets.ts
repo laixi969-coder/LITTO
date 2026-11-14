@@ -1,5 +1,5 @@
 /** Secret handling for settings returned to / received from the browser: keys never leave the server in clear text. */
-const SECRET_KEY = /^(apiKey|token|secret|password|accessKey)$/i;
+const SECRET_KEY = /^(apiKey|token|authToken|accessToken|refreshToken|clientSecret|secretKey|secretAccessKey|secret|password|accessKey)$/i;
 const MASK = "••••";
 export const isMasked = (v: unknown) => typeof v === "string" && v.startsWith(MASK);
 const mask = (v: string) => (v ? `${MASK}${v.slice(-4)}` : "");

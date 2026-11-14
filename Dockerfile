@@ -12,8 +12,8 @@ COPY . .
 RUN bun install --frozen-lockfile
 
 RUN bun run build:server \
-    && mkdir -p data/workspaces/myProject \
-    && chown -R bun:bun data
+    && mkdir -p data/workspaces/myProject dataBackups \
+    && chown -R bun:bun data dataBackups
 
 ENV NODE_ENV=production
 ENV MILIMILI_HOST=0.0.0.0

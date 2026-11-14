@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction } from "express";
 import buildRoute from "@/core";
 import { error } from "@/lib/responseFormat";
 import desktopRequest from "@/lib/desktop";
-import { mountCloud, requireAdminForPlugins, requireSession } from "@/lib/cloud";
+import { mountCloud, requireAdminForPlugins, requireSession, requireWriteRole } from "@/lib/cloud";
 import { noStoreApi, rateLimit, securityHeaders, staticCacheHeaders } from "@/lib/security";
 import { authEnabled } from "@/utils/tenant";
 import initializePlugins from "@/utils/plugins/initialize";
@@ -108,14 +108,35 @@ export async function createApp({
   });
   app.use(languageRequest);
   await mountCloud(app);
+  if (authEnabled()) app.use("/api", rateLimit(2400));
+  app.use("/api", noStoreApi, requireSession);
+  // ACT: 单进程最多同时缓冲两个 API 请求体；结束接收即释放，不占用长任务名额。
+  let receivingBodies = 0;
+  app.use("/api", (req, res, next) => {
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
+    if (receivingBodies >= 2) return res.status(429).json(error("正在接收其他请求，请稍后重试", null, 429));
+    receivingBodies++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      receivingBodies--;
+      req.off("end", release);
+      res.off("close", release);
+      res.off("finish", release);
+    };
+    req.once("end", release);
+    res.once("close", release);
+    res.once("finish", release);
+    next();
+  });
   app.use("/a2a", express.json({ limit: "2mb" }));
   app.use(["/api/workspaces/files/write", "/api/assets/save"], express.raw({ type: "application/octet-stream", limit: "100mb" }));
-  app.use(express.json({ limit: "100mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+  app.use("/api", express.json({ limit: "100mb" }));
+  app.use("/api", express.urlencoded({ extended: true, limit: "100mb" }));
   app.use("/api/desktop", desktopRequest);
   // 账号模式面向多人开放才需要限流；单机桌面模式只有本机一个用户。
-  if (authEnabled()) app.use("/api", rateLimit(2400));
-  app.use("/api", noStoreApi, requireSession, requireAdminForPlugins);
+  app.use("/api", requireWriteRole, requireAdminForPlugins);
 
   const router = await import("@/router");
   router.default(app);

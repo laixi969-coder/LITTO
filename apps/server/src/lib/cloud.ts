@@ -1,6 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { join } from "node:path";
-import { rm } from "@toonflow/file";
+import { rm, readdirSync, lstatSync } from "@toonflow/file";
 import { error } from "@/lib/responseFormat";
 import { authEnabled, tenantDir, tenantStore, type Tenant } from "@/utils/tenant";
 
@@ -38,6 +38,19 @@ export async function mountCloud(app: Express) {
     if (activeRequests.get(workspaceId)) throw new Error("等待工作区请求结束后重试清理");
     await rm(directory, { recursive: true, force: true });
   });
+  // ACT: 单进程同步扫描与预占不跨 await；大工作区升级为持久化空间账本。
+  embed.configureWorkspaceStorage(workspaceId => {
+    function bytes(directory: string): number {
+      let entries: string[];
+      try { entries = readdirSync(directory); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0; throw error; }
+      return entries.reduce((total, name) => {
+        const path = join(directory, name), info = lstatSync(path);
+        return total + (info.isDirectory() ? bytes(path) : info.isFile() ? info.size : 0);
+      }, 0);
+    }
+    return bytes(tenantDir(workspaceId));
+  });
   embed.initCloud();
   // Hono handler expects a raw request stream: mount before any body parser.
   app.use("/cloud", (req, res) => void embed!.cloudRequestListener(req, res));
@@ -61,12 +74,6 @@ export function requireSession(req: Request, res: Response, next: NextFunction) 
     return res.status(403).json(error("页面来源校验失败，请从应用页面重试", null, 403));
   }
   if (req.get("x-milimili-user") && req.get("x-milimili-user") !== tenant.userId) return res.status(409).json(error("账号已在其他页面切换，当前编辑仍保留，请重新登录原账号后保存", null, 409));
-  const path = req.path.toLowerCase().replace(/\/+$/, "");
-  const readOnlyPost = req.method === "POST" && (["/ai/media/estimate", "/ai/media/preflight"].includes(path)
-    || path === "/ai/media/blocking" && req.body?.save === false);
-  if (tenant.role === "VIEWER" && !["GET", "HEAD", "OPTIONS"].includes(req.method) && !readOnlyPost) {
-    return res.status(403).json(error("只读成员不能修改工作区或执行任务", null, 403));
-  }
   (req as Request & { tenant?: Tenant }).tenant = tenant;
   const workspaceId = tenant.workspaceId;
   activeRequests.set(workspaceId, (activeRequests.get(workspaceId) ?? 0) + 1);
@@ -91,5 +98,18 @@ export function requireAdminForPlugins(req: Request, res: Response, next: NextFu
   if ((/^\/providers(?:\/|$)/i.test(req.path) || desktopInstall && req.body?.type === "provider") && (!tenant || !embed?.modelPermissions(tenant.userId).canManage))
     return res.status(403).json(error("仅超级管理员可以配置、测试或修改模型供应商", null, 403));
   if ((pluginPath.test(req.path) || desktopInstall) && !tenant?.isAdmin) return res.status(403).json(error("仅平台管理员可以安装或修改插件与供应商", null, 403));
+  next();
+}
+
+export function requireWriteRole(req: Request, res: Response, next: NextFunction) {
+  if (!authEnabled()) return next();
+  const tenant = (req as Request & { tenant?: Tenant }).tenant;
+  if (!tenant) return res.status(401).json(error("请先登录", null, 401));
+  const path = req.path.toLowerCase().replace(/\/+$/, "");
+  const readOnlyPost = req.method === "POST" && (["/ai/media/estimate", "/ai/media/preflight"].includes(path)
+    || path === "/ai/media/blocking" && req.body?.save === false);
+  if (tenant.role === "VIEWER" && !["GET", "HEAD", "OPTIONS"].includes(req.method) && !readOnlyPost) {
+    return res.status(403).json(error("只读成员不能修改工作区或执行任务", null, 403));
+  }
   next();
 }
