@@ -136,7 +136,7 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
   }));
 }
 
-function detectMimeType(bytes: Uint8Array, fallback: string) {
+export function detectMimeType(bytes: Uint8Array, fallback: string) {
   const header = Buffer.from(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 16));
   const text = header.toString("ascii");
   const mimeType = fallback.split(";")[0].trim().toLowerCase();

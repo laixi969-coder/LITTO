@@ -790,7 +790,7 @@ function canUseCanvasClipboard(event: Event) {
   const target = event.target;
   return props.active && !event.defaultPrevented && !props.settingsVisible && !!canvasId.value && !!project.value?.directory
     && target instanceof Element
-    && !target.closest("input, textarea, select, button, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='slider'], [role='dialog'], #agentPanel")
+    && !target.closest("input, textarea, select, button, video, audio, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='slider'], [role='dialog'], #agentPanel")
     && (target === document.body || target === document.documentElement || canvasElement.value?.contains(target));
 }
 
@@ -962,7 +962,7 @@ function updateCanvasKeys(event: KeyboardEvent) {
   zoomKeyPressed.value = !event.isComposing && shortcutPressed(event, shortcuts.zoom, pressedCodes);
   const editing =
     !(target instanceof Element) ||
-    !!target.closest("input, textarea, select, button, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='slider']");
+    !!target.closest("input, textarea, select, button, video, audio, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='slider']");
   panKeyPressed.value = !!inCanvas && !editing && !event.isComposing && shortcutPressed(event, shortcuts.pan, pressedCodes);
   if (event.type === "keyup" || event.defaultPrevented || event.isComposing || !inCanvas || editing) return;
   const action = ([
@@ -1060,6 +1060,7 @@ const nodeWindow = window as typeof window & {
 };
 nodeWindow.toonflowNodeHost = { vue: vueRuntime, vueFlow: vueFlowRuntime, elementPlus: elementPlusRuntime, ai: { runAgentLoop, createAssistantMessageEventStream } };
 provide("nodeConfig", (nodeType: string) => nodeConfigs.value[nodeType] ?? {});
+provide("canvasActive", computed(() => props.active));
 provide("workspaceFiles", () => {
   const directory = canvasDirectory;
   if (!directory) throw new Error("请先选择工作目录");

@@ -32,8 +32,10 @@ import * as personalization from "@/utils/personalization";
 import * as mentionFiles from "@/agent/mentionFiles";
 import * as story from "@/utils/story";
 import * as autoFilm from "@/utils/autoFilm";
+import * as creative from "@/utils/creative";
 
 export default {
+  creative,
   autoFilm,
   story,
   assets,
