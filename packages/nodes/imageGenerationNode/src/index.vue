@@ -90,7 +90,7 @@ import type { ImageView } from "@toonflow/tools-scaffold/runtime";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImageViewer } from "element-plus";
 import { IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { compileImageViews, collectReferenceViews, compileVisualModifiers, type VisualModifiers, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeImageRequest, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { compileImageViews, collectReferenceViews, resolveNodeReferenceText, compileVisualModifiers, type VisualModifiers, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeImageRequest, type NodeMediaModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import promptTools from "@toonflow/nodes-scaffold/promptTools";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
@@ -173,8 +173,8 @@ watch(
 const modelGroups = computed(() => groupNodeModels(models.value));
 const baseGenerationPrompt = computed(() =>
   [
-    data.value.prompt.trim(),
-    ...refList.value.flatMap((item, index) => (item.dataType === "STRING" && item.value?.trim() ? [`参考 ${index + 1}：\n${item.value.trim()}`] : [])),
+    resolveNodeReferenceText(data.value.prompt.trim(), refList.value),
+    ...refList.value.filter(item => item.dataType === "STRING").flatMap((item, index) => (typeof item.value === "string" && item.value.trim() ? [`文字参考${index + 1}：\n${item.value.trim()}`] : [])),
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -255,6 +255,7 @@ async function startGeneration() {
   if (!choice) throw new Error("请先选择图片模型");
   if (!sizeOptions.value.includes(data.value.size) || !ratioOptions.value.includes(data.value.ratio) || pixelRatio(data.value.size) && pixelRatio(data.value.size) !== data.value.ratio) throw new Error("当前模型或尺寸不支持已选画幅，请调整模型或尺寸；不会自动改为默认比例");
   if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
+  if (!data.value.production && /\{\{ref \d+\}\}/.test(generationPrompt.value)) throw new Error("提示词含未绑定的参考标记，请重新连接素材或移除标记");
   if (!data.value.production && refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();

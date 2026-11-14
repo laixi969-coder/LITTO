@@ -58,3 +58,14 @@ export function collectReferenceViews(values: NodeInputValue[], frames?: { first
   const items = frames ? [{ item: frames.first, role: "firstFrame" as const, index: 0 }, { item: frames.last, role: "lastFrame" as const, index: 0 }] : values.filter(item => item.dataType === "IMAGE").map((item, index) => ({ item, role: "image" as const, index }));
   return items.flatMap(({ item, role, index }) => item?.dataType === "IMAGE" && item.value?.view ? [{ role, index, view: item.value.view }] : []);
 }
+
+export function resolveNodeReferenceText(text: string, values: NodeInputValue[], frames?: { first?: NodeInputValue; last?: NodeInputValue }) {
+  return text.replace(/\{\{ref (\d+)\}\}/g, (marker, number: string) => {
+    const index = Number(number) - 1, reference = values[index];
+    if (!reference || reference.value === undefined) return marker;
+    if (reference.dataType === "IMAGE" && frames) return frames.first && referenceKey(reference) === referenceKey(frames.first) ? "首帧图片" : frames.last && referenceKey(reference) === referenceKey(frames.last) ? "尾帧图片" : "未分配图片";
+    const labels: Record<string, string> = { IMAGE: "图片", VIDEO: "视频", AUDIO: "音频", STRING: "文字参考" };
+    const label = typeof reference.dataType === "string" ? labels[reference.dataType] : undefined;
+    return label ? `${label}${values.slice(0, index + 1).filter(item => item.dataType === reference.dataType).length}` : marker;
+  });
+}

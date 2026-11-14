@@ -17,12 +17,13 @@
     <div v-if="selecting" class="referencePicker" role="status">点击画布中的图片、视频或文本节点添加参考。<el-button @click="stopSelecting">完成</el-button><span>{{ referenceMessage }}</span></div>
   </teleport>
   <el-dialog v-model="workshopVisible" title="镜头工坊" width="min(720px, 94vw)" top="4vh" appendToBody :closeOnClickModal="false" :showClose="!savingWorkshop && !assetBusy" :closeOnPressEscape="!savingWorkshop && !assetBusy">
-    <div class="cameraWorkshop nodrag nopan nowheel" :inert="savingWorkshop" @pointerdown.stop>
+    <div class="cameraWorkshop nodrag nopan nowheel" :inert="savingWorkshop || assetBusy" @pointerdown.stop>
       <div class="cameraFields"><label v-for="option in cameraOptions" :key="option.key">{{ option.label }}<el-select v-model="camera[option.key]" :aria-label="option.label"><el-option v-for="value in option.values" :key="value" :label="value" :value="value === '自动' ? '' : value" /></el-select></label></div>
       <visualAssetPicker v-model="draft" :active="workshopVisible" :disabled="savingWorkshop || assetBusy" @busy="assetBusy = $event" />
       <label>配色<el-select v-model="color" aria-label="配色"><el-option label="自动" value="" /><el-option v-if="draft.palette" :label="draft.palette.name" :value="draft.color" /><el-option v-for="item in colorPresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
       <div class="colorPalette" aria-label="配色示意"><span v-for="hex in draft.palette?.colors ?? colorPresets.find(item => item.text === color)?.colors" :key="hex" :style="{ background: hex }" :title="hex" /></div>
-      <label>风格<el-select v-model="style" aria-label="风格"><el-option label="自动" value="" /><el-option v-for="item in stylePresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
+      <label>风格<el-select v-model="style" aria-label="风格"><el-option label="自动" value="" /><el-option v-if="draft.styleReference" :label="draft.styleReference.name" :value="draft.style" /><el-option v-for="item in stylePresets" :key="item.name" :label="item.name" :value="item.text" /></el-select></label>
+      <visualStylePicker v-model="draft" :active="workshopVisible" :disabled="savingWorkshop || assetBusy" />
       <label>生成内容预览<el-input :modelValue="compiledPreview || workshopText" type="textarea" :rows="5" readonly aria-label="镜头工坊提示词预览" /></label>
       <template v-if="mediaType === 'video'"><label>全局运镜（最多 5 项，按列表顺序执行）<el-select modelValue="" aria-label="添加全局运镜" :disabled="draft.motions.length >= 5" @change="addMotion"><el-option v-for="item in motionOptions" :key="item.id" :label="item.label" :value="item.id" :disabled="draft.motions.some(value => value.id === item.id)" /></el-select></label><ol class="motionList"><li v-for="(item, index) in draft.motions" :key="item.id"><span>{{ index + 1 }}. {{ item.label }}</span><el-button :disabled="!index" @click="moveMotion(index, -1)">上移</el-button><el-button :disabled="index === draft.motions.length - 1" @click="moveMotion(index, 1)">下移</el-button><el-button @click="draft.motions.splice(index, 1)">移除</el-button></li></ol></template><p>修饰独立保存，不改写正文。逐镜焦距、光圈和运镜优先，全局对应设置仅用于未指定该字段的分镜。风格和配色作用于整段，沿用人物与资产约束。文字引导效果须看生成结果。</p><p v-if="workshopError" role="alert">{{ workshopError }}</p>
     </div>
@@ -36,6 +37,7 @@
 
 <script setup lang="ts">
 import visualAssetPicker from "./visualAssetPicker.vue";
+import visualStylePicker from "./visualStylePicker.vue";
 import { computed, onScopeDispose, ref, watch } from "vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
 import { ElButton, ElDialog, ElInput, ElMessage, ElOption, ElPopover, ElSelect } from "element-plus";
@@ -90,8 +92,8 @@ const workshopVisible = ref(false), assetBusy = ref(false);
 const emptyWorkshop = (): VisualModifiers => ({ camera: { camera: "", lens: "", focal: "", aperture: "" }, motions: [], color: "", style: "" });
 const draft = ref<VisualModifiers>(emptyWorkshop());
 const camera = computed(() => draft.value.camera as Record<string, string>);
-const color = computed({ get: () => draft.value.color, set: value => { draft.value.color = value; delete draft.value.palette; } });
-const style = computed({ get: () => draft.value.style, set: value => { draft.value.style = value; } });
+const color = computed({ get: () => draft.value.color, set: value => { if (value !== draft.value.color) { draft.value.color = value; delete draft.value.palette; } } });
+const style = computed({ get: () => draft.value.style, set: value => { if (value !== draft.value.style) { draft.value.style = value; delete draft.value.styleReference; } } });
 const motionOptions = filmTechniques.filter(item => item.category === "camera" && item.stages.includes("video"));
 const compiledPreview = ref(""), workshopError = ref(""), savingWorkshop = ref(false);
 const workshopText = computed(() => compileVisualModifiers(props.preview ?? props.text, draft.value, node.data.storyboard?.shots));

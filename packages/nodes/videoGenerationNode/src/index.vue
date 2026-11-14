@@ -89,7 +89,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { compileImageViews, collectReferenceViews, compileVisualModifiers, type VisualModifiers, cameraTrajectorySchema, videoDurations, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, videoStoryboardSchema, compileVideoStoryboard, storyboardGenerateAudio, type VideoStoryboard, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { compileImageViews, collectReferenceViews, resolveNodeReferenceText, compileVisualModifiers, type VisualModifiers, cameraTrajectorySchema, videoDurations, groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, videoStoryboardSchema, compileVideoStoryboard, storyboardGenerateAudio, type VideoStoryboard, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import promptTools from "@toonflow/nodes-scaffold/promptTools";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
@@ -201,16 +201,7 @@ watch([selectedModel, () => data.value.duration, () => data.value.resolution], (
 }, { flush: "sync" });
 const modelGroups = computed(() => groupNodeModels(models.value));
 function resolveReferenceText(value: string) {
-  return value.replace(/\{\{ref (\d+)\}\}/g, (marker, number: string) => {
-      const index = Number(number) - 1;
-      const reference = refList.value[index];
-      if (!reference) return marker;
-      const position = refList.value.slice(0, index + 1).filter(item => item.dataType === reference.dataType).length;
-      if (reference.dataType === "IMAGE" && frameMode.value) return frames.value.first && referenceKey(reference) === referenceKey(frames.value.first) ? "首帧图片" : frames.value.last && referenceKey(reference) === referenceKey(frames.value.last) ? "尾帧图片" : "未分配图片";
-      const labels: Record<string, string> = { IMAGE: "图片", VIDEO: "视频", AUDIO: "音频", STRING: "文字参考" };
-      const label = typeof reference.dataType === "string" ? labels[reference.dataType] : undefined;
-      return label ? `${label}${position}` : marker;
-    });
+  return resolveNodeReferenceText(value, refList.value, frameMode.value ? frames.value : undefined);
 }
 const baseGenerationPrompt = computed(() =>
   [

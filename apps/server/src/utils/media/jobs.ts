@@ -110,7 +110,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   if (request.purpose === "storyboard" && (kind !== "image" || request.shotId)) throw Object.assign(new Error("多格总览仅用于分镜规划，不绑定正式 shotId；正式镜头请独立生成高清关键帧"), { status: 400 });
   if (request.localRepair && (!request.shotId || kind !== "image")) throw Object.assign(new Error("精修须提供图像镜头 shotId"), { status: 400 });
   if (request.candidateDirection && (!request.shotId || kind !== "image" || request.localRepair)) throw Object.assign(new Error("系列变体仅支持普通镜头关键帧，不能与局部修改同时使用"), { status: 400 });
-  if (!request.shotId && !request.storyboard && !request.referenceViews?.length && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
+  if (!request.shotId && !request.storyboard && !request.referenceViews?.length && !request.visualModifiers && !request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词"), { status: 400 });
   if (request.storyboard && (kind !== "video" || request.shotId)) throw Object.assign(new Error("正式镜头请先将分镜编排保存到镜头时间线并重新编译"), { status: 400 });
   await assertMediaModelSelection(kind, request, directory);
   const tenant = currentTenant();
@@ -142,6 +142,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     }
     request = await applyMediaQuality(directory, kind, request, model);
     request = prepareVideoStoryboard(prepareVisualModifiers(request, model), model);
+    if (!request.prompt.trim()) throw Object.assign(new Error("独立素材须提供生成提示词或有效的工坊设置"), { status: 400 });
     if (kind === "video" && model.lipSync) speechSyncInputs = await validateSpeechInputs(directory, request);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
     const spec = isDirectorPrompt(request.prompt) ? "" : compileShotSpec(request.shotSpec);

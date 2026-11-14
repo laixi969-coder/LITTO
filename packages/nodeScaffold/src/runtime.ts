@@ -1,6 +1,6 @@
 export { default as nodeSkeleton } from "./nodeSkeleton.vue";
 export { useNode, type NodeOptions } from "./useNode";
-export { useNodeReferences, collectReferenceViews } from "./useNodeReferences";
+export { useNodeReferences, collectReferenceViews, resolveNodeReferenceText } from "./useNodeReferences";
 export { useNodeGeneration } from "./useNodeGeneration";
 export { showNodeError } from "./showNodeError";
 export * from "./connection";
