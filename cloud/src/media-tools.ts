@@ -6,7 +6,9 @@ import { run } from "./db.ts";
 import { storage } from "./storage.ts";
 import { log } from "./util.ts";
 
-const exec = (args: string[]) => new Promise<void>((res, rej) => { const p = spawn("ffmpeg", ["-y", "-loglevel", "error", ...args]); let e = ""; p.stderr.on("data", (d) => (e += d)); p.on("error", rej); p.on("exit", (c) => (c === 0 ? res() : rej(new Error(e.slice(-300))))); });
+let derivativeJobs = 0;
+
+const exec = (args: string[]) => new Promise<void>((res, rej) => { const p = spawn("ffmpeg", ["-y", "-loglevel", "error", ...args], { timeout: 120000, killSignal: "SIGKILL" }); let e = ""; p.stderr.on("data", (d) => (e = (e + d).slice(-4096))); p.on("error", rej); p.on("close", (c) => (c === 0 ? res() : rej(new Error(e.slice(-300))))); });
 
 /**
  * Best-effort derivatives (PRD §17/P2): JPEG thumbnail for images/videos and a 480p proxy for videos.
@@ -14,7 +16,10 @@ const exec = (args: string[]) => new Promise<void>((res, rej) => { const p = spa
  */
 export async function makeDerivatives(media: { id: string; workspaceId: string; projectId: string | null; mime: string; storageKey: string }) {
     if (!/^(video\/(mp4|webm)|image\/(png|jpeg|webp|gif))$/.test(media.mime)) return;
+    // ACT: 衍生素材为可选优化，最多两个后台任务；忙时保留原片播放，不无限排队。
+    if (derivativeJobs >= 2) return;
     const dir = mkdtempSync(join(tmpdir(), "milimili-media-"));
+    derivativeJobs++;
     try {
         const src = join(dir, "src");
         writeFileSync(src, await storage.get(media.storageKey));
@@ -32,7 +37,7 @@ export async function makeDerivatives(media: { id: string; workspaceId: string; 
         }
     } catch (e) {
         log.info("derivatives skipped:", (e as Error).message.slice(0, 120));
-    } finally { rmSync(dir, { recursive: true, force: true }); }
+    } finally { derivativeJobs--; rmSync(dir, { recursive: true, force: true }); }
 }
 
 export type Probe = {

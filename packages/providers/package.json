@@ -8,6 +8,7 @@
   },
   "exports": {
     ".": "./index.ts",
+    "./http": "./src/http.ts",
     "./modelYear": "./src/modelYear.ts",
     "./aspect": "./src/aspect.ts",
     "./types": "./types.d.ts",

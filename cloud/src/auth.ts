@@ -160,6 +160,8 @@ export function loginUser(email: string, identity?: { provider: string; subject:
         if (identity) run("INSERT OR IGNORE INTO oauth_identities VALUES(?,?,?,?)", identity.provider, identity.subject, u.id, now());
         return u;
     });
+    // ACT: 每次登录最多清理一千条，避免历史积压阻塞正常登录。
+    run("DELETE FROM sessions WHERE id IN (SELECT id FROM sessions WHERE expires_at<=? LIMIT 1000)", now());
     const token = randomBytes(32).toString("base64url");
     run("INSERT INTO sessions VALUES(?,?,?,?,?)", ulid(), user.id, sha256(token), new Date(Date.now() + SESSION_TTL_MS).toISOString(), now());
     audit(user.id, "auth.login", user.id, identity ? { via: identity.provider } : undefined);

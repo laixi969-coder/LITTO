@@ -1,16 +1,24 @@
-import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeAtomicSync, lstatSync, chmodSync } from "@toonflow/file";
 import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 
 const dataDir = resolve(process.env.MILIMILI_DATA_DIR ?? join(process.cwd(), "data"));
 mkdirSync(dataDir, { recursive: true });
 
-// Master key: env wins; otherwise a generated key persisted next to the data (dev only).
+// 已有密钥只读取；并发首次启动只能有一个创建者，不能覆盖另一进程使用的密钥。
 function masterKey(): Buffer {
-    if (process.env.MILIMILI_MASTER_KEY) return Buffer.from(process.env.MILIMILI_MASTER_KEY, "hex");
-    const f = join(dataDir, ".master.key");
-    if (!existsSync(f)) writeFileSync(f, randomBytes(32).toString("hex"), { mode: 0o600 });
-    return Buffer.from(readFileSync(f, "utf8").trim(), "hex");
+    const configured = process.env.MILIMILI_MASTER_KEY;
+    let value = configured;
+    if (value === undefined) {
+        const path = join(dataDir, ".master.key");
+        try { writeAtomicSync(path, randomBytes(32).toString("hex"), { exclusive: true, mode: 0o600 }); }
+        catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+        if (!lstatSync(path).isFile() || lstatSync(path).isSymbolicLink()) throw new Error("主密钥必须是普通文件");
+        chmodSync(path, 0o600);
+        value = readFileSync(path, "utf8").trim();
+    }
+    if (!/^[a-f0-9]{64}$/i.test(value)) throw new Error("主密钥必须是 32 字节十六进制值");
+    return Buffer.from(value, "hex");
 }
 
 export const config = {

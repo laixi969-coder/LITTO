@@ -1,3 +1,5 @@
+import { fetchMediaOutput } from "./providers/openai.ts";
+import { uploadMaxBytes } from "./upload.ts";
 import { all, audit, get, run, scoped, setting, tx } from "./db.ts";
 import { charge, creditsFor, hold, release } from "./credits.ts";
 import { ADAPTERS, credentialFor, markCredential, modelView, secretOf } from "./providers/registry.ts";
@@ -254,8 +256,16 @@ async function execute(jobId: string) {
                     run("UPDATE generation_jobs SET parameters=?, provider_task_id=NULL WHERE id=?", j({ ...p, remoteTask: { status: "failed", updatedAt: now() } }), jobId);
                     throw Object.assign(new Error(hook.error ?? "provider reported failure"), { retryable: false });
                 }
+                if (!Array.isArray(hook.outputs) || hook.outputs.length > 20) throw new Error("回调输出数量无效");
                 const outputs = [];
-                for (const o of hook.outputs ?? []) outputs.push(o.b64 ? { data: Buffer.from(o.b64, "base64"), mime: o.mime ?? "image/png", duration: o.duration } : await (async () => { const r = await fetch(o.url); if (!r.ok) throw new Error(`callback output HTTP ${r.status}`); return { data: Buffer.from(await r.arrayBuffer()), mime: o.mime ?? r.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream", duration: o.duration }; })());
+                let outputBytes = 0;
+                for (const o of hook.outputs) {
+                    if (typeof o.b64 === "string" && o.b64.length > Math.ceil((uploadMaxBytes - outputBytes) / 3) * 4) throw new Error("回调素材总大小超限");
+                    const output = o.b64 ? { data: Buffer.from(o.b64, "base64"), mime: o.mime ?? "image/png", duration: o.duration } : await fetchMediaOutput(o.url, undefined, signal, uploadMaxBytes - outputBytes);
+                    outputBytes += output.data.length;
+                    if (outputBytes > uploadMaxBytes) throw new Error("回调素材总大小超限");
+                    outputs.push(output);
+                }
                 result = { outputs, costUsd: typeof hook.costUsd === "number" && Number.isFinite(hook.costUsd) && hook.costUsd >= 0 ? hook.costUsd : null };
                 break;
             }

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { authOf, deleteAccount, logout, modelPermissions, requireRole, setSessionCookie, verifyPassword } from "../auth.ts";
-import { all, audit, get, run, scoped } from "../db.ts";
+import { all, audit, get, run, scoped, tx, hydrate } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { accountOf, grant } from "../credits.ts";
 import { addCredential, credentialView, listModels, listProviders, testProvider } from "../providers/registry.ts";
@@ -122,7 +122,10 @@ platform.get("/generations", (c) => {
     if (q.projectId) where.projectId = q.projectId;
     if (q.status) where.status = q.status;
     if (q.targetId) where.targetId = q.targetId;
-    return c.json(s.list("generation_jobs", where, "created_at DESC").slice(0, 200).map(jobView));
+    const columns: Record<string, string> = { projectId: "project_id", status: "status", targetId: "target_id" };
+    const keys = Object.keys(where);
+    const rows = all("SELECT * FROM generation_jobs WHERE workspace_id=?" + keys.map(key => " AND " + columns[key] + "=?").join("") + " ORDER BY created_at DESC,id DESC LIMIT 200", s.workspaceId, ...keys.map(key => where[key]));
+    return c.json(rows.map(row => jobView(hydrate("generation_jobs", row))));
 });
 platform.get("/generations/:id", (c) => {
     const { s } = ctx(c);
@@ -183,10 +186,12 @@ platform.post("/projects", async (c) => {
     return c.json(p, 201);
 });
 export function createProject(s: ReturnType<typeof scoped>, name: string) {
-    const p = s.insert("projects", { name, status: "active", updated_at: now() });
-    s.insert("worlds", { project_id: p.id, data: { era: "", locationLogic: "", architecture: "", culture: "", weather: "", time: "", material: "", physics: "real-world", realism: "photographic", environmentalConstraints: [] }, updated_at: now() });
-    s.insert("looks", { project_id: p.id, scope: "project", data: { contrast: "", saturation: "", palette: [], skinTone: "", blackLevel: "", highlightRolloff: "", shadowBehavior: "", grain: "", halation: "", bloom: "", lensCharacter: "", texture: "", sharpnessPhilosophy: "", colorReferenceIds: [] }, updated_at: now() });
-    return p;
+    return tx(() => {
+      const p = s.insert("projects", { name, status: "active", updated_at: now() });
+      s.insert("worlds", { project_id: p.id, data: { era: "", locationLogic: "", architecture: "", culture: "", weather: "", time: "", material: "", physics: "real-world", realism: "photographic", environmentalConstraints: [] }, updated_at: now() });
+      s.insert("looks", { project_id: p.id, scope: "project", data: { contrast: "", saturation: "", palette: [], skinTone: "", blackLevel: "", highlightRolloff: "", shadowBehavior: "", grain: "", halation: "", bloom: "", lensCharacter: "", texture: "", sharpnessPhilosophy: "", colorReferenceIds: [] }, updated_at: now() });
+      return p;
+    });
 }
 platform.get("/projects/:id", (c) => {
     const { p } = project(c, c.req.param("id"));

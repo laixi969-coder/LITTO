@@ -133,6 +133,7 @@ CREATE INDEX idx_trial_reservations_workspace ON trial_reservations(workspace_id
         sql: "CREATE TABLE workspace_purges(workspace_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending', error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);",
     },
     { id: "0013_loginStates", sql: "CREATE TABLE login_states(id TEXT PRIMARY KEY, expires_at TEXT NOT NULL); CREATE INDEX idx_login_states_expiry ON login_states(expires_at);" },
+    { id: "0014_queryIndexes", sql: "CREATE INDEX idx_jobs_workspace_time ON generation_jobs(workspace_id,created_at DESC,id DESC); CREATE INDEX idx_sessions_expiry ON sessions(expires_at);" },
 ];
 
 export const db = await openSqlite(config.dbFile);
@@ -200,7 +201,7 @@ export const snake = (s: string) => s.replace(/[A-Z]/g, (c) => "_" + c.toLowerCa
 
 export function hydrate(table: string, r: Row | undefined): Row | undefined {
     if (!r) return r;
-    const out: Row = {};
+    const out: Row = Object.create(null);
     for (const [k, v] of Object.entries(r)) {
         if (JSON_COLS[table]?.includes(k) && typeof v === "string") {
             const parsed = JSON.parse(v);
@@ -209,6 +210,7 @@ export function hydrate(table: string, r: Row | undefined): Row | undefined {
             else out[camel(k)] = parsed;
         } else out[camel(k)] = v;
     }
+    for (const [key, value] of Object.entries(r)) if (!JSON_COLS[table]?.includes(key)) out[camel(key)] = value;
     return out;
 }
 
