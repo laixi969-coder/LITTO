@@ -1,4 +1,4 @@
-# 短剧编剧资料来源与许可
+# 短剧创作资料来源与许可
 
 来源：[0xsline/short-drama](https://github.com/0xsline/short-drama)，固定提交：8979a428c31a865421d661bdb606e24314b683a0，核验日期：2026-10-10。
 
@@ -30,6 +30,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+
+## 2026-11-14：Drama Skills 改编方法
+
+来源：[zenstory-ai/drama-skills](https://github.com/zenstory-ai/drama-skills)，固定提交：8cf7404981b7095b498e061832bb3c9ffd6a42be。
+
+参考 short-drama-develop/references/adaptation-craft.md、short-drama-write/references/script-craft.md 与 short-drama-review/references/rubric-story-script.md，将删改后的必要条件核对、人物合并的知情与立场检查、心理转译及来源与剧本双向审读归纳改写到 script.md。复用现有场次、资料与简报，不引入独立改编台账、固定短剧节奏、上游脚本、样例剧情或新审批流程。上游作者不为这些改动及其生成效果背书。
+
+同一提交的 short-drama-storyboard/SKILL.md 与 references/blocking-playbooks.md 还用于两处局部补充：3D 导演台 agentPrompt.ts 按已有空间锚点推导站位、支撑与机位变化后的观察关系；videoPromptDirector/references/segmentPlanning.md 在实际参考容量不足时按本镜用途取舍并保留必要输入。没有移植上游站位编辑器、图片槽位格式、固定参考数量、模型默认值或生成脚本。许可归档在本文件，不要求使用这些节点的用户先运行故事技能。
+
+以下版权声明与上文「上游 MIT 许可原文」中的授权、保留声明和免责条款共同适用于本节参考内容：
+
+Copyright (c) 2026 drama-skills contributors
 
 ## 2026-10-11：Short-Drama Factory v4.3
 

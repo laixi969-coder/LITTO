@@ -3,7 +3,7 @@ name: story
 description: >
   为短视频、商业广告、电影和剧集创作、改写有戏剧冲突的故事或剧本；支持现实题材、爱情、亲情、喜剧、悬疑、推理、动作、冒险、科幻、奇幻、寓言及实验叙事。每场戏都要有冲突与转折。也支持主持人系列、当下被改写、秩序即世界等特色写法。恐怖、生活流和安静情感戏不作为本技能目标。
 metadata:
-  version: "2.1.0"
+  version: "2.1.1"
   displayName: 故事与剧本
   author: MILI MILI
   basedOn: hiccai-host-story

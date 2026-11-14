@@ -44,6 +44,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+## 2026-11-14 增补：Fight Scene Director
+
+来源：[ZzzAloong/fight-scene-director](https://github.com/ZzzAloong/fight-scene-director)，固定提交 `6265df37ae701449ef672f46db65ab15c4af9fc2`。参考 SKILL.md 与 references/trajectory-workflow.md 的轨迹图图例判读、人物/攻击/摄影机分层和交汇点动作校对，以自有表述补入 actionChoreography.md，衔接已有 blocking 与 camera.design。未采用固定图数、时长、镜头配额、强制胜负、自动夸张画风或默认破坏；未复制样例、上游代码或安装流程。图示与提示词不作为实际生成效果证据。
+
+以下版权声明与本文件 MIT 许可中的授权、保留声明及免责条款共同适用于本节参考内容：
+
+Copyright (c) 2026 AIZAO Aloong
+
 ## fight-prompt-director：MIT
 
 MIT License

@@ -69,17 +69,17 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const story = /剧情|剧本|故事|短剧|中剧|电影|story/i.test(task);
   const music = /\bmv\b|musicFilm|音乐视频|音乐短片|音乐电影/i.test(task) || !advertising && !story && /歌曲|演唱|唱跳/.test(task);
   const topics = [
-    { match: /人物|角色|表演|对白|对话|演唱|唱跳|反应|演技|vlog|自拍|performance|dialogue/i, name: "cinema", paths: ["references/performanceDirection.md", "references/creativePreparation.md", "references/humanPerformance.md"] },
+    { match: /人物|角色|表演|表情|眼神戏|活人感|对白|对话|演唱|唱跳|反应|演技|vlog|自拍|performance|dialogue|facial|micro.?expression/i, name: "cinema", paths: ["references/performanceDirection.md", "references/creativePreparation.md", "references/humanPerformance.md"] },
     { match: /资产|角色卡|三视图|四视图|妆造|服装|道具|场景设计/, name: "workflow", paths: ["references/assets.md", "references/methods/visualDesign.md"] },
     { match: /妆造|服装|换装|妆发|衣装/, name: "workflow", paths: ["references/methods/characterStyling.md"] },
     { match: /布光|灯光|光线|调色|滤镜|色板|材质|质感|视频|镜头|关键帧|生图|vlog|自拍|明亮|lighting|grading|filter/i, name: "workflow", paths: ["references/methods/colorAndLight.md"] },
-    { match: /真人|写实|质感|皮肤|塑料|手机|视频|镜头|关键帧|生图|realism|photoreal|live.action/i, name: "continuity", paths: ["references/realism.md"] },
+    { match: /真人|写实|逼真|拟真|照片级|质感|皮肤|塑料|蜡像|手机|视频|镜头|关键帧|生图|realism|photoreal|live.action/i, name: "continuity", paths: ["references/realism.md"] },
     { match: /创意|大纲|编剧|写.*剧本|故事开发/, name: "story", paths: ["references/core-methodology.md"] },
     { match: /镜头|分镜|运镜|摄影|构图|机位|俯视|剖面|全景|白模|camera|cinematography/i, name: "cinema", paths: ["references/shotLanguage.md", "references/masterShots.md"] },
     { match: /场面调度|对话调度|对白调度|正反打|过肩|轴线|三角机位|力量对比|走位|blocking|staging/i, name: "filmDirecting", paths: [] },
     { match: /九宫格|九格|9\s*[宫宮格]|十六宫格|16\s*[宫宮格]|多格分镜|宫格分镜|storyboard\s*grid/i, name: "cinema", paths: ["references/storyboardGrid.md"] },
     { match: /剖面|全景|白模|空间设计|群像设计|环境|场景|真人|写实|脏旧|做旧|破败|维护状态|photoreal|live.action/i, name: "workflow", paths: ["references/methods/visualDesign.md"] },
-    { match: /打斗|交锋|群战|武打|武术|武侠|仙侠|搏击|格斗|追逐|武器|兵器|刀剑|剑斗|法术|combat|martial|fight|wuxia/i, name: "cinema", paths: ["references/combatDesign.md", "references/actionChoreography.md", "references/manjuActionDirection.md", "references/creativePreparation.md"] },
+    { match: /打斗|交锋|群战|武打|武术|武侠|仙侠|拳脚|拳击|近战|对打|招式|剑术|搏击|格斗|追逐|武器|兵器|刀剑|剑斗|法术|combat|martial|fight|wuxia/i, name: "cinema", paths: ["references/combatDesign.md", "references/actionChoreography.md", "references/manjuActionDirection.md", "references/creativePreparation.md"] },
     { match: /声音|音效|混音|配音|口型|剪辑|对白|对话|dialogue/i, name: "cinema", paths: ["references/coverage.md"] },
     { match: /分段|接戏|续接|连贯|连续|长镜头|continuity/i, name: "videoPromptDirector", paths: ["references/segmentPlanning.md", "references/wardrobeContinuity.md"] },
     { match: /修复|穿帮|失败|漂移/, name: "videoPromptDirector", paths: ["references/failureRepair.md"] },
@@ -165,7 +165,10 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   if (storyboardOnly) referencePaths.cinema = ["references/shotLanguage.md", "references/movementDirection.md", "references/performanceDirection.md", "references/coverage.md"];
   // ACT: 默认视频模型在开始本轮前已选定时预读模型规则；中途切换仍须按工具返回的实际模型读取。
   if (names.includes("workflow") && videoModel?.seedance) referencePaths.workflow.push("references/seedanceDirector.md");
-  if (!focused) for (const topic of selectedTopics) referencePaths[topic.name].push(...topic.paths);
+  // 仅拆分镜仍需当前场面的动作、表演与真实感方法；不重新加载故事开发或资产生产。
+  if (!focused || storyboardOnly) for (const topic of selectedTopics) {
+    if (!focused || names.includes(topic.name)) referencePaths[topic.name].push(...topic.paths);
+  }
   for (const name of new Set(names)) {
     const skill = available.find(item => item.name === name);
     if (!skill) { warnings.push(`缺少技能 ${name}`); continue; }
