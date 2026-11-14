@@ -26,7 +26,7 @@ import { getRectOfNodes, useVueFlow, type GraphNode, type Node, type XYPosition 
 import { ElButton, ElCard, ElMessage } from "element-plus";
 import { IconCopyPlus, IconBoxMultiple, IconDeselect } from "@tabler/icons-vue";
 import { useNodeEvent } from "@toonflow/nodes-scaffold/nodeEvent";
-import { finishGroupDrag, getSelectionRoots, getSelectionTree, groupCanvasNodes } from "../selectionNodes";
+import { finishGroupDrag, getSelectionRoots, getSelectionTree, groupCanvasNodes, remapNodeReferences } from "../selectionNodes";
 
 const props = defineProps<{
   batchHistory: (action: () => Promise<void>) => Promise<void>;
@@ -90,7 +90,7 @@ async function duplicateNodes(selection: GraphNode[], signal: AbortSignal, withE
     copy.parentNode = ids.get(saved.parentNode ?? "") ?? saved.parentNode;
     copy.position = positions ? { ...positions.get(node.id)! }
       : { x: saved.position.x + (rootsIds.has(node.id) ? bounds.width + 64 : 0), y: saved.position.y };
-    copy.data = { ...copy.data, label: `${copy.data?.label || "未命名节点"} - 副本` };
+    copy.data = { ...remapNodeReferences(copy.data, ids), label: `${copy.data?.label || "未命名节点"} - 副本` };
     return copy;
   }));
   signal.throwIfAborted();

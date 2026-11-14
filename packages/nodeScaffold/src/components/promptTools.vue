@@ -106,7 +106,8 @@ async function saveWorkshop() {
   if (props.disabled || savingWorkshop.value || assetBusy.value) return;
   savingWorkshop.value = true; workshopError.value = "";
   try {
-    const value = visualModifiersSchema.parse(draft.value);
+    const plan = visualModifiersSchema.parse(draft.value);
+    const value = compileVisualModifiers("", plan) ? plan : undefined;
     const request = props.request?.();
     if (!request) throw new Error("当前节点尚未提供生成参数");
     const signature = JSON.stringify(request);

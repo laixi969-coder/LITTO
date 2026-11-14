@@ -36,9 +36,13 @@ export function prepareVisualModifiers(request: MediaGenerationRequest, model: M
     } catch (cause) { throw Object.assign(cause instanceof Error ? cause : new Error(String(cause)), { status: 400 }); }
   }
   if (!request.visualModifiers) return request;
-  if (model.promptControl === "imageAndCameraOnly" || model.lipSync) invalid("当前模型不执行文字修饰，请恢复自动或更换模型");
-  if (model.type !== "video" && request.visualModifiers.motions.length) invalid("图片模型不能执行有顺序的运镜");
-  try { return { ...request, visualModifiers: undefined, prompt: compileVisualModifiers(request.prompt, request.visualModifiers, request.storyboard?.shots) }; }
+  try {
+    const modifiers = compileVisualModifiers("", request.visualModifiers, request.storyboard?.shots);
+    if (!modifiers) return { ...request, visualModifiers: undefined };
+    if (model.promptControl === "imageAndCameraOnly" || model.lipSync) invalid("当前模型不执行文字修饰，请恢复自动或更换模型");
+    if (model.type !== "video" && request.visualModifiers.motions.length) invalid("图片模型不能执行有顺序的运镜");
+    return { ...request, visualModifiers: undefined, prompt: [request.prompt, modifiers].filter(Boolean).join("\n\n") };
+  }
   catch (cause) { throw Object.assign(cause instanceof Error ? cause : new Error(String(cause)), { status: 400 }); }
 }
 

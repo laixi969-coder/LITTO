@@ -213,6 +213,9 @@ export default Router().post("/", validateFields({
   const modifiers = raw.visualModifiers === undefined ? undefined : visualModifiersSchema.safeParse(raw.visualModifiers);
   if (modifiers && !modifiers.success) return res.status(400).json(error("生成修饰无效", modifiers.error.issues, 400));
   const authoredPrompt = compileVisualModifiers(compileVideoStoryboard(String(raw.prompt ?? ""), plan?.success ? plan.data : undefined), modifiers?.success ? modifiers.data : undefined, plan?.success ? plan.data.shots : []);
+  if (mediaType !== "audio" && !raw.shotId && !authoredPrompt.trim() && !(Array.isArray(raw.referenceViews) && raw.referenceViews.length)) {
+    return res.status(400).json(error("独立素材须提供生成提示词或有效的工坊设置", null, 400));
+  }
   const hasIdentityReference = (Array.isArray(raw.images) && raw.images.length > 0) || Boolean(raw.firstFrame) || typeof continueFrom === "string";
 
   // 肤质路径：资产与定妆固定 clean，其余按项目 assets/visual.json，请求可覆盖。

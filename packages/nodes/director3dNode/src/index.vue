@@ -27,7 +27,7 @@ import { computed, inject, onBeforeUnmount, provide, ref, shallowRef, watch, typ
 import { useVueFlow } from "@vue-flow/core";
 import { IconCube3dSphere } from "@tabler/icons-vue";
 import { ElLoading, ElMessage } from "element-plus";
-import { nodeSkeleton, nodeTools, useNode, useNodeFiles, useNodeReferences, z, type NodeHandle, type NodeData, type NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
+import { nodeSkeleton, nodeTools, useNode, useNodeFiles, useNodeReferences, resolveNodePromptReferences, z, type NodeHandle, type NodeData, type NodeAiModel } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import sceneEditor from "./sceneEditor.vue";
@@ -445,7 +445,7 @@ async function generate(instruction?: string, reportError = false) {
     return;
   }
   const choice = selectedModel.value;
-  const requirement = instruction ?? prompt.value.trim();
+  const requirement = resolveNodePromptReferences(instruction ?? prompt.value.trim(), refList.value, instruction === undefined ? promptModel.value : undefined);
   if (!choice || !requirement) {
     if (reportError) throw new Error("缺少已配置的文字模型或预演要求");
     return;
@@ -456,10 +456,11 @@ async function generate(instruction?: string, reportError = false) {
   const basePlanId = data.value.selectedPlanId ?? "";
   const task = { id: crypto.randomUUID(), instruction: requirement };
   tasks.value = [...tasks.value, task];
-  if (instruction === undefined) setPrompt("");
   try {
     const workspaceFiles = files.getWorkspaceFiles();
     if (refList.value.some(item => item.value === undefined)) throw new Error("引用节点暂无内容，请先补充引用内容");
+    if (requirement.includes("{{ref 0}}")) throw new Error("提示词含已断开的参考，请重新连接素材或移除引用");
+    if (instruction === undefined) setPrompt("");
     const mediaReferences = refList.value
       .filter(item => item.value !== undefined && (item.dataType === "STRING" || item.dataType === "IMAGE" || item.dataType === "VIDEO"))
       .map(item => item.dataType === "STRING" ? { dataType: item.dataType, value: item.value } : { dataType: item.dataType, value: { ...item.value } });

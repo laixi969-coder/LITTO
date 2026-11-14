@@ -1,4 +1,29 @@
 import { getRectOfNodes, type GraphNode, type Node, type useVueFlow } from "@vue-flow/core";
+import type { AnyTagProps } from "x-sender";
+
+export function remapNodeReferences(data: Node["data"], ids: Map<string, string>) {
+  const remapBinding = (value: { source: string; sourceHandle: string }) => ({ ...value, source: ids.get(value.source) ?? value.source });
+  const remapKey = (key: string) => {
+    try {
+      const [source, handle] = JSON.parse(decodeURIComponent(key));
+      return ids.has(source) ? encodeURIComponent(JSON.stringify([ids.get(source), handle])) : key;
+    } catch { return key; }
+  };
+  return {
+    ...data,
+    ...(data.imageSource ? { imageSource: remapBinding(data.imageSource) } : {}),
+    ...(data.videoFrames ? { videoFrames: Object.fromEntries(Object.entries(data.videoFrames).map(([key, value]) => [key, value ? remapBinding(value as { source: string; sourceHandle: string }) : null])) } : {}),
+    ...(Array.isArray(data.storyboardReferences) ? { storyboardReferences: data.storyboardReferences.map(remapBinding) } : {}),
+    ...(data.referenceOrder ? { referenceOrder: Object.fromEntries(Object.entries(data.referenceOrder).map(([key, value]) => [key, (value as string[]).map(remapKey)])) } : {}),
+    ...(Array.isArray(data.promptModel) ? { promptModel: (data.promptModel as AnyTagProps[][]).map(line => line.map(tag => {
+      if (tag.type !== "Custom") return tag;
+      const template = document.createElement("template");
+      template.innerHTML = tag.html;
+      for (const reference of template.content.querySelectorAll<HTMLElement>(".imageReference[data-reference-id]")) reference.dataset.referenceId = remapKey(reference.dataset.referenceId!);
+      return { ...tag, html: template.innerHTML };
+    })) } : {}),
+  };
+}
 
 export function getSelectionRoots(selection: GraphNode[], nodes: GraphNode[]) {
   const selected = new Map(selection.map(node => [node.id, node]));

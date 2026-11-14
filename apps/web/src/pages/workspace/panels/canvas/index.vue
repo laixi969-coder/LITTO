@@ -174,7 +174,7 @@ import canvasCharacters from "./components/canvasCharacters.vue";
 import groupNode from "./components/groupNode.vue";
 import selectionToolbar from "./components/selectionToolbar.vue";
 import nodeSearch from "./components/nodeSearch.vue";
-import { finishGroupDrag, getSelectionTree } from "./selectionNodes";
+import { finishGroupDrag, getSelectionTree, remapNodeReferences } from "./selectionNodes";
 import type { NodeOutput } from "@toonflow/nodes-scaffold/values";
 import type { NodeConnectionFeedback, NodeHandle } from "@toonflow/nodes-scaffold/connection";
 import { imageViewSchema, type ImageView } from "@toonflow/tools-scaffold/runtime";
@@ -884,7 +884,7 @@ async function insertSnapshot(snapshot: { nodes: Node[]; edges: Edge[] }, positi
   await canvasHistory.batch(async () => {
     flow.removeSelectedElements();
     addNodes(snapshot.nodes.map(node => ({ ...node, id: ids.get(node.id)!, parentNode: ids.get(node.parentNode ?? ""), selected: true,
-      data: { ...node.data, ...(node.data.imageSource ? { imageSource: { ...node.data.imageSource, source: ids.get(node.data.imageSource.source) ?? node.data.imageSource.source } } : {}), ...(node.data.videoFrames ? { videoFrames: Object.fromEntries(Object.entries(node.data.videoFrames).map(([key, value]) => { const binding = value as { source: string; sourceHandle: string } | null; return [key, binding ? { ...binding, source: ids.get(binding.source) ?? binding.source } : null]; })) } : {}), ...(Array.isArray(node.data.storyboardReferences) ? { storyboardReferences: node.data.storyboardReferences.map((item: { source: string; sourceHandle: string }) => ({ ...item, source: ids.get(item.source) ?? item.source })) } : {}) },
+      data: remapNodeReferences(node.data, ids),
       position: node.parentNode ? node.position : { x: position.x + node.position.x - left, y: position.y + node.position.y - top } })));
     await nextTick();
     signal.throwIfAborted();

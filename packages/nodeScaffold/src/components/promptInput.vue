@@ -16,6 +16,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { ElButton, ElDialog, ElImageViewer, useZIndex } from "element-plus";
 import { IconMaximize } from "@tabler/icons-vue";
 import xSender, { type AnyTagProps, type MentionItem } from "x-sender";
+import { getPromptText } from "../promptText";
 import "x-sender/lib/XSender.css";
 
 const props = defineProps<{ references: (MentionItem & { value: string })[]; expandable?: boolean; label?: string }>();
@@ -75,7 +76,14 @@ function normalizeModel(value: AnyTagProps[][]): AnyTagProps[][] {
       const id = template.content.querySelector<HTMLElement>(".imageReference[data-reference-id]")?.dataset.referenceId;
       if (!id) return [{ type: "Write", text: template.content.textContent ?? "" }];
       const reference = props.references.find(item => item.id === id);
-      if (!reference) return [];
+      if (!reference) {
+        const missing = template.content.querySelector<HTMLElement>(".imageReference[data-reference-id]")!;
+        missing.classList.add("missingReference");
+        missing.dataset.value = "{{ref 0}}";
+        missing.textContent = "参考已断开";
+        missing.title = "重新连接原素材以恢复引用，或删除此标签";
+        return [{ type: "Custom", html: template.innerHTML }];
+      }
       return [{ type: "Custom", html: `<span style="display: inline-block;">${referenceHtml(reference)}</span>` }];
     });
     const next: AnyTagProps[] = [{ type: "Write", text: "" }];
@@ -145,23 +153,6 @@ function syncModel(value = sender?.getModel() ?? model.value) {
   }
   model.value = next;
   text.value = getPromptText(next);
-}
-
-function getPromptText(value: AnyTagProps[][]) {
-  return value.map(line => line.map(tag => {
-    if (tag.type === "Write") return tag.text;
-    if (tag.type === "Input") return tag.text || tag.placeholder;
-    if (tag.type !== "Custom") {
-      const prefix = tag.type === "Mention" ? "@" : tag.type === "Trigger" ? tag.key : "";
-      return prefix + tag.name;
-    }
-    const content = document.createElement("template");
-    content.innerHTML = tag.html;
-    for (const reference of content.content.querySelectorAll<HTMLElement>(".imageReference[data-value]")) {
-      reference.replaceWith(reference.dataset.value ?? "");
-    }
-    return content.content.textContent ?? "";
-  }).join("")).join("\n");
 }
 
 watch(model, (value) => {
@@ -398,6 +389,11 @@ function handleMentionKey(event: KeyboardEvent) {
     line-height: 18px;
     white-space: nowrap;
     vertical-align: middle;
+
+    &.missingReference {
+      border-color: var(--el-color-danger);
+      color: var(--el-color-danger);
+    }
 
     &:has(img) {
       cursor: zoom-in;

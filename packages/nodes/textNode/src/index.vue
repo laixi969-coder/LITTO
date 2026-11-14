@@ -61,7 +61,7 @@
 import { computed, inject, onMounted, onBeforeUnmount, ref, watch, type Component } from "vue";
 import { ElButton, ElCard, ElInput, ElSelect, ElDrawer, ElOption, ElOptionGroup, ElMessage } from "element-plus";
 import { IconEdit, IconFileText, IconSparkles, IconArrowUp } from "@tabler/icons-vue";
-import { groupNodeModels, nodeSkeleton, nodeTools, useNode, useNodeReferences, z, type NodeAiModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { groupNodeModels, nodeSkeleton, nodeTools, useNode, useNodeReferences, resolveNodePromptReferences, z, type NodeAiModel, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 
@@ -218,7 +218,9 @@ async function generateText() {
     const references = refList.value
       .filter(item => item.value !== undefined && (item.dataType === "STRING" || item.dataType === "IMAGE" || item.dataType === "VIDEO"))
       .map(item => item.dataType === "STRING" ? { dataType: item.dataType, value: item.value } : { dataType: item.dataType, value: { ...item.value } });
-    const input = { providerId: choice.providerId, modelId: choice.modelId, prompt: prompt.value.trim(), references };
+    const resolvedPrompt = resolveNodePromptReferences(prompt.value.trim(), refList.value, promptModel.value);
+    if (resolvedPrompt.includes("{{ref 0}}")) throw new Error("提示词含已断开的参考，请重新连接素材或移除引用");
+    const input = { providerId: choice.providerId, modelId: choice.modelId, prompt: resolvedPrompt, references };
     const directory = references.some(item => item.dataType !== "STRING") ? (await textFiles.list()).directory : undefined;
     const result = await ai.generate({
       ...input,

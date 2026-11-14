@@ -55,7 +55,12 @@ async function load() {
     const [assets, project] = await Promise.all([json("/api/ai/media/visualAssets", current.signal), json(`/api/story/get?directory=${encodeURIComponent(directory)}`, current.signal)]);
     current.signal.throwIfAborted(); catalog.value = assets; board.value = resolveVisualBoard(visualBoardSchema.parse(project.visualBoard));
     saved.value = entries.some(item => item.name === "visualPalettes.json") ? librarySchema.parse(await workspace.readJson("visualPalettes.json")).palettes : [];
-    current.signal.throwIfAborted(); setPaletteFields(model.value.palette);
+    current.signal.throwIfAborted();
+    model.value.references = model.value.references?.map(reference => {
+      const item = board.value.find(item => item.frameId === reference.frameId);
+      return item ? referenceSnapshot(item) : reference;
+    });
+    setPaletteFields(model.value.palette);
     const matches = saved.value.filter(item => item.name === model.value.palette?.name && JSON.stringify(item.colors) === JSON.stringify(model.value.palette.colors));
     if (matches.length === 1) savedId.value = matches[0]!.id;
   } catch (cause) { if (!current.signal.aborted) error.value = cause instanceof Error ? cause.message : String(cause); }
@@ -106,7 +111,8 @@ async function savePalette() {
   } catch (cause) { error.value = cause instanceof Error ? cause.message : String(cause); }
   finally { busy.value = false; }
 }
-function toggleReference(item: ReturnType<typeof resolveVisualBoard>[number], selected: boolean) { model.value.references = (model.value.references ?? []).filter(value => value.frameId !== item.frameId); if (selected) model.value.references.push({ frameId: item.frameId, purpose: item.purpose, note: item.note, direction: item.purpose === "composition" ? item.director.composition : item.purpose === "lighting" ? item.director.light : item.director.palette.join("、") }); }
+function referenceSnapshot(item: ReturnType<typeof resolveVisualBoard>[number]) { return { frameId: item.frameId, purpose: item.purpose, note: item.note, direction: item.purpose === "composition" ? item.director.composition : item.purpose === "lighting" ? item.director.light : item.director.palette.join("、") }; }
+function toggleReference(item: ReturnType<typeof resolveVisualBoard>[number], selected: boolean) { model.value.references = (model.value.references ?? []).filter(value => value.frameId !== item.frameId); if (selected) model.value.references.push(referenceSnapshot(item)); }
 </script>
 <style scoped lang="scss">
 .visualAssetPicker { display: grid; gap: 12px; label { display: grid; gap: 6px; } .paletteColors { display: flex; span { width: 30px; height: 20px; } } .harmonyEditor { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin: 12px 0; input:not([type="color"]) { width: 100px; } } .colorEditor { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; } article { display: flex; gap: 10px; margin: 10px 0; img { width: 90px; height: 60px; object-fit: cover; } label { display: block; } } p { font-size: 12px; line-height: 1.6; } }

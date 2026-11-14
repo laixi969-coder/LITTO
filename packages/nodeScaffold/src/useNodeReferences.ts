@@ -3,6 +3,8 @@ import { useNode, useVueFlow } from "@vue-flow/core";
 import type { NodeData } from "./connection";
 import { useNodeEvent } from "./nodeEvent";
 import type { NodeInputValue } from "./values";
+import type { AnyTagProps } from "x-sender";
+import { getPromptText } from "./promptText";
 
 export function useNodeReferences(handleId = "in") {
   const { id, node } = useNode<NodeData & { referenceOrder?: Record<string, string[]> }>();
@@ -59,7 +61,19 @@ export function collectReferenceViews(values: NodeInputValue[], frames?: { first
   return items.flatMap(({ item, role, index }) => item?.dataType === "IMAGE" && item.value?.view ? [{ role, index, view: item.value.view }] : []);
 }
 
-export function resolveNodeReferenceText(text: string, values: NodeInputValue[], frames?: { first?: NodeInputValue; last?: NodeInputValue }) {
+export function resolveNodePromptReferences(text: string, values: NodeInputValue[], model?: AnyTagProps[][]) {
+  if (model?.length && getPromptText(model).trim() === text.trim()) {
+    // 输入框可在未选中时卸载，生成仍按素材身份解析，不能用旧序号猜测当前素材。
+    text = getPromptText(model, id => {
+      const index = values.findIndex(item => referenceKey(item) === id);
+      return `{{ref ${index + 1}}}`;
+    }).trim();
+  }
+  return text.replace(/\{\{ref (\d+)\}\}/g, (marker, number: string) => values[Number(number) - 1]?.value === undefined ? "{{ref 0}}" : marker);
+}
+
+export function resolveNodeReferenceText(text: string, values: NodeInputValue[], frames?: { first?: NodeInputValue; last?: NodeInputValue }, model?: AnyTagProps[][]) {
+  text = resolveNodePromptReferences(text, values, model);
   return text.replace(/\{\{ref (\d+)\}\}/g, (marker, number: string) => {
     const index = Number(number) - 1, reference = values[index];
     if (!reference || reference.value === undefined) return marker;

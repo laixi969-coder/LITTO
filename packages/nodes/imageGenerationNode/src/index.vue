@@ -173,7 +173,7 @@ watch(
 const modelGroups = computed(() => groupNodeModels(models.value));
 const baseGenerationPrompt = computed(() =>
   [
-    resolveNodeReferenceText(data.value.prompt.trim(), refList.value),
+    resolveNodeReferenceText(data.value.prompt.trim(), refList.value, undefined, data.value.promptModel),
     ...refList.value.filter(item => item.dataType === "STRING").flatMap((item, index) => (typeof item.value === "string" && item.value.trim() ? [`文字参考${index + 1}：\n${item.value.trim()}`] : [])),
   ]
     .filter(Boolean)

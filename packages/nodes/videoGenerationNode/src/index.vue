@@ -205,7 +205,7 @@ function resolveReferenceText(value: string) {
 }
 const baseGenerationPrompt = computed(() =>
   [
-    resolveReferenceText(data.value.prompt.trim()),
+    resolveNodeReferenceText(data.value.prompt.trim(), refList.value, frameMode.value ? frames.value : undefined, data.value.promptModel),
     ...refList.value.filter(item => item.dataType === "STRING").flatMap((item, index) => (typeof item.value === "string" && item.value.trim() ? [`文字参考${index + 1}：\n${item.value.trim()}`] : [])),
   ]
     .filter(Boolean)
