@@ -2,17 +2,24 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { resolveSession, tokenOf } from "../auth.ts";
+import { bad, HttpError } from "../util.ts";
 import { scoped } from "../db.ts";
 import { body, project } from "../http.ts";
 import { listPresence, removePresence, setPresence, subscribe } from "../events.ts";
 
 /** Real-time collaboration: SSE change feed + presence per project (workspace-scoped; VIEWER may subscribe). */
 export const collab = new Hono();
+const userStreams = new Map<string, number>();
+let streamCount = 0;
 
 collab.get("/projects/:pid/events", (c) => {
     const { a, p } = project(c, c.req.param("pid"));
+    if (c.req.method === "HEAD") return c.body(null, 200);
     const pid = p.id, ws = a.workspaceId, user = a.user;
     const token = tokenOf(c);
+    if ((userStreams.get(user.id) ?? 0) >= 8 || streamCount >= 256) throw new HttpError(429, "协作连接过多，请关闭多余页面后重试", "stream_limit");
+    userStreams.set(user.id, (userStreams.get(user.id) ?? 0) + 1);
+    streamCount++;
     return streamSSE(c, async (stream) => {
         let pending = new Map<string, unknown>();
         let timer: ReturnType<typeof setTimeout> | null = null;
@@ -52,6 +59,9 @@ collab.get("/projects/:pid/events", (c) => {
                 if (++beats % 15 === 0 && authorized()) await stream.write(": heartbeat\n\n");
             }
         } finally {
+            const remaining = (userStreams.get(user.id) ?? 1) - 1;
+            if (remaining) userStreams.set(user.id, remaining); else userStreams.delete(user.id);
+            streamCount--;
             closed = true;
             off();
             if (timer) clearTimeout(timer);
@@ -62,8 +72,9 @@ collab.get("/projects/:pid/events", (c) => {
 });
 
 collab.post("/projects/:pid/presence", async (c) => {
-    const { a, p } = project(c, c.req.param("pid"));
-    const b = await body(c, z.object({ shotId: z.string().nullable().optional(), assetId: z.string().nullable().optional(), cursor: z.any().optional() }));
+    const { a, p, s } = project(c, c.req.param("pid"));
+    const b = await body(c, z.object({ shotId: z.string().nullable().optional(), assetId: z.string().nullable().optional(), cursor: z.object({ x: z.number().finite(), y: z.number().finite() }).strict().nullable().optional() }));
+    if (b.shotId && s.get("shots", b.shotId)?.projectId !== p.id || b.assetId && s.get("assets", b.assetId)?.projectId !== p.id) throw bad("协作目标不属于当前项目");
     return c.json(setPresence(a.workspaceId, p.id, a.user, b));
 });
 collab.get("/projects/:pid/presence", (c) => { const { a, p } = project(c, c.req.param("pid")); return c.json(listPresence(a.workspaceId, p.id)); });

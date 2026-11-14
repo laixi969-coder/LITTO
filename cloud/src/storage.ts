@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "@toonflow/file";
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, statSync } from "@toonflow/file";
 import { reservedUploadBytes, uploadMaxBytes } from "./upload.ts";
 import { join, dirname } from "node:path";
 import { config } from "./config.ts";
@@ -90,7 +90,14 @@ export function reserveWorkspaceStorage(workspaceId: string, bytes: number) {
 }
 export function usage(workspaceId: string) {
     const media = get("SELECT COALESCE(SUM(size),0) AS bytes, COUNT(*) AS files FROM media WHERE workspace_id=?", workspaceId)!;
-    return { bytes: media.bytes + workspaceFileBytes(workspaceId) + (workspaceReservations.get(workspaceId) ?? 0), files: media.files };
+    let derivatives = 0;
+    for (const row of all("SELECT thumbnail_key,proxy_key FROM media WHERE workspace_id=?", workspaceId)) {
+        for (const key of [row.thumbnail_key, row.proxy_key]) if (key) {
+            try { derivatives += statSync(join(config.mediaDir, key)).size; }
+            catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+        }
+    }
+    return { bytes: media.bytes + derivatives + workspaceFileBytes(workspaceId) + (workspaceReservations.get(workspaceId) ?? 0), files: media.files };
 }
 
 export async function saveMedia(workspaceId: string, projectId: string | null, data: Buffer, opts: { source: string; uploadId?: string; mime?: string; duration?: number; allowUnsniffed?: boolean; signal?: AbortSignal }) {

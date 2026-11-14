@@ -2,7 +2,7 @@ import { renderOptionsSchema } from "../domain/nle-render.ts";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
-import { authOf, requireAdmin } from "../auth.ts";
+import { authOf, requireAdmin, revalidateAuth } from "../auth.ts";
 import { all, audit, get, run, setting, setSetting, tx } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { checkout, fulfilStripe, packs, paymentsOf, plans, setPlan, subscriptionOf, verifyStripe, paymentProvider } from "../billing.ts";
@@ -80,6 +80,7 @@ extra.put("/media/uploads/:id/:part", async (c) => {
     const n = Number(c.req.param("part"));
     if (!Number.isInteger(n) || n < 0 || n >= meta.parts) throw bad("part out of range");
     const buf = await readUpload(c.req.raw, Math.min(PART_MAX, meta.size));
+    revalidateAuth(c);
     if (!buf.length || buf.length > PART_MAX) throw bad("bad part size");
     const directory = upDir(a.workspaceId, c.req.param("id"));
     const received = readdirSync(directory).filter(name => /^part-\d+$/.test(name) && name !== `part-${n}`)
@@ -165,11 +166,21 @@ extra.post("/webhooks/providers/:providerId", async (c) => {
     const raw = await c.req.text();
     const want = createHmac("sha256", decrypt(JSON.parse(p.webhook_secret))).update(raw).digest("hex");
     const got = c.req.header("x-milimili-signature") ?? "";
-    if (want.length !== got.length || !timingSafeEqual(Buffer.from(want), Buffer.from(got))) return c.json({ error: "bad signature" }, 400);
-    const payload = JSON.parse(raw);
-    const job = get("SELECT id FROM generation_jobs WHERE provider_id=? AND provider_task_id=?", p.id, String(payload.taskId));
+    if (!/^[a-f0-9]{64}$/i.test(got) || !timingSafeEqual(Buffer.from(want, "hex"), Buffer.from(got, "hex"))) return c.json({ error: "bad signature" }, 400);
+    let rawPayload: unknown;
+    try { rawPayload = JSON.parse(raw); } catch { return c.json({ error: "invalid callback JSON" }, 400); }
+    const parsed = z.object({ taskId: z.string().min(1).max(512), status: z.enum(["done", "failed"]),
+        costUsd: z.number().finite().nonnegative().nullable().optional(), error: z.string().max(1000).optional(),
+        outputs: z.array(z.object({ b64: z.string().min(1).optional(), url: z.string().url().max(4096).optional(), mime: z.string().max(100).optional(), duration: z.number().finite().nonnegative().optional() }).refine(output => !!output.b64 !== !!output.url)).max(20).optional(),
+    }).refine(payload => payload.status !== "done" || !!payload.outputs?.length).safeParse(rawPayload);
+    if (!parsed.success) return c.json({ error: "invalid callback payload" }, 400);
+    const payload = parsed.data;
+    const job = get("SELECT id,status FROM generation_jobs WHERE provider_id=? AND provider_task_id=?", p.id, payload.taskId);
     if (!job) return c.json({ error: "unknown task" }, 404);
-    run("INSERT INTO webhook_events VALUES(?,?,?,?,?)", ulid(), job.id, p.id, raw, now());
+    tx(() => {
+        if (["SUCCEEDED", "CANCELLED"].includes(job.status) || get("SELECT id FROM webhook_events WHERE job_id=? AND json_extract(payload,'$.taskId')=? LIMIT 1", job.id, payload.taskId)) return;
+        run("INSERT INTO webhook_events VALUES(?,?,?,?,?)", ulid(), job.id, p.id, JSON.stringify(payload), now());
+    });
     kick();
     return c.json({ received: true });
 });

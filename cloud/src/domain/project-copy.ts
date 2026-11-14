@@ -1,6 +1,6 @@
 import { all, run, scoped, tx, type Scope } from "../db.ts";
 import { storage } from "../storage.ts";
-import { notFound, ulid } from "../util.ts";
+import { notFound, ulid, conflict } from "../util.ts";
 import { createProject } from "../routes/platform.ts";
 import { recomputeStates } from "./state.ts";
 
@@ -63,6 +63,8 @@ export function duplicateProject(s: Scope, id: string, name: string, actor: stri
 /** Permanent removal of a project and all its rows + media files. */
 export async function purgeProject(workspaceId: string, projectId: string) {
     const scope = scoped(workspaceId);
+    if (!scope.get("projects", projectId, true)?.deletedAt) throw conflict("请先将项目移入回收站，再永久删除");
+    if (all("SELECT id FROM generation_jobs WHERE workspace_id=? AND project_id=? AND (status IN ('QUEUED','RUNNING') OR held>0) UNION ALL SELECT id FROM renders WHERE workspace_id=? AND project_id=? AND status IN ('QUEUED','RUNNING') LIMIT 1", workspaceId, projectId, workspaceId, projectId).length) throw conflict("项目仍有运行任务或未结清冻结额，请核对完成后再永久删除");
     // 兼容旧库的共享媒体：删项目前把引用快照留在库中，仍被其他作品使用的文件转为租户持有。
     // 新入库/导入已经复制文件；这里只迁移旧记录，不改变已采用角色的媒体 ID。
     tx(() => {
@@ -78,7 +80,9 @@ export async function purgeProject(workspaceId: string, projectId: string) {
         for (const asset of scope.list("assets")) if (asset.projectId !== projectId && asset.attributes?.authoritativeReference) retained.add(asset.attributes.authoritativeReference);
         for (const id of retained) run("UPDATE media SET project_id=NULL WHERE id=? AND workspace_id=? AND project_id=?", id, workspaceId, projectId);
     });
-    for (const m of all("SELECT storage_key FROM media WHERE workspace_id=? AND project_id=?", workspaceId, projectId)) await storage.delete(m.storage_key).catch(() => {});
+    for (const m of all("SELECT storage_key,thumbnail_key,proxy_key FROM media WHERE workspace_id=? AND project_id=?", workspaceId, projectId)) {
+        for (const key of [m.storage_key, m.thumbnail_key, m.proxy_key]) if (key) await storage.delete(key);
+    }
     const tables = all("SELECT name FROM sqlite_master WHERE type='table'").map((r) => r.name).filter((n) => all(`PRAGMA table_info(${n})`).some((c) => c.name === "project_id") && all(`PRAGMA table_info(${n})`).some((c) => c.name === "workspace_id"));
     tx(() => {
         // asset_versions / generation_outputs hang off parents; remove by parent id first.

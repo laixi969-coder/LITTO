@@ -134,6 +134,7 @@ CREATE INDEX idx_trial_reservations_workspace ON trial_reservations(workspace_id
     },
     { id: "0013_loginStates", sql: "CREATE TABLE login_states(id TEXT PRIMARY KEY, expires_at TEXT NOT NULL); CREATE INDEX idx_login_states_expiry ON login_states(expires_at);" },
     { id: "0014_queryIndexes", sql: "CREATE INDEX idx_jobs_workspace_time ON generation_jobs(workspace_id,created_at DESC,id DESC); CREATE INDEX idx_sessions_expiry ON sessions(expires_at);" },
+    { id: "0015_callbackStorageIndexes", sql: "CREATE INDEX idx_webhook_job_time ON webhook_events(job_id,created_at DESC); CREATE INDEX idx_media_workspace ON media(workspace_id);" },
 ];
 
 export const db = await openSqlite(config.dbFile);

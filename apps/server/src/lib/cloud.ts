@@ -105,6 +105,10 @@ export function requireWriteRole(req: Request, res: Response, next: NextFunction
   if (!authEnabled()) return next();
   const tenant = (req as Request & { tenant?: Tenant }).tenant;
   if (!tenant) return res.status(401).json(error("请先登录", null, 401));
+  let current: Tenant | null;
+  try { current = tenantOf(req); } catch { return res.status(403).json(error("无权访问该工作区", null, 403)); }
+  if (!current) return res.status(401).json(error("请先登录", null, 401));
+  if (current.userId !== tenant.userId || current.workspaceId !== tenant.workspaceId || current.role !== tenant.role || current.isAdmin !== tenant.isAdmin) return res.status(409).json(error("权限已改变，请刷新后重试", null, 409));
   const path = req.path.toLowerCase().replace(/\/+$/, "");
   const readOnlyPost = req.method === "POST" && (["/ai/media/estimate", "/ai/media/preflight"].includes(path)
     || path === "/ai/media/blocking" && req.body?.save === false);

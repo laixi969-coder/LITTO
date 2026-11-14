@@ -50,6 +50,8 @@ ssoPublic.get("/:id/callback", async (c) => {
     const email = String(claims.email ?? "").toLowerCase();
     if (!email || !(claims.email_verified === true || claims.email_verified === "true")) throw new HttpError(403, "the IdP did not return a verified email", "unverified_email");
     if (!(JSON.parse(conn.domains) as string[]).map((x) => x.toLowerCase()).includes(domainOf(email))) throw new HttpError(403, "email domain is not allowed for this connection", "domain_not_allowed");
+    const latest = get("SELECT * FROM sso_connections WHERE id=? AND enabled=1", conn.id);
+    if (JSON.stringify(latest) !== JSON.stringify(conn)) throw new HttpError(409, "SSO 配置已改变，请重新登录", "sso_changed");
     const r = loginUser(email, { provider: `sso:${conn.id}`, subject: String(claims.sub) });
     if (conn.workspace_id && get("SELECT 1 FROM workspaces WHERE id=? AND deleted_at IS NULL", conn.workspace_id)) {
         // INSERT OR IGNORE: an existing membership (and its role, higher or lower) is never changed by SSO login.

@@ -255,3 +255,17 @@ export function createLoginState(scope: string) {
 export function consumeLoginState(scope: string, state: string) {
   if (run("DELETE FROM login_states WHERE id=? AND expires_at>?", sha256(scope + ":" + state), now()).changes !== 1) throw new HttpError(400, "登录请求已过期或已使用，请重新登录", "bad_state");
 }
+
+export function assertWorkspaceEditor(workspaceId: string, userId: string) {
+  const member = get("SELECT m.role FROM workspace_members m JOIN users u ON u.id=m.user_id JOIN workspaces w ON w.id=m.workspace_id WHERE m.workspace_id=? AND m.user_id=? AND u.status='active' AND u.deleted_at IS NULL AND w.deleted_at IS NULL", workspaceId, userId);
+  if (!member || !["OWNER", "ADMIN", "EDITOR"].includes(member.role)) throw Object.assign(forbidden("工作区生成权限已失效"), { retryable: false, fallbackAllowed: false });
+}
+
+/** 接收正文可能跨越撤权操作；拒绝继续使用请求开始时的旧身份。 */
+export function revalidateAuth(c: Context) {
+  const previous = c.get("auth") as Auth | undefined;
+  if (!previous) return;
+  const current = resolveSession(tokenOf(c), previous.workspaceId);
+  if (!current) throw new HttpError(401, "session invalid", "unauthenticated");
+  if (current.user.id !== previous.user.id || current.role !== previous.role || current.user.isAdmin !== previous.user.isAdmin) throw new HttpError(409, "权限已改变，请刷新后重试", "authorization_changed");
+}

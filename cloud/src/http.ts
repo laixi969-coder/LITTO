@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import type { ZodTypeAny, z } from "zod";
-import { authOf, requireRole, type Role } from "./auth.ts";
+import { authOf, requireRole, revalidateAuth, type Role } from "./auth.ts";
 import { scoped, audit } from "./db.ts";
 import { readUpload } from "./upload.ts";
 import { bad, notFound } from "./util.ts";
@@ -8,7 +8,8 @@ import { bad, notFound } from "./util.ts";
 export async function body<T extends ZodTypeAny>(c: Context, schema: T): Promise<z.infer<T>> {
     let raw: unknown;
     const bytes = await readUpload(c.req.raw, c.req.path.startsWith("/auth/") ? 16 * 1024 : 2 * 1024 * 1024);
-    try { raw = JSON.parse(bytes.toString("utf8")); } catch { raw = {}; }
+    revalidateAuth(c);
+    try { raw = bytes.length ? JSON.parse(bytes.toString("utf8")) : {}; } catch { throw bad("JSON 格式错误"); }
     const r = schema.safeParse(raw);
     if (!r.success) throw bad("validation failed", r.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
     return r.data;

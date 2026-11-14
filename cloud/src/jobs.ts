@@ -12,7 +12,7 @@ import { onJobSucceeded } from "./domain/lifecycle.ts";
 import { inc, observe } from "./metrics.ts";
 import { assertSpeechPlan } from "./domain/speechPlanning.ts";
 import { shotFingerprint } from "./domain/realism.ts";
-import { requireModelAccess } from "./auth.ts";
+import { requireModelAccess, assertWorkspaceEditor } from "./auth.ts";
 import { requireNarrative } from "./domain/narrativeGate.ts";
 
 export type JobSpec = {
@@ -34,6 +34,7 @@ export function estimate(modelId: string, kind: string, params: Record<string, a
 /** Creating a job never waits for the provider. Credits are held up-front; failure releases the hold. */
 export function enqueue(spec: JobSpec) {
     requireModelAccess(spec.createdBy);
+    assertWorkspaceEditor(spec.workspaceId, spec.createdBy);
     if (spec.idempotencyKey) {
         const ex = get("SELECT response FROM idempotency_keys WHERE workspace_id=? AND key=?", spec.workspaceId, spec.idempotencyKey);
         if (ex) {
@@ -208,7 +209,14 @@ async function execute(jobId: string) {
     const adapter = ADAPTERS[prov.adapter];
     const cred = credentialFor(prov.id, job.workspaceId, job.projectId);
     try {
-        if (!raw.provider_task_id && !job.parameters?.remoteTask) requireModelAccess(job.createdBy);
+        const submitting = !raw.provider_task_id && (!job.parameters?.remoteTask || ["failed", "rejected"].includes(job.parameters.remoteTask.status));
+        const authorizeSubmission = () => {
+            assertWorkspaceEditor(job.workspaceId, job.createdBy);
+            requireModelAccess(job.createdBy);
+            const active = get("SELECT m.provider_id,m.status AS model_status,p.status AS provider_status FROM models m JOIN providers p ON p.id=m.provider_id WHERE m.id=?", job.modelId);
+            if (active?.provider_id !== job.providerId || active?.model_status !== "active" || active?.provider_status !== "active" || job.projectId && !s.get("projects", job.projectId)) throw Object.assign(bad("项目或模型已停用或改变"), { retryable: false, fallbackAllowed: false });
+        };
+        if (submitting) authorizeSubmission();
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
@@ -237,6 +245,7 @@ async function execute(jobId: string) {
         if (!taskId) {
             try { await narrativeUnchanged?.(); }
             catch (cause) { throw Object.assign(cause as Error, { retryable: false, fallbackAllowed: false }); }
+            if (submitting) authorizeSubmission();
             if (job.providerId !== "workspaceMedia") {
                 if (p.remoteTask && !["failed", "rejected"].includes(p.remoteTask.status)) throw Object.assign(new Error("供应商提交结果待核查，不能重复提交"), { retryable: false, fallbackAllowed: false });
                 run("UPDATE generation_jobs SET parameters=? WHERE id=?", j({ ...p, remoteTask: { status: "submitting", updatedAt: now() } }), jobId);
@@ -249,7 +258,7 @@ async function execute(jobId: string) {
             if (get("SELECT status FROM generation_jobs WHERE id=?", jobId)?.status === "CANCELLED") return;
             if (Date.now() > deadline) throw Object.assign(new Error(`timeout after ${prov.timeout_ms}ms`), { timeout: true });
             // A provider callback (webhook) wins over polling.
-            const ev = get("SELECT payload FROM webhook_events WHERE job_id=? ORDER BY id DESC LIMIT 1", jobId);
+            const ev = get("SELECT payload FROM webhook_events WHERE job_id=? AND json_extract(payload,'$.taskId')=? ORDER BY created_at DESC,rowid DESC LIMIT 1", jobId, taskId);
             if (ev) {
                 const hook = JSON.parse(ev.payload);
                 if (hook.status === "failed") {

@@ -4,7 +4,7 @@ import { ADAPTERS, credentialFor, markCredential, secretOf } from "./providers/r
 import { mustRoute, resolvePolicy } from "./providers/router.ts";
 import { storage } from "./storage.ts";
 import { bad, now, ulid, redact, log } from "./util.ts";
-import { requireModelAccess } from "./auth.ts";
+import { requireModelAccess, assertWorkspaceEditor } from "./auth.ts";
 
 /**
  * LLM layer (PRD §12–§13 "Skills output structured specs"): text/vision calls go through the same
@@ -13,6 +13,7 @@ import { requireModelAccess } from "./auth.ts";
  */
 export async function runText(o: { workspaceId: string; projectId: string | null; actor: string; system: string; prompt: string; json?: boolean; imageMediaIds?: string[]; frames?: { data: Buffer; mime: string }[]; label: string; mockEcho?: string }) {
     requireModelAccess(o.actor);
+    assertWorkspaceEditor(o.workspaceId, o.actor);
     const scope = scoped(o.workspaceId);
     if (o.projectId && !scope.get("projects", o.projectId)) throw bad("项目不存在或无权访问");
     const need = o.imageMediaIds?.length || o.frames?.length ? ["vision"] : [];
@@ -31,6 +32,8 @@ export async function runText(o: { workspaceId: string; projectId: string | null
         if (!x || x.projectId !== o.projectId || !x.mime.startsWith("image/")) throw bad("参考图片不属于当前项目或已删除");
         inputs.push({ role: "VISION", mime: x.mime, data: await storage.get(x.storageKey), weight: 1 });
     }
+    assertWorkspaceEditor(o.workspaceId, o.actor);
+    requireModelAccess(o.actor);
     const est = creditsFor(JSON.parse(m.price).perCall ?? null);
     if (platformFunded && !(est > 0)) throw bad("平台文本模型须开启积分计费并配置有效的按次单价");
     const id = ulid();

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { authOf, deleteAccount, logout, modelPermissions, requireRole, setSessionCookie, verifyPassword } from "../auth.ts";
+import { authOf, deleteAccount, logout, modelPermissions, requireRole, setSessionCookie, verifyPassword, revalidateAuth } from "../auth.ts";
 import { all, audit, get, run, scoped, tx, hydrate } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { accountOf, grant } from "../credits.ts";
@@ -35,6 +35,12 @@ platform.get("/auth/me", (c) => {
     return c.json({ user: a.user, workspaceId: a.workspaceId, role: a.role, workspaces: ws, modelAccess: modelPermissions(a.user.id) });
 });
 platform.post("/auth/logout", (c) => (logout(c), c.json({ ok: true })));
+platform.post("/auth/logoutAll", (c) => {
+    const a = authOf(c);
+    tx(() => { run("DELETE FROM sessions WHERE user_id=?", a.user.id); audit(a.user.id, "auth.logoutAll", a.user.id); });
+    logout(c);
+    return c.json({ ok: true });
+});
 platform.delete("/auth/account", async (c) => {
     await body(c, z.object({ confirm: z.literal("DELETE") }));
     deleteAccount(authOf(c).user.id);
@@ -150,6 +156,7 @@ platform.post("/media", async (c) => {
     const projectId = c.req.query("projectId") ?? null;
     if (projectId && !s.get("projects", projectId)) throw notFound("project");
     const buf = await readUpload(c.req.raw);
+    revalidateAuth(c);
     if (!buf.length) throw bad("empty body");
     const m = await saveMedia(a.workspaceId, projectId, buf, { source: "upload" });
     return c.json(mediaView(m), 201);

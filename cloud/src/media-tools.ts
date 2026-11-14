@@ -2,11 +2,21 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "@toonflow/file";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { run } from "./db.ts";
-import { storage } from "./storage.ts";
+import { get, run } from "./db.ts";
+import { storage, reserveWorkspaceStorage } from "./storage.ts";
 import { log } from "./util.ts";
 
 let derivativeJobs = 0;
+async function saveDerivative(mediaId: string, workspaceId: string, key: string, data: Buffer, column: "thumbnail_key" | "proxy_key") {
+    const available = () => get("SELECT m.id FROM media m JOIN workspaces w ON w.id=m.workspace_id LEFT JOIN projects p ON p.id=m.project_id WHERE m.id=? AND m.workspace_id=? AND m.deleted_at IS NULL AND w.deleted_at IS NULL AND (m.project_id IS NULL OR p.id IS NOT NULL AND p.deleted_at IS NULL)", mediaId, workspaceId);
+    if (!available()) throw new Error("素材或项目已删除，停止生成衍生素材");
+    const release = reserveWorkspaceStorage(workspaceId, data.length);
+    try {
+        await storage.put(key, data);
+        if (!available()) { await storage.delete(key); throw new Error("素材已删除，衍生素材已清理"); }
+        run(`UPDATE media SET ${column}=? WHERE id=? AND workspace_id=?`, key, mediaId, workspaceId);
+    } finally { release(); }
+}
 
 const exec = (args: string[]) => new Promise<void>((res, rej) => { const p = spawn("ffmpeg", ["-y", "-loglevel", "error", ...args], { timeout: 120000, killSignal: "SIGKILL" }); let e = ""; p.stderr.on("data", (d) => (e = (e + d).slice(-4096))); p.on("error", rej); p.on("close", (c) => (c === 0 ? res() : rej(new Error(e.slice(-300))))); });
 
@@ -26,14 +36,12 @@ export async function makeDerivatives(media: { id: string; workspaceId: string; 
         const thumb = join(dir, "t.jpg");
         await exec(["-i", src, "-frames:v", "1", "-vf", "scale=320:-2", thumb]);
         const tKey = `${media.storageKey}.thumb.jpg`;
-        await storage.put(tKey, readFileSync(thumb));
-        run("UPDATE media SET thumbnail_key=? WHERE id=?", tKey, media.id);
+        await saveDerivative(media.id, media.workspaceId, tKey, readFileSync(thumb), "thumbnail_key");
         if (media.mime.startsWith("video/")) {
             const proxy = join(dir, "p.mp4");
             await exec(["-i", src, "-vf", "scale=-2:480", "-c:v", "libx264", "-crf", "30", "-preset", "veryfast", "-an", proxy]);
             const pKey = `${media.storageKey}.proxy.mp4`;
-            await storage.put(pKey, readFileSync(proxy));
-            run("UPDATE media SET proxy_key=? WHERE id=?", pKey, media.id);
+            await saveDerivative(media.id, media.workspaceId, pKey, readFileSync(proxy), "proxy_key");
         }
     } catch (e) {
         log.info("derivatives skipped:", (e as Error).message.slice(0, 120));

@@ -8,6 +8,13 @@ const PRESENCE_TTL = 45_000;
 const key = (ws: string, pid: string) => `${ws}|${pid}`;
 const listeners = new Map<string, Set<Listener>>();
 const presence = new Map<string, Map<string, PresenceEntry>>();
+setInterval(() => {
+    const cutoff = Date.now() - PRESENCE_TTL;
+    for (const [projectKey, entries] of presence) {
+        for (const [userId, entry] of entries) if (entry.at < cutoff) entries.delete(userId);
+        if (!entries.size) presence.delete(projectKey);
+    }
+}, PRESENCE_TTL).unref();
 
 export function publishChange(table: string, id: string, workspaceId: string, projectId: string | null) {
     try {
@@ -35,6 +42,7 @@ export function listPresence(ws: string, pid: string): PresenceEntry[] {
     if (!m) return [];
     const cut = Date.now() - PRESENCE_TTL;
     for (const [u, e] of m) if (e.at < cut) m.delete(u);
+    if (!m.size) presence.delete(key(ws, pid));
     return [...m.values()];
 }
 const emitPresence = (ws: string, pid: string) => { const s = listeners.get(key(ws, pid)); if (s) for (const l of s) { try { l({ type: "presence", data: listPresence(ws, pid) }); } catch { /* ignore */ } } };
@@ -50,5 +58,7 @@ export function setPresence(ws: string, pid: string, user: { id: string; email: 
     return listPresence(ws, pid);
 }
 export function removePresence(ws: string, pid: string, userId: string) {
-    if (presence.get(key(ws, pid))?.delete(userId)) emitPresence(ws, pid);
+    const entries = presence.get(key(ws, pid));
+    if (entries?.delete(userId)) emitPresence(ws, pid);
+    if (!entries?.size) presence.delete(key(ws, pid));
 }
