@@ -1,7 +1,7 @@
-import { createHmac, createPrivateKey, createPublicKey, createVerify, randomBytes, sign as edSign } from "node:crypto";
+import { createHmac, createPrivateKey, createPublicKey, createVerify, sign as edSign } from "node:crypto";
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { loginUser, setSessionCookie } from "../auth.ts";
+import { loginUser, setSessionCookie, createLoginState, consumeLoginState } from "../auth.ts";
 import { config } from "../config.ts";
 import { sign, verifySig } from "../crypto.ts";
 import { HttpError } from "../util.ts";
@@ -22,7 +22,7 @@ const form = (o: Record<string, string>) => new URLSearchParams(o).toString();
 async function postForm(url: string, body: Record<string, string>, headers: Record<string, string> = {}) {
     const r = await fetch(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json", ...headers }, body: form(body) });
     const j: any = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) throw new HttpError(502, `oauth provider error: ${j.error_description ?? j.error ?? r.status}`);
+    if (!r.ok || j.error) throw new HttpError(502, `oauth provider HTTP ${r.status}`);
     return j;
 }
 
@@ -78,8 +78,8 @@ oauth.get("/providers", (c) => c.json(Object.keys(providers())));
 oauth.get("/:provider/start", (c) => {
     const p = providers()[c.req.param("provider")];
     if (!p) throw new HttpError(404, "oauth provider not configured", "not_configured");
-    const state = randomBytes(16).toString("base64url");
-    setCookie(c, "milimili_oauth_state", `${state}.${sign(state)}`, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: 600 });
+    const state = createLoginState(`oauth:${p.id}`);
+    setCookie(c, "milimili_oauth_state", `${state}.${sign(state)}`, { httpOnly: true, sameSite: p.id === "apple" ? "None" : "Lax", secure: p.id === "apple" || config.production, path: "/", maxAge: 600 });
     const q = form({ client_id: p.clientId, redirect_uri: redirectUri(p.id), response_type: "code", scope: p.scope, state, ...(p.id === "apple" ? { response_mode: "form_post" } : {}) });
     return c.redirect(`${p.authUrl}?${q}`);
 });
@@ -89,6 +89,7 @@ async function callback(c: any, code: string | undefined, state: string | undefi
     if (!p) throw new HttpError(404, "oauth provider not configured", "not_configured");
     const [s, sig] = (getCookie(c, "milimili_oauth_state") ?? "").split(".");
     if (!code || !state || state !== s || !sig || !verifySig(s, sig)) throw new HttpError(400, "invalid oauth state", "bad_state");
+    consumeLoginState(`oauth:${p.id}`, state);
     deleteCookie(c, "milimili_oauth_state", { path: "/" });
     const id = await p.exchange(code, redirectUri(p.id));
     if (!id.email || !id.verified) throw new HttpError(403, "the provider did not return a verified email", "unverified_email");

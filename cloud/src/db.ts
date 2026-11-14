@@ -132,6 +132,7 @@ CREATE INDEX idx_trial_reservations_workspace ON trial_reservations(workspace_id
         id: "0012_workspacePurges",
         sql: "CREATE TABLE workspace_purges(workspace_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending', error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);",
     },
+    { id: "0013_loginStates", sql: "CREATE TABLE login_states(id TEXT PRIMARY KEY, expires_at TEXT NOT NULL); CREATE INDEX idx_login_states_expiry ON login_states(expires_at);" },
 ];
 
 export const db = await openSqlite(config.dbFile);

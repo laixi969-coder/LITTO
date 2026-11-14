@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
-import { authOf, loginUser, requireAdmin, setSessionCookie } from "../auth.ts";
+import { authOf, loginUser, requireAdmin, setSessionCookie, createLoginState, consumeLoginState } from "../auth.ts";
 import { audit, get, run, all } from "../db.ts";
 import { config } from "../config.ts";
 import { decrypt, encrypt, sign, verifySig } from "../crypto.ts";
@@ -26,7 +26,7 @@ ssoPublic.get("/:id/start", async (c) => {
     if (!conn) throw notFound("sso connection");
     const d = await discover(conn.issuer);
     const { verifier, challenge } = pkce();
-    const payload = Buffer.from(JSON.stringify({ id: conn.id, state: randomBytes(16).toString("base64url"), nonce: randomBytes(16).toString("base64url"), verifier })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({ id: conn.id, state: createLoginState(`sso:${conn.id}`), nonce: randomBytes(16).toString("base64url"), verifier })).toString("base64url");
     setCookie(c, "milimili_sso", `${payload}.${sign(payload)}`, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: 600 });
     const st = JSON.parse(Buffer.from(payload, "base64url").toString());
     const q = new URLSearchParams({ client_id: conn.client_id, redirect_uri: redirectUri(conn.id), response_type: "code", scope: "openid email profile", state: st.state, nonce: st.nonce, code_challenge: challenge, code_challenge_method: "S256" });
@@ -41,10 +41,11 @@ ssoPublic.get("/:id/callback", async (c) => {
     const st = JSON.parse(Buffer.from(payload, "base64url").toString());
     deleteCookie(c, "milimili_sso", { path: "/" });
     if (st.id !== conn.id || !c.req.query("state") || c.req.query("state") !== st.state || !c.req.query("code")) throw new HttpError(400, "invalid sso state", "bad_state");
+    consumeLoginState(`sso:${conn.id}`, st.state);
     const d = await discover(conn.issuer);
     const tr = await fetch(d.token_endpoint, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: new URLSearchParams({ grant_type: "authorization_code", code: c.req.query("code")!, redirect_uri: redirectUri(conn.id), client_id: conn.client_id, client_secret: decrypt(JSON.parse(conn.secret_enc)), code_verifier: st.verifier }), signal: AbortSignal.timeout(10_000) });
     const tj: any = await tr.json().catch(() => ({}));
-    if (!tr.ok || !tj.id_token) throw new HttpError(502, `IdP token error: ${tj.error_description ?? tj.error ?? tr.status}`, "sso_bad_idp");
+    if (!tr.ok || !tj.id_token) throw new HttpError(502, `IdP token HTTP ${tr.status}`, "sso_bad_idp");
     const claims = await verifyIdToken(tj.id_token, { issuer: conn.issuer, discoveredIssuer: d.issuer, clientId: conn.client_id, nonce: st.nonce, jwksUri: d.jwks_uri });
     const email = String(claims.email ?? "").toLowerCase();
     if (!email || !(claims.email_verified === true || claims.email_verified === "true")) throw new HttpError(403, "the IdP did not return a verified email", "unverified_email");

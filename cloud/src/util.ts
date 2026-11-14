@@ -38,7 +38,10 @@ export const j = (v: unknown) => JSON.stringify(v ?? null);
 
 /** Strip anything that looks like an API key from log strings. */
 export function redact(s: string): string {
-    return s.replace(/(sk|key|tok|Bearer)[-_ ]?[A-Za-z0-9_\-]{12,}/g, "$1-***");
+    return s
+        .replace(/Bearer\s+[^\s,"'}]+/gi, "Bearer [redacted]")
+        .replace(/("?(?:api[_-]?key|auth[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|access[_-]?key|password|secret|token|authorization|cookie)"?\s*[:=]\s*)("(?:[^"\\]|\\.)*"|'[^']*'|[^\s,;}]+)/gi, "$1[redacted]")
+        .replace(/(sk|key|tok)[-_][A-Za-z0-9_\-]{8,}/gi, "$1-***");
 }
 export const log = {
     info: (...a: unknown[]) => !process.env.MILIMILI_QUIET && console.log(redact(a.map(String).join(" "))),

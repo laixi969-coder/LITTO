@@ -2,7 +2,8 @@ import { bodyLimit } from "hono/body-limit";
 import { createReadStream, stat } from "@toonflow/file";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { Hono, type Context } from "hono";
+import { clientIp } from "./requestSecurity.ts";
+import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { authenticate } from "./auth.ts";
 import { authPublic, platform } from "./routes/platform.ts";
@@ -46,13 +47,6 @@ app.use("*", async (c, next) => {
 // x-forwarded-for 由客户端任意填写，只有部署在可信反向代理后（MILIMILI_TRUST_PROXY=1）才采用，否则每次换个假 IP 就能绕过限流。
 const buckets = new Map<string, { t: number; n: number }>();
 setInterval(() => { const cutoff = Date.now() - 60_000; for (const [key, b] of buckets) if (b.t < cutoff) buckets.delete(key); }, 60_000).unref();
-function clientIp(c: Context) {
-    if (process.env.MILIMILI_TRUST_PROXY === "1") {
-        const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-        if (forwarded) return forwarded;
-    }
-    return (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket?.remoteAddress ?? "local";
-}
 app.use("*", async (c, next) => {
     const auth = c.req.path.startsWith("/auth/");
     const key = `${clientIp(c)}:${auth ? "auth" : "api"}`;

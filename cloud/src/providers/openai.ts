@@ -2,9 +2,9 @@ import { ProviderError, type GenRequest, type PollResult, type ProviderAdapter }
 
 const hdr = (key?: string) => ({ ...(key ? { authorization: `Bearer ${key}` } : {}) });
 const fail = async (r: Response) => {
-    const body = (await r.text()).slice(0, 300);
+    await r.body?.cancel();
     // Never echo request headers; provider bodies are truncated and redacted by the logger.
-    throw new ProviderError(`provider HTTP ${r.status}: ${body}`, r.status >= 500 || r.status === 429);
+    throw new ProviderError(`provider HTTP ${r.status}`, r.status >= 500 || r.status === 429);
 };
 const reportedCost = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 const url = (base: string | undefined, p: string) => `${(base ?? "https://api.openai.com/v1").replace(/\/$/, "")}${p}`;

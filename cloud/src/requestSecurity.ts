@@ -1,3 +1,5 @@
+import type { Context } from "hono";
+
 /** Cookie 写请求需自定义标记和可信来源；显式 Bearer 客户端不依赖浏览器 Cookie。 */
 export function validMutationSource(headers: { authorization?: string; origin?: string; referer?: string; marker?: string }, requestOrigin: string) {
   if (headers.authorization?.startsWith("Bearer ")) return true;
@@ -7,4 +9,12 @@ export function validMutationSource(headers: { authorization?: string; origin?: 
     const trusted = (process.env.MILIMILI_CORS_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean);
     return source !== "null" && (source === new URL(requestOrigin).origin || trusted.includes(source));
   } catch { return false; }
+}
+
+export function clientIp(c: Context) {
+  if (process.env.MILIMILI_TRUST_PROXY === "1") {
+    const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+    if (forwarded) return forwarded;
+  }
+  return (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket?.remoteAddress ?? "local";
 }

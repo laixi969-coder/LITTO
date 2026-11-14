@@ -43,6 +43,10 @@ export function summary(workspaceId: string | null, days = 30, period?: "month")
 export function exportCsv(workspaceId: string, days = 90) {
     const since = new Date(Date.now() - days * 864e5).toISOString();
     const rows = all("SELECT created_at, kind, provider_id, model_id, units, unit, cost_usd, status, duration_ms FROM usage_events WHERE workspace_id=? AND created_at>=? ORDER BY created_at", workspaceId, since);
-    const esc = (v: unknown) => (v === null || v === undefined ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+    const esc = (v: unknown) => {
+        let text = v === null || v === undefined ? "" : String(v);
+        if (typeof v === "string" && /^(?:[\t\r\n]|\s*[=+@-])/.test(text)) text = "'" + text;
+        return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    };
     return ["time,kind,provider,model,units,unit,cost_usd,status,duration_ms", ...rows.map((r) => [r.created_at, r.kind, r.provider_id, r.model_id, r.units, r.unit, r.cost_usd, r.status, r.duration_ms].map(esc).join(","))].join("\n") + "\n";
 }

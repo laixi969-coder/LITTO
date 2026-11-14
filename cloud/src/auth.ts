@@ -108,20 +108,21 @@ export async function provisionUser(email: string, password: string, actorId: st
   });
 }
 
-// ACT: 单进程按邮箱限制每 15 分钟 10 次尝试；多实例须改为共享存储。
+// ACT: 单进程按来源与邮箱限制尝试，避免单一来源锁死账号；多实例须共享限流存储。
 const passwordAttempts = new Map<string, { count: number; expiresAt: number }>();
-export async function verifyPassword(email: string, password: string) {
+export async function verifyPassword(email: string, password: string, source = "local") {
   email = email.trim().toLowerCase();
   assertNotSsoEnforced(email);
   requireAccountAccess(email);
   const at = Date.now();
   for (const [key, attempt] of passwordAttempts) if (attempt.expiresAt <= at) passwordAttempts.delete(key);
-  const attempt = passwordAttempts.get(email) ?? { count: 0, expiresAt: at + 15 * 60_000 };
-  if (attempt.count >= 10 || passwordAttempts.size >= 10_000 && !passwordAttempts.has(email)) {
+  const attemptKey = sha256(`${source}\n${email}`);
+  const attempt = passwordAttempts.get(attemptKey) ?? { count: 0, expiresAt: at + 15 * 60_000 };
+  if (attempt.count >= 10 || passwordAttempts.size >= 10_000 && !passwordAttempts.has(attemptKey)) {
     throw new HttpError(429, "登录尝试过多，请 15 分钟后重试", "rate_limited");
   }
   attempt.count++;
-  passwordAttempts.set(email, attempt);
+  passwordAttempts.set(attemptKey, attempt);
   const user = get("SELECT u.id, u.status, u.deleted_at, p.password_hash FROM users u LEFT JOIN user_passwords p ON p.user_id=u.id WHERE u.email=?", email);
   const hash = String(user?.password_hash ?? "");
   const validHash = /^scrypt:[0-9a-f]{32}:[0-9a-f]{128}$/.test(hash);
@@ -136,7 +137,7 @@ export async function verifyPassword(email: string, password: string) {
     throw new HttpError(401, "邮箱或密码不正确", "bad_credentials");
   }
   const result = loginUser(email);
-  passwordAttempts.delete(email);
+  passwordAttempts.delete(attemptKey);
   return result;
 }
 
@@ -238,4 +239,17 @@ export function deleteAccount(userId: string) {
     });
     audit(userId, "account.delete", userId, { workspaces: ws.map((w) => w.id) });
     void sweepWorkspacePurges();
+}
+
+/** 登录 state 仅保存哈希，跨重启过期，事务删除防止并发重放。 */
+export function createLoginState(scope: string) {
+  const state = randomBytes(32).toString("base64url");
+  tx(() => {
+    run("DELETE FROM login_states WHERE expires_at<=?", now());
+    run("INSERT INTO login_states VALUES(?,?)", sha256(scope + ":" + state), new Date(Date.now() + 600_000).toISOString());
+  });
+  return state;
+}
+export function consumeLoginState(scope: string, state: string) {
+  if (run("DELETE FROM login_states WHERE id=? AND expires_at>?", sha256(scope + ":" + state), now()).changes !== 1) throw new HttpError(400, "登录请求已过期或已使用，请重新登录", "bad_state");
 }

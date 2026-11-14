@@ -19,11 +19,27 @@ export const plans = () => setting<Plan[]>("plans", DEFAULT_PLANS);
 export const packs = () => setting<Pack[]>("packs", DEFAULT_PACKS);
 const MONTHS = { free: 0, monthly: 1, quarterly: 3, annual: 12, custom: 12 } as const;
 
+export function subscriptionEnd(period: Plan["period"], start = new Date()) {
+    if (period === "free") return null;
+    const months = MONTHS[period];
+    if (!Number.isInteger(months) || months <= 0) throw bad("套餐周期无效");
+    const end = new Date(start);
+    const day = end.getUTCDate();
+    end.setUTCMonth(end.getUTCMonth() + months, 1);
+    const lastDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate();
+    end.setUTCDate(Math.min(day, lastDay));
+    return end.toISOString();
+}
+
 export function subscriptionOf(ws: string) {
     const s = get("SELECT * FROM subscriptions WHERE workspace_id=?", ws)!;
     // Lapsed paid plans fall back to free; granted credits are kept.
     if (s.plan !== "free" && s.period_end && s.period_end < now()) {
-        run("UPDATE subscriptions SET plan='free', period='free', status='active', period_end=NULL, updated_at=? WHERE id=?", now(), s.id);
+        const free = plans().find(plan => plan.id === "free") ?? DEFAULT_PLANS[0]!;
+        tx(() => {
+            run("UPDATE subscriptions SET plan='free', period='free', status='active', period_end=NULL, updated_at=? WHERE id=?", now(), s.id);
+            run("UPDATE workspaces SET quota_bytes=? WHERE id=?", free.storageGb * 1024 ** 3, ws);
+        });
         return get("SELECT * FROM subscriptions WHERE id=?", s.id)!;
     }
     return s;
@@ -31,7 +47,7 @@ export function subscriptionOf(ws: string) {
 
 export function setPlan(ws: string, plan: Plan, grantCredits: boolean, note: string) {
     tx(() => {
-        const end = plan.period === "free" ? null : new Date(new Date().setMonth(new Date().getMonth() + MONTHS[plan.period])).toISOString();
+        const end = subscriptionEnd(plan.period);
         run("UPDATE subscriptions SET plan=?, period=?, status='active', period_end=?, updated_at=? WHERE workspace_id=?", plan.id, plan.period, end, now(), ws);
         run("UPDATE workspaces SET quota_bytes=? WHERE id=?", plan.storageGb * 1024 ** 3, ws);
         if (grantCredits && plan.credits) grant(ws, plan.credits, "PURCHASE", `${plan.name}: plan credits`);
@@ -59,7 +75,9 @@ const stripe: PaymentProvider = {
 };
 export const paymentProvider = (): PaymentProvider => {
     const id = setting<string>("paymentProvider", process.env.NODE_ENV === "production" ? "stripe" : "mock");
-    return id === "stripe" ? stripe : mockPay;
+    if (id === "stripe") return stripe;
+    if (id === "mock") return mockPay;
+    throw bad("支付渠道配置无效，请联系管理员");
 };
 
 export async function checkout(ws: string, kind: "pack" | "plan", itemId: string, returnUrl: string, requestKey: string) {
@@ -73,6 +91,7 @@ export async function checkout(ws: string, kind: "pack" | "plan", itemId: string
     if (!item) throw notFound(kind);
     if (kind === "plan" && item.period === "free") { setPlan(ws, item, false, "downgrade"); return { completed: true }; }
     if (kind === "plan" && item.period === "custom") throw bad("custom plans are arranged with sales (admin sets them)");
+    if (saved && !["stripe", "mock"].includes(saved.provider)) throw bad("订单支付渠道无效");
     const prov = saved ? (saved.provider === "stripe" ? stripe : mockPay) : paymentProvider();
     const id = saved?.paymentId ?? ulid();
     const intent = saved ?? { kind, itemId, paymentId: id, provider: prov.id, title: item.name, amountUsd: item.priceUsd };

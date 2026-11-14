@@ -162,7 +162,7 @@ async function tick() {
     if (ticking) return;
     ticking = true;
     try {
-        const due = all("SELECT * FROM generation_jobs WHERE status='QUEUED' AND run_after<=? ORDER BY created_at LIMIT 50", now());
+        const due = all("SELECT j.* FROM generation_jobs j JOIN providers p ON p.id=j.provider_id WHERE j.status='QUEUED' AND j.run_after<=? AND (SELECT COUNT(*) FROM generation_jobs r WHERE r.provider_id=j.provider_id AND r.status='RUNNING') < p.concurrency ORDER BY j.created_at LIMIT 50", now());
         for (const row of due) {
             if (inflight.has(row.id)) continue;
             const prov = get("SELECT * FROM providers WHERE id=?", row.provider_id);

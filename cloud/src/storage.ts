@@ -4,6 +4,7 @@ import { join, dirname } from "node:path";
 import { config } from "./config.ts";
 import { all, get, run, scoped, tx } from "./db.ts";
 import { sign, verifySig } from "./crypto.ts";
+import { subscriptionOf } from "./billing.ts";
 import { bad, conflict, now, sha256, ulid } from "./util.ts";
 import { makeDerivatives, probeBuffer } from "./media-tools.ts";
 
@@ -80,6 +81,7 @@ let workspaceFileBytes = (_workspaceId: string) => 0;
 const workspaceReservations = new Map<string, number>();
 export function configureWorkspaceStorage(readBytes: (workspaceId: string) => number) { workspaceFileBytes = readBytes; }
 export function reserveWorkspaceStorage(workspaceId: string, bytes: number) {
+    subscriptionOf(workspaceId);
     const quota = get("SELECT quota_bytes FROM workspaces WHERE id=? AND deleted_at IS NULL", workspaceId);
     if (!Number.isSafeInteger(bytes) || bytes < 0 || !quota || bytes > 0 && usage(workspaceId).bytes + reservedUploadBytes(workspaceId) + bytes > quota.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
     workspaceReservations.set(workspaceId, (workspaceReservations.get(workspaceId) ?? 0) + bytes);
@@ -97,6 +99,7 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     const s = sniff(data);
     if (!s && !opts.allowUnsniffed) throw bad("unsupported or unrecognised file type");
     const mime = s?.mime ?? opts.mime ?? "application/octet-stream";
+    subscriptionOf(workspaceId);
     const ws = get("SELECT quota_bytes FROM workspaces WHERE id=?", workspaceId)!;
     if (usage(workspaceId).bytes + reservedUploadBytes(workspaceId, opts.uploadId) + data.length > ws.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
     // Real video/audio: record true duration and size (needed for trim limits in the editor). Best effort, needs ffprobe.
@@ -110,6 +113,7 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     try {
         opts.signal?.throwIfAborted();
         // 文件写入期间其他请求也可能完成入库；同步复核配额与记录写入之间不能再 await。
+        subscriptionOf(workspaceId);
         const current = get("SELECT quota_bytes FROM workspaces WHERE id=? AND deleted_at IS NULL", workspaceId);
         if (!current || usage(workspaceId).bytes + reservedUploadBytes(workspaceId, opts.uploadId) + data.length > current.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
         row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: probed?.duration ?? opts.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });

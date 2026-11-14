@@ -62,6 +62,7 @@ extra.post("/media/uploads", async (c) => {
     const { a, s } = ctx(c, "EDITOR");
     const b = await body(c, z.object({ size: z.number().int().positive().max(200 * 1024 * 1024), parts: z.number().int().min(1).max(2000), projectId: z.string().optional() }));
     if (b.projectId && !s.get("projects", b.projectId)) throw notFound("project");
+    subscriptionOf(a.workspaceId);
     const q = get("SELECT quota_bytes FROM workspaces WHERE id=?", a.workspaceId)!;
     if (usage(a.workspaceId).bytes + reservedUploadBytes(a.workspaceId) + b.size > q.quota_bytes) throw bad("storage quota exceeded");
     const id = ulid();
