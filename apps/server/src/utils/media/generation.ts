@@ -107,7 +107,7 @@ export async function listMediaModels(all = false): Promise<MediaModel[]> {
     return [{
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
       cameraTrajectory: model.cameraTrajectory === true, promptControl: model.promptControl === "imageAndCameraOnly" ? "imageAndCameraOnly" : undefined,
-      mode: model.mode, durationResolutionMap: model.durationResolutionMap ?? builtIn?.durationResolutionMap, audio: model.audio, nativeDialogue: model.nativeDialogue === true, lipSync: model.lipSync === true, speechInstructions: model.speechInstructions === true,
+      videoTask: model.videoTask ?? builtIn?.videoTask, mode: model.mode, durationResolutionMap: model.durationResolutionMap ?? builtIn?.durationResolutionMap, audio: model.audio, nativeDialogue: model.nativeDialogue === true, lipSync: model.lipSync === true, speechInstructions: model.speechInstructions === true,
       ...(model.type === "video" ? {
         videoRatios: mediaOptions(model.videoRatios ?? record(input.aspect_ratio ?? input.ratio).enum ?? builtIn?.videoRatios, /^[1-9]\d{0,3}:[1-9]\d{0,3}$/),
         multiShotCapabilities: readMultiShotCapabilities(provider, model, record(configurations[provider.id]).baseUrl),
@@ -342,12 +342,12 @@ export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "
 }
 
 /** 交付与恢复检查同一份实际文件；失败保留付费原件，不能以重生成或叠对白补救。 */
-async function validateMediaDelivery(directory: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest, files: GeneratedMedia[], signal?: AbortSignal, reportTask?: ProviderTools["reportTask"]) {
+async function validateMediaDelivery(directory: string, mediaType: "image" | "video" | "audio", request: MediaGenerationRequest, files: GeneratedMedia[], signal?: AbortSignal, reportTask?: ProviderTools["reportTask"], editing = false) {
   if (mediaType === "audio") return;
   const speech = (request as MediaGenerationRequest & { speechSyncInputs?: { ratio?: string } }).speechSyncInputs;
   const ratio = request.ratio || speech?.ratio || (await readMediaAspect(directory))[mediaType === "image" ? "imageRatio" : "videoRatio"];
   const needsAudio = mediaType === "video" && (request.generateAudio === true || !!speech);
-  if (!ratio && !needsAudio) return;
+  if (!ratio && !needsAudio && !editing) return;
   try {
     const ffmpeg = await createWorkspaceFfmpeg(directory, signal, true);
     for (const file of files) {
@@ -355,6 +355,7 @@ async function validateMediaDelivery(directory: string, mediaType: "image" | "vi
       const probe = await new Promise<import("@toonflow/ffmpeg/types").FfprobeData>((resolve, reject) => ffmpeg.ffprobe(file.path, (error, data) => error ? reject(error) : resolve(data)));
       const frame = probe.streams.find(stream => stream.codec_type === "video");
       if (ratio && (!frame?.width || !frame.height || !matchesAspect(frame.width, frame.height, ratio, mediaType === "video" ? 16 : 0))) throw new Error(file.path + "：请求画幅 " + ratio + "，实际 " + (frame?.width ?? "未知") + "×" + (frame?.height ?? "未知"));
+      if (editing && (!request.duration || !Number.isFinite(Number(probe.format.duration)) || Math.abs(Number(probe.format.duration) - request.duration) > 0.2)) throw new Error(file.path + "：编辑结果时长未保持原片，不能作为已完成编辑采用");
       if (needsAudio && !probe.streams.some(stream => stream.codec_type === "audio")) throw new Error(file.path + "：请求声画同出或口型同步，但返回视频没有音轨；不能直接叠对白当作口型同步");
     }
   } catch (cause) {
@@ -395,6 +396,7 @@ async function generateMediaUnrecorded(
   if (!recovery) access.assert();
   const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType) ?? (recovery ? { id: request.modelId, label: request.modelId, type: mediaType } as (typeof providerInfo.models)[number] : undefined);
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
+  const editing = model.videoTask === "edit" || (mediaProviders as readonly Provider[]).find(item => item.id === request.providerId)?.models?.find(item => item.id === request.modelId)?.videoTask === "edit";
   const speechInputs = !recovery && mediaType === "video" && model.lipSync ? await validateSpeechInputs(directory, request, signal) : undefined;
   if (speechInputs) request = { ...request, generateAudio: true };
   if (!silentFfmpeg && mediaType !== "audio" && (request.ratio || request.generateAudio === true)) await createWorkspaceFfmpeg(directory, signal, true);
@@ -459,7 +461,8 @@ async function generateMediaUnrecorded(
       images,
       videos, audios, firstFrame, lastFrame,
       // 已安装的 WAND 适配器可能仍是旧版；首帧画幅在本地核验，调用时交由供应商按首帧决定。
-      ratio: model.lipSync || request.providerId === "tencentWand" && (firstFrame || request.mode === "singleImage" && images?.length === 1) ? undefined : request.ratio, resolution: request.resolution, duration,
+      // ACT: 编辑沿用源片；真实时长与画幅保留在任务记录中，协议层不发送覆盖参数，也兼容已安装的旧编辑适配器。
+      ratio: editing || model.lipSync || request.providerId === "tencentWand" && (firstFrame || request.mode === "singleImage" && images?.length === 1) ? undefined : request.ratio, resolution: request.resolution, duration: editing ? undefined : duration,
       generateAudio: request.generateAudio, mode: request.mode,
       cameraTrajectory: request.cameraTrajectory, imageAndCameraOnly: request.imageAndCameraOnly,
     }));
@@ -540,7 +543,7 @@ async function generateMediaUnrecorded(
       } finally { release(); }
     }
     signal?.throwIfAborted();
-    await validateMediaDelivery(directory, mediaType, request, result, signal, reportTask);
+    await validateMediaDelivery(directory, mediaType, request, result, signal, reportTask, editing);
     await reportTask?.({ status: "saved", files: await Promise.all(result.map(async file => ({ ...file, hash: createHash("sha256").update(await readFile((await resolveWorkspacePath(directory, file.path)).path)).digest("hex") }))) });
     return result;
   } catch (err) {
@@ -649,7 +652,7 @@ export async function generateMediaDirect(
       return file;
     })) : await generateMediaUnrecorded(cwd, mediaType, request, signal, reportTask, execution);
     signal?.throwIfAborted();
-    if (execution?.task?.files?.length) await validateMediaDelivery(cwd, mediaType, request, files, signal, reportTask);
+    if (execution?.task?.files?.length) await validateMediaDelivery(cwd, mediaType, request, files, signal, reportTask, (await listMediaModels(true)).find(item => item.providerId === request.providerId && item.modelId === request.modelId)?.videoTask === "edit");
     // 先登记画布再计费返回：用户在 UI 里看到的节点与磁盘文件必须同时存在。
     try {
       for (const file of files) await registerOnCanvas(cwd, file, request);

@@ -32,9 +32,8 @@
           v-model="refList"
           @preview="setReferencePreview"
           @remove="removeReference" />
-        <div v-if="frameMode" class="referenceHint">
-          {{ selectedMode === "startFrameOptional" ? "仅一张图片时作为尾帧；两张图片按顺序作为首帧、尾帧" : "图片引用按顺序作为首帧、尾帧" }}
-        </div>
+        <videoReferencePanel v-model="data.videoFrames" :references="refList" :mode="selectedMode" :editing="editing" :production="!!data.production" :disabled="generating || deleting || uploading" :error="referenceError" />
+        <p v-if="editing && data.storyboard" class="referenceHint">已保存分镜仍保留；视频编辑模式沿用原片，不应用分镜编排。</p>
         <promptInput ref="promptEditor" v-model="data.promptModel" v-model:text="data.prompt" :references="referenceMentions" expandable />
         <div class="promptFooter">
           <el-select
@@ -61,14 +60,15 @@
             v-model:duration="data.duration"
             v-model:resolution="data.resolution"
             v-model:ratio="data.ratio"
-            v-model:mode="data.mode"
+            :mode="data.mode"
+            @update:mode="value => { data.modeExplicit = true; data.mode = value; }"
             v-model:generateAudio="data.generateAudio"
             :ratios="ratioOptions"
             :resolutions="resolutionOptions"
             :model="selectedModel"
             :disabled="generating || deleting || !selectedModel" />
           <promptTools :text="data.prompt" mediaType="video" :request="generationInput" :preview="workshopBasePrompt" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
-          <storyboardEditor :count="data.storyboard?.shots.length" :duration="data.duration" :production="!!data.production" :disabled="generating || deleting || uploading || toolsBusy" :references="storyboard.mentions.value" :load="storyboard.load" :save="saveStoryboard" :clear="!data.production && data.storyboard ? clearStoryboard : undefined" :validate="storyboard.validate" :preview="storyboard.textPreview" @busy="storyboardBusy = $event" />
+          <storyboardEditor :count="data.storyboard?.shots.length" :duration="data.duration" :production="!!data.production" :disabled="editing || generating || deleting || uploading || toolsBusy" :references="storyboard.mentions.value" :load="storyboard.load" :save="saveStoryboard" :clear="!data.production && data.storyboard ? clearStoryboard : undefined" :validate="storyboard.validate" :preview="storyboard.textPreview" @busy="storyboardBusy = $event" />
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -77,7 +77,7 @@
             :aria-label="generating ? '停止生成' : '生成视频'"
             @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration(true).catch((error) => showNodeError(error, '视频生成失败'))" />
         </div>
-        <p v-if="data.storyboard" class="referenceHint">已保存 {{ data.storyboard.shots.length }} 镜 · {{ data.storyboard.shots.at(-1)?.end }} 秒，生成时采用当前编排。</p>
+        <p v-if="!editing && data.storyboard" class="referenceHint">已保存 {{ data.storyboard.shots.length }} 镜 · {{ data.storyboard.shots.at(-1)?.end }} 秒，生成时采用当前编排。</p>
         <p v-if="storyboardError" class="storyboardError" role="alert">{{ storyboardError }}</p>
         <details v-if="data.storyboard" class="generationPreview"><summary>查看生成内容{{ data.production ? '（正式镜头编译预览）' : '（包含分镜编排）' }}</summary><pre>{{ data.production ? storyboard.preview.value || '请打开分镜编排，保存后重新编译以查看正式镜头发送内容。' : generationPrompt }}</pre></details>
       </el-card>
@@ -97,6 +97,8 @@ import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import mediaHistory from "@toonflow/nodes-scaffold/mediaHistory";
 import generationSettings from "./components/generationSettings.vue";
 import storyboardEditor from "./components/storyboardEditor.vue";
+import videoReferencePanel from "./components/videoReferencePanel.vue";
+import { readVideoFrames, referenceKey, validateVideoReferences, type VideoFrames } from "./videoReferences";
 import { useStoryboard } from "./useStoryboard";
 
 defineOptions({
@@ -115,7 +117,7 @@ const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals 
   label: "视频生成",
 });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { visualModifiers?: VisualModifiers; storyboard?: VideoStoryboard; storyboardReferences?: { source: string; sourceHandle: string }[]; storyboardTimeline?: string; purpose?: "asset" | "standalone"; production?: { shotId: string; productionFingerprint: string }; cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; durationReason?: string; resolution: string; ratio: string; mode: string; generateAudio: boolean });
+const data = computed(() => node.data as { videoFrames?: VideoFrames; modeExplicit?: boolean; visualModifiers?: VisualModifiers; storyboard?: VideoStoryboard; storyboardReferences?: { source: string; sourceHandle: string }[]; storyboardTimeline?: string; purpose?: "asset" | "standalone"; production?: { shotId: string; productionFingerprint: string }; cameraTrajectory?: NodeVideoRequest["cameraTrajectory"]; imageAndCameraOnly?: boolean; generationPending?: boolean; generationJobId?: string; generationRequest?: { requestId: string; input: NodeVideoRequest }; prompt: string; promptModel: PromptModel; model: string; duration?: number; durationReason?: string; resolution: string; ratio: string; mode: string; generateAudio: boolean });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
@@ -141,7 +143,14 @@ const selectedModel = computed(() => models.value.find((item) => JSON.stringify(
 const ratioOptions = computed(() => getRatios(selectedModel.value));
 const resolutionOptions = computed(() => selectedModel.value ? getResolutions(selectedModel.value) : []);
 const selectedMode = computed(() => selectedModel.value?.mode?.find((item) => JSON.stringify(item) === data.value.mode) as NodeVideoRequest["mode"]);
-const frameMode = computed(() => ["startEndRequired", "endFrameOptional", "startFrameOptional"].includes(String(selectedMode.value)));
+const editing = computed(() => selectedModel.value?.videoTask === "edit");
+const frameMode = computed(() => ["singleImage", "startEndRequired", "endFrameOptional", "startFrameOptional"].includes(String(selectedMode.value)));
+const frames = computed(() => readVideoFrames(refList.value, selectedMode.value, data.value.videoFrames));
+// ACT: 首次迁移沿用旧顺序，随后固定素材来源；拖动参考列表不再隐式交换首尾帧。
+watch([frameMode, () => refList.value.map(referenceKey).join("|")], () => {
+  if (frameMode.value && !data.value.production && !data.value.videoFrames && refList.value.some(item => item.dataType === "IMAGE")) data.value.videoFrames = frames.value.bindings;
+}, { immediate: true, flush: "sync" });
+const referenceError = computed(() => { if (data.value.production || !selectedModel.value) return ""; try { validateVideoReferences(refList.value, selectedMode.value, data.value.videoFrames); return ""; } catch (cause) { return cause instanceof Error ? cause.message : String(cause); } });
 const mediaCounts = computed(() => ({
   image: refList.value.filter((item) => item.dataType === "IMAGE").length,
   video: refList.value.filter((item) => item.dataType === "VIDEO").length,
@@ -174,7 +183,7 @@ function getResolutions(choice: NodeMediaModel, duration?: number) {
 }
 // ACT: 引用改变时只替换不适用的模式；普通媒体优先作为参考，避免自动变成首尾帧。
 watch([selectedModel, matchingModes, () => data.value.mode], ([choice, matches]) => {
-  if (!choice || matches.some((item) => JSON.stringify(item) === data.value.mode)) return;
+  if (!choice || matches.some((item) => JSON.stringify(item) === data.value.mode) || data.value.modeExplicit && choice.mode?.some(item => JSON.stringify(item) === data.value.mode)) return;
   const modes = choice.mode ?? [];
   const mode = matches.find(Array.isArray) ?? matches.find((item) => item === "singleImage")
     ?? matches.find((item) => item === "endFrameOptional") ?? matches[0]
@@ -186,6 +195,7 @@ watch([selectedModel, () => data.value.duration, () => data.value.resolution], (
   if (!choice) return;
   const resolutions = getResolutions(choice);
   if (!resolutions.includes(data.value.resolution)) data.value.resolution = resolutions[0] ?? "";
+  if (choice.videoTask === "edit") return;
   const durations = videoDurations(choice, data.value.resolution);
   if (!durations.includes(data.value.duration!)) data.value.duration = durations.at(-1);
 }, { flush: "sync" });
@@ -196,7 +206,7 @@ function resolveReferenceText(value: string) {
       const reference = refList.value[index];
       if (!reference) return marker;
       const position = refList.value.slice(0, index + 1).filter(item => item.dataType === reference.dataType).length;
-      if (reference.dataType === "IMAGE" && frameMode.value) return position === 1 && !(selectedMode.value === "startFrameOptional" && mediaCounts.value.image === 1) ? "首帧图片" : "尾帧图片";
+      if (reference.dataType === "IMAGE" && frameMode.value) return frames.value.first && referenceKey(reference) === referenceKey(frames.value.first) ? "首帧图片" : frames.value.last && referenceKey(reference) === referenceKey(frames.value.last) ? "尾帧图片" : "未分配图片";
       const labels: Record<string, string> = { IMAGE: "图片", VIDEO: "视频", AUDIO: "音频", STRING: "文字参考" };
       const label = typeof reference.dataType === "string" ? labels[reference.dataType] : undefined;
       return label ? `${label}${position}` : marker;
@@ -212,9 +222,9 @@ const baseGenerationPrompt = computed(() =>
 );
 const storyboard = useStoryboard({ data, references: refList, mentions: referenceMentions, model: selectedModel, duration: computed(() => data.value.duration), mode: selectedMode,
   basePrompt: baseGenerationPrompt, resolveText: resolveReferenceText, request: () => generationInput(), directory: async () => (await files.getWorkspaceFiles().list()).directory });
-const storyboardError = computed(() => { try { if (data.value.storyboard) storyboard.validate(data.value.storyboard); return ""; } catch (error) { return error instanceof Error ? error.message : String(error); } });
-const workshopBasePrompt = computed(() => compileVideoStoryboard(baseGenerationPrompt.value, data.value.storyboard ? storyboard.resolve(data.value.storyboard) : undefined));
-const generationPrompt = computed(() => { try { return data.value.production ? storyboard.preview.value || baseGenerationPrompt.value : compileVisualModifiers(workshopBasePrompt.value, data.value.visualModifiers, data.value.storyboard?.shots); } catch { return ""; } });
+const storyboardError = computed(() => { try { if (!editing.value && data.value.storyboard) storyboard.validate(data.value.storyboard); return ""; } catch (error) { return error instanceof Error ? error.message : String(error); } });
+const workshopBasePrompt = computed(() => compileVideoStoryboard(baseGenerationPrompt.value, !editing.value && data.value.storyboard ? storyboard.resolve(data.value.storyboard) : undefined));
+const generationPrompt = computed(() => { try { return data.value.production ? storyboard.preview.value || baseGenerationPrompt.value : compileVisualModifiers(workshopBasePrompt.value, data.value.visualModifiers, editing.value ? [] : data.value.storyboard?.shots); } catch { return ""; } });
 watch(() => [data.value.model, data.value.duration, data.value.resolution, data.value.ratio, data.value.mode, data.value.generateAudio, data.value.production?.shotId, JSON.stringify(data.value.visualModifiers)], () => { storyboard.preview.value = ""; }, { flush: "sync" });
 async function saveStoryboard(plan: VideoStoryboard) {
   await storyboard.save(plan);
@@ -294,11 +304,12 @@ async function startGeneration(manual = false) {
   if (uploading.value) throw new Error("视频正在替换，请等待完成");
   if (deleting.value) throw new Error("节点正在删除");
   if (!choice) throw new Error("请先选择视频模型");
-  if (data.value.storyboard) storyboard.validate(data.value.storyboard);
-  if (data.value.storyboard && selectedModel.value?.audio === "optional" && !data.value.generateAudio && [data.value.storyboard.music, data.value.storyboard.soundEffects].includes("on")) throw new Error("分镜要求生成声音，但模型音频已关闭；请开启音频或修改分镜声音设置");
-  if (!data.value.duration) throw new Error("请先按完整剧情段落选择生成时长");
-  if (!getResolutions(choice, data.value.duration).includes(data.value.resolution)) throw new Error("当前模型不支持所选时长与分辨率组合，请重新选择");
-  if (!ratioOptions.value.includes(data.value.ratio)) throw new Error(`当前模型不支持比例 ${data.value.ratio}，可选：${ratioOptions.value.join("、")}`);
+  if (!editing.value && data.value.storyboard) storyboard.validate(data.value.storyboard);
+  if (!data.value.production) validateVideoReferences(refList.value, selectedMode.value, data.value.videoFrames);
+  if (!editing.value && data.value.storyboard && selectedModel.value?.audio === "optional" && !data.value.generateAudio && [data.value.storyboard.music, data.value.storyboard.soundEffects].includes("on")) throw new Error("分镜要求生成声音，但模型音频已关闭；请开启音频或修改分镜声音设置");
+  if (!editing.value && !data.value.duration) throw new Error("请先按完整剧情段落选择生成时长");
+  if (!getResolutions(choice, editing.value ? undefined : data.value.duration).includes(data.value.resolution)) throw new Error("当前模型不支持所选时长与分辨率组合，请重新选择");
+  if (!editing.value && !ratioOptions.value.includes(data.value.ratio)) throw new Error(`当前模型不支持比例 ${data.value.ratio}，可选：${ratioOptions.value.join("、")}`);
   if (choice.cameraTrajectory && (!data.value.cameraTrajectory || !data.value.imageAndCameraOnly)) throw new Error("请先通过 setCameraTrajectory 配置并校准轨迹，或在镜头制作面板导入轨迹");
   if (!data.value.production && !generationPrompt.value) throw new Error("请输入生成提示词");
   if (!data.value.production && /\{\{ref \d+\}\}/.test(generationPrompt.value)) throw new Error("提示词含未绑定的参考标记，请重新连接资产并写入提示词");
@@ -329,21 +340,21 @@ function generationInput(manual = false): Omit<NodeVideoRequest, "directory"> {
     providerId: choice.providerId,
     modelId: choice.modelId,
     prompt: baseGenerationPrompt.value,
-    storyboard: storyboard.generationPlan(),
+    storyboard: editing.value ? undefined : storyboard.generationPlan(),
     visualModifiers: data.value.visualModifiers,
     ...data.value.production,
     purpose: data.value.purpose,
     mode: selectedMode.value,
-    duration: data.value.duration,
+    duration: editing.value ? undefined : data.value.duration,
     durationReason: data.value.durationReason || (manual ? `用户按视频节点当前配置明确发起 ${data.value.duration} 秒生成` : undefined),
     resolution: data.value.resolution || undefined,
-    ratio: data.value.ratio,
-    generateAudio: data.value.storyboard ? storyboardGenerateAudio(data.value.storyboard, choice.audio, audio) : audio,
+    ratio: editing.value ? undefined : data.value.ratio,
+    generateAudio: !editing.value && data.value.storyboard ? storyboardGenerateAudio(data.value.storyboard, choice.audio, audio) : audio,
     outputDirectory: `assets/${id}`,
     images: frameMode.value || choice.cameraTrajectory ? undefined : images,
-    firstFrame: choice.cameraTrajectory || frameMode.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
+    firstFrame: choice.cameraTrajectory ? images[0] : !data.value.production && frameMode.value && frames.value.first?.dataType === "IMAGE" && frames.value.first.value ? { path: frames.value.first.value.url, mimeType: frames.value.first.value.mimeType } : undefined,
     ...(choice.cameraTrajectory ? { cameraTrajectory: data.value.cameraTrajectory, imageAndCameraOnly: data.value.imageAndCameraOnly } : {}),
-    lastFrame: frameMode.value ? images[selectedMode.value === "startFrameOptional" && images.length === 1 ? 0 : 1] : undefined,
+    lastFrame: !data.value.production && frameMode.value && frames.value.last?.dataType === "IMAGE" && frames.value.last.value ? { path: frames.value.last.value.url, mimeType: frames.value.last.value.mimeType } : undefined,
     videos: references.flatMap((item) => item.dataType === "VIDEO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
     audios: references.flatMap((item) => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
   };
@@ -419,6 +430,8 @@ function getConfig() {
     storyboard: data.value.storyboard,
     storyboardReferences: data.value.storyboardReferences,
     storyboardError: storyboardError.value,
+    videoFrames: data.value.videoFrames,
+    referenceError: referenceError.value,
     generationPrompt: generationPrompt.value,
     references: refList.value.map((item, index) => ({
       marker: `{{ref ${index + 1}}}`,

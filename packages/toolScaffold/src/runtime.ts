@@ -104,6 +104,7 @@ export interface MultiShotCapability {
 }
 
 export interface MediaModel {
+  videoTask?: "edit";
   cameraTrajectory?: boolean;
   promptControl?: "imageAndCameraOnly";
   providerId: string;

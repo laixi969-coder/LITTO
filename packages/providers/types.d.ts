@@ -12,6 +12,7 @@ type VideoMode =
   | (`${"video" | "image" | "audio"}Reference:${number}`)[];
 
 interface ProviderModel {
+  videoTask?: "edit";
   cameraTrajectory?: boolean;
   promptControl?: "imageAndCameraOnly";
   id: string;

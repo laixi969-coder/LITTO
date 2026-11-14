@@ -3,7 +3,7 @@
     <template #reference>
       <el-button class="settingsButton" text size="small" :disabled="disabled" aria-label="视频生成设置">
         <span class="ratioShape" :style="ratioStyle(ratio)" aria-hidden="true" />
-        <span>{{ [ratio, resolution, duration ? `${duration}秒` : '', model?.audio === 'optional' ? (generateAudio ? '有声' : '无声') : ''].filter(Boolean).join(' · ') }}</span>
+        <span>{{ [model?.videoTask === 'edit' ? '视频编辑 · 沿用原片' : ratio, resolution, model?.videoTask !== 'edit' && duration ? `${duration}秒` : '', model?.audio === 'optional' ? (generateAudio ? '有声' : '无声') : ''].filter(Boolean).join(' · ') }}</span>
         <icon-chevron-up :size="14" aria-hidden="true" />
       </el-button>
     </template>
@@ -13,7 +13,7 @@
         <el-option v-for="item in modes" :key="item.value" :value="item.value" :label="item.label" />
       </el-select>
       <div v-if="durations.length || resolutions.length" class="outputOptions">
-        <div v-if="durations.length" class="outputField">
+        <div v-if="model?.videoTask !== 'edit' && durations.length" class="outputField">
           <div class="sectionLabel">时长</div>
           <el-select v-model="duration" :disabled="disabled" :teleported="false" placeholder="按剧情段落选择" aria-label="视频时长">
             <el-option v-for="item in durations" :key="item" :value="item" :label="`${item}秒`" />
@@ -26,8 +26,8 @@
           </el-select>
         </div>
       </div>
-      <div class="sectionLabel">比例</div>
-      <div class="ratioOptions" role="group" aria-label="视频比例">
+      <div v-if="model?.videoTask !== 'edit'" class="sectionLabel">比例</div>
+      <div v-if="model?.videoTask !== 'edit'" class="ratioOptions" role="group" aria-label="视频比例">
         <el-button v-for="item in ratios" :key="item" class="ratioButton" :disabled="disabled" :aria-label="`比例 ${item}`" :aria-pressed="ratio === item" @click="ratio = item">
           <span class="ratioContent">
             <span class="ratioShape" :style="ratioStyle(item)" aria-hidden="true" />
@@ -62,7 +62,7 @@ const modeLabels: Record<string, string> = {
 };
 const modes = computed(() => (props.model?.mode ?? []).map(item => ({
   value: JSON.stringify(item),
-  label: Array.isArray(item) ? "混合参考" : modeLabels[item] ?? item,
+  label: Array.isArray(item) ? props.model?.videoTask === "edit" ? "编辑已有视频" : "混合参考" : modeLabels[item] ?? item,
 })));
 const durations = computed(() => props.model ? videoDurations(props.model, resolution.value) : []);
 

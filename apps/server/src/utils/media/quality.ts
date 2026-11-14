@@ -1,3 +1,5 @@
+import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
+import type { FfprobeData } from "@toonflow/ffmpeg/types";
 import { readFile, writeAtomic } from "@toonflow/file";
 import { z } from "zod";
 import { videoDurations, type MediaGenerationRequest, type MediaModel, type QuestionContext } from "@toonflow/tools-scaffold/runtime";
@@ -186,7 +188,9 @@ export async function requestMediaQuality(directory: string, toolCallId: string,
 export async function applyMediaQuality(directory: string, kind: "image" | "video" | "audio", request: MediaGenerationRequest, model: MediaModel) {
   if (kind === "audio") return request;
   if (kind === "video" && request.generateAudio === true && !model.audio) throw new Error("当前模型未声明生成声音能力，不能静默忽略 generateAudio；此次未提交生成");
-  const aspect = (await readMediaAspect(directory))[kind === "image" ? "imageRatio" : "videoRatio"];
+  const editing = kind === "video" && model.videoTask === "edit";
+  if (editing && (request.shotId || request.storyboard || request.firstFrame || request.lastFrame || request.images?.length || request.audios?.length || request.videos?.length !== 1)) throw Object.assign(new Error("视频编辑仅接受一段原片与文字，请使用独立素材并移除分镜、首尾帧和其他媒体参考"), { status: 400 });
+  const aspect = editing ? undefined : (await readMediaAspect(directory))[kind === "image" ? "imageRatio" : "videoRatio"];
   if (aspect && request.ratio) {
     const [width, height] = aspect.split(":").map(Number);
     const [requestedWidth, requestedHeight] = request.ratio.split(":").map(Number);
@@ -194,7 +198,7 @@ export async function applyMediaQuality(directory: string, kind: "image" | "vide
   }
   // 专用口型只核验原片，比例不作为重绘参数发送。
   if (model.lipSync) return request;
-  request = { ...request, ratio: aspect || request.ratio };
+  request = { ...request, ratio: editing ? undefined : aspect || request.ratio };
   const field = kind === "image" ? "size" : "resolution";
   const saved = (await readMediaQuality(directory)).preferences.find(item => item.kind === kind && item.providerId === request.providerId && item.modelId === request.modelId);
   const options = qualityOptions(model);
@@ -205,6 +209,15 @@ export async function applyMediaQuality(directory: string, kind: "image" | "vide
   const ratio = request.ratio?.split(":").map(Number);
   if (pixels && ratio?.length === 2 && Number(pixels[1]) * ratio[1]! !== Number(pixels[2]) * ratio[0]!) throw new Error(`图片尺寸 ${value} 与画幅 ${request.ratio} 不一致，请选择匹配规格，不会自动改变用户选择`);
   if (kind === "image" && request.ratio && model.imageRatios?.length && !model.imageRatios.includes(request.ratio) && !pixels) throw new Error(`当前模型不支持图片画幅 ${request.ratio}；不会回退到默认比例，此次未提交生成`);
+  if (editing) {
+    const source = await resolveWorkspacePath(directory, request.videos![0]!.path);
+    const ffmpeg = await createWorkspaceFfmpeg(directory, undefined, true);
+    const probe = await new Promise<FfprobeData>((resolve, reject) => ffmpeg.ffprobe(source.path, (error, data) => error ? reject(error) : resolve(data)));
+    const stream = probe.streams.find(item => item.codec_type === "video");
+    const duration = Number(probe.format.duration);
+    if (!stream?.width || !stream.height || !Number.isFinite(duration) || duration <= 0) throw new Error("无法读取原片的真实时长与画幅");
+    return { ...request, resolution: value, duration, ratio: `${stream.width}:${stream.height}`, durationReason: "视频编辑继承已核验原片时长" };
+  }
   if (kind === "video") {
     const durations = videoDurations(model, value);
     const maximum = durations.at(-1);

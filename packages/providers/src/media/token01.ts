@@ -65,7 +65,7 @@ async function resumeMedia(this: ProviderContext, task: MediaTask & { id: string
 }
 
 export default {
-  id: "token01", label: "Token01", version: "1.1.8", rules, resumeMedia,
+  id: "token01", label: "Token01", version: "1.1.9", rules, resumeMedia,
   readme: "使用 Token01 令牌生成图片和视频。模型可用性以令牌分组为准。支持文生图、单图编辑及各模型支持的视频生成模式；参考素材需要可访问的公网中转地址。\n\n[图片文档](https://token01.apifox.cn/api-530538219) · [视频文档](https://token01.apifox.cn/api-530551459)",
   models: [
     {"id": "vidu-q2", "label": "vidu-q2", "type": "image", "mode": ["text", "singleImage"], "imageSizes": ["1K"], "imageRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"]},
@@ -96,7 +96,7 @@ export default {
     {"id": "happyhorse-1.1-t2v", "label": "happyhorse-1.1-t2v", "type": "video", "mode": ["text"], "durationResolutionMap": [{"duration": [5], "resolution": ["480P", "720P", "1080P"]}]},
     {"id": "happyhorse-1.1-i2v", "label": "happyhorse-1.1-i2v", "type": "video", "mode": ["singleImage"], "durationResolutionMap": [{"duration": [5], "resolution": ["480P", "720P", "1080P"]}]},
     {"id": "happyhorse-1.1-r2v", "label": "happyhorse-1.1-r2v", "type": "video", "mode": [["imageReference:9"]], "durationResolutionMap": [{"duration": [5], "resolution": ["480P", "720P", "1080P"]}]},
-    {"id": "happyhorse-1.0-video-edit", "label": "happyhorse-1.0-video-edit", "type": "video", "mode": [["videoReference:1"]], "durationResolutionMap": [{"duration": [5], "resolution": ["720P", "1080P"]}]},
+    {"id": "happyhorse-1.0-video-edit", "videoTask": "edit", "label": "happyhorse-1.0-video-edit", "type": "video", "mode": [["videoReference:1"]], "durationResolutionMap": [{"duration": [5], "resolution": ["720P", "1080P"]}]},
     {"id": "vidu-q3-ad", "label": "vidu-q3-ad", "type": "video", "mode": [["imageReference:7"]], "durationResolutionMap": [{"duration": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["720P", "1080P"]}]},
     {"id": "vidu-q3-drama", "label": "vidu-q3-drama", "type": "video", "mode": [["imageReference:7"]], "durationResolutionMap": [{"duration": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "resolution": ["720P", "1080P"]}]},
     {"id": "vidu-q3-pro", "label": "vidu-q3-pro", "type": "video", "mode": ["singleImage"], "durationResolutionMap": [{"duration": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], "resolution": ["540P", "720P", "1080P"]}], "audio": "optional"},
@@ -149,16 +149,16 @@ export default {
       if (images.length > maxImages || videos.length > maxVideos || audios.length > maxAudios) throw new Error("参考素材数量或类型超出此模型当前支持范围");
       if (input.model === "happyhorse-1.0-video-edit" && videos.length !== 1) throw new Error("视频编辑需要一段参考视频");
     }
+    const edit = input.model === "happyhorse-1.0-video-edit";
     const duration = input.duration ?? 5;
     const resolution = (input.resolution || model.durationResolutionMap?.[0]?.resolution[0] || "720P").toUpperCase();
-    if (!model.durationResolutionMap?.some(row => row.duration.includes(duration) && row.resolution.includes(resolution))) throw new Error("不支持此视频时长与分辨率组合");
+    if (!model.durationResolutionMap?.some(row => (edit || row.duration.includes(duration)) && row.resolution.includes(resolution))) throw new Error("不支持此视频时长与分辨率组合");
     const seedance = input.model.startsWith("Doubao-Seedance-");
     const minimax = input.model.startsWith("MiniMax-H3");
     const workflow = input.model === "MiniMax-H3-Fast";
     const kling = input.model.startsWith("kling-");
     const wan = input.model.startsWith("wan3.");
     const vidu = input.model.startsWith("vidu-");
-    const edit = input.model === "happyhorse-1.0-video-edit";
     const ratio = input.ratio || "16:9";
     if ((kling || workflow) && !["16:9", "9:16", "1:1"].includes(ratio) || wan && !["16:9", "9:16", "1:1", "4:3", "3:4"].includes(ratio) || (seedance || minimax) && !["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"].includes(ratio)) throw new Error("不支持此视频画幅");
     if (input.generateAudio && !model.audio) throw new Error("此模型未声明支持生成音频");
