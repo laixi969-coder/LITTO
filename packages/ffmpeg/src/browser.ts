@@ -10,6 +10,34 @@ const runNames = new Set<string>(runMethods);
 const queryNames = new Set<string>(queryMethods);
 type Listener = (...args: any[]) => void;
 
+export type VideoFrameSamples = {
+  duration: number; frameRate: number; width: number; height: number;
+  frames: { time: number; path: string; mimeType: "image/jpeg" }[];
+};
+
+export async function sampleVideoFrames(directory: string, path: string, options: { count?: number; timestamps?: number[] } = {}, signal?: AbortSignal): Promise<VideoFrameSamples> {
+  const active = AbortSignal.any([AbortSignal.timeout(120000), ...(signal ? [signal] : [])]);
+  active.throwIfAborted();
+  const requestId = crypto.randomUUID();
+  const cancel = () => {
+    void fetch("/api/ffmpeg/sampleFrames", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
+      body: JSON.stringify({ directory, requestId, cancel: true }), signal: AbortSignal.timeout(5000),
+    }).catch(cause => console.error("视频采样取消失败", cause));
+  };
+  active.addEventListener("abort", cancel, { once: true });
+  try {
+    const response = await fetch("/api/ffmpeg/sampleFrames", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
+      body: JSON.stringify({ directory, path, ...options, requestId }), signal: active,
+    });
+    const result = await response.json() as { data: VideoFrameSamples; message?: string };
+    if (!response.ok) throw remoteError(result);
+    active.throwIfAborted();
+    return result.data;
+  } finally { active.removeEventListener("abort", cancel); }
+}
+
 function snapshot<T>(value: T): T {
   return JSON.parse(JSON.stringify(value, (_key, item) => {
     if (["function", "symbol", "bigint"].includes(typeof item) || (typeof item === "number" && !Number.isFinite(item))) {

@@ -19,6 +19,7 @@
         v-if="previewUrl"
         ref="player"
         :src="previewUrl"
+        :file="outputFile"
         label="生成视频"
         @loadedmetadata="resizeVideo" />
       <div v-else class="videoEmpty" role="img" aria-label="暂无生成视频">

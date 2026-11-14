@@ -42,21 +42,42 @@
             <el-dropdown-item command="current" :icon="IconPhotoScan">截取当前帧</el-dropdown-item>
             <el-dropdown-item command="first" :icon="IconPlayerSkipBack">截取首帧</el-dropdown-item>
             <el-dropdown-item command="last" :icon="IconPlayerSkipForward">截取尾帧</el-dropdown-item>
+            <el-dropdown-item command="review" :disabled="!file">逐帧查看与批量抽帧</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
     </div>
   </div>
+  <el-dialog v-model="reviewVisible" title="逐帧查看与批量抽帧" width="min(1100px, 94vw)" appendToBody :closeOnClickModal="false">
+    <div class="frameReview nodrag nopan nowheel" @pointerdown.stop @keydown.stop>
+      <p v-if="reviewError" role="alert">{{ reviewError }}</p>
+      <video v-if="reviewVisible" ref="reviewVideo" :src="src" controls playsinline :aria-label="`${label}逐帧查看`" @loadedmetadata="reviewVideo!.currentTime = Math.min(currentTime, Math.max(0, duration - 0.001))" @timeupdate="reviewTime = reviewVideo?.currentTime ?? 0" />
+      <div class="reviewControls">
+        <el-button :disabled="!sampleMetadata || sampling" @click="stepFrame(-1)">上一帧</el-button>
+        <span>{{ reviewTime.toFixed(3) }} 秒</span>
+        <el-button :disabled="!sampleMetadata || sampling" @click="stepFrame(1)">下一帧</el-button>
+        <el-button :disabled="!sampleMetadata || sampling" @click="loadSamples([reviewVideo?.currentTime ?? reviewTime])">采样当前时间</el-button>
+        <label>均匀采样张数<input v-model.number="sampleCount" type="number" min="1" max="24" aria-label="均匀采样张数" /></label>
+        <el-button :loading="sampling" :disabled="sampling || !Number.isInteger(sampleCount) || sampleCount < 1 || sampleCount > 24" @click="loadSamples()">重新采样</el-button>
+      </div>
+      <p v-if="sampleMetadata">源片 {{ sampleMetadata.width }}×{{ sampleMetadata.height }} · {{ sampleMetadata.duration.toFixed(3) }} 秒 · 平均 {{ sampleMetadata.frameRate.toFixed(3) }} fps。按平均帧率定位；可变帧率视频不保证每次恰好移动一个编码帧。采样图最长边 960 像素，不含声音。</p>
+      <div class="sampleGrid" :aria-busy="sampling"><label v-for="item in sampledFrames" :key="item.path"><img :src="item.preview" :alt="`${item.time.toFixed(3)} 秒采样帧`" /><span><input v-model="item.selected" type="checkbox" :disabled="item.added" :aria-label="`选择 ${item.time.toFixed(3)} 秒采样帧`" />{{ item.time.toFixed(3) }} 秒{{ item.added ? ' · 已入画布' : '' }}</span></label></div>
+      <p>选中的画面会保存为独立图片节点，并记录原视频路径与采样时间。加入故事参考后，可在故事工作台分析采样画面并审阅结果。</p>
+    </div>
+    <template #footer><el-button :disabled="sampling || addingStorySource || !sampleMetadata" @click="addStorySource" :loading="addingStorySource">加入故事参考</el-button><el-button :disabled="sampling || !sampledFrames.some(item => item.selected && !item.added)" @click="addSampledFrames">将选中帧加入画布</el-button><el-button @click="reviewVisible = false">关闭</el-button></template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { inject, onBeforeUnmount, ref, watch } from "vue";
 import { useNode, useVueFlow } from "@vue-flow/core";
-import { ElButton, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage, ElPopover, ElSlider } from "element-plus";
+import { ElButton, ElDialog, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage, ElPopover, ElSlider } from "element-plus";
 import { IconPlayerPlay, IconPlayerPause, IconVolume, IconVolumeOff, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
 import { useNodeFiles } from "../workspaceFiles";
+import { sampleVideoFrames, type VideoFrameSamples } from "@toonflow/ffmpeg/browser";
+import type { NodeMediaValue } from "../values";
 
-const { src, label = "节点视频" } = defineProps<{ src: string; label?: string }>();
+const { src, file, label = "节点视频" } = defineProps<{ src: string; file?: NodeMediaValue; label?: string }>();
 const emit = defineEmits<{ loadedmetadata: [event: Event] }>();
 const video = ref<HTMLVideoElement>();
 const fullscreen = ref(false);
@@ -75,15 +96,16 @@ const files = useNodeFiles();
 const getCanvas = inject<(() => { id: string } | undefined) | undefined>("canvas", undefined);
 let captureController: AbortController | undefined;
 
-watch(() => getCanvas?.()?.id, () => captureController?.abort(), { flush: "sync" });
+watch(() => getCanvas?.()?.id, () => { captureController?.abort(); reviewVisible.value = false; sampleController?.abort(); }, { flush: "sync" });
 watch(() => src, () => {
   captureController?.abort();
+  reviewVisible.value = false; sampleController?.abort();
   ready.value = false;
   playing.value = false;
   currentTime.value = 0;
   duration.value = 0;
 }, { flush: "sync" });
-onBeforeUnmount(() => captureController?.abort());
+onBeforeUnmount(() => { captureController?.abort(); clearReview(); });
 
 async function enterFullscreen() {
   if (!video.value) return;
@@ -177,7 +199,8 @@ function loadFrame(source: HTMLVideoElement, time: number, signal: AbortSignal) 
   });
 }
 
-async function captureFrame(command: "current" | "first" | "last") {
+async function captureFrame(command: "current" | "first" | "last" | "review") {
+  if (command === "review") { video.value?.pause(); reviewTime.value = currentTime.value; reviewVisible.value = true; await loadSamples(); return; }
   if (!video.value || !ready.value || capturing.value) return;
   if (!nodeTypes?.value?.["remote-imageNode"]) return void ElMessage.error("请先启用图片节点插件");
   capturing.value = true;
@@ -221,7 +244,7 @@ async function captureFrame(command: "current" | "first" | "last") {
       const position = other.computedPosition;
       if (position.x < x + width && position.x + other.dimensions.width > x && position.y < y + 300 && position.y + other.dimensions.height > y) y = position.y + other.dimensions.height + 24;
     }
-    addNodes({ id, type: "remote-imageNode", position: { x, y }, data: { label: name, outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } } });
+    addNodes({ id, type: "remote-imageNode", position: { x, y }, data: { label: name, ...(file ? { videoFrame: { path: file.url, time: source.currentTime, duration: duration.value } } : {}), outputs: { image: { dataType: "IMAGE", value: { url: path, mimeType: "image/png" } } } } });
     committed = true;
     ElMessage.success("已截取为图片节点");
   } catch (error) {
@@ -236,6 +259,98 @@ async function captureFrame(command: "current" | "first" | "last") {
     capturing.value = false;
     captureController = undefined;
   }
+}
+
+const reviewVisible = ref(false), reviewVideo = ref<HTMLVideoElement>(), reviewTime = ref(0), reviewError = ref("");
+const sampling = ref(false), sampleCount = ref(6), addingStorySource = ref(false);
+const sampleMetadata = ref<VideoFrameSamples>();
+const sampledFrames = ref<(VideoFrameSamples["frames"][number] & { preview: string; selected: boolean; added: boolean })[]>([]);
+let sampleController: AbortController | undefined;
+let sampleWorkspace: ReturnType<typeof files.getWorkspaceFiles> | undefined;
+let sampleDirectory = "", sampleSource = "";
+const sampleFolders = new Map<string, { workspace: ReturnType<typeof files.getWorkspaceFiles>; retained: boolean }>();
+
+watch(reviewVisible, visible => { if (!visible) clearReview(); }, { flush: "sync" });
+
+function clearReview() {
+  sampleController?.abort();
+  reviewVideo.value?.pause();
+  for (const item of sampledFrames.value) URL.revokeObjectURL(item.preview);
+  sampledFrames.value = []; sampleMetadata.value = undefined;
+  for (const [path, batch] of sampleFolders) {
+    if (!batch.retained) void batch.workspace.remove(path, true).catch(cause => {
+      if (cause?.response?.data?.data?.code !== "ENOENT") ElMessage.error(`采样临时文件清理失败：${cause instanceof Error ? cause.message : String(cause)}`);
+    });
+  }
+  sampleFolders.clear(); sampleWorkspace = undefined; sampleDirectory = ""; sampleSource = "";
+}
+
+async function loadSamples(timestamps?: number[]) {
+  if (sampling.value || !file) return;
+  sampling.value = true; reviewError.value = "";
+  const controller = sampleController = new AbortController();
+  const previews: string[] = [];
+  try {
+    const workspace = sampleWorkspace ?? files.getWorkspaceFiles();
+    const directory = sampleDirectory || (await workspace.list()).directory;
+    const path = sampleSource || file.url;
+    const result = await sampleVideoFrames(directory, path, timestamps ? { timestamps } : { count: sampleCount.value }, controller.signal);
+    const folder = result.frames[0]?.path.slice(0, result.frames[0].path.lastIndexOf("/"));
+    if (folder) sampleFolders.set(folder, { workspace, retained: false });
+    controller.signal.throwIfAborted();
+    const items = [];
+    for (const frame of result.frames) {
+      const bytes = await workspace.read(frame.path);
+      controller.signal.throwIfAborted();
+      const preview = URL.createObjectURL(new Blob([bytes], { type: frame.mimeType })); previews.push(preview);
+      items.push({ ...frame, preview, selected: true, added: false });
+    }
+    if (!reviewVisible.value || findNode(node.id) !== node) throw new Error("画布或来源视频已变化，请重新打开");
+    for (const item of sampledFrames.value) URL.revokeObjectURL(item.preview);
+    sampledFrames.value = items; sampleMetadata.value = result;
+    sampleWorkspace = workspace; sampleDirectory = directory; sampleSource = path;
+  } catch (cause) {
+    previews.forEach(url => URL.revokeObjectURL(url));
+    if (!controller.signal.aborted) reviewError.value = cause instanceof Error ? cause.message : String(cause);
+  } finally {
+    sampling.value = false; if (sampleController === controller) sampleController = undefined;
+    if (!reviewVisible.value) clearReview();
+  }
+}
+
+function stepFrame(offset: number) {
+  if (!reviewVideo.value || !sampleMetadata.value) return;
+  reviewVideo.value.pause();
+  reviewVideo.value.currentTime = Math.min(Math.max(0, sampleMetadata.value.duration - 0.001), Math.max(0, reviewVideo.value.currentTime + offset / sampleMetadata.value.frameRate));
+  reviewTime.value = reviewVideo.value.currentTime;
+}
+
+function addSampledFrames() {
+  if (!nodeTypes?.value?.["remote-imageNode"] || findNode(node.id) !== node || !sampleMetadata.value) { reviewError.value = "请启用图片节点并保持来源视频可用"; return; }
+  const items = sampledFrames.value.filter(item => item.selected && !item.added);
+  const left = node.computedPosition.x + node.dimensions.width + 40;
+  const bottom = Math.max(node.computedPosition.y, ...getNodes.value.filter(item => item.computedPosition.x >= left - 300).map(item => item.computedPosition.y + item.dimensions.height + 24));
+  addNodes(items.map((item, index) => ({ id: crypto.randomUUID(), type: "remote-imageNode", position: { x: left + index % 3 * 540, y: bottom + Math.floor(index / 3) * 300 }, data: {
+    label: `${node.data.label || label} · ${item.time.toFixed(3)} 秒`, videoFrame: { path: sampleSource, time: item.time, duration: sampleMetadata.value!.duration, frameRate: sampleMetadata.value!.frameRate },
+    outputs: { image: { dataType: "IMAGE", value: { url: item.path, mimeType: item.mimeType } } },
+  } })));
+  for (const item of items) { item.added = true; const batch = sampleFolders.get(item.path.slice(0, item.path.lastIndexOf("/"))); if (batch) batch.retained = true; }
+  ElMessage.success(`已添加 ${items.length} 个带时间点的图片节点`);
+}
+
+async function addStorySource() {
+  if (!sampleDirectory || !file || addingStorySource.value) return;
+  addingStorySource.value = true; reviewError.value = "";
+  const directory = sampleDirectory, path = sampleSource, mimeType = file.mimeType, name = node.data.label || label;
+  try {
+    const response = await fetch(`/api/story/get?directory=${encodeURIComponent(directory)}`);
+    const project = await response.json(); if (!response.ok) throw new Error(project.message || "读取故事参考失败");
+    if (project.data.sources.some((item: { path: string }) => item.path === path)) { ElMessage.success("该视频已在故事参考中，可打开故事工作台分析"); return; }
+    const saved = await fetch("/api/story/apply", { method: "POST", headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" }, body: JSON.stringify({ directory, expectedVersion: project.data.version, action: { type: "source", value: { id: crypto.randomUUID(), name, path, mimeType, purpose: "reference", observations: [], coverage: "", unknowns: ["尚未分析；采样画面不等于已理解完整视频与声音"] } } }) });
+    const result = await saved.json(); if (!saved.ok) throw new Error(result.message || "保存故事参考失败");
+    ElMessage.success("已加入故事参考，可在故事工作台分析采样画面");
+  } catch (cause) { reviewError.value = cause instanceof Error ? cause.message : String(cause); }
+  finally { addingStorySource.value = false; }
 }
 </script>
 
@@ -372,5 +487,11 @@ async function captureFrame(command: "current" | "first" | "last") {
       &::after { display: none; }
     }
   }
+}
+.frameReview {
+  video { display: block; width: 100%; max-height: 45vh; background: #000; }
+  p { font-size: 12px; line-height: 1.6; }
+  .reviewControls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; input { width: 60px; } }
+  .sampleGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; label { display: grid; gap: 6px; img { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; } span { font-size: 12px; } } }
 }
 </style>

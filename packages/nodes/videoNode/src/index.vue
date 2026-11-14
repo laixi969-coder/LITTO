@@ -26,6 +26,7 @@
         v-else-if="previewUrl"
         ref="player"
         :src="previewUrl"
+        :file="outputFile"
         @loadedmetadata="resizeVideo" />
       <div v-else-if="outputFile" class="exportLoading" role="status">{{ previewError || "正在加载视频…" }}</div>
       <input ref="fileInput" class="fileInput" type="file" accept="video/*" aria-label="选择视频" :disabled="uploading || exporting" @change="uploadVideo" />

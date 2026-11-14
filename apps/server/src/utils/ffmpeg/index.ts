@@ -7,6 +7,7 @@ import { authEnabled, currentTenant } from "@/utils/tenant";
 import { assertRawSpeechExport } from "@/utils/media/speechGuard";
 
 export { executeRemoteFfmpeg } from "@toonflow/ffmpeg";
+export { sampleFrames } from "@/utils/ffmpeg/sampleFrames";
 
 const directory = join(dirname(conf.path), "ffmpeg", target);
 let download: DownloadState = { phase: "idle", received: 0 };

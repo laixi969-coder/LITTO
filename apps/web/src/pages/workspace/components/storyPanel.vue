@@ -156,7 +156,7 @@
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, watch } from "vue";
 import axios from "axios";
-import { createBrowserFfmpeg } from "@toonflow/ffmpeg/browser";
+import { sampleVideoFrames } from "@toonflow/ffmpeg/browser";
 import { useNodeAi, type NodeAiModel } from "@toonflow/nodes-scaffold/nodeAi";
 import { newStoryProject, storyActionSchema, storyActionParameters, storyWritingGuide, musicFilmWritingGuide, shortDramaWritingGuide, storyStale, storyImpact, type StoryProject, type StoryAction, type StoryDraft, type StorySource } from "@toonflow/tool-scene-list/storyProject";
 import { resolveVisualBoard } from "@toonflow/tool-scene-list/visualReference";
@@ -326,20 +326,10 @@ async function analyzeSource(source: StoryProject["sources"][number]) {
   let coverage = "";
   const references: NonNullable<Parameters<typeof ai.generate>[0]["references"]> = [];
   if (source.mimeType.startsWith("video/")) {
-    const ffmpeg = await createBrowserFfmpeg(directory, controller?.signal);
-    const duration = await new Promise<number>((resolve, reject) => ffmpeg.ffprobe(source.path, (cause, data) => cause ? reject(cause) : resolve(Number(data.format.duration))));
-    if (!Number.isFinite(duration) || duration <= 0) throw new Error("无法读取参考片时长");
-    for (const path of ["assets", "assets/story"]) await files.mkdir(path).catch(cause => { if (cause?.response?.data?.data?.code !== "EEXIST") throw cause; });
-    const output = `assets/story/reference${crypto.randomUUID().replaceAll("-", "")}`;
-    await files.mkdir(output);
-    const times = Array.from({ length: 6 }, (_value, index) => duration * (index + 0.5) / 6);
-    for (const [index, time] of times.entries()) {
-      controller?.signal.throwIfAborted();
-      const path = `${output}/frame${index}.jpg`;
-      await new Promise<void>((resolve, reject) => ffmpeg().input(source.path).inputOptions([`-ss ${time}`]).outputOptions(["-frames:v 1"]).on("end", () => resolve()).on("error", reject).save(path));
-      references.push({ dataType: "IMAGE", value: { url: path, mimeType: "image/jpeg" } });
-    }
-    coverage = `仅查看 ${duration.toFixed(2)} 秒参考片的 6 张采样帧，按附图顺序为 ${times.map(time => `${time.toFixed(2)}s`).join("、")}；未听声音、未检查其他时间画面，不推断完整剧情、对白或运镜。`;
+    const sampled = await sampleVideoFrames(directory, source.path, { count: 6 }, controller?.signal);
+    controller?.signal.throwIfAborted();
+    for (const frame of sampled.frames) references.push({ dataType: "IMAGE", value: { url: frame.path, mimeType: frame.mimeType } });
+    coverage = `仅查看 ${sampled.duration.toFixed(2)} 秒参考片的 ${sampled.frames.length} 张采样帧，按附图顺序为 ${sampled.frames.map(frame => `${frame.time.toFixed(2)}s`).join("、")}；未听声音、未检查其他时间画面，不推断完整剧情、对白或运镜。`;
   } else if (source.mimeType.startsWith("image/")) references.push({ dataType: "IMAGE", value: { url: source.path, mimeType: source.mimeType } });
   if (!content && !references.length) throw new Error("此资料暂无可读正文或图像，须人工校正覆盖范围");
   await modelAction("source", `只分析资料 ${source.id}，保留 id/name/path/textPath/mimeType/purpose，写 observations（精确原文引句及页码/段落；图片用图中位置，视频采样用时间）、coverage、unknowns。区分事实和叙事机制，不补造。${coverage}\n${JSON.stringify(sourceValue(source))}\n提取正文（最多前 400000 字节，超过范围未读）：\n${content ?? "使用实际附图，未提供的角度未知"}`, references.length ? references : undefined, action => {

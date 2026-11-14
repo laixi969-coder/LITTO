@@ -68,7 +68,8 @@ async function pollTask(this: ProviderContext, task: MediaTask & { id: string })
 }
 
 export default {
-  id: "runningHub", label: "RunningHub", version: "1.5.0", apiUrl, rules,
+  id: "runningHub", label: "RunningHub", version: "1.5.1", apiUrl, rules,
+  resumeMedia: pollTask,
   readme: "支持 Nano Banana、Midjourney 文生图和参考图，以及 Seedance 2.0 文生视频、首尾帧和多模态参考视频。需使用 Enterprise-Shared API Key。[接口文档](https://www.runninghub.ai/runninghub-api-doc-en/) · [价格目录](https://www.runninghub.ai/call-api/search-api/standard-model)。价格为参考，最终费用以平台结算为准。",
   models: [
     { id: "nanoBanana2", label: "Nano Banana 2", type: "image", price: "价格依分辨率和模式而变，以 RunningHub 价格目录为准", mode: ["text", "singleImage", "multiReference"], imageSizes: ["1K", "2K", "4K"], imageRatios: ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "5:4", "4:5", "21:9", "1:4", "4:1", "1:8", "8:1"] },

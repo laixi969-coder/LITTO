@@ -480,13 +480,31 @@ export async function loadMediaProviderSource(source: string, config: Record<str
     const generate = definition[name];
     if (!generate) continue;
     Object.assign(provider, { [name]: async (request: ImageRequest & VideoRequest & AudioRequest & ProviderTask & { id: string }) => {
+      const recoveryTaskId = name === "resumeMedia" ? request.id : undefined;
       let failure: { status?: number; message: string } | undefined;
       let pendingRequests = 0;
       let overlappingRequests = false;
       let requestCount = 0;
       const tool = { ...provider.tool, fetch: Object.assign(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
         const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-        if (name === "resumeMedia" && !["GET", "HEAD"].includes(method)) throw Object.assign(new Error("恢复任务只能查询原结果，禁止重新提交生成"), { retryable: false, fallbackAllowed: false });
+        if (name === "resumeMedia" && !["GET", "HEAD"].includes(method)) {
+          let query: Request | undefined;
+          if (id === "runningHub" && method === "POST") {
+            // ACT: RH 的查询协议使用 POST；只放行原任务的精确查询，并禁止跟随重定向到提交接口。
+            try {
+              const queryInit = { ...init, redirect: "error" as const };
+              const effectiveRequest = input instanceof Request ? new Request(input, queryInit) : new Request(String(input), queryInit);
+              const url = new URL(effectiveRequest.url);
+              const body = await effectiveRequest.clone().json();
+              if (url.origin === "https://www.runninghub.ai" && url.pathname === "/openapi/v2/query" && !url.username && !url.password && !url.search && !url.hash
+                && effectiveRequest.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() === "application/json"
+                && body && typeof body === "object" && !Array.isArray(body) && Object.keys(body).length === 1 && Reflect.get(body, "taskId") === recoveryTaskId && typeof recoveryTaskId === "string" && !!recoveryTaskId.trim()) query = effectiveRequest;
+            } catch { /* 无法确认查询身份时沿用恢复请求限制。 */ }
+          }
+          if (!query) throw Object.assign(new Error("恢复任务只能查询原结果，禁止重新提交生成"), { retryable: false, fallbackAllowed: false });
+          input = query;
+          init = undefined;
+        }
         if (++pendingRequests > 1) overlappingRequests = true;
         const requestId = ++requestCount;
         failure = undefined;

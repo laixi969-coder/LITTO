@@ -17,6 +17,8 @@
 
 Atelier 菜单还显示 RH 应用、RH ComfyUI、3D/3D 世界、智能超清、质感增强、逐帧拉片等入口。本轮未执行这些任务，不能仅凭入口证明其可用性、判断 LITTO 缺失或宣称已全面对齐。本文不把外围工具菜单视为已验收的同等能力。
 
+后续外围工具的逐项观察、实际修复和剩余缺口见 [atelierPeripheralAudit.md](atelierPeripheralAudit.md)。
+
 静态辅助证据：安装包 app.asar SHA-256 为 `1d9ad3790f5c6587d1f57ba359b2317a2ba94c78fb746917c6ec6d986fcdd96f`；REA 父证据 `ev_a3331849da2811ad3209a101e90be415b058a97478b37280dfba43ff12e79d86`。包内 Codex 附件出现完整性不匹配，静态分析以 record-and-continue 记录且覆盖不完整；未执行包内代码，不以该结果证明功能运行。上表 Atelier 结论以实际 UI 观察为准，LITTO 链路结论来自当前仓库与下列验证。
 
 ## 实际修复

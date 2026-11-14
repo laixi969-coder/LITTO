@@ -70,7 +70,7 @@ export async function createApp({
     if (runningHubInfo?.isFile() && !runningHubInfo.isSymbolicLink()) {
       const previous = createHash("sha256").update(await readFile(runningHubTarget)).digest("hex");
       // ACT: 只升级已知内置版本，保留用户对供应商文件的修改。
-      if (["4c98c9f66fbda37c0b9bfc113163f1b36e1bef3fc5a70d8e3dbd3bcc191f7240", "52158bab91d9bf0cb665f40eca632c26f8174b347ab29a60900648b26064830f", "c17ac72fdb79f25cb88cac5699a423f6cc5bc5cd8af8868850e3c57f1da8616b", "77769ef1563a5a327da84ffdb5baa2bbadf98c77fd858341aaf964ff0ccdcac0"].includes(previous)) await writeAtomic(runningHubTarget, await readFile(resolve(providersRoot, "media/runningHub.ts")));
+      if (["4c98c9f66fbda37c0b9bfc113163f1b36e1bef3fc5a70d8e3dbd3bcc191f7240", "52158bab91d9bf0cb665f40eca632c26f8174b347ab29a60900648b26064830f", "c17ac72fdb79f25cb88cac5699a423f6cc5bc5cd8af8868850e3c57f1da8616b", "77769ef1563a5a327da84ffdb5baa2bbadf98c77fd858341aaf964ff0ccdcac0", "a5d28df1604119d708bfe75d95a1a05cf73f6e7ff1227be8aaf8d58c954fc79c"].includes(previous)) await writeAtomic(runningHubTarget, await readFile(resolve(providersRoot, "media/runningHub.ts")));
     }
     const atlasCloudTarget = resolve(dataDirectory, "providers/atlasCloud.ts");
     const atlasCloudInfo = await lstat(atlasCloudTarget).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return null; throw error; });
