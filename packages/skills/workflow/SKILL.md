@@ -2,7 +2,7 @@
 name: workflow
 description: 在 MILI MILI 当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.18.0"
+  version: "2.18.1"
   displayName: 视频制作工作流
   author: Toonflow
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -14,7 +14,9 @@ metadata:
 
 ## 从哪里开始
 
-当前项目 `brief.kind=shortDramaCommerce` 时，使用[短剧带货](references/shortDramaCommerce.md)及其中的剧情方法，沿用公共摄影、资产与生成链路；本节其他作品的创意路由不适用。该方法及 Su 剧情资料只用于短剧带货板块，不扩散到剧情片、普通连载、商业广告或 MV。
+当前项目 `brief.kind=shortDramaCommerce` 时，使用[短剧带货](references/shortDramaCommerce.md)及其商品衔接方法，沿用公共摄影、资产与生成链路。
+
+当前项目 `brief.kind=serial` 且 `serialFormat=short` 时，按[短剧故事创作](../story/shortDrama.md)组织故事。采用后按剧情片要求做剧本、拆解、资产与分镜，每集的制作序列引用同一项目的采用稿与资产。
 
 从想法创作故事或剧本时先读取 [story](../story/SKILL.md)，短剧分集按其中的专项选择规则处理。TikTok、Reels、Shorts、带货/UGC、软件推广、纯内容涨粉、Hook 或 hiccai-pop 改用 [adfilm 的原生短视频方法](../adfilm/references/nativeShortVideo.md)；仅要拍摄方案或文字创意时直接交付，不默认调用生成模型。主 Agent 按作品目标选主方法并主动推进已授权阶段，不将电影、剧集、短剧的所有模板同时强制执行；已有定稿继续按制作提取流程，不重新立项。
 
@@ -94,7 +96,7 @@ metadata:
 分镜之前必须先有资产，没有资产的镜头等于每镜重新选角、重新搭景。顺序固定为：
 
 1. **拆资产**。调 `POST /api/ai/media/assets` 读取已采用剧本，或用 `script` 指定本次原文。新清单写入 `assets/assetPlan.json`，每项 `evidence` 保留原句，`brief` 说明出场用途和状态变化。复核时检查引句是否真的支持该项判断。
-2. **出角色卡**：每个 `must` 角色先把定妆图做出来并采用，写进 `assets/cast/<角色名>.json`（含 `references`）。同一个人物贯穿全片，脸不能变。
+2. **确定角色卡**。剧情片、商业广告、MV、短剧广告和连载短剧共用项目选角。从 `readStoryProject` 的 `brief.cast` 和 `productionContext.characters` 核对演员、戏中名和项目资产 ID。拆解和人物镜头沿用该 ID，关键帧使用已采用定妆，视频承接采用的关键帧。用 `generateImage` 或 `generateVideo` 制作独立素材时，先用 `productionSpec(readAsset)` 读取该 ID，将主定妆的实际路径与 MIME 类型传入 `images`。独立媒体 HTTP 接口的 `cast` 也可接收项目资产 ID 或戏中名。需补全身或背面设定时，以上述定妆为依据制作本项目的四视图。
 3. **出场景定场**：每个主场景出一张定场帧，作为该场景所有镜头的共同参考，用于光向、材质与空间的一致。
 4. **出道具**：只在剧情里起作用的道具才做，纯装饰不做。
 5. **再进分镜**：以上采用后才开始写 shotSpec 与生成镜头。

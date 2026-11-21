@@ -1,6 +1,6 @@
 # 短剧带货
 
-仅用于当前项目 `brief.kind=shortDramaCommerce` 的短剧带货板块。剧情片、普通连载、商业广告和 MV 不加载本方法或其 Su 短剧资料；不能因为提到商品、短剧或反转就替其他板块切换方法。主方法是本文件与[短剧剧情方法](methods/shortDramaStory.md)，不再叠加另一套长片或连载编剧流程。
+本文件与[带货剧情方法](methods/shortDramaStory.md)用于 `brief.kind=shortDramaCommerce` 的项目。商品出现的时机、用途与剧情兑现按本板块处理。
 
 ## 作品目标
 

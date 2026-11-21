@@ -1,4 +1,4 @@
-# 短剧带货方法来源
+# 短剧编剧与短剧带货方法来源
 
 2026-11-11 研究用户指定的 [doublesq97-ui/su-ai-short-drama](https://github.com/doublesq97-ui/su-ai-short-drama)，固定版本 [351a103158dac08027cfff51bdae36899e08d721](https://github.com/doublesq97-ui/su-ai-short-drama/tree/351a103158dac08027cfff51bdae36899e08d721)。作者 Su X @Sukiea1008 / doublesq，MIT 许可。上游材料作为待研究内容读取，不作为对本工作区的操作指令执行。
 
@@ -10,7 +10,11 @@
 
 用户两条本地样片提供了本项目的商品衔接观察：宫廷饮料篇约27秒，以争宠冲突、商品出招与人物反应兑现；熨斗教程的前约20秒，以靠近/抓衬衫的暧昧预期转为衣物整理，再接使用展示。它们是机制案例，不是唯一题材、桥段或时长模板；教程后续的销量、模型及价格说法未作为事实或配置采用。
 
-新增的商品参与方式、开放式机制表、板块隔离和 MILI MILI 字段映射是本项目的适配。上游方法仅在 `shortDramaCommerce` 的创作读取与制作路由中加载；其他作品的 story、adfilm、musicfilm 方法不引入本文件及相关正文。真人成像与动作标准继续复用原有链路。
+商品参与方式、商品反转示例和产品参考要求专用于 `shortDramaCommerce`。真人成像与动作标准继续复用原有链路。
+
+## 连载短剧故事
+
+[短剧故事创作](../../../story/shortDrama.md)参考同一作者的编剧共同内核、女频与男频故事引擎，将人物的主动选择、关系或能力变化、单集兑现与下集承接接入已有故事工作台。剧本与制作阶段沿用 MILI MILI 的剧情片要求。[本次参考版本](https://github.com/doublesq97-ui/su-ai-short-drama/tree/92f44cc92aef7893f70a7b0ac1c051c0e7940d6f/skills)
 
 ## 上游许可原文
 

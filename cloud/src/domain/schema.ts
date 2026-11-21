@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { findFilmTechnique } from "@toonflow/tool-media-generation/filmTechniques";
+import { castingAgeGroups, castingGenders } from "@toonflow/tool-media-generation/characterCasting";
 import { bad } from "../util.ts";
 
 export const SCHEMA_VERSION = 1;
@@ -41,10 +42,13 @@ export const lookSchema = z.object({
     sharpnessPhilosophy: z.string().default(""), colorReferenceIds: z.array(z.string().min(1)).max(8).default([]).describe("当前项目的图片 reference ID，用于实际生图输入与质感对照；不是媒体 ID"),
 });
 
+export const castingSchema = z.object({ gender: z.enum(castingGenders).optional(), ageGroup: z.enum(castingAgeGroups).optional() }).strict();
+
 export const assetInput = z.object({
     type: z.enum(ASSET_TYPES), name: z.string().min(1).max(120),
     description: z.string().default(""),
     attributes: z.object({
+        casting: castingSchema.optional(),
         characterDirection: z.object({
             speech: z.string().trim().max(2000), behavior: z.string().trim().max(2000),
             relationships: z.string().trim().max(2000).default(""),

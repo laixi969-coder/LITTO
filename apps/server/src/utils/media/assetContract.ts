@@ -1,6 +1,7 @@
 import { readdir, readFileSync } from "@toonflow/file";
 import { join } from "node:path";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
+import { listProjectCharacters } from "@/utils/media/projectCast";
 
 /**
  * 资产契约：项目资产到底齐没齐，只在这里判一次。
@@ -27,6 +28,10 @@ export interface AssetProblem {
 
 export interface CharacterContract {
   name: string;
+  assetId?: string;
+  libraryId?: string;
+  actorName?: string;
+  referenceMediaId?: string;
   references: string[];
   wardrobe: string;
   identity: string;
@@ -65,6 +70,41 @@ export function sameSubject(castName: string, planName: string) {
   return head(castName) === head(planName) || castName === planName;
 }
 
+export async function readCharacterContracts(cwd: string): Promise<CharacterContract[]> {
+  const castDir = await resolveWorkspacePath(cwd, "assets/cast", true).then(item => item.path).catch(() => "");
+  const characters: CharacterContract[] = listProjectCharacters(cwd).filter(actor => actor.libraryId).map(actor => ({
+    name: actor.name, assetId: actor.id, actorName: actor.actorName, libraryId: actor.libraryId, referenceMediaId: actor.referenceMediaId, references: [],
+    wardrobe: actor.wardrobe ?? "", identity: actor.description ?? "", quality: actor.approved ? "ready" : "draft",
+    hasFourView: actor.fourView, usable: actor.approved && !!actor.referenceMediaId,
+  }));
+  for (const file of castDir ? await list(castDir, ".json") : []) {
+    const name = file.replace(/\.json$/, "");
+    const record = await readJson<{ references?: string[]; wardrobe?: string; identity?: string; quality?: string; fourView?: boolean; referenceMediaId?: string }>(join(castDir, file));
+    if (!record) continue;
+    const references = Array.isArray(record.references) ? record.references : [];
+    const actor = characters.find(item => item.assetId === name);
+    if (record.referenceMediaId) {
+      if (actor?.referenceMediaId === record.referenceMediaId && record.fourView && record.quality !== "draft" && references.length && references.every(Boolean)) {
+        actor.hasFourView = true;
+        actor.references = references;
+        actor.wardrobe = record.wardrobe?.trim() || actor.wardrobe;
+      }
+      continue;
+    }
+    if (characters.some(item => item.assetId && item.name === name)) continue;
+    characters.push({
+      name,
+      references,
+      wardrobe: record.wardrobe ?? "",
+      identity: record.identity ?? "",
+      quality: record.quality ?? "ready",
+      hasFourView: record.fourView === true,
+      usable: references.length > 0 && references.every(Boolean) && record.quality !== "draft",
+    });
+  }
+  return characters;
+}
+
 export async function inspectAssets(cwd: string, options: { needsLowerBody?: boolean } = {}): Promise<ProjectAssets> {
   const planPath = await resolveWorkspacePath(cwd, "assets/assetPlan.json").then(item => item.path).catch(() => "");
   const rawPlan = planPath ? await readJson<{ items?: { kind: string; name: string }[] }>(planPath) : null;
@@ -77,22 +117,7 @@ export async function inspectAssets(cwd: string, options: { needsLowerBody?: boo
       }
     : null;
 
-  const castDir = await resolveWorkspacePath(cwd, "assets/cast", true).then(item => item.path).catch(() => "");
-  const characters: CharacterContract[] = [];
-  for (const file of castDir ? await list(castDir, ".json") : []) {
-    const record = await readJson<{ references?: string[]; wardrobe?: string; identity?: string; quality?: string; fourView?: boolean }>(join(castDir, file));
-    if (!record) continue;
-    const references = Array.isArray(record.references) ? record.references : [];
-    characters.push({
-      name: file.replace(/\.json$/, ""),
-      references,
-      wardrobe: record.wardrobe ?? "",
-      identity: record.identity ?? "",
-      quality: record.quality ?? "ready",
-      hasFourView: record.fourView === true,
-      usable: references.length > 0 && record.quality !== "draft",
-    });
-  }
+  const characters = await readCharacterContracts(cwd);
 
   const sceneDir = await resolveWorkspacePath(cwd, "assets/scenes", true).then(item => item.path).catch(() => "");
   const sceneFiles = sceneDir ? [...await list(sceneDir, ".png"), ...await list(sceneDir, ".jpg")] : [];

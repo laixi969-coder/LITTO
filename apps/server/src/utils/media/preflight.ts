@@ -1,5 +1,5 @@
-import { join } from "node:path";
-import { mkdir, readFileSync, readdir, stat } from "@toonflow/file";
+import { readCharacterContracts } from "@/utils/media/assetContract";
+import { mkdir, readFileSync, stat } from "@toonflow/file";
 import { resolveDirectorPalette } from "@/utils/media/directorMatch";
 import { getStatus } from "@/utils/ffmpeg";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
@@ -59,27 +59,15 @@ export async function preflight(cwd: string, options: { shotSpec?: Record<string
   });
 
   // 2. 角色档案：有 draft 标记的参考图会把上一版的缺陷带进新片。
-  const castDir = await resolveWorkspacePath(cwd, "assets/cast", true).then(item => item.path).catch(() => "");
-  let castFiles: string[] = [];
-  try {
-    castFiles = castDir ? (await readdir(castDir)).filter(name => name.endsWith(".json")) : [];
-  } catch { castFiles = []; }
-  let usable = 0;
-  const drafts: string[] = [];
-  for (const name of castFiles) {
-    const record = await readJson<{ quality?: string; references?: string[] }>(join(castDir, name));
-    if (!record) continue;
-    const references = Array.isArray(record.references) ? record.references : [];
-    const missing = references.filter(reference => !reference);
-    if (record.quality === "draft") drafts.push(name.replace(/\.json$/, ""));
-    else if (references.length && !missing.length) usable += 1;
-  }
+  const characters = await readCharacterContracts(cwd);
+  const usable = characters.filter(item => item.usable).length;
+  const drafts = characters.filter(item => item.quality === "draft").map(item => item.name);
   items.push({
     key: "cast",
-    level: castFiles.length ? (usable ? "info" : "block") : "warn",
+    level: characters.length ? (usable ? "info" : "block") : "warn",
     passed: usable > 0,
-    detail: castFiles.length
-      ? `${castFiles.length} 份角色档案，可用 ${usable} 份${drafts.length ? `，草稿 ${drafts.join("、")}` : ""}`
+    detail: characters.length
+      ? `${characters.length} 份角色档案，可用 ${usable} 份${drafts.length ? `，草稿 ${drafts.join("、")}` : ""}`
       : "没有角色档案，人物镜将无法锁定身份",
     rule: "角色档案 cast",
   });
@@ -94,16 +82,16 @@ export async function preflight(cwd: string, options: { shotSpec?: Record<string
     level: planned.length ? "info" : "warn",
     passed: planned.length > 0,
     detail: planned.length
-      ? `资产清单 ${planned.length} 项（角色 ${plannedCharacters}），其中角色档案 ${castFiles.length} 份`
+      ? `资产清单 ${planned.length} 项（角色 ${plannedCharacters}），其中角色档案 ${characters.length} 份`
       : "没有 assets/assetPlan.json，说明还没从剧本拆资产；先拆再进分镜，否则每镜重新选角搭景",
     rule: "资产先行：角色卡／场景／道具 → 分镜",
   });
-  if (planned.length && plannedCharacters > 0 && castFiles.length < plannedCharacters) {
+  if (planned.length && plannedCharacters > 0 && characters.length < plannedCharacters) {
     items.push({
       key: "castCoverage",
       level: "warn",
       passed: false,
-      detail: `清单里 ${plannedCharacters} 个角色，只有 ${castFiles.length} 份档案，缺的会在分镜阶段每镜漂移`,
+      detail: `清单里 ${plannedCharacters} 个角色，只有 ${characters.length} 份档案，缺的会在分镜阶段每镜漂移`,
       rule: "角色卡先于分镜",
     });
   }

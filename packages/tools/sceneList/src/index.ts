@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ToolDefinition, ToolFiles, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 import { breakdownSchema, sceneListSchema, validateBreakdown, validateSceneList, type SceneList } from "./schema";
-import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject, applyStoryTextEdits, storyTextEditsSchema } from "./storyProject";
+import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject, isShortDrama, applyStoryTextEdits, storyTextEditsSchema } from "./storyProject";
 import { visualDirectors, visualFrames, resolveVisualBoard } from "./visualReference";
 import { inspectStoryLogic, storyLogicSchema } from "./storyLogic";
 
@@ -10,6 +10,10 @@ const historyDirectory = "场次表历史";
 const breakdownPath = "拆解清单.json";
 const storyApprovalSchema = z.strictObject({ revisionId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/) });
 const storyDecisionParameters = z.strictObject({ decision: storyDecisionSchema });
+const castContext = z.object({ characters: z.array(z.object({
+  id: z.string(), name: z.string(), libraryId: z.string().optional(), actorName: z.string().optional(), referenceMediaId: z.string().optional(),
+  casting: z.object({ gender: z.string().optional(), ageGroup: z.string().optional() }).optional().catch(undefined),
+})).optional() }).optional();
 const storyTextSchema = z.strictObject({
   text: z.string().min(1).max(120000).describe("待交付的正文原文；统计篇幅时不含标题或说明，精确改稿时传完整原稿"),
   edits: storyTextEditsSchema.optional(),
@@ -41,15 +45,17 @@ const plugin: ToolPlugin = {
   createTools({ files, story }) {
     async function checkStory(value: SceneList) {
       if (!story) return;
-      const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read());
+      const project = storyProjectSchema.extend({ productionContext: castContext }).parse(await story.read());
+      const cast = project.productionContext?.characters?.filter(actor => actor.libraryId) ?? [];
       // 版本用于并发控制；仅收藏视觉参考不代表已经进入故事采用流程。
       if (!project.revisions.length && !project.sources.length && !project.directions.length && JSON.stringify(project.brief) === JSON.stringify(newStoryProject().brief)) {
-        return { approved: undefined, visualReferences: resolveVisualBoard(project.visualBoard) };
+        return { approved: undefined, cast, visualReferences: resolveVisualBoard(project.visualBoard) };
       }
       await story.validateSources?.();
       const approved = project.revisions.find(item => item.id === project.approvedId);
       if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先调用 requestStoryApproval 在聊天中确认采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
       if (JSON.stringify(value.scenes.map(item => item.sceneId)) !== JSON.stringify(approved.scenes.map(item => item.sceneId))) rejected(["场次表须按已采用剧本的顺序保留全部 sceneId"]);
+      if (isShortDrama(project.brief) && value.kind !== "story") rejected(["短剧沿用剧情片场次表，kind 须为 story"]);
       if (project.brief.kind === "shortDramaCommerce" && value.kind !== "shortDramaCommerce") rejected(["短剧带货的场次表 kind 必须为 shortDramaCommerce"]);
       if (project.brief.kind === "musicFilm") {
         if (value.kind !== "musicFilm") rejected(["MV 的场次表 kind 必须为 musicFilm"]);
@@ -60,7 +66,7 @@ const plugin: ToolPlugin = {
           }
         }
       }
-      return { approved, visualReferences: resolveVisualBoard(project.visualBoard) };
+      return { approved, cast, visualReferences: resolveVisualBoard(project.visualBoard) };
     }
     const tools: ToolDefinition[] = [
       {
@@ -95,7 +101,7 @@ const plugin: ToolPlugin = {
         name: "saveSceneList",
         label: "保存场次表",
         executionMode: "sequential",
-        description: "保存剧本的结构化场次表。有故事项目时只依据 approvedId 对应的已采用正文、canon 和 threads，不从旧候选或旧审稿补回已删除的剧情、道具状态和光源。人物、场景、道具、服装各自给固定 id，场次只引用 id；服务端校验 id 唯一、引用存在、场次连续编号和体量上限。保存为新版本，旧版本移入历史。",
+        description: "保存剧本的结构化场次表。有故事项目时只依据 approvedId 对应的已采用正文、canon 和 threads，不从旧候选或旧审稿补回已删除的剧情、道具状态和光源。按正文可见动作区分道具递出、被接住和最终带走，人物与持物状态以该场实际结果为准。人物、场景、道具、服装的固定 id 用小写字母开头，只含小写字母和数字，例如 c1、loc1、prop1。分集短剧沿用 kind=story，逐场传已采用的 sceneId，集号由 readSceneList 在 scenes[].story.episodeNumber 返回。服务端校验引用、顺序和体量，保存为新版本，旧版本移入历史。",
         parameters: z.toJSONSchema(sceneListSchema, { io: "input", target: "draft-07" }),
         async execute(_id, params, signal) {
           signal?.throwIfAborted();
@@ -125,11 +131,11 @@ const plugin: ToolPlugin = {
               const context = await checkStory(saved);
               if (context?.approved) return json({
                 ...saved,
-                storyContext: { revisionId: context.approved.id, brief: context.approved.brief, title: context.approved.title, outline: context.approved.outline, canon: context.approved.canon, threads: context.approved.threads, visualReferences: context.visualReferences },
+                storyContext: { revisionId: context.approved.id, brief: context.approved.brief, cast: context.cast, title: context.approved.title, outline: context.approved.outline, canon: context.approved.canon, threads: context.approved.threads, visualReferences: context.visualReferences },
                 // ACT: 从采用版本即时关联正文，不在场次表再存一份可能过期的故事。
                 scenes: saved.scenes.map((scene, index) => ({ ...scene, story: context.approved.scenes[index] })),
               });
-              return json({ ...saved, visualReferences: context?.visualReferences });
+              return json({ ...saved, cast: context?.cast, visualReferences: context?.visualReferences });
             }
             catch (cause) { return json({ ...saved, needsUpdate: true, reason: cause instanceof Error ? cause.message : "故事版本已改变" }); }
           }
@@ -146,10 +152,18 @@ const plugin: ToolPlugin = {
           signal?.throwIfAborted();
           const sceneList = await readSaved(files);
           if (!sceneList) rejected(["还没有场次表，请先用 saveSceneList 保存场次表"]);
-          await checkStory(sceneList);
+          const context = await checkStory(sceneList);
           const { value, issues } = validateBreakdown(params, sceneList);
           if (!value) rejected(issues);
-          await files.writeFile(breakdownPath, JSON.stringify({ schemaVersion: 1, savedAt: new Date().toISOString(), ...value }, null, 2));
+          const assets = value.assets.map(item => {
+            const name = sceneList.characters.find(character => character.id === item.entityId)?.name;
+            const matches = item.type === "Character" ? context?.cast.filter(actor => item.assetId ? actor.id === item.assetId : actor.name === name) ?? [] : [];
+            if (item.assetId && !matches.length) rejected([`「${item.name}」的 assetId 未匹配本项目已选演员，请核对 readSceneList 的选角资料`]);
+            if (matches.length > 1) rejected([`「${name}」对应多个已选演员，请用 assetId 指定`]);
+            const actor = matches[0];
+            return actor ? { ...item, assetId: actor.id, libraryId: actor.libraryId, referenceMediaId: actor.referenceMediaId } : item;
+          });
+          await files.writeFile(breakdownPath, JSON.stringify({ schemaVersion: 1, savedAt: new Date().toISOString(), ...value, assets }, null, 2));
           return json({ saved: breakdownPath, sceneListVersion: value.sceneListVersion, assets: value.assets.length, skipped: value.skipped.length, gaps: value.gaps });
         },
       },

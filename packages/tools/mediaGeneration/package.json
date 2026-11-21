@@ -6,7 +6,8 @@
   "exports": {
     "./runtime": "./src/runtime.ts",
     "./voiceProject": "./src/voiceProject.ts",
-    "./filmTechniques": "./src/filmTechniques.ts"
+    "./filmTechniques": "./src/filmTechniques.ts",
+    "./characterCasting": "./src/characterCasting.ts"
   },
   "scripts": {
     "build": "bun build.ts",

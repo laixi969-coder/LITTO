@@ -308,7 +308,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const reactions = brief?.dialogue.lines.flatMap((line, index) => (line.reactions ?? []).map(reaction => ({ ...reaction, lineNumber: index + 1 }))) ?? [];
     if (kind === "image" && initiallyHidden.size && !cam.design?.start?.trim()) warnings.push("创作准备未完成：有资产稍后才揭示，请在 camera.design.start 写明首帧实际可见的持物、遮挡与位置");
     const appearance = assets.flatMap(asset => {
-        const attributes = Object.fromEntries(Object.entries(asset.attributes ?? {}).filter(([key]) => !["characterDirection", "authoritativeReference", "authoritativePromotedAt", "importedFrom", "biography", "backstory", "relationships", "voice", "voiceId"].includes(key)));
+        const attributes = Object.fromEntries(Object.entries(asset.attributes ?? {}).filter(([key]) => !["characterDirection", "authoritativeReference", "authoritativePromotedAt", "importedFrom", "libraryActorName", "casting", "biography", "backstory", "relationships", "voice", "voiceId"].includes(key)));
         return Object.keys(attributes).length ? [`${asset.name}: ${JSON.stringify(attributes)}`] : [];
     });
 

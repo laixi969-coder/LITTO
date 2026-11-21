@@ -24,7 +24,7 @@
         <label class="uploadButton">上传角色图片<input type="file" multiple accept="image/png,image/jpeg,image/webp" aria-label="上传角色参考图片" :disabled="busy || importing || !uploadAssetId && !uploadName.trim()" @change="uploadCharacterFiles" /></label>
         <el-button v-if="selectedNode?.type === 'remote-imageNode' && selectedNode.data.outputs?.image?.value" :disabled="busy || importing || !uploadAssetId && !uploadName.trim()" @click="useCanvasImage">关联画布中选中的图片</el-button>
       </details>
-      <characterPicker v-model="librarySelection" :projectId="projectId" :existingIds="importedIds" :disabled="busy || loading" @busy="importing = $event" @imported="refreshImported" />
+      <characterPicker v-model="librarySelection" :projectId="projectId" :projectAssets="characters" :disabled="busy || loading" @busy="importing = $event" @imported="refreshImported" />
     </template>
   </section>
 </template>
@@ -58,7 +58,6 @@ const videoKeyframe = computed(() => {
 });
 const target = computed(() => videoKeyframe.value ?? (selectedNode.value && ["remote-imageGenerationNode", "remote-videoGenerationNode"].includes(selectedNode.value.type ?? "") && (selectedNode.value.type === "remote-imageGenerationNode" || selectedNode.value.data.production?.shotId) ? selectedNode.value : undefined));
 const portraits = computed(() => Object.fromEntries(images.value.map(image => [image.id, image])));
-const importedIds = computed(() => characters.value.flatMap(character => character.attributes?.importedFrom ? [character.attributes.importedFrom] : []));
 const linkedNames = computed(() => characters.value.filter(character => linkedIds.value.includes(character.id)).map(character => character.name).join("、"));
 const mediaUrl = (url: string) => url.startsWith("/") ? `/cloud${url}` : url;
 let revision = 0;

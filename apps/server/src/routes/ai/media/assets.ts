@@ -6,6 +6,7 @@ import { mkdir } from "@toonflow/file";
 import { dirname } from "node:path";
 import u from "@/utils";
 import { planAssets, scriptFromWorkspace } from "@/utils/media/assetPlan";
+import { listProjectCharacters } from "@/utils/media/projectCast";
 
 export default Router().post("/", validateFields({
   directory: z.string().min(1).max(4096),
@@ -16,7 +17,7 @@ export default Router().post("/", validateFields({
   const suppliedScript = script?.trim();
   const text = suppliedScript || await scriptFromWorkspace(cwd);
   if (!text) return res.status(400).json(error("工作区没有已采用的剧本，也没有传 script，无法拆资产", null, 400));
-  const plan = await planAssets(text);
+  const plan = await planAssets(text, listProjectCharacters(cwd).filter(actor => actor.libraryId));
   if (!plan) return res.status(503).json(error("资产拆解需要可用的语言模型，当前没有选中的文本模型或调用失败", null, 503));
   const groups = {
     character: plan.items.filter(item => item.kind === "character"),

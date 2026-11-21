@@ -20,7 +20,8 @@ export const isAuthDisabled = () => authDisabled;
 export const canManageModels = () => authDisabled || me?.modelAccess.canManage === true;
 
 export async function cloudRequest<T = unknown>(path: string, method = "GET", body?: unknown): Promise<T> {
-  const response = await fetch(`/cloud${path}`, { method, credentials: "same-origin", headers: { "Content-Type": "application/json", "x-milimili-csrf": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const binary = body instanceof Blob;
+  const response = await fetch(`/cloud${path}`, { method, credentials: "same-origin", headers: { "Content-Type": binary ? body.type || "application/octet-stream" : "application/json", "x-milimili-csrf": "1" }, body: binary ? body : body === undefined ? undefined : JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const details = Array.isArray(data.details) ? data.details.map((item: { path: string; message: string }) => `${item.path}：${item.message}`).join("；") : "";

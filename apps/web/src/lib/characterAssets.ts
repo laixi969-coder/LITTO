@@ -1,7 +1,8 @@
 import type { StoryProject } from "@toonflow/tool-scene-list/storyProject";
+import type { CharacterCasting } from "@toonflow/tool-media-generation/characterCasting";
 import { cloudRequest } from "@/lib/session";
 
-export type LibraryCharacter = { id: string; name: string; description: string; favorite: boolean; media: { url: string } | null; images?: { url: string }[] };
+export type LibraryCharacter = { id: string; name: string; description?: string; sourceAssetId?: string | null; attributes?: { casting?: CharacterCasting }; favorite: boolean; media: { url: string } | null; images?: { url: string }[] };
 export type CharacterSelection = { libraryId: string; actorName: string; roleName: string; imageUrl: string };
 
 export async function importCharacters(projectId: string, selections: CharacterSelection[]) {

@@ -56,7 +56,10 @@
         </el-alert>
         <section class="creationPanel" aria-label="创建项目">
           <div class="creationHeading">
-            <h1>今天，想拍点什么？</h1>
+            <div class="creationTitle">
+              <h1>今天，想拍点什么？</h1>
+              <el-button v-if="accounts" type="primary" plain :icon="IconUsers" :disabled="creating || opening" @click="castingVisible = true">角色库{{ selectedCharacters.length ? ' · 已选 ' + selectedCharacters.length : '' }}</el-button>
+            </div>
             <p>从一句想法开始，让剧本、角色和画面在同一张画布上成形。</p>
           </div>
           <el-card class="promptCard" shadow="never" :bodyStyle="{ padding: '20px 24px' }" :footerStyle="{ padding: '12px 24px' }">
@@ -103,14 +106,12 @@
               <p v-if="!accounts && !workspaceDirectory" class="workspaceHint">先选择一个空文件夹，保存画布和素材。</p>
             </template>
           </el-card>
-          <characterPicker v-model="selectedCharacters" :disabled="creating || opening" />
           <div class="creationChoices">
             <button
               v-for="lane in creationLanes"
               :key="lane.kind"
               type="button"
               class="creationChoice"
-              :class="{ creationImport: lane.kind === 'existing' }"
               :disabled="creating || opening"
               @click="openBrief(lane.kind)">
               <component :is="lane.icon" :size="28" />
@@ -194,15 +195,19 @@
         </section>
       </div>
     </div>
+    <el-dialog v-model="castingVisible" title="角色库" width="min(780px, 94vw)" top="6vh" destroyOnClose :showClose="!castingBusy" :closeOnClickModal="!castingBusy" :closeOnPressEscape="!castingBusy">
+      <characterPicker v-model="selectedCharacters" alwaysOpen @busy="castingBusy = $event" />
+      <template #footer><el-button type="primary" :disabled="castingBusy" @click="castingVisible = false">完成选角</el-button></template>
+    </el-dialog>
     <el-dialog
       v-model="briefVisible"
       :title="currentLane.title"
       :class="{ musicBrief: briefKind === 'musicFilm', sourceBrief: briefKind !== 'musicFilm' }"
       :width="briefKind === 'musicFilm' ? 'min(720px, calc(100vw - 24px))' : 'min(560px, calc(100vw - 32px))'"
       alignCenter
-      :closeOnClickModal="!creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
-      :closeOnPressEscape="!creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
-      :showClose="!creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
+      :closeOnClickModal="!castingBusy && !creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
+      :closeOnPressEscape="!castingBusy && !creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
+      :showClose="!castingBusy && !creating && !musicBusy && !readingMusicFiles && !readingSourceFiles"
       @close="musicAnalysisRef?.stopPreview()">
       <el-form class="briefForm" labelPosition="top" @submit.prevent="startBrief">
         <template v-if="briefKind === 'shortDramaCommerce' || briefKind === 'creative'">
@@ -238,7 +243,7 @@
           <musicAnalysis ref="musicAnalysisRef" :attachments="musicAttachments" :disabled="creating || readingMusicFiles" @busy="musicBusy = $event" @ready="musicHasLyrics = $event" />
         </template>
         <template v-if="briefKind !== 'musicFilm'">
-          <el-form-item :label="briefKind === 'shortDramaCommerce' ? '商品资料与剧情参考' : briefKind === 'creative' ? '产品、品牌与广告参考资料' : briefKind === 'story' ? '故事资料与参考素材' : '剧本与参考素材'">
+          <el-form-item :label="briefKind === 'shortDramaCommerce' ? '商品资料与剧情参考' : briefKind === 'creative' ? '产品、品牌与广告参考资料' : briefKind === 'existing' ? '剧本与参考素材' : '故事资料与参考素材'">
             <label class="musicUpload" :class="{ uploadDisabled: creating || readingSourceFiles }">
               <input type="file" accept=".txt,.md,.docx,.pdf,.srt,.lrc,image/*,video/*" multiple :disabled="creating || readingSourceFiles" aria-label="上传文档、PDF、图片或参考片" @change="addSourceFiles" />
               <strong>{{ readingSourceFiles ? '正在读取文档…' : sourceFiles.length ? '继续添加素材' : '选择文档、图片或参考片' }}</strong>
@@ -257,15 +262,15 @@
             :disabled="creating"
             :placeholder="currentLane.placeholder" />
         </el-form-item>
-        <characterPicker v-model="selectedCharacters" :disabled="creating || readingSourceFiles || readingMusicFiles || musicBusy" />
+        <characterPicker v-if="accounts" v-model="selectedCharacters" :disabled="creating || readingSourceFiles || readingMusicFiles || musicBusy" @busy="castingBusy = $event" />
         <mediaPreferences v-model="mediaPreferencesValue" :disabled="creating" />
         <p class="briefHint">受众、时长和画面风格不用现在想好，助手会在需要时再问你。</p>
       </el-form>
       <template #footer>
         <div class="briefActions" :class="{ musicFooter: briefKind === 'musicFilm' }">
           <span v-if="briefKind === 'musicFilm'" class="footerHint">{{ musicBusy ? '处理完成或停止后，即可继续创作' : '歌曲、歌词、想法，任选一项即可开始' }}</span>
-          <el-button :disabled="creating || readingMusicFiles || musicBusy || readingSourceFiles" @click="briefVisible = false">取消</el-button>
-          <el-button type="primary" :loading="creating" :disabled="readingSourceFiles || readingMusicFiles || musicBusy || !canStartBrief" @click="startBrief">开始创作</el-button>
+          <el-button :disabled="castingBusy || creating || readingMusicFiles || musicBusy || readingSourceFiles" @click="briefVisible = false">取消</el-button>
+          <el-button type="primary" :loading="creating" :disabled="castingBusy || readingSourceFiles || readingMusicFiles || musicBusy || !canStartBrief" @click="startBrief">开始创作</el-button>
         </div>
       </template>
     </el-dialog>
@@ -286,7 +291,9 @@ import {
   IconPlugConnected,
   IconArrowUp,
   IconLayoutGrid,
+  IconUsers,
   IconMovie,
+  IconDeviceTv,
   IconSpeakerphone,
   IconShoppingBag,
   IconMusic,
@@ -319,7 +326,7 @@ import { getCanvasShots, type CanvasShot } from "@/lib/canvasShots";
 import { isCanvasFile } from "@/pages/workspace/canvasFile";
 import { canManageModels, getMe, isAuthDisabled, logout } from "@/lib/session";
 import { openConnectModel } from "@/components/connectModel/state";
-import { customProviders, loadPlatformTrial, platformTrial, settings as settingsStore } from "@/stores/settings";
+import { customProviders, loadPlatformTrial, modelChoices, platformTrial, settings as settingsStore } from "@/stores/settings";
 import workspacePicker from "./workspacePicker.vue";
 import mediaPreferences from "@/components/mediaPreferences.vue";
 import musicAnalysis from "./musicAnalysis.vue";
@@ -330,13 +337,12 @@ const settingsVisible = ref(false);
 const me = getMe();
 const accounts = !isAuthDisabled();
 const canSend = computed(() => accounts || !!workspaceDirectory.value);
-// "Ready" = at least one text model with models, and a media provider with a key (masked values count: they mean a key is stored).
-// 自己的文本模型优先；没有时，平台试用还有积分也能直接开始写故事。
+// 创作入口与对话使用同一份可用模型列表，供应商目录也可能包含当前无法调用的模型。
 const hasOwnTextModel = computed(() => customProviders.value.some((item) => item.models.length > 0));
 const trialReady = computed(() => platformTrial.value.models.length > 0 && platformTrial.value.credits > 0);
 const usingTrial = computed(() => !hasOwnTextModel.value && trialReady.value);
 const trialExhausted = computed(() => !hasOwnTextModel.value && platformTrial.value.models.length > 0 && platformTrial.value.credits <= 0);
-const hasTextModel = computed(() => hasOwnTextModel.value || trialReady.value);
+const hasTextModel = computed(() => modelChoices.value.length > 0);
 // 每次回到首页刷新一次剩余积分。
 void loadPlatformTrial();
 const hasMediaModel = computed(() => {
@@ -500,12 +506,14 @@ async function renameProject(project: Project) {
 // message 默认取首页输入框；通道弹窗传入带技能指令的消息，不能写回输入框，否则用户会看到内部指令。
 const mediaPreferencesValue = ref({ imageRatio: "", imageSize: "", videoRatio: "", videoResolution: "" });
 const selectedCharacters = ref<CharacterSelection[]>([]);
+const castingVisible = ref(false), castingBusy = ref(false);
 async function createProject(fromPrompt = true, message = prompt.value, attachments = promptAttachments.value, storyBrief?: StoryProject["brief"]) {
   if (modelSaving.value) return;
   if (creating.value || opening.value || (fromPrompt && !accounts && !workspaceDirectory.value)) return;
   // Sending an idea without a text model would just fail: take the person to the one-minute wizard instead.
-  if (fromPrompt && message.trim() && !hasTextModel.value) {
-    briefVisible.value = false;
+  if (fromPrompt && (message.trim() || attachments.length) && !hasTextModel.value) {
+    if (!canManageModels()) return ElMessage.warning(me?.modelAccess.canUse ? "平台默认对话模型暂不可用，请联系超级管理员检查配置" : "尚未获得模型使用权限，请联系超级管理员加入模型使用白名单");
+    if (accounts && storyBrief && brief.subject.trim()) prompt.value = brief.subject.trim();
     return openConnectModel("text");
   }
   creating.value = true;
@@ -515,7 +523,7 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
     if (accounts) {
       // Accounts mode: the server makes an empty project folder inside the caller's own workspace; no folder picking.
       const title = fromPrompt
-        ? message
+        ? (storyBrief?.idea || message)
             .trim()
             .replace(/^\/skill:\S+\s*/, "")
             .split(/\n/)[0]
@@ -600,13 +608,13 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
   }
 }
 const briefVisible = ref(false);
-// 四类作品并列；已有素材使用同等显眼的通栏卡片。
 const creationLanes = [
-  { kind: "story", skill: "story", icon: IconMovie, title: "剧情片", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
-  { kind: "creative", skill: "adfilm", icon: IconSpeakerphone, title: "商业广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
-  { kind: "shortDramaCommerce", skill: "workflow", icon: IconShoppingBag, title: "短剧带货", desc: "用钩子与反转留住观众，让商品顺着剧情出现。", label: "商品与剧情想法", placeholder: "想带什么商品？有哪些卖点，想拍怎样的冲突或反转？" },
-  { kind: "musicFilm", skill: "musicfilm", icon: IconMusic, title: "MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法（选填）", placeholder: "上传歌曲或歌词，补充你想要的情绪与画面感觉。也可以直接粘贴歌词。" },
-  { kind: "existing", skill: "story", icon: IconFileImport, title: "已有剧本或素材", desc: "导入剧本、参考片或参考图，整理后继续。", label: "补充说明（选填）", placeholder: "粘贴剧本，或说明参考素材的用途。" },
+  { kind: "story", promptPrefix: "/skill:story", icon: IconMovie, title: "剧情片", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
+  { kind: "serial", promptPrefix: "请创作一部连载短剧。", icon: IconDeviceTv, title: "短剧", desc: "构思贯穿全剧的冲突，写出每集的转折与悬念。", label: "短剧想法", placeholder: "主角想争取什么？也可以写下计划集数和每集时长。" },
+  { kind: "creative", promptPrefix: "/skill:adfilm", icon: IconSpeakerphone, title: "商业广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
+  { kind: "shortDramaCommerce", promptPrefix: "/skill:workflow", icon: IconShoppingBag, title: "短剧广告（带货）", desc: "用钩子与反转留住观众，让商品顺着剧情出现。", label: "商品与剧情想法", placeholder: "想带什么商品？有哪些卖点，想拍怎样的冲突或反转？" },
+  { kind: "musicFilm", promptPrefix: "/skill:musicfilm", icon: IconMusic, title: "MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法（选填）", placeholder: "上传歌曲或歌词，补充你想要的情绪与画面感觉。也可以直接粘贴歌词。" },
+  { kind: "existing", promptPrefix: "/skill:story", icon: IconFileImport, title: "已有剧本或素材", desc: "导入剧本、参考片或参考图，整理后继续。", label: "补充说明（选填）", placeholder: "粘贴剧本，或说明参考素材的用途。" },
 ] as const;
 type LaneKind = (typeof creationLanes)[number]["kind"];
 const briefKind = ref<LaneKind>("story");
@@ -691,27 +699,34 @@ function openBrief(kind: LaneKind) {
   briefVisible.value = true;
 }
 async function startBrief() {
-  const isMusic = briefKind.value === "musicFilm";
-  if (creating.value || musicBusy.value || readingMusicFiles.value || readingSourceFiles.value || !canStartBrief.value) return;
+  const kind = briefKind.value;
+  const isMusic = kind === "musicFilm";
+  if (creating.value || castingBusy.value || musicBusy.value || readingMusicFiles.value || readingSourceFiles.value || !canStartBrief.value) return;
   // 受众、时长、风格等由技能按需追问，弹窗只收核心想法。
   const defaultSubjects: Record<LaneKind, string> = {
     story: "根据上传的故事资料与参考素材创作故事",
+    serial: "根据上传的故事资料与参考素材构思分集短剧",
     creative: "根据上传的产品、品牌与参考资料创作广告",
     shortDramaCommerce: "根据上传的商品与参考素材创作短剧带货视频",
     musicFilm: "根据上传的歌曲与歌词创作 MV",
     existing: "整理上传的剧本与参考素材，在保留原有内容的基础上继续创作",
   };
-  const subject = brief.subject.trim() || defaultSubjects[briefKind.value];
-  const message = `/skill:${currentLane.value.skill} ${subject}${isMusic && musicAttachments.value.length ? "\n以附件为创作依据。若附有 littoMusicAnalysis 报告，使用其中真实计算的时长、节拍、旋律候选和 cutPlan 帧剪点；musicLyrics 包含原歌词、转写时间戳和人工校正。以校正后的 cues 为逐句依据，未校准结果标为自动识别待复核。场次与镜头规划明确对应歌曲秒数和剪点帧号。没有分析报告才用可用的 ffprobe 读取时长。无法读取的信息明确说明，不编造听感、歌词或节拍。" : ""}\n开始前只追问必要的缺失信息，最多 4 个问题。`;
+  const subject = brief.subject.trim() || defaultSubjects[kind];
+  const message = `${currentLane.value.promptPrefix} ${subject}${isMusic && musicAttachments.value.length ? "\n以附件为创作依据。若附有 littoMusicAnalysis 报告，使用其中真实计算的时长、节拍、旋律候选和 cutPlan 帧剪点；musicLyrics 包含原歌词、转写时间戳和人工校正。以校正后的 cues 为逐句依据，未校准结果标为自动识别待复核。场次与镜头规划明确对应歌曲秒数和剪点帧号。没有分析报告才用可用的 ffprobe 读取时长。无法读取的信息明确说明，不编造听感、歌词或节拍。" : ""}\n开始前只追问必要的缺失信息，最多 4 个问题。`;
   readingMusicFiles.value = true;
   try {
     const reports = isMusic ? await musicAnalysisRef.value?.buildAttachments() ?? [] : [];
-    const attachments = isMusic ? [...musicAttachments.value, ...reports] : [...(["shortDramaCommerce", "creative"].includes(briefKind.value) ? productImages.value : []), ...sourceFiles.value.flat()];
+    const attachments = isMusic ? [...musicAttachments.value, ...reports] : [...(["shortDramaCommerce", "creative"].includes(kind) ? productImages.value : []), ...sourceFiles.value.flat()];
     if (!accounts && !workspaceDirectory.value) {
       workspaceDirectory.value = (await relocationPicker.value?.chooseDirectory()) ?? "";
       if (!workspaceDirectory.value) return;
     }
-    await createProject(true, message, attachments, { ...newStoryProject().brief, kind: briefKind.value === "creative" ? "adfilm" : isMusic ? "musicFilm" : briefKind.value === "shortDramaCommerce" ? "shortDramaCommerce" : "story", duration: briefKind.value === "shortDramaCommerce" ? 30 : 60, idea: subject });
+    const storyBrief = newStoryProject().brief;
+    storyBrief.kind = kind === "creative" ? "adfilm" : kind === "existing" ? "story" : kind;
+    storyBrief.idea = subject;
+    if (kind === "serial") storyBrief.serialFormat = "short";
+    if (kind === "shortDramaCommerce") storyBrief.duration = 30;
+    await createProject(true, message, attachments, storyBrief);
   } catch (cause) {
     ElMessage.error(cause instanceof Error ? cause.message : "创作准备失败");
   } finally {
@@ -873,11 +888,15 @@ watch(
       margin: 24px 0 48px;
       .creationHeading {
         margin-bottom: 24px;
+        .creationTitle {
+          display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 12px;
+          .el-button { min-height: 42px; margin: 0; }
+        }
         h1 {
           font-size: 32px;
           font-weight: 600;
           letter-spacing: -0.04em;
-          margin: 0 0 12px;
+          margin: 0;
         }
         p {
           margin: 0;
@@ -935,7 +954,6 @@ watch(
         gap: 16px;
         margin-top: 20px;
         .creationChoice {
-          &.creationImport { grid-column: 1 / -1; }
           display: flex;
           align-items: center;
           gap: 16px;

@@ -44,7 +44,14 @@
     </el-tooltip>
     <floatingAgent v-model="agentVisible" :historyTarget="historyTarget" @resize="agentWidth = $event" @autoFilm="openAutoFilmHandoff" />
     <settings v-model="settingsVisible" />
-    <div ref="productionActionsRef" class="productionActions"><el-button @click="autoFilmSession = ''; autoFilmVisible = true">一键自动成片</el-button><el-button @click="storyVisible = true">故事工作台</el-button><el-button @click="productionVisible = true">镜头制作</el-button><el-button @click="productionPanelRef?.openLibrary()">资产库</el-button><el-button @click="voiceVisible = true">配音与口型</el-button></div>
+    <div ref="productionActionsRef" class="productionActions">
+      <el-button @click="autoFilmSession = ''; autoFilmVisible = true">一键自动成片</el-button>
+      <el-button @click="storyVisible = true">故事工作台</el-button>
+      <el-button v-if="workspaceStore.project?.projectId" @click="productionPanelRef?.openLibrary('Character')"><icon-users :size="16" />角色库</el-button>
+      <el-button @click="productionVisible = true">镜头制作</el-button>
+      <el-button @click="productionPanelRef?.openLibrary()">资产库</el-button>
+      <el-button @click="voiceVisible = true">配音与口型</el-button>
+    </div>
     <autoFilmPanel v-if="workspaceStore.project" :key="`autoFilm${workspaceStore.project.directory}`" v-model="autoFilmVisible" :directory="workspaceStore.project.directory" :handoffSession="autoFilmSession" />
     <storyPanel v-if="workspaceStore.project" :key="`story${workspaceStore.project.directory}`" ref="storyPanelRef" v-model="storyVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" @produce="prepareStoryProduction" />
     <voicePanel v-if="workspaceStore.project" :key="`voice${workspaceStore.project.directory}`" ref="voicePanelRef" v-model="voiceVisible" :directory="workspaceStore.project.directory" @settings="settingsVisible = true" />
@@ -117,7 +124,7 @@ const panelOptions = [
   { label: "画布", value: "canvas", icon: IconLayoutDashboard },
   { label: "文档", value: "document", icon: IconFileText },
 ];
-const agentVisible = ref(window.innerWidth >= 760);
+const agentVisible = ref(!!workspaceStore.pendingAgentMessage || window.innerWidth >= 760);
 const agentWidth = ref(0);
 const historyTarget = ref<HTMLElement>();
 const settingsVisible = ref(false);

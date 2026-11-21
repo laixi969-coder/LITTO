@@ -135,6 +135,9 @@ export const storyDecisionSchema = z.discriminatedUnion("type", [
 export function storyActionParameters(type: StoryAction["type"]) {
   return z.toJSONSchema(storyActionSchema.options.find(option => option.shape.type.value === type)!, { io: "input", target: "draft-07" });
 }
+export function isShortDrama(brief: StoryProject["brief"]) {
+  return brief.kind === "serial" && brief.serialFormat === "short";
+}
 export function newStoryProject(): StoryProject {
   return { littoStory: 1, version: 0, visualBoard: [], brief: { kind: "story", idea: "", audience: "", channel: "", intent: "", genre: "", tone: "", ending: "", duration: 60, constraints: "" }, frameworks: [], expansions: [], sources: [], directions: [], revisions: [], reviews: [], boards: {}, previews: [], releases: [], learnings: [], approvals: [] };
 }

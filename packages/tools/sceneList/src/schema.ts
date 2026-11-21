@@ -112,6 +112,7 @@ export const breakdownSchema = z.object({
   sceneListVersion: z.number().int().min(1).describe("readSceneList 返回的 version；场次表改动后须重新拆解"),
   assets: z.array(z.object({
     entityId,
+    assetId: text(120).min(1).optional().describe("已选演员的项目资产 ID，戏中名重名或与场次表不同时指定"),
     type: z.enum(["Character", "Wardrobe", "Environment", "Prop", "Product", "Vehicle", "Creature"]),
     name: text(60).min(1),
     invariants: z.array(text(200).min(1)).min(1).max(20).describe("跨场次必须保持不变的特征"),

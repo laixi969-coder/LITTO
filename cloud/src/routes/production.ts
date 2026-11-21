@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { all, get, run, type Scope } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
-import { ASSET_TYPES, PERSONA_AXES, assetInput, bindingInput, lookSchema, personaTagSchema, worldSchema, shotInput } from "../domain/schema.ts";
+import { revalidateAuth } from "../auth.ts";
+import { readUpload, uploadSlot } from "../upload.ts";
+import { ASSET_TYPES, PERSONA_AXES, assetInput, bindingInput, castingSchema, lookSchema, personaTagSchema, worldSchema, shotInput } from "../domain/schema.ts";
 import { approveAsset, assetVersions, createAsset, createVariant, newAssetVersion, rollbackAsset, updateAsset } from "../domain/assets.ts";
 import { bindReference, createShot, deleteShot, moveShot, shotPartial, updateShot } from "../domain/shots.ts";
 import { statesOf, recomputeStates } from "../domain/state.ts";
@@ -24,7 +26,7 @@ import { autoObserve } from "../domain/qc-vision.ts";
 import { inspectProductionQuality } from "../domain/qualityInspection.ts";
 import { audioReviewSchema, reviewedSegmentsSchema, shotFingerprint, techniqueReviewSchema, motionReviewSchema } from "../domain/realism.ts";
 import { createBatch, listBatches, listCandidates, promoteCandidate, scoreCandidate } from "../domain/candidates.ts";
-import { importFromLibrary, publishToLibrary, searchLibrary, updateLibraryReference, setLibraryFavorite, deleteLibraryAsset } from "../domain/library.ts";
+import { addLibraryCharacter, importFromLibrary, publishToLibrary, searchLibrary, setLibraryCasting, updateLibraryReference, setLibraryFavorite, deleteLibraryAsset } from "../domain/library.ts";
 import { acceptLocalRepair, repairDirective, scheduleLocalRepair, localRepairSchema } from "../domain/localRepair.ts";
 
 export const production = new Hono();
@@ -466,7 +468,21 @@ production.get("/library/assets", (c) => {
     }, {} as Record<string, string>);
     const favorite = c.req.query("favorite");
     if (favorite !== undefined && !["true", "false"].includes(favorite)) throw bad("favorite 须为 true 或 false");
-    return c.json(searchLibrary(s, { type: t as any, tags: Object.keys(tags).length ? (tags as any) : undefined, excludeName: n, q: c.req.query("q"), favorite: favorite === undefined ? undefined : favorite === "true", limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined }));
+    return c.json(searchLibrary(s, { type: t, tags, gender: c.req.query("gender"), ageGroup: c.req.query("ageGroup"), excludeName: n, q: c.req.query("q"), favorite: favorite === undefined ? undefined : favorite === "true", limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined }));
+});
+production.post("/library/characters", uploadSlot, async c => {
+    const { s, a } = ctx(c, "EDITOR");
+    const parsed = castingSchema.extend({ name: z.string().trim().min(1).max(120) }).safeParse(c.req.query());
+    if (!parsed.success) throw bad("角色名称或选角分类无效");
+    const { name, ...casting } = parsed.data;
+    const image = await readUpload(c.req.raw, 100 * 1024 * 1024);
+    revalidateAuth(c);
+    return c.json(await addLibraryCharacter(s, name, casting, image, a.user.id, () => revalidateAuth(c)), 201);
+});
+production.put("/library/assets/:id/casting", async c => {
+    const { s, a } = ctx(c, "EDITOR");
+    const casting = await body(c, castingSchema);
+    return c.json(setLibraryCasting(s, c.req.param("id"), casting, a.user.id));
 });
 production.post("/library/assets/:assetId/publish", async (c) => {
     const { s, a } = ctx(c, "EDITOR");

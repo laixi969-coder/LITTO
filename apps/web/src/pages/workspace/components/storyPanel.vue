@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" :title="project.brief.kind === 'shortDramaCommerce' ? '短剧带货工作台' : '故事工作台'" size="min(1120px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
+  <el-drawer v-model="visible" :title="isShortDrama(project.brief) ? '短剧工作台' : project.brief.kind === 'shortDramaCommerce' ? '短剧广告工作台' : '故事工作台'" size="min(1120px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
     <div class="storyPanel" :aria-busy="busy || childBusy">
       <p v-if="error" class="errorMessage" role="alert">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
       <div class="toolbar">
@@ -18,7 +18,7 @@
             <label>{{ brief.kind === 'serial' ? '单集目标时长（秒）' : '目标时长（秒）' }}<input v-model.number="brief.duration" type="number" min="1" max="3600" /></label>
             <template v-if="brief.kind === 'serial'">
               <label>剧集形态<select v-model="brief.serialFormat"><option :value="undefined">未指定</option><option value="short">短剧</option><option value="medium">中剧</option></select></label>
-              <label>计划集数<input v-model.number="brief.episodeCount" type="number" min="1" max="100" /></label>
+              <label>计划集数<input :value="brief.episodeCount" type="number" min="1" max="100" @input="setEpisodeCount" /></label>
             </template>
             <label v-for="field in briefFields" :key="field.key" :class="{ fullField: field.key === 'idea' || field.key === 'constraints' }">{{ field.label }}<textarea v-model="brief[field.key]" rows="2" /></label>
           </div>
@@ -169,7 +169,7 @@ import { createSourceAttachments } from "@/components/agent/sourceAttachments";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
 import storyPreview from "./storyPreview.vue";
 import storyFeedback from "./storyFeedback.vue";
-import { storyFrameworkBasis, storyFrameworkReady, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
+import { isShortDrama, storyFrameworkBasis, storyFrameworkReady, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
 import visualReferenceBoard from "./visualReferenceBoard.vue";
 
 const props = defineProps<{ directory: string }>();
@@ -217,7 +217,7 @@ const previewRef = ref<InstanceType<typeof storyPreview>>(), feedbackRef = ref<I
 let controller: AbortController | undefined;
 const tabs = [{ id: "sources", label: "目标与资料" }, { id: "directions", label: "框架与展开" }, { id: "script", label: "剧本与审稿" }, { id: "visual", label: "视觉参考" }, { id: "preview", label: "动态分镜" }, { id: "feedback", label: "发布反馈" }];
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === modelKey.value));
-const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "shortDramaCommerce", label: "短剧带货" }, { value: "musicFilm", label: "音乐影像" }];
+const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "shortDramaCommerce", label: "短剧广告（带货）" }, { value: "musicFilm", label: "音乐影像" }];
 const briefFields = [{ key: "idea", label: "想法 / 创作需求" }, { key: "audience", label: "谁会看 / 在什么情境下看" }, { key: "channel", label: "观看渠道" }, { key: "intent", label: "希望观众感受什么或做什么" }, { key: "genre", label: "类型" }, { key: "tone", label: "语气与风格" }, { key: "ending", label: "结尾选择" }, { key: "constraints", label: "不可改变的内容与制作预算 / 限制" }] as const;
 const sceneFields = [{ key: "goal", label: "人物目标" }, { key: "obstacle", label: "阻碍" }, { key: "change", label: "此场改变了什么" }, { key: "knowledge", label: "人物与观众分别知道什么" }, { key: "speech", label: "实际对白 / 旁白（不含角色名与表演说明）" }] as const;
 const issueLabels = { contradiction: "明确矛盾", comprehension: "理解风险", taste: "审美建议" };
@@ -267,6 +267,10 @@ function createRuleTest(kind: StoryLogic["rules"][number]["tests"][number]["kind
 }
 function addManualRule() {
   manualLogic.value.rules.push({ rule: "", subjects: [], tests: (["trigger", "boundary", "payoff"] as const).map(createRuleTest) });
+}
+function setEpisodeCount(event: Event) {
+  const input = event.target as HTMLInputElement;
+  brief.value.episodeCount = input.value === "" ? undefined : input.valueAsNumber;
 }
 async function saveBrief() { if (JSON.stringify(brief.value) !== JSON.stringify(project.value.brief)) await apply({ type: "brief", value: brief.value }); }
 async function saveDraft() {
@@ -343,7 +347,7 @@ async function generate(type: "framework" | "directions" | "draft" | "review" | 
   const id = revisionId.value;
   if (type === "draft" && ["story", "serial"].includes(project.value.brief.kind) && (!frameworkReady.value || project.value.frameworkApproval?.step !== "draft")) throw new Error("请先确认框架并选择展开完整正文");
   const instructions = {
-    framework: "只构思一份可审阅故事框架，不写完整正文。value 包含 title、format、content；content 依次交代一句话故事、人物与锁定事实、主要段落或三幕、伏笔与揭示、结尾。沿用用户指定形式与已选方向，未指定篇幅不自定长剧。",
+    framework: `只构思一份可审阅故事框架，不写完整正文。value 包含 title、format、content；content 依次交代一句话故事、人物与锁定事实、${isShortDrama(project.value.brief) ? "全剧主线与分集走向" : "主要段落或三幕"}、伏笔与揭示、结尾。沿用用户指定形式与已选方向，未指定篇幅不自定长剧。`,
     directions: "生成 2–3 个真正不同的方向。资料未读部分明确标未知，信息不足时给假设，不要求用户填写专业参数。",
     draft: `按照已选择的方向写完整可视听剧本和简洁大纲，按目标时长控制台词与场次；parentId=${id || "未指定"}。`,
     review: `审阅版本 ${id}，记录实际阅读的场次与重要问题。检查是否符合用户要求，以及关键人物行动、因果和结尾是否可理解；区分明确矛盾、理解风险与审美建议。问题引用对应场次的正文原句；无需问题时 issues 留空，quality 和 logic 可省略。`,

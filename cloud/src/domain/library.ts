@@ -1,19 +1,20 @@
 import { z } from "zod";
 import { run, tx, audit, type Scope, type Row } from "../db.ts";
 import { bad, conflict, notFound } from "../util.ts";
-import { assetInput, personaTagSchema, type PersonaTags } from "./schema.ts";
+import { assetInput, castingSchema, personaTagSchema, type PersonaTags } from "./schema.ts";
 import { createAsset, approveAsset, event } from "./assets.ts";
-import { mediaView, saveMedia, storage } from "../storage.ts";
+import { mediaView, saveMedia, sniff, storage } from "../storage.ts";
 
 export const librarySearchSchema = z.object({
   type: assetInput.shape.type.optional(), tags: personaTagSchema.optional(),
+  gender: castingSchema.shape.gender.or(z.literal("未标注")), ageGroup: castingSchema.shape.ageGroup.or(z.literal("未标注")),
   q: z.string().trim().max(120).optional(), favorite: z.boolean().optional(),
   excludeName: z.string().max(120).optional(), limit: z.number().int().min(1).max(500).default(100),
 });
 
 // 演员自身的习惯可以复用，项目人物关系、配音记录和来源标记不能成为下一部作品的事实。
 function reusableAttributes(attributes: Record<string, any> = {}) {
-  const { importedFrom, authoritativeReference, authoritativePromotedAt, voice, voiceId, characterDirection, ...rest } = attributes;
+  const { importedFrom, libraryActorName, authoritativeReference, authoritativePromotedAt, voice, voiceId, characterDirection, ...rest } = attributes;
   return { ...rest, ...(characterDirection ? { characterDirection: { speech: characterDirection.speech ?? "", behavior: characterDirection.behavior ?? "", relationships: "" } } : {}) };
 }
 
@@ -78,7 +79,7 @@ export async function publishToLibrary(s: Scope, assetId: string, actor: string,
     const values = {
       source_asset_id: asset.id, type: asset.type, name: asset.name, persona_tags: tags,
       data: {
-        description: asset.description ?? "", attributes: reusableAttributes(asset.attributes), references: [],
+        description: asset.description ?? "", attributes: { ...reusableAttributes(asset.attributes), ...(existing?.attributes?.casting ? { casting: existing.attributes.casting } : {}) }, references: [],
         invariants: asset.invariants ?? [], allowedVariations: asset.allowedVariations ?? [], forbiddenChanges: asset.forbiddenChanges ?? [],
         authoritativeReference: copies.get(authoritative), sourceProjectId: asset.projectId, sourceVersion: asset.version, favorite: true,
         referenceSnapshots: references.map(ref => ({ ...ref, mediaId: ref.mediaId ? copies.get(ref.mediaId) : null })),
@@ -91,7 +92,7 @@ export async function publishToLibrary(s: Scope, assetId: string, actor: string,
   });
 }
 
-export function searchLibrary(s: Scope, input: z.input<typeof librarySearchSchema> = {}) {
+export function searchLibrary(s: Scope, input: unknown = {}) {
   const parsed = librarySearchSchema.safeParse(input);
   if (!parsed.success) throw bad("角色库筛选参数无效", parsed.error.issues);
   const query = parsed.data;
@@ -99,6 +100,8 @@ export function searchLibrary(s: Scope, input: z.input<typeof librarySearchSchem
   return s.list("library_assets", {}, "reuse_count DESC, created_at DESC").filter(entry => {
     return (!query.type || entry.type === query.type) && (!query.excludeName || entry.name !== query.excludeName)
       && (query.favorite === undefined || Boolean(entry.favorite) === query.favorite)
+      && (!query.gender || entry.type === "Character" && (entry.attributes?.casting?.gender ?? "未标注") === query.gender)
+      && (!query.ageGroup || entry.type === "Character" && (entry.attributes?.casting?.ageGroup ?? "未标注") === query.ageGroup)
       && (!query.q || `${entry.name} ${entry.description ?? ""}`.toLocaleLowerCase().includes(query.q.toLocaleLowerCase()))
       && wanted.every(([axis, value]) => entry.personaTags?.[axis] === value);
   }).slice(0, query.limit).map(entry => ({
@@ -108,6 +111,36 @@ export function searchLibrary(s: Scope, input: z.input<typeof librarySearchSchem
     media: entry.authoritativeReference ? mediaView(s.get("media", entry.authoritativeReference)) : null,
     images: [...new Set([entry.authoritativeReference, ...(entry.referenceSnapshots ?? (entry.references ?? []).map((id: string) => s.get("refs", id)).filter(Boolean)).map((ref: Row) => ref.mediaId)])].filter(Boolean).map(id => s.get("media", id)).filter(media => media?.mime.startsWith("image/")).map(media => mediaView(media)), createdAt: entry.createdAt,
   }));
+}
+
+export async function addLibraryCharacter(s: Scope, name: string, casting: z.infer<typeof castingSchema>, image: Buffer, actor: string, beforeWrite: () => void) {
+  if (image.length < 12 || !["image/png", "image/jpeg", "image/webp"].includes(sniff(image)?.mime ?? "")) throw bad("定妆图请选择 PNG、JPG 或 WebP 图片");
+  const media = await saveMedia(s.workspaceId, null, image, { source: "upload" });
+  try {
+    beforeWrite();
+    return tx(() => {
+      const entry = s.insert("library_assets", { type: "Character", name, data: {
+        attributes: { casting }, authoritativeReference: media.id, favorite: true,
+        invariants: ["保持所选定妆图中的人物身份与面部特征"], referenceSnapshots: [],
+      } });
+      audit(actor, "library.create", entry.id, { name, casting }, s.workspaceId);
+      return entry;
+    });
+  } catch (error) {
+    s.softDelete("media", media.id);
+    throw error;
+  }
+}
+
+export function setLibraryCasting(s: Scope, libraryId: string, casting: z.infer<typeof castingSchema>, actor: string) {
+  const entry = s.get("library_assets", libraryId);
+  if (!entry) throw notFound("library asset");
+  if (entry.type !== "Character") throw bad("只有人物资产可以设置选角分类");
+  return tx(() => {
+    run("UPDATE library_assets SET data=json_set(data,'$.attributes.casting',json(?)), updated_at=? WHERE id=? AND workspace_id=?", JSON.stringify(casting), new Date().toISOString(), libraryId, s.workspaceId);
+    audit(actor, "library.casting", libraryId, casting, s.workspaceId);
+    return s.get("library_assets", libraryId)!;
+  });
 }
 
 export function setLibraryFavorite(s: Scope, libraryId: string, favorite: boolean, actor: string) {
@@ -126,7 +159,7 @@ export function deleteLibraryAsset(s: Scope, libraryId: string, actor: string) {
 }
 
 export function findLibraryAsset(s: Scope, entry: Row, projectId: string) {
-  const source = s.get("assets", entry.sourceAssetId);
+  const source = entry.sourceAssetId ? s.get("assets", entry.sourceAssetId) : undefined;
   if (source?.projectId === projectId) return source;
   return s.list("assets", { projectId }).find(asset => asset.attributes?.importedFrom === entry.id);
 }
@@ -157,7 +190,7 @@ export async function importFromLibrary(s: Scope, libraryId: string, projectId: 
     }).id);
     const created = createAsset(s, projectId, assetInput.parse({
       type: entry.type, name: overrides.name ?? entry.name, description: entry.description ?? "",
-      attributes: { ...reusableAttributes(entry.attributes), authoritativeReference: copies.get(authoritative), importedFrom: libraryId },
+      attributes: { ...reusableAttributes(entry.attributes), authoritativeReference: copies.get(authoritative), importedFrom: libraryId, ...(entry.type === "Character" ? { libraryActorName: entry.name } : {}) },
       references: localReferences, invariants: overrides.invariants ?? entry.invariants ?? [],
       allowedVariations: entry.allowedVariations ?? [], forbiddenChanges: entry.forbiddenChanges ?? [], personaTags: entry.personaTags,
     }));
@@ -178,7 +211,7 @@ export async function updateLibraryReference(s: Scope, libraryId: string, mediaI
     const { type, name, ...data } = assetInput.parse(entry);
     const result = s.update("library_assets", libraryId, { data: {
       ...data, attributes: reusableAttributes(data.attributes), references: [], favorite: Boolean(s.get("library_assets", libraryId)!.favorite),
-      authoritativeReference: copies.get(mediaId), sourceProjectId: entry.sourceProjectId,
+      authoritativeReference: copies.get(mediaId), sourceProjectId: entry.sourceProjectId, sourceVersion: entry.sourceVersion,
       referenceSnapshots: references.map(ref => ({ ...ref, mediaId: ref.mediaId ? copies.get(ref.mediaId) : null })),
     } });
     audit(actor, "library.reference", libraryId, { mediaId }, s.workspaceId);

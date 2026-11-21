@@ -20,6 +20,7 @@ import { createSkillContext } from "@/agent/skills";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
 import { workspaceProject, prepareShot } from "@/utils/media/jobs";
+import { readProjectAsset } from "@/utils/media/projectCast";
 import { imageGenerationSchema, videoGenerationSchema } from "@toonflow/tool-media-generation/runtime";
 import { readStoryContext, readStoryProject, applyStoryAction, checkSources, requestStoryApproval, requestStoryDecision } from "@/utils/story";
 import { requestKeyframeApproval } from "@/utils/media/keyframeApproval";
@@ -167,19 +168,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const { renderId } = z.strictObject({ renderId: z.string().min(1) }).parse(data);
           return publishRender(renderId);
         }
-        if (operation === "readAsset") {
-          const { asset, images } = await api.readWorkspaceAsset(scope, projectId, data);
-          const referenceImages = [];
-          for (const image of images) {
-            mediaSignal(signal)?.throwIfAborted();
-            const folder = `assets/characters/${asset.id}`;
-            const path = `${folder}/reference${image.mediaId}`;
-            await files.mkdir(folder, true);
-            await files.writeFile(path, image.data);
-            referenceImages.push({ mediaId: image.mediaId, path, mimeType: image.mimeType });
-          }
-          return { ...asset, referenceImages };
-        }
+        if (operation === "readAsset") return readProjectAsset(cwd, data, mediaSignal(signal));
         if (operation === "readVisionModels") return { models: listAiModels(), note: "已选语言模型；图片输入能力以实际供应商响应为准，检查失败不视为通过" };
         if (operation === "analyzeReference" || operation === "inspectAdPilot" || operation === "inspectAdFilm") {
           const models = listAiModels();

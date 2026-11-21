@@ -1,5 +1,5 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { musicFilmWritingGuide } from "@toonflow/tool-scene-list/storyProject";
+import { isShortDrama, musicFilmWritingGuide } from "@toonflow/tool-scene-list/storyProject";
 import { createSkillContext, loadAgentSkills, readStoryInstructions } from "@/agent/skills";
 import { readStoryProject } from "@/utils/story";
 import { cloud } from "@/lib/cloud";
@@ -65,8 +65,10 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const available = loadAgentSkills(cwd).skills;
   const explicitNames = available.filter(skill => explicitlyNamesSkill(task, skill.name)).map(skill => skill.name);
   if (!explicitNames.length && !tools.some(tool => ["readStoryProject", "productionSpec", "generateImage", "generateVideo", "generateShots", "nodeTools", "getCanvas"].includes(tool.name))) return "";
+  const project = await readStoryProject(cwd);
+  const shortDrama = isShortDrama(project.brief);
   const advertising = /adfilm|brandFilm|商业广告|广告|品牌片|产品片|带货|\bugc\b|探店|餐厅推广/i.test(task);
-  const story = /剧情|剧本|故事|短剧|中剧|电影|story/i.test(task);
+  const story = /剧情|剧本|故事|短剧|中剧|电影|story/i.test(task) || shortDrama && /集|大纲|框架|续写|改写|继续|接着/.test(task);
   const music = /\bmv\b|musicFilm|音乐视频|音乐短片|音乐电影/i.test(task) || !advertising && !story && /歌曲|演唱|唱跳/.test(task);
   const topics = [
     { match: /人物|角色|表演|表情|眼神戏|活人感|对白|对话|演唱|唱跳|反应|演技|vlog|自拍|performance|dialogue|facial|micro.?expression/i, name: "cinema", paths: ["references/performanceDirection.md", "references/creativePreparation.md", "references/humanPerformance.md"] },
@@ -74,7 +76,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     { match: /妆造|服装|换装|妆发|衣装/, name: "workflow", paths: ["references/methods/characterStyling.md"] },
     { match: /布光|灯光|光线|调色|滤镜|色板|材质|质感|视频|镜头|关键帧|生图|vlog|自拍|明亮|lighting|grading|filter/i, name: "workflow", paths: ["references/methods/colorAndLight.md"] },
     { match: /真人|写实|逼真|拟真|照片级|质感|皮肤|塑料|蜡像|手机|视频|镜头|关键帧|生图|realism|photoreal|live.action/i, name: "continuity", paths: ["references/realism.md"] },
-    { match: /创意|大纲|编剧|写.*剧本|故事开发/, name: "story", paths: ["references/core-methodology.md"] },
+    { match: /创意|大纲|编剧|写.*剧本|故事开发/, name: "story", paths: [] },
     { match: /镜头|分镜|运镜|摄影|构图|机位|俯视|剖面|全景|白模|camera|cinematography/i, name: "cinema", paths: ["references/shotLanguage.md", "references/masterShots.md"] },
     { match: /场面调度|对话调度|对白调度|正反打|过肩|轴线|三角机位|力量对比|走位|blocking|staging/i, name: "filmDirecting", paths: [] },
     { match: /九宫格|九格|9\s*[宫宮格]|十六宫格|16\s*[宫宮格]|多格分镜|宫格分镜|storyboard\s*grid/i, name: "cinema", paths: ["references/storyboardGrid.md"] },
@@ -85,7 +87,6 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     { match: /修复|穿帮|失败|漂移/, name: "videoPromptDirector", paths: ["references/failureRepair.md"] },
   ];
   // ACT: 明确的任务类型优先；简短续作沿用已保存简报，不根据附件正文猜作品类型。
-  const project = await readStoryProject(cwd);
   const api = cloud(), tenant = currentTenant();
   const projectId = api && tenant ? workspaceProject(cwd, false) : undefined;
   const pendingShots = projectId ? api!.scoped(tenant!.workspaceId).list("shots", { projectId }).filter(shot => !shot.approvedTakeId) : [];
@@ -93,7 +94,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const topicText = `${task}\n${JSON.stringify(project.revisions.find(item => item.id === project.approvedId)?.brief ?? project.brief)}\n${JSON.stringify(pendingShots.map(shot => ({ action: shot.action, creativeBrief: shot.creativeBrief, camera: shot.camera, lighting: shot.lighting, realism: shot.realism })))}`;
   const selectedTopics = topics.filter(topic => topic.match.test(topicText));
   // ACT: 先读取已保存的制作上下文再判断入口，避免“再快一点”等续作指令在专项路由前被漏掉。
-  if (!explicitNames.length && !music && !advertising && !story && !selectedTopics.length && !/视频|短片|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
+  if (!explicitNames.length && !music && !advertising && !story && !shortDrama && !selectedTopics.length && !/视频|短片|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
   if (!canReadSkills(tools)) {
     return "## 制作技能状态\n本轮技能正文读取未开启，未自动加载制作技能；不能声称已使用。";
   }
@@ -101,7 +102,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const savedKind = project.version > 0 ? project.brief.kind : sequenceKinds.size === 1 ? [...sequenceKinds][0] : project.brief.kind;
   const shortDramaCommerce = savedKind === "shortDramaCommerce";
   // ACT: MV 内讨论剧情或说“不要故事”仍是 MV；明确指定 story 技能才切回故事入口。
-  const kind = shortDramaCommerce ? savedKind : music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
+  const kind = shortDramaCommerce || shortDrama ? savedKind : music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
     : savedKind;
   const primary = shortDramaCommerce ? "workflow" : kind === "musicFilm" ? "musicfilm" : ["adfilm", "brandFilm"].includes(kind) ? "adfilm" : "story";
   const intentText = explicitNames.length || /图片|图像|生图|视频|短片|分镜|剧本|五板块/.test(task) ? task : topicText;
@@ -111,7 +112,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   // ACT: 仅对明确的文字创作收窄上下文；按分句排除否定要求，复杂或不明意图仍沿用制作流程。
   const taskIntent = task.split(/[，,。；;\n]/).filter(part => !/^(?:请)?(?:不要|不用|无需|不必|不|勿)/.test(part.trim())).join("\n");
   const storyOnly = (story || shortDramaCommerce) && ["story", "workflow"].includes(primary) && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
-    && !/视频|分镜|关键帧|运镜|拍摄|预演|成片|制片/.test(taskIntent);
+    && !/视频|分镜|镜头|关键帧|运镜|拍摄|预演|成片|制片|拆解|场次表|资产|定妆|三视图|出图|生图|剪辑/.test(taskIntent);
   // ACT: 采用稿已存在且本轮只拆分镜时，不重复加载编剧、资产生产与生成协议；不明确的续作仍走原流程。
   const storyboardOnly = !!project.approvedId && !explicitNames.length && /分镜/.test(taskIntent)
     && !imagePrompt && !scriptPrompt && !standalonePrompt
@@ -167,7 +168,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   if (names.includes("workflow") && videoModel?.seedance) referencePaths.workflow.push("references/seedanceDirector.md");
   // 仅拆分镜仍需当前场面的动作、表演与真实感方法；不重新加载故事开发或资产生产。
   if (!focused || storyboardOnly) for (const topic of selectedTopics) {
-    if (!focused || names.includes(topic.name)) referencePaths[topic.name].push(...topic.paths);
+    if (topic.name !== "story" && (!focused || names.includes(topic.name))) referencePaths[topic.name].push(...topic.paths);
   }
   for (const name of new Set(names)) {
     const skill = available.find(item => item.name === name);

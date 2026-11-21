@@ -13,6 +13,8 @@ import { resolveDirectorPalette } from "@/utils/media/directorMatch";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { looksLikePersonShot } from "@/utils/media/generation";
 import { assertAssetsReady } from "@/utils/media/flow";
+import { readCastingReference } from "@/utils/media/projectCast";
+import { readCharacterContracts } from "@/utils/media/assetContract";
 import { authEnabled } from "@/utils/tenant";
 import { resolveWorkspacePath } from "@/utils/workspace/files";
 import { translateMessage, validationOptions } from "@/lib/i18n";
@@ -140,14 +142,31 @@ interface CastEntry {
 }
 
 /**
- * 角色档案复用：`assets/cast/<角色名>.json` 保存长期身份与定妆参考，
- * 每次生成按名引用即可，不用重新挑脸，也不会因为重述文字而漂移。
+ * 项目角色先按资产 ID 或戏中名取已采用的定妆参考；独立的文件角色卡沿用原入口。
  */
 async function loadCast(cwd: string, names: string[]) {
   const images: { path: string; mimeType: string }[] = [];
   const notes: string[] = [];
   const wardrobes: string[] = [];
-  for (const name of names) {
+  const actors = (await readCharacterContracts(cwd)).filter(actor => actor.libraryId);
+  for (const name of new Set(names)) {
+    const byId = actors.find(actor => actor.assetId === name || actor.libraryId === name);
+    const matches = byId ? [byId] : actors.filter(actor => actor.name === name || actor.actorName === name);
+    if (matches.length > 1) throw Object.assign(new Error(`「${name}」对应多位演员，请用项目角色的资产 ID 指定`), { status: 409 });
+    const actor = matches[0];
+    if (actor?.assetId) {
+      const reference = await readCastingReference(cwd, actor.assetId, actor.referenceMediaId);
+      if (!images.some(image => image.path === reference.path)) {
+        images.push({ path: reference.path, mimeType: reference.mimeType });
+        for (const path of actor.references) {
+          await resolveWorkspacePath(cwd, path);
+          if (!images.some(image => image.path === path)) images.push({ path, mimeType: imageMime(path) });
+        }
+        if (actor.wardrobe) wardrobes.push(`${actor.name} 穿${actor.wardrobe}`);
+        notes.push(`${actor.name}：沿用已选演员的面部身份和体型，本镜服装与表演遵循当前项目设定`);
+      }
+      continue;
+    }
     const file = await resolveWorkspacePath(cwd, `assets/cast/${name}.json`);
     let entry: CastEntry;
     try {
@@ -162,12 +181,12 @@ async function loadCast(cwd: string, names: string[]) {
       images.push({ path: reference, mimeType: imageMime(reference) });
     }
     const label = entry.name ?? name;
-    notes.push(`${label}：${[entry.identity, entry.wardrobe].filter(Boolean).join("；")}`);
+    notes.push(`${label}：${[entry.identity, entry.wardrobe].filter(Boolean).join("；")}。脸型、年龄与定妆按该角色档案`);
     if (entry.wardrobe?.trim()) wardrobes.push(`${label} 穿${entry.wardrobe.trim()}`);
   }
   return {
     images,
-    note: notes.length ? `CAST: ${notes.join("；")}。以上参考图按顺序对应该角色的身份与定妆，脸型、年龄、服装以参考为准。` : "",
+    note: notes.length ? `CAST: ${notes.join("；")}。以上角色参考按所列次序对应人物。` : "",
     wardrobe: wardrobes.join("；"),
   };
 }
@@ -203,6 +222,7 @@ async function resolveSkinFinish(cwd: string, isAsset: boolean, override?: strin
 
 export default Router().post("/", validateFields({
   requestId: z.string().uuid().optional(), directory: z.string().min(1).max(4096), mediaType: z.enum(["image", "video", "audio"]),
+  cast: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
 }), async (req, res) => {
   const { directory, mediaType, requestId, continueFrom, styleReference, cast, skinFinish, ...raw } = req.body;
   const cwd = await u.workspace.resolveWorkspace(req, directory);
@@ -239,7 +259,7 @@ export default Router().post("/", validateFields({
   // 角色档案：先按名解析，把定妆参考和身份说明并进请求。
   let castWardrobe = "";
   if (Array.isArray(cast) && cast.length && mediaType !== "audio") {
-    const resolved = await loadCast(cwd, cast.map(String));
+    const resolved = await loadCast(cwd, cast.map((name: string) => name.trim()));
     castWardrobe = resolved.wardrobe;
     // 用 request.prompt 而不是 raw.prompt：年代锚点与项目影调已经写进去了，这里重建会把它们丢掉。
     request = {

@@ -4,6 +4,7 @@ import { storyActionSchema, storyDecisionSchema, storyProjectSchema, newStoryPro
 import { lockWorkspaceFiles, resolveWorkspacePath } from "@/utils/workspace/files";
 import { currentTenant } from "@/utils/tenant";
 import { cloud } from "@/lib/cloud";
+import { listProjectCharacters } from "@/utils/media/projectCast";
 import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
 import { inspectStoryLogic } from "@toonflow/tool-scene-list/storyLogic";
 import { storyFrameworkBasis, storyFrameworkReady, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
@@ -20,12 +21,7 @@ export async function readStoryProject(directory: string): Promise<StoryProject>
 }
 export async function readStoryContext(directory: string) {
   const project = await readStoryProject(directory);
-  const api = cloud(), tenant = currentTenant();
-  const link = api && tenant ? api.dbGet("SELECT project_id FROM workspace_project_links WHERE workspace_id=? AND directory=?", tenant.workspaceId, directory) : null;
-  const characters = api && tenant && link ? api.scoped(tenant.workspaceId).list("assets", { projectId: link.project_id })
-    .filter(asset => asset.type === "Character")
-    .map(asset => ({ id: asset.id, name: asset.name, description: asset.description, characterDirection: asset.attributes?.characterDirection })) : [];
-  return { ...project, productionContext: { characters } };
+  return { ...project, productionContext: { characters: listProjectCharacters(directory) } };
 }
 async function readSource(directory: string, relativePath: string, maxBytes: number) {
   const { path } = await resolveWorkspacePath(directory, relativePath);
@@ -204,7 +200,9 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
       }
       case "visualBoard":
         project.visualBoard = action.values; break;
-      case "brief": project.brief = action.value; break;
+      case "brief":
+        project.brief = { ...action.value, ...(action.value.cast === undefined && project.brief.cast ? { cast: project.brief.cast } : {}) };
+        break;
       case "source": {
         const fingerprint = await sourceFingerprint(directory, action.value);
         const previous = project.sources.findIndex(source => source.id === action.value.id);

@@ -3,14 +3,17 @@ name: story
 description: >
   为短视频、商业广告、电影和剧集创作、改写有戏剧冲突的故事或剧本；支持现实题材、爱情、亲情、喜剧、悬疑、推理、动作、冒险、科幻、奇幻、寓言及实验叙事。每场戏都要有冲突与转折。也支持主持人系列、当下被改写、秩序即世界等特色写法。恐怖、生活流和安静情感戏不作为本技能目标。
 metadata:
-  version: "2.1.1"
+  version: "2.2.0"
   displayName: 故事与剧本
+  shortDramaEntry: shortDrama.md
   author: MILI MILI
   basedOn: hiccai-host-story
   sourceCommit: 3d425deeaacf2f092f5eea3071912fe10ffb41c0
 ---
 
 # 故事
+
+项目简报为 `kind=serial` 且 `serialFormat=short` 时，以[短剧故事创作](shortDrama.md)组织全剧与单集。剧本改编、拆解、资产与分镜沿用现有制作要求。
 
 根据用户指定的题材、形式、媒介、情绪、时长、篇幅和禁忌创作。默认故事面向视频呈现，用户指定小说等形式时服从用户。明确要求优先于本技能的默认做法；没有指定的细节自行判断。不要把现实故事硬改成奇幻，也不要因为题材名称强制套固定结构。用户要修改既有故事时，以原文及指定修改范围为准。
 

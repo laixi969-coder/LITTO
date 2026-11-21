@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getConfiguredModel } from "@/utils/ai";
 import { selectedModel } from "@/utils/modelSelection";
 import { readStoryProject } from "@/utils/story";
+import type { listProjectCharacters } from "@/utils/media/projectCast";
 
 const assetItem = z.object({
   kind: z.enum(["character", "scene", "prop"]),
@@ -38,7 +39,7 @@ prompt 只描写选定的一种可见状态；出处、台词和后续变化留�
  * 把剧本拆成资产清单。角色卡、场景定场、道具图必须先于分镜做，
  * 否则每个镜头都在重新选角、重新搭景，跨镜必然漂移。
  */
-export async function planAssets(script: string): Promise<{ items: AssetItem[] } | null> {
+export async function planAssets(script: string, cast: ReturnType<typeof listProjectCharacters> = []) {
   const choice = selectedModel("text");
   if (!choice?.providerId || !choice?.modelId) return null;
   const configured = getConfiguredModel(choice.providerId, choice.modelId);
@@ -53,6 +54,7 @@ export async function planAssets(script: string): Promise<{ items: AssetItem[] }
         content: [
           "剧本：",
           script,
+          ...(cast.length ? ["项目已选演员，请用戏中名登记实际出镜的人物，沿用已有定妆。", JSON.stringify(cast.map(actor => ({ assetId: actor.id, roleName: actor.name, actorName: actor.actorName, casting: actor.casting })))] : []),
           "",
           "请输出资产清单。",
           '格式（严格 JSON）：{"items":[{"kind":"character|scene|prop","name":"名称","brief":"出场依据、用途与状态沿革","evidence":["剧本中的连续短引句"],"prompt":"一个当前状态的资产图提示词","shotSpec":{"shotSize":"定妆景别","lens":"焦段","lighting":"光源","blocking":"构图"},"priority":"must|nice"}]}',
@@ -85,7 +87,11 @@ export async function planAssets(script: string): Promise<{ items: AssetItem[] }
       throw Object.assign(new Error(`资产「${item.name}」的引句在本次剧本中找不到，请核对出处`), { status: 502 });
     }
   }
-  return plan;
+  return { items: plan.items.map(item => {
+    const matches = item.kind === "character" ? cast.filter(actor => actor.name === item.name) : [];
+    const actor = matches.length === 1 ? matches[0] : undefined;
+    return actor ? { ...item, assetId: actor.id, libraryId: actor.libraryId, referenceMediaId: actor.referenceMediaId } : item;
+  }) };
 }
 
 /** 没传剧本时，从工作区已采用的版本里拼场次正文。 */

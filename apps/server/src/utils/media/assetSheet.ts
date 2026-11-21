@@ -48,18 +48,21 @@ export function assetPrompt({ kind, name, description, wardrobe, reference }: As
 }
 
 /** 角色四视图落成可用角色卡：references 有内容、quality 不是 draft，才算进流程。 */
-export async function registerAsset(cwd: string, { kind, name, description, wardrobe }: AssetRequest, files: { path: string; mimeType: string }[]) {
+export async function registerAsset(cwd: string, { kind, name, description, wardrobe }: AssetRequest, files: { path: string; mimeType: string }[], actor?: { id: string; referenceMediaId?: string }) {
   const paths = files.map(file => file.path);
   if (kind === "character") {
-    const target = await resolveWorkspacePath(cwd, `assets/cast/${name}.json`, true);
+    const path = `assets/cast/${actor?.id ?? name}.json`;
+    const target = await resolveWorkspacePath(cwd, path, true);
     await mkdir(join(target.path, ".."), { recursive: true });
     const previous = await readFile(target.path, "utf8").catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return "{}";
       throw error;
     }).then(text => JSON.parse(text) as Record<string, unknown>);
-    const references = [...new Set([...(Array.isArray(previous?.references) ? previous!.references as string[] : []), ...paths])];
+    const prior = previous.referenceMediaId === actor?.referenceMediaId && Array.isArray(previous.references) ? previous.references as string[] : [];
+    const references = [...new Set([...prior, ...paths])];
     await writeAtomic(target.path, JSON.stringify({
       name,
+      referenceMediaId: actor?.referenceMediaId,
       identity: description.trim(),
       wardrobe: wardrobe?.trim() ?? "",
       references,
@@ -68,7 +71,7 @@ export async function registerAsset(cwd: string, { kind, name, description, ward
       fourView: true,
       updatedAt: new Date().toISOString(),
     }, null, 2));
-    return { kind, name, path: `assets/cast/${name}.json`, references };
+    return { kind, name, path, references };
   }
   const folder = kind === "scene" ? "assets/scenes" : "assets/props";
   const target = await resolveWorkspacePath(cwd, `${folder}/${name}.json`, true);

@@ -3,6 +3,7 @@ import { existsSync, mkdir, readFile, realpath, stat } from "@toonflow/file";
 import { basename, dirname, join, relative, sep } from "node:path";
 import { loadSkills, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import type { SkillContext, SkillLocation, SkillScope } from "@toonflow/tools-scaffold/runtime";
+import { isShortDrama } from "@toonflow/tool-scene-list/storyProject";
 import conf from "@/utils/conf";
 import { authEnabled, currentTenant } from "@/utils/tenant";
 import { isWithin, lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
@@ -30,11 +31,16 @@ export async function readStoryInstructions(cwd: string, signal?: AbortSignal) {
     const documents = await Promise.all(paths.map(path => context.read({ name: "workflow", path }, signal)));
     return documents.map(document => `## ${document.path}\n${document.content}`).join("\n\n");
   }
-  const manifest = await context.read({ name: "story" }, signal);
-  // ACT: 只展开主技能直接引用的创作资料，不递归加载参考库或其他技能，避免上下文无限增长。
-  const paths = [...new Set([...manifest.content.matchAll(/\]\((references\/[^\s)#?]+\.md)(?:#[^\s)]*)?\)/g)].map(match => match[1]!))];
-  const references = await Promise.all(paths.map(path => context.read({ name: "story", scope: manifest.scope, path }, signal)));
-  return [manifest.content, ...references.map(reference => `## ${reference.path}\n${reference.content}`)].join("\n\n");
+  let entry = await context.read({ name: "story" }, signal);
+  if (isShortDrama(project.brief)) {
+    const { frontmatter } = parseFrontmatter<{ metadata?: { shortDramaEntry?: unknown } }>(entry.content);
+    const path = frontmatter.metadata?.shortDramaEntry;
+    if (typeof path === "string" && path) entry = await context.read({ name: "story", scope: entry.scope, path }, signal);
+  }
+  // ACT: 只展开当前入口直接引用的创作资料，不递归加载参考库或其他技能，避免上下文无限增长。
+  const paths = [...new Set([...entry.content.matchAll(/\]\((references\/[^\s)#?]+\.md)(?:#[^\s)]*)?\)/g)].map(match => match[1]!))];
+  const references = await Promise.all(paths.map(path => context.read({ name: "story", scope: entry.scope, path }, signal)));
+  return [entry.content, ...references.map(reference => `## ${reference.path}\n${reference.content}`)].join("\n\n");
 }
 
 export function createSkillContext(cwd: string): SkillContext {

@@ -19,9 +19,9 @@
           <nav class="assetTypeTabs" aria-label="资产类型">
             <button v-for="item in assetTypeTabs" :key="item[0]" type="button" :aria-pressed="assetTypeFilter === item[0]" @click="run(() => selectAssetType(item[0]))">{{ item[1] }}</button>
           </nav>
-          <h3>跨项目资产库</h3>
+          <h3>{{ assetTypeFilter === 'Character' ? '角色库' : '跨项目资产库' }}</h3>
           <p class="reviewHint">上传照片或生成定妆图，保存并采用资产后收藏。资产库独立保存参考图，各项目导入后可单独修改；按上方类型分别查看人物、场景与道具。</p>
-          <characterPicker v-if="assetTypeFilter === 'Character'" v-model="selectedCharacters" :projectId="projectId" :existingIds="importedCharacterIds" :disabled="busy" @busy="castingBusy = $event" @imported="run(refreshAssetLibrary)" />
+          <characterPicker v-if="assetTypeFilter === 'Character'" ref="castingPicker" v-model="selectedCharacters" alwaysOpen :projectId="projectId" :projectAssets="assets" :disabled="busy" @busy="castingBusy = $event" @imported="run(refreshAssetLibrary)" @changed="run(refreshAssetLibrary)" />
           <details class="libraryManagement" :open="assetTypeFilter !== 'Character'"><summary>管理资产库（收藏、筛选与删除）</summary>
           <details class="libraryFilters"><summary>搜索与筛选</summary>
             <div class="fieldGrid">
@@ -329,6 +329,7 @@ const section = ref("overview"), busy = ref(false), error = ref(""), message = r
 const batchBusy = ref(false), projectMedia = ref<any[]>([]), mediaFilter = ref("");
 const mediaVersionLabel = (status: string) => ({ variant: "关键帧候选", candidate: "视频候选", hero: "当前主帧", approved: "已批准", superseded: "历史版本", rejected: "未采用" }[status] ?? status);
 const selectedCharacters = ref<CharacterSelection[]>([]), castingBusy = ref(false);
+const castingPicker = ref<InstanceType<typeof characterPicker>>();
 const controller = new AbortController();
 let pollTimer: ReturnType<typeof setTimeout> | undefined;
 onScopeDispose(() => { controller.abort(); clearTimeout(pollTimer); clearInterval(watchTimer); });
@@ -966,10 +967,12 @@ async function refreshAssetLibrary() {
   const [images, refs, projectAssets] = await Promise.all([request(`/projects/${projectId}/assetImages`), request(`/projects/${projectId}/references`), request(`/projects/${projectId}/assets`)]);
   assetImages.value = images; references.value = refs; assets.value = projectAssets;
   await Promise.all([searchLibraryAssets(), refreshLibrarySources()]);
+  castingPicker.value?.refresh();
 }
 async function toggleFavorite(entry: any) {
   await request(`/library/assets/${entry.id}/favorite`, "PUT", { favorite: !entry.favorite });
   await searchLibraryAssets();
+  castingPicker.value?.refresh();
 }
 async function removeAsset(item: any) {
   const approved = item.approvalStatus === "approved";
@@ -990,7 +993,8 @@ async function generateCharacter() {
   emit("generateCharacter", item.id);
   visible.value = false;
 }
-async function openLibrary() {
+async function openLibrary(type?: "Character") {
+  if (type) { assetTypeFilter.value = type; libraryFilter.value.type = type; }
   section.value = "assets"; visible.value = true;
   if (loaded) await run(refreshAssetLibrary);
 }
