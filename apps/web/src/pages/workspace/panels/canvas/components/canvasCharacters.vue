@@ -42,7 +42,7 @@ import type { CharacterSelection } from "@/lib/characterAssets";
 
 type Character = { id: string; name: string; type: string; attributes?: { authoritativeReference?: string; importedFrom?: string } };
 type AssetImage = { id: string; url: string; mime: string };
-type Shot = { id: string; projectId: string; assetIds: string[]; visibleAssetIds?: string[]; updatedAt?: string; heroKeyframeId?: string; approvedTakeId?: string };
+type Shot = { id: string; projectId: string; assetIds: string[]; visibleAssetIds?: string[]; initiallyHiddenAssetIds?: string[]; updatedAt?: string; heroKeyframeId?: string; approvedTakeId?: string };
 const props = defineProps<{ projectId: string; directory: string; availableNodes: { type: string }[]; batchHistory: (action: () => Promise<void>) => Promise<void>; getSignal: () => AbortSignal }>();
 const visible = defineModel<boolean>({ default: false });
 const flow = useVueFlow();
@@ -156,7 +156,7 @@ async function applyCharacters() {
       if (JSON.stringify(visibleAssetIds) !== JSON.stringify(shot.visibleAssetIds ?? shot.assetIds)) {
         if (shot.heroKeyframeId || shot.approvedTakeId) await ElMessageBox.confirm("调整出镜角色会使已采用画面的检查记录过期，原有画面保留。", "调整镜头角色", { confirmButtonText: "应用角色", cancelButtonText: "取消" });
         signal.throwIfAborted();
-        await cloudRequest(`/shots/${encodeURIComponent(shot.id)}`, "PATCH", { assetIds: [...new Set([...shot.assetIds, ...chosen])], visibleAssetIds, expectedUpdatedAt: shot.updatedAt, confirm: !!(shot.heroKeyframeId || shot.approvedTakeId) });
+        await cloudRequest(`/shots/${encodeURIComponent(shot.id)}`, "PATCH", { assetIds: [...new Set([...shot.assetIds, ...chosen])], visibleAssetIds, initiallyHiddenAssetIds: shot.initiallyHiddenAssetIds?.filter(id => visibleAssetIds.includes(id)), expectedUpdatedAt: shot.updatedAt, confirm: !!(shot.heroKeyframeId || shot.approvedTakeId) });
       }
       linkedIds.value = chosen;
       window.dispatchEvent(new Event("milimiliProductionUpdated"));

@@ -25,6 +25,8 @@ export default Router().post("/", validateFields({
   const result = await registerImported(cwd, { kind, name, description, wardrobe, images });
   res.json(success({
     ...result,
-    note: "导入的资产不进生成队列、不消耗额度；要补其他角度时用 POST /api/ai/media/assetSheet（reference 指向这张图）",
+    note: kind === "scene"
+      ? "场景参考已登记。补拍其他角度时，用已采用的首图生成独立文件，再将原有参考与新视角一起登记到这个场景。"
+      : "导入的资产不进生成队列、不消耗额度；要补其他角度时用 POST /api/ai/media/assetSheet（reference 指向这张图）",
   }));
 });

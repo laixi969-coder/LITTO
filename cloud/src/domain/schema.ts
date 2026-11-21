@@ -160,6 +160,10 @@ export const creativeBriefSchema = z.object({
             speakerId: directionText, text: directionText,
             start: z.number().finite().nonnegative(), end: z.number().finite().positive(),
             delivery: directionText, lipSync: z.enum(["visible", "offscreen"]), framing: directionText,
+            reactions: z.array(z.object({
+                listenerId: directionText, cue: directionText.regex(/[\p{L}\p{N}]/u).describe("本句中触发可见反应的原词"),
+                before: directionText.describe("听清该词前的可见动作或视线"), after: directionText.describe("听清后发生的可见变化"),
+            }).strict()).max(8).optional(),
             audio: z.object({ mediaId: z.string().min(1), text: directionText }).strict().optional(),
             coverage: z.array(z.object({ start: z.number().finite().nonnegative(), end: z.number().finite().positive(), description: directionText }).strict()).min(1).max(40).optional(),
         }).strict()).max(40),
@@ -205,6 +209,7 @@ export const shotInput = z.object({
     narrativeFunction: z.enum(NARRATIVE_FUNCTIONS).default("Establish"),
     assetIds: z.array(z.string()).default([]),
     visibleAssetIds: z.array(z.string()).optional().describe("本镜实际出镜的资产，须为 assetIds 的子集；画外声音保留在对白中。省略时兼容旧镜头，沿用 assetIds；空数组表示无人无物出镜"),
+    initiallyHiddenAssetIds: z.array(z.string().min(1)).optional().describe("本镜稍后才入画或揭示的出镜资产。首帧不发送其外观和专属参考，视频按本镜动作揭示"),
     action: z.string().default(""), performance: z.object({ emotion: z.string().default(""), intensity: z.number().default(0.5), eyeline: z.string().default(""), lookTarget: z.string().default(""), gesture: z.string().default(""), timing: z.string().default("") }).default({}),
     blocking: z.object({ foreground: z.string().default(""), midground: z.string().default(""), background: z.string().default("") }).default({}),
     camera: cameraSchema.default({}), lighting: lightingSchema.default({}),

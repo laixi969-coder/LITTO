@@ -9,10 +9,17 @@ import { musicSource } from "./music.ts";
 
 export const shotPartial = shotInput.partial();
 
-export function validateVisibleAssets(input: Pick<ShotInput, "assetIds" | "visibleAssetIds" | "creativeBrief">) {
-    if (input.visibleAssetIds === undefined) return;
-    if (input.visibleAssetIds.some(id => !input.assetIds.includes(id))) throw bad("出镜资产须属于本镜 assetIds");
-    if (input.creativeBrief?.dialogue.lines.some(line => line.lipSync === "visible" && !input.visibleAssetIds!.includes(line.speakerId))) throw bad("画内说话人须在出镜资产中；画外声音使用 offscreen");
+export function validateVisibleAssets(input: Pick<ShotInput, "assetIds" | "visibleAssetIds" | "initiallyHiddenAssetIds" | "creativeBrief">) {
+    const visible = input.visibleAssetIds ?? input.assetIds;
+    if (input.visibleAssetIds?.some(id => !input.assetIds.includes(id))) throw bad("出镜资产须属于本镜 assetIds");
+    if (input.initiallyHiddenAssetIds?.some(id => !visible.includes(id))) throw bad("稍后入画的资产须属于本镜出镜资产");
+    for (const line of input.creativeBrief?.dialogue.lines ?? []) {
+        if (line.lipSync === "visible" && !visible.includes(line.speakerId)) throw bad("画内说话人须在出镜资产中；画外声音使用 offscreen");
+        for (const reaction of line.reactions ?? []) {
+            if (reaction.listenerId === line.speakerId || !visible.includes(reaction.listenerId)) throw bad("对白反应须绑定本镜出镜的听者");
+            if (!line.text.includes(reaction.cue)) throw bad("触发反应的词必须逐字出现在对应原句中");
+        }
+    }
 }
 
 const dataOf = (i: ShotInput) => {
@@ -57,7 +64,7 @@ export function createShot(s: Scope, projectId: string, input: ShotInput) {
 }
 
 /** Changing the core intent of a shot that already has a Hero Frame / Approved Take must be confirmed (PRD §13). */
-const CORE = ["source", "continuityFromShotId", "continuity", "sceneId", "narrativeFunction", "action", "assetIds", "visibleAssetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "interactions", "creativeBrief", "advertising", "techniques"] as const;
+const CORE = ["source", "continuityFromShotId", "continuity", "sceneId", "narrativeFunction", "action", "assetIds", "visibleAssetIds", "initiallyHiddenAssetIds", "camera", "lighting", "realism", "freedomMap", "performance", "blocking", "intendedStateDelta", "duration", "subtitle", "generationDuration", "inspectionRegion", "musicVideo", "interactions", "creativeBrief", "advertising", "techniques"] as const;
 export function updateShot(s: Scope, id: string, patch: Partial<ShotInput>, confirm = false) {
     const shot = s.get("shots", id);
     if (!shot) throw notFound("shot");
@@ -151,7 +158,7 @@ export function createShotsFromDrafts(s: Scope, projectId: string, sequenceId: s
             validateShotDirection(d);
             if (!scenes.has(d.sceneIndex)) scenes.set(d.sceneIndex, s.insert("scenes", { project_id: projectId, sequence_id: sequenceId, name: d.sceneName, ord: d.sceneIndex, data: {} }).id);
             const ord = all("SELECT COALESCE(MAX(ord),-1)+1 AS n FROM shots WHERE sequence_id=? AND workspace_id=? AND deleted_at IS NULL", sequenceId, s.workspaceId)[0].n;
-            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, ...(d.visibleAssetIds !== undefined ? { visibleAssetIds: d.visibleAssetIds } : {}), action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration, ...(d.source ? { source: d.source } : {}), ...(d.creativeBrief ? { creativeBrief: d.creativeBrief } : {}), ...(d.techniques ? { techniques: d.techniques } : {}), ...(d.continuity ? { continuity: d.continuity } : {}), ...(d.continuityFromIndex !== undefined ? { continuityFromShotId: out[d.continuityFromIndex].id } : {}) } });
+            const shot = s.insert("shots", { project_id: projectId, sequence_id: sequenceId, scene_id: scenes.get(d.sceneIndex), ord, schema_version: SCHEMA_VERSION, status: "planned", data: { subtitle: d.subtitle ?? "", title: d.title, narrativeFunction: d.narrativeFunction, assetIds: d.assetIds, ...(d.visibleAssetIds !== undefined ? { visibleAssetIds: d.visibleAssetIds } : {}), ...(d.initiallyHiddenAssetIds?.length ? { initiallyHiddenAssetIds: d.initiallyHiddenAssetIds } : {}), action: d.action, performance: d.performance, blocking: d.blocking, camera: d.camera, lighting: d.lighting, intendedStateDelta: d.intendedStateDelta, constraints: [], duration: d.duration, ...(d.source ? { source: d.source } : {}), ...(d.creativeBrief ? { creativeBrief: d.creativeBrief } : {}), ...(d.techniques ? { techniques: d.techniques } : {}), ...(d.continuity ? { continuity: d.continuity } : {}), ...(d.continuityFromIndex !== undefined ? { continuityFromShotId: out[d.continuityFromIndex].id } : {}) } });
             out.push(shot);
         }
         recomputeStates(s, sequenceId);

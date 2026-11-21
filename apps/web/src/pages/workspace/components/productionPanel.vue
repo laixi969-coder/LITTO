@@ -147,7 +147,13 @@
             <imageRegion v-if="draft.inspectionRegion && inspectionImage" v-model="draft.inspectionRegion" :src="mediaUrl(inspectionImage.url)" label="检查区域" :disabled="busy" @update:modelValue="dirty = true" />
             <p v-else-if="draft.inspectionRegion">请先选择或生成关键帧，再框选检查区域。</p>
             <h3>出场资产</h3>
-            <div class="checkList"><div v-for="item in assets" :key="item.id"><label><input v-model="draft.assetIds" type="checkbox" :value="item.id" @change="changeShotAsset(item.id)" />{{ item.name }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</label><label v-if="draft.assetIds.includes(item.id)"><input type="checkbox" :checked="(draft.visibleAssetIds ?? draft.assetIds).includes(item.id)" @change="setAssetVisibility(item.id, ($event.target as HTMLInputElement).checked)" />出镜</label></div></div>
+            <div class="checkList">
+              <div v-for="item in assets" :key="item.id">
+                <label><input v-model="draft.assetIds" type="checkbox" :value="item.id" @change="changeShotAsset(item.id)" />{{ item.name }} · {{ item.approvalStatus === 'approved' ? '已批准' : '草稿' }}</label>
+                <label v-if="draft.assetIds.includes(item.id)"><input type="checkbox" :checked="(draft.visibleAssetIds ?? draft.assetIds).includes(item.id)" @change="setAssetVisibility(item.id, ($event.target as HTMLInputElement).checked)" />出镜</label>
+                <label v-if="(draft.visibleAssetIds ?? draft.assetIds).includes(item.id)"><input type="checkbox" :checked="draft.initiallyHiddenAssetIds?.includes(item.id)" @change="setLaterAppearance(item.id, ($event.target as HTMLInputElement).checked)" />稍后入画</label>
+              </div>
+            </div>
             <div class="fieldGrid" @change="dirty = true"><label>轴线侧<select v-model="draft.camera.side"><option value="none">未指定</option><option value="A">A 侧</option><option value="B">B 侧</option></select></label><label>画面运动方向<select v-model="draft.camera.screenDirection"><option value="none">无</option><option value="left">向左</option><option value="right">向右</option></select></label><label>光向坐标<select v-model="draft.lighting.directionSpace"><option value="screen">画面坐标</option><option value="world">场景固定坐标</option></select></label><label>主光方向<select v-model="draft.lighting.keyDirection"><option v-for="value in ['none', 'left', 'right', 'front', 'back', 'top']" :key="value">{{ value }}</option></select></label></div>
             <button type="button" @click="run(saveShot)">{{ dirty ? '保存镜头规格' : '镜头规格已保存' }}</button>
             <h3>参考用途</h3>
@@ -592,12 +598,20 @@ async function saveShot() {
 }
 function changeShotAsset(id: string) {
   if (draft.value.visibleAssetIds) draft.value.visibleAssetIds = [...new Set([...draft.value.visibleAssetIds, id])].filter(value => draft.value.assetIds.includes(value));
+  if (draft.value.initiallyHiddenAssetIds) draft.value.initiallyHiddenAssetIds = draft.value.initiallyHiddenAssetIds.filter((value: string) => draft.value.assetIds.includes(value));
   dirty.value = true;
 }
 function setAssetVisibility(id: string, visible: boolean) {
   const ids = new Set<string>(draft.value.visibleAssetIds ?? draft.value.assetIds);
   if (visible) ids.add(id); else ids.delete(id);
+  if (!visible && draft.value.initiallyHiddenAssetIds?.includes(id)) setLaterAppearance(id, false);
   draft.value.visibleAssetIds = [...ids]; dirty.value = true;
+}
+function setLaterAppearance(id: string, later: boolean) {
+  const ids = new Set<string>(draft.value.initiallyHiddenAssetIds);
+  if (later) ids.add(id); else ids.delete(id);
+  draft.value.initiallyHiddenAssetIds = [...ids];
+  dirty.value = true;
 }
 async function selectShot(id: string) {
   await saveShot();

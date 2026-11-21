@@ -212,14 +212,16 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           const input = { directory: cwd, projectId, sequenceIds, storyRevisionId: story.approvedId ?? undefined,
             script: sequences.map(sequence => sequence!.script ?? "").join("\n") };
           const snapshot = await narrativePlan(input);
-          const review = await reviewNarrative(snapshot, mediaSignal(signal) ?? new AbortController().signal);
+          // 无采用稿也能按当前镜头规格看听实片，逐场核对原稿仍由 reviewNarrative 检查。
+          const review = snapshot.plan.revision || operation === "reviewNarrative"
+            ? await reviewNarrative(snapshot, mediaSignal(signal) ?? new AbortController().signal) : undefined;
           if ((await narrativePlan(input)).key !== snapshot.key) throw new Error("审查期间剧本、分镜或剪辑已变化，请重新核对");
-          const issues = [...snapshot.issues, ...narrativeFailures(review)];
+          const issues = [...snapshot.issues, ...(review ? narrativeFailures(review) : [])];
           if (operation === "observeNarrative") {
             const mediaId = parsed.mediaId!;
             const plan = await cameraObservationPlan(cwd, projectId, mediaId, sequenceIds);
             const observerKey = videoObservationModel().key;
-            const events = review.scenes.flatMap(scene => (scene.events ?? []).map(event => ({ ...event, sceneId: scene.sceneId })));
+            const events = review?.scenes.flatMap(scene => (scene.events ?? []).map(event => ({ ...event, sceneId: scene.sceneId }))) ?? [];
             const observation = await observeVideo(cwd, projectId, projectId, mediaId, JSON.stringify(snapshot.plan), mediaSignal(signal) ?? new AbortController().signal, plan, events);
             if ((await narrativePlan(input)).key !== snapshot.key || videoObservationModel().key !== observerKey) throw new Error("观察期间剧本、分镜或审片模型已变化，请重新观察");
             return { issues, observation, storyKey: snapshot.key, observerKey };

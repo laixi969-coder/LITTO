@@ -23,7 +23,8 @@ export interface AutoFilmPlayback {
   storyChecks?: Record<"narrative" | "performance" | "continuity" | "dialogueCoverage" | "lipSync" | "editing" | "sound", AutoFilmCheck>;
   eventReviews?: ({ id: string; quote: string; start: number | null; end: number | null; evidence: "direct" | "inferred" | "unverified" } & AutoFilmCheck)[];
   cutReviews?: ({ id: string; seconds: number } & AutoFilmCheck)[];
-  dialogueReviews?: { id: string; speakerId: string; transcript: string; start: number | null; end: number | null; verdict: "pass" | "revise" | "unverified"; note: string }[];
+  dialogueReviews?: (AutoFilmCheck & { id: string; speakerId: string; transcript: string; start: number | null; end: number | null;
+    reactions?: (AutoFilmCheck & { listenerId: string; cue: string; heardAt: number | null; reactedAt: number | null })[] })[];
   cameraReviews?: {
     takeId: string;
     fingerprint: string;

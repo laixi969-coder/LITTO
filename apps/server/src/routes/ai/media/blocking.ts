@@ -16,7 +16,7 @@ const personSchema = z.strictObject({
 });
 
 const cameraSchema = z.strictObject({
-  id: z.string().trim().min(1).max(20),
+  id: z.string().trim().min(1).max(128),
   x: z.number().min(-10).max(1000),
   y: z.number().min(-10).max(1000),
   target: z.union([z.string().trim().min(1).max(40), z.tuple([z.number(), z.number()])]),

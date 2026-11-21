@@ -4,7 +4,7 @@ import { shotInput } from "./schema.ts";
 import { conflict, notFound, HttpError } from "../util.ts";
 import { statesOf, validateStateDelta, continuityPredecessor } from "./state.ts";
 import { adContext } from "./adDirection.ts";
-import { needsLipSync, qualityReviewPlan, coversSpeechRanges } from "@toonflow/tool-media-generation/runtime";
+import { needsLipSync, qualityReviewPlan, coversSpeechRanges, hasDialogueReactions } from "@toonflow/tool-media-generation/runtime";
 import { z } from "zod";
 import { techniqueVersion, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
 import { assertSpeechPlan } from "./speechPlanning.ts";
@@ -125,6 +125,13 @@ export function requireReviewed(s: Scope, type: "keyframe" | "take", item: Recor
     if (coverageIssue) throw conflict(coverageIssue, "speech_media_coverage_required");
   }
   const plan = qualityReviewPlan(shot ?? {}, type);
+  if (type === "take" && shot && hasDialogueReactions(shot)) {
+    const observed = item.meta?.narrativeObservation;
+    if (observed?.version !== 1 || observed.hash !== s.get("media", item.mediaId)?.hash || observed.fingerprint !== shotFingerprint(s, shot.id)
+      || observed.storyChecks?.performance?.verdict !== "pass" || observed.storyChecks?.dialogueCoverage?.verdict !== "pass") {
+      throw conflict("须看听当前视频并核对对白词位与听者反应，抢拍或缺少声画证据的镜头不能采用", "dialogue_reaction_review_required");
+    }
+  }
   if (type === "take" && shot?.source?.revisionId && (!evidence?.fullPlayback || evidence.vision?.creativeReview?.verdict !== "pass" || !evidence.observedStateDelta)) {
     throw conflict("叙事镜头须完整播放，对照剧本确认表演与动作衔接通过，并记录实际末态，才能采用或定稿", "narrative_playback_required");
   }

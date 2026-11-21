@@ -116,22 +116,26 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     if (missingAssets.length) throw bad(`镜头资产不存在或不属于当前项目：${missingAssets.join("、")}；请在生成前修正资产引用`);
     // ACT: 旧镜头未标明出镜集合时沿用 assetIds；不凭台词中的画外标记猜测整镜是否出镜。
     const visibleIds = new Set<string>(shot.visibleAssetIds ?? shot.assetIds);
+    const initiallyHidden = new Set<string>(shot.initiallyHiddenAssetIds);
     const state = statesOf(s, shotId);
-    const relevantIds = new Set(visibleIds);
-    for (const id of visibleIds) {
+    const relevantIds = new Set([...visibleIds].filter(id => kind === "video" || !initiallyHidden.has(id)));
+    for (const id of [...relevantIds]) {
         const wardrobeId = state.start.characters[id]?.wardrobeId;
         if (wardrobeId && projectAssets.get(wardrobeId)?.type === "Wardrobe") relevantIds.add(wardrobeId);
     }
     const assets = [...relevantIds].map(id => projectAssets.get(id)!) as any[];
+    const coveredByHero = (id: string) => kind === "video" && !!extra.startFrameMediaId && !initiallyHidden.has(id);
+    const assetRefOwners = s.list("reference_bindings", { projectId: proj, targetType: "asset" });
     const assetBindings = assets.flatMap(asset => {
         // 已审看主帧承载视频身份；不再挤占单首帧模式的输入槽。
+        const bound = assetRefOwners.filter(binding => binding.targetId === asset.id);
         const audio = kind === "video" && ["Character", "Creature"].includes(asset.type)
-            ? s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).filter(binding => binding.role === "AUDIO")
+            ? bound.filter(binding => binding.role === "AUDIO")
                 .map(binding => ({ ...binding, notes: `${asset.name} 的音色参考` })) : [];
-        if (kind === "video" && extra.startFrameMediaId || asset.attributes?.authoritativeReference) return audio;
+        if (coveredByHero(asset.id) || asset.attributes?.authoritativeReference) return audio;
         const role = ["Character", "Creature"].includes(asset.type) ? "IDENTITY"
             : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
-        const inherited: Row[] = s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).filter(binding => binding.role === role)
+        const inherited: Row[] = bound.filter(binding => binding.role === role)
             .map(binding => ({ ...binding, lockLevel: (["IDENTITY", "WARDROBE"].includes(role) || asset.type === "Prop" && role === "GEOMETRY") ? "LOCK" : binding.lockLevel }));
         const references = (asset.references ?? []).filter((id: string) => !inherited.some(binding => binding.referenceId === id))
             .filter((id: string) => s.get("refs", id)?.kind === "image")
@@ -141,20 +145,22 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     // 视频由已检查首帧继承影调；静帧须实际发送视觉目标，容量不足仍走原有锁定参考门禁。
     const lookBindings = kind === "image" ? lookReferenceBindings(s, proj, look) : [];
     const bindings = [...s.list("reference_bindings", { targetType: "shot", targetId: shotId }), ...assetBindings, ...lookBindings].filter(binding => {
-        if (!["IDENTITY", "WARDROBE", "GEOMETRY", "ENVIRONMENT"].includes(binding.role)) return true;
+        const depictsAsset = ["IDENTITY", "WARDROBE", "GEOMETRY", "ENVIRONMENT"].includes(binding.role);
+        if (!depictsAsset && (kind !== "image" || !initiallyHidden.size || binding.role === "AUDIO")) return true;
         const reference = s.get("refs", binding.referenceId);
-        const owners = [...projectAssets.values()].filter(asset => asset.references?.includes(binding.referenceId)
-            || reference?.mediaId && asset.attributes?.authoritativeReference === reference.mediaId);
-        return !owners.length || owners.some(asset => relevantIds.has(asset.id));
+        const owners = assetRefOwners.filter(owner => owner.referenceId === binding.referenceId).map(owner => owner.targetId);
+        for (const asset of projectAssets.values()) if (asset.references?.includes(binding.referenceId)
+            || reference?.mediaId && asset.attributes?.authoritativeReference === reference.mediaId) owners.push(asset.id);
+        return !owners.length || owners.some(id => depictsAsset ? relevantIds.has(id) : !initiallyHidden.has(id));
     });
     const model = modelView(get("SELECT * FROM models WHERE id=?", modelId)!);
     const caps = model.capabilities;
     // 保留完整状态账本，只投影本镜资产；不把历史人物、全场知情或情绪档案作为画面指令。
     const start = Object.fromEntries(["characters", "wardrobe", "props", "environment"].map(group => [group,
-        Object.fromEntries(Object.entries(state.start[group as keyof typeof state.start]).filter(([id]) => relevantIds.has(id)).map(([id, value]) => {
+        Object.fromEntries(Object.entries(state.start[group as keyof typeof state.start]).filter(([id]) => relevantIds.has(id) && !initiallyHidden.has(id)).map(([id, value]) => {
             if (!value || typeof value !== "object" || Array.isArray(value)) return [id, value];
             const { heldBy, present, ...rest } = value;
-            return [id, { ...rest, ...(heldBy && visibleIds.has(heldBy) ? { heldBy: projectAssets.get(heldBy)?.name ?? heldBy } : {}) }];
+            return [id, { ...rest, ...(heldBy && relevantIds.has(heldBy) && !initiallyHidden.has(heldBy) ? { heldBy: projectAssets.get(heldBy)?.name ?? heldBy } : {}) }];
         })),
     ]));
     const warnings: string[] = [];
@@ -204,7 +210,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     const inputs: Compiled["inputs"] = [];
     let used = kind === "video" && extra.startFrameMediaId ? 1 : 0;
     // 已验收主帧承载视频身份；关键帧生成须实际发送定妆图，不能只把媒体 ID 写进提示词。
-    if (!extra.startFrameMediaId) for (const asset of assets) {
+    for (const asset of assets) {
+        if (coveredByHero(asset.id)) continue;
         const mediaId = asset.attributes?.authoritativeReference;
         if (!mediaId) continue;
         const media = s.get("media", mediaId);
@@ -270,7 +277,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     if (["story", "serial", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"].includes(s.get("sequences", shot.sequenceId)?.kind ?? "story")) {
       for (const asset of assets) {
         if (asset.approvalStatus !== "approved") warnings.push(`创作准备未完成：资产「${asset.name}」尚未采用，请先固定设定再生成正式镜头`);
-        if (kind === "video" && extra.startFrameMediaId || !["Character", "Creature", "Wardrobe", "Environment", "Product", "Vehicle", "Prop"].includes(asset.type)) continue;
+        if (coveredByHero(asset.id) || !["Character", "Creature", "Wardrobe", "Environment", "Product", "Vehicle", "Prop"].includes(asset.type)) continue;
         const role = ["Character", "Creature"].includes(asset.type) ? "IDENTITY" : asset.type === "Wardrobe" ? "WARDROBE" : asset.type === "Environment" ? "ENVIRONMENT" : "GEOMETRY";
         const referenceIds = [...(asset.references ?? []), ...s.list("reference_bindings", { targetType: "asset", targetId: asset.id }).map(binding => binding.referenceId)];
         const mediaIds = new Set([asset.attributes?.authoritativeReference, ...referenceIds.map(id => s.get("refs", id)?.mediaId)].filter(Boolean));
@@ -296,14 +303,17 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     lock.push(...(extra.repair?.addLock ?? []));
     const freedom = { LOCK: [...new Set(lock)], CONTROL: shot.freedomMap?.CONTROL?.length ? shot.freedomMap.CONTROL : ["composition", "focal length", "action", "camera move", "lighting"], ALLOW: shot.freedomMap?.ALLOW?.length ? shot.freedomMap.ALLOW : ["natural cloth creases", "micro-expressions", "subtle hair movement"], RANDOM: shot.freedomMap?.RANDOM?.length ? shot.freedomMap.RANDOM : [] };
     const brief = shot.creativeBrief as ShotInput["creativeBrief"];
+    const startingImage = kind === "image" && (!!cam.design?.start?.trim() || initiallyHidden.size > 0);
     const assetName = (id: string) => projectAssets.get(id)?.name ?? id;
+    const reactions = brief?.dialogue.lines.flatMap((line, index) => (line.reactions ?? []).map(reaction => ({ ...reaction, lineNumber: index + 1 }))) ?? [];
+    if (kind === "image" && initiallyHidden.size && !cam.design?.start?.trim()) warnings.push("创作准备未完成：有资产稍后才揭示，请在 camera.design.start 写明首帧实际可见的持物、遮挡与位置");
     const appearance = assets.flatMap(asset => {
         const attributes = Object.fromEntries(Object.entries(asset.attributes ?? {}).filter(([key]) => !["characterDirection", "authoritativeReference", "authoritativePromotedAt", "importedFrom", "biography", "backstory", "relationships", "voice", "voiceId"].includes(key)));
         return Object.keys(attributes).length ? [`${asset.name}: ${JSON.stringify(attributes)}`] : [];
     });
 
     let sections: Record<string, string> = {
-        creativeIntent: kind === "image" && cam.design?.start
+        creativeIntent: startingImage
             ? "Create only the specified starting instant. The starting frame defines present gaze, position and held objects; later story outcomes must remain absent. Use the current lighting and Look even when the environment reference has different exposure or color."
             : J([brief?.intent, brief?.visualPayoff,
             cam.design?.purpose && `Viewing purpose: ${cam.design.purpose}`,
@@ -321,25 +331,25 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         subject: J([kind === "image" && !!cam.design?.start && "Appearance references only; initial occupancy is defined exclusively by the starting frame, not by this list",
             ...assets.map(a => `${a.name} (${a.type}${a.description ? ": " + clean(a.description, a.name) : ""})`)]),
         assetDetails: J(appearance),
-        action: kind === "image" && cam.design?.start ? "Render the specified starting frame only, before subsequent actions and their results." : clean(shot.action || shot.title, "action"),
+        action: startingImage ? "Render the specified starting frame only, before subsequent actions and their results." : clean(shot.action || shot.title, "action"),
         performance: kind === "video" ? J([
             // ACT: 时间线存在不代表已包含触发与反应；保留导演原文，语义冲突由现有叙事审查处理。
             shot.performance?.gesture, shot.performance?.timing,
             shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`,
-            shot.performance?.lookTarget && `looking at ${shot.performance.lookTarget}`,
+            shot.performance?.lookTarget && `gaze target: ${shot.performance.lookTarget}; keep the subject's gaze on the specified in-scene target or follow its planned changes, including while showing an object. Look into the lens only if directed.`,
             !shot.performance?.gesture && shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`,
         ]) : "",
         continuityContext: Object.values(start).some(group => Object.keys(group).length)
             ? `Continuity ledger for present subjects, not additional action instructions. Retain compatible injuries, identity and prop ownership; previous poses or contacts may predate this shot. Follow the explicit starting state and current causal action order; never reinstate completed contact, restore lost power or replay an earlier event to fill speech: ${JSON.stringify(start)}` : "",
-        shotConnection: shot.continuity ? `本镜跨镜关系 ${shot.continuity.mode}；起始画面承接要求：${shot.continuity.visual}。这是本镜起点约束，不重演前镜事件、不生成额外转场。${shot.continuity.mode === "coverage" ? "按本镜新机位保持空间、视线和动作阶段，不照搬前镜构图。" : ""}` : "",
+        shotConnection: shot.continuity ? `本镜跨镜关系 ${shot.continuity.mode}。${kind === "image" && initiallyHidden.size ? "" : `起始画面承接要求：${shot.continuity.visual}。`}这是本镜起点约束，不重演前镜事件、不生成额外转场。${shot.continuity.mode === "coverage" ? "按本镜新机位保持空间、视线和动作阶段，不照搬前镜构图。" : ""}` : "",
         blocking: J([
-            !timed("foreground") && (kind === "video" || !cam.design?.start) && shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`,
-            (kind === "video" || !cam.design?.start) && shot.blocking?.midground && `midground: ${shot.blocking.midground}`,
-            !timed("background") && (kind === "video" || !cam.design?.start) && shot.blocking?.background && `background: ${shot.blocking.background}`,
+            !timed("foreground") && !startingImage && shot.blocking?.foreground && `foreground: ${shot.blocking.foreground}`,
+            !startingImage && shot.blocking?.midground && `midground: ${shot.blocking.midground}`,
+            !timed("background") && !startingImage && shot.blocking?.background && `background: ${shot.blocking.background}`,
         ]),
         view: viewText,
         // ACT: 完整路线优先于旧运动摘要，避免默认 static 冲突；语义一致性由导演复核，不用关键词猜轨迹。
-        camera: J([`${cam.shotSize} shot`, !timed("lensMm") && `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, !timed("aperture") && cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, cam.focus && `focus on ${cam.focus}`, kind === "video" && !timed("cameraMove") && !cam.design?.cameraPath?.trim() && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
+        camera: J([`${cam.shotSize} shot`, !timed("lensMm") && `${cam.lensMm}mm lens`, cam.height && `${cam.height} height`, cam.angle && `${cam.angle} angle`, cam.position && `from ${cam.position}`, !timed("aperture") && cam.depth && `${cam.depth} depth of field`, cam.axisCrossing && `motivated axis crossing: ${cam.axisCrossing}`, (kind === "video" || !initiallyHidden.size) && cam.focus && `focus on ${cam.focus}`, kind === "video" && !timed("cameraMove") && !cam.design?.cameraPath?.trim() && `camera ${cam.motion}${cam.motivation ? ` (${cam.motivation})` : ""}`]),
         lighting: J([lt.worldSource && `fixed world light source: ${lt.worldSource}`, lt.keyDirection && lt.keyDirection !== "none" && `key direction ${lt.keyDirection} in ${lt.directionSpace ?? "screen"} coordinates`, lt.motivatedLight && `motivated by ${lt.motivatedLight}`, lt.key && `key: ${lt.key}`, lt.fill && `fill: ${lt.fill}`, lt.negativeFill && `negative fill: ${lt.negativeFill}`, lt.practicals?.length && `practicals: ${lt.practicals.join(", ")}`, lt.exposure && `exposure: ${lt.exposure}`, lt.timeOfDay && `${lt.timeOfDay}`, lt.colorTemp]),
         world: world ? J([world.realism && `medium: ${world.realism}`, world.era, world.locationLogic, world.architecture, world.weather && `weather: ${world.weather}`, world.time, world.material && `materials: ${world.material}`, `physics: ${world.physics}`, ...(world.environmentalConstraints ?? [])]) : "",
         look: J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette.length > 0 && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`, look.shadowBehavior && `shadow behavior ${look.shadowBehavior}`, look.bloom && `bloom ${look.bloom}`, look.texture && `material texture ${look.texture}`, look.sharpnessPhilosophy && `sharpness philosophy ${look.sharpnessPhilosophy}`]),
@@ -363,6 +373,9 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         repair: extra.repair?.note ?? "",
     };
     if (kind === "video") {
+        if (reactions.length) sections.dialogue += "\n听者的表演提示（只说上列原句）：\n" + reactions.map(reaction =>
+            `第${reaction.lineNumber}句，${assetName(reaction.listenerId)}保持${reaction.before}，听清“${reaction.cue}”后才${reaction.after}。`).join("\n");
+        if (initiallyHidden.size) sections.shotConnection = J([sections.shotConnection, `起幅时尚不可见：${[...initiallyHidden].map(assetName).join("、")}。只在本镜规定的入画或揭示动作之后看清。`]);
         if (cam.design?.timeline) {
             sections.timeline = executionTimeline.map(item => `【${item.start}-${item.end}s${item.editId ? ` · 源镜号 ${item.editId}` : ""} · ${item.transition === "cut" ? "切镜" : "连续动作"}】${timelineDescription(item)}`).join("\n");
         }

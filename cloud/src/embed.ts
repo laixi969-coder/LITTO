@@ -33,7 +33,7 @@ export { inspectFinalQuality, finalQualityView, finalReviewPlan, sequenceFingerp
 export { shotFingerprint } from "./domain/realism.ts";
 export { continuityPlanningIssues } from "./domain/continuity.ts";
 export { assertSpeechPlan, speechPlanningIssues, shotDialogueMode } from "./domain/speechPlanning.ts";
-export { editView, getEdit } from "./domain/nle.ts";
+export { editView, getEdit, nativeDialogueWindows } from "./domain/nle.ts";
 export { cutPairSchema, soundBridgeSchema, suggestCuts, previewCut, soundBridge } from "./domain/cutEditing.ts";
 export { startRender } from "./domain/assembly.ts";
 export { renderOptionsSchema, waitNleRender } from "./domain/nle-render.ts";

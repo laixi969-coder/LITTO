@@ -6,6 +6,7 @@ import { bad, conflict, forbidden, j, notFound, now, ulid } from "../util.ts";
 import { mediaView } from "../storage.ts";
 import { parseGrade, type Grade } from "./grade.ts";
 import { musicSource } from "./music.ts";
+import type { ShotInput } from "./schema.ts";
 
 /**
  * Editable multi-track timeline (PRD P3 "高级 NLE"). Persisted in `timelines.data`; derived `buildTimeline` (assembly.ts) stays the fallback.
@@ -38,6 +39,31 @@ export function resolveClip(s: Scope, c: EClip): Resolved {
     const mid = c.mediaId ?? take?.mediaId ?? hero?.mediaId ?? null;
     const m = mid ? s.get("media", mid) : null;
     return { kind: c.mediaId && m ? "media" : take ? "take" : hero ? "hero" : "missing", mediaId: mid, mime: m?.mime ?? null, srcDuration: m?.duration ?? null };
+}
+
+type DialogueLine = NonNullable<ShotInput["creativeBrief"]>["dialogue"]["lines"][number];
+
+/** 将本镜原声的实际可听区间映射到剪辑时间。J/L 切保留同源音轨，画内发声还须与画面的源时钟重合。 */
+export function nativeDialogueWindows(s: Scope, edit: Body, picture: EClip, lines: DialogueLine[]) {
+    const mediaId = resolveClip(s, picture).mediaId;
+    if (!mediaId) return [];
+    const sources = edit.clips.filter(clip => clip.id === picture.id ? !picture.audioDetached
+        : clip.linkedClipId === picture.id && clip.type === "media" && clip.mediaId === mediaId && edit.tracks.some(track => track.id === clip.trackId && track.kind === "audio"));
+    return sources.flatMap(audio => {
+        const track = edit.tracks.find(item => item.id === audio.trackId);
+        if (!track || track.muted || audio.gainDb + track.gainDb <= -60) return [];
+        return lines.flatMap((line, lineIndex) => {
+            const from = Math.max(line.start, audio.in), to = Math.min(line.end, audio.in + audio.duration * audio.speed);
+            if (to <= from + EPS) return [];
+            const start = audio.start + (from - audio.in) / audio.speed, stop = audio.start + (to - audio.in) / audio.speed;
+            const frame = 1 / edit.fps;
+            const obscured = audio.fadeIn > frame && start < audio.start + audio.fadeIn - EPS || audio.fadeOut > frame && stop > end(audio) - audio.fadeOut + EPS;
+            const pictureStart = picture.start + (line.start - picture.in) / picture.speed;
+            const synced = line.lipSync !== "visible" || (picture.speed === 1 && line.start >= picture.in - EPS && line.end <= picture.in + picture.duration + EPS && Math.abs(start - pictureStart) <= EPS);
+            const complete = from <= line.start + EPS && to >= line.end - EPS && audio.speed === 1 && !obscured;
+            return [{ line, lineIndex, sourceId: audio.id, start: r3(start), end: r3(stop), complete, synced }];
+        });
+    });
 }
 
 // ---------------------------------------------------------------- conform

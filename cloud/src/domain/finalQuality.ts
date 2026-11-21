@@ -8,12 +8,12 @@ import type { Scope } from "../db.ts";
 import { storage } from "../storage.ts";
 import { probeFile, runCmd } from "../media-tools.ts";
 import { bad, conflict, notFound, now, HttpError } from "../util.ts";
-import { getEdit, resolveClip, validateTimeline } from "./nle.ts";
+import { getEdit, nativeDialogueWindows, resolveClip, validateTimeline } from "./nle.ts";
 import { adContext, adReadiness, isAdSequence } from "./adDirection.ts";
 import { needsLipSync, requireReviewed, shotFingerprint } from "./realism.ts";
 import { techniquePlan, techniqueVersion } from "@toonflow/tool-media-generation/filmTechniques";
 import { checkSequence, openHighIssues } from "./continuity.ts";
-import { finalReviewFields } from "@toonflow/tool-media-generation/runtime";
+import { coversSpeechRanges, finalReviewFields, hasDialogueReactions } from "@toonflow/tool-media-generation/runtime";
 import { validateMusicEdit } from "./music.ts";
 
 export function assertSpeechExport(s: Scope, sequenceId: string) {
@@ -21,14 +21,24 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
   validateTimeline(s, edit);
   validateMusicEdit(s, edit);
   const active = edit.clips.filter(clip => !edit.tracks.find(track => track.id === clip.trackId)?.muted);
+  const pictures = active.filter(clip => edit.tracks.find(track => track.id === clip.trackId)?.kind === "video");
+  const pictureRanges = pictures.map(clip => ({ start: clip.start, end: clip.start + clip.duration }));
   checkSequence(s, sequenceId);
   for (const shot of s.list("shots", { sequenceId })) {
-    for (const line of shot.creativeBrief?.dialogue?.lines ?? []) {
-      if (!active.some(clip => clip.shotId === shot.id && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video"
-        && clip.in <= line.start + 0.001 && clip.in + clip.duration * clip.speed >= line.end - 0.001)) throw conflict("定稿缺少完整的既定对白画面；删除、静音或裁走镜头不能绕过对白覆盖检查", "speech_export_blocked");
+    const lines = shot.creativeBrief?.dialogue?.lines ?? [];
+    const clips = pictures.filter(clip => clip.shotId === shot.id);
+    if (lines.length && shotDialogueMode(s, shot) === "native") {
+      const windows = clips.flatMap(clip => nativeDialogueWindows(s, edit, clip, lines));
+      for (const index of lines.keys()) {
+        const matches = windows.filter(window => window.lineIndex === index);
+        const [window] = matches;
+        if (matches.length !== 1 || !window.complete || !window.synced || !coversSpeechRanges([window], pictureRanges)) throw conflict("原生对白须保留一遍完整、原速的同源声音并有画面承接；画内说话时还须与说话者嘴部同步", "speech_export_blocked");
+      }
+    } else for (const line of lines) {
+      if (!clips.some(clip => clip.in <= line.start + 0.001 && clip.in + clip.duration * clip.speed >= line.end - 0.001)) throw conflict("定稿缺少完整的既定对白画面；删除、静音或裁走镜头不能绕过对白覆盖检查", "speech_export_blocked");
     }
   }
-  for (const clip of active.filter(clip => edit.tracks.find(track => track.id === clip.trackId)?.kind === "video")) {
+  for (const clip of pictures) {
     const shot = clip.shotId ? s.get("shots", clip.shotId) : null;
     const source = resolveClip(s, clip);
     // 显式静态落版沿用已检查的主帧；不能把它当运动镜头、对白或演唱的替身。
@@ -46,6 +56,7 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
     requireReviewed(s, "take", take);
     const lines = shot.creativeBrief?.dialogue?.lines ?? [];
     if (!lines.length && !needsLipSync(shot)) continue;
+    if (lines.length && shotDialogueMode(s, shot) === "native") continue;
     const relevant = lines.map((line: any, lineIndex: number) => ({ ...line, lineIndex })).filter((line: any) => line.start < clip.in + clip.duration * clip.speed && line.end > clip.in);
     if (relevant.some((line: any) => line.start < clip.in - 0.001 || line.end > clip.in + clip.duration * clip.speed + 0.001)) throw conflict("定稿剪辑截断了对白，须保留完整发声区间", "speech_export_blocked");
     if (!relevant.length && lines.length) continue;
@@ -304,13 +315,16 @@ export async function reviewFinalQuality(s: Scope, id: string, input: unknown, a
   const passing = plan.fields.every(field => review.checks[field.id as keyof typeof review.checks] === "pass")
     && Object.values(review.checks).every(value => value === "pass") && !review.techniqueReview.some(item => item.verdict === "revise")
     && plan.cuts.every(cut => review.cutReview.some(item => item.id === cut.id && item.verdict === "pass"));
-  if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(shot => shot.source?.revisionId)) {
+  const shots = s.list("shots", { sequenceId: render.sequenceId });
+  const fromScript = shots.some(shot => shot.source?.revisionId);
+  if (passing && (fromScript || shots.some(hasDialogueReactions))) {
     const observed = render.manifest?.narrativeObservation;
+    const checks = fromScript ? ["narrative", "performance", "continuity", "editing", "sound", "dialogueCoverage", "lipSync"] : ["performance", "dialogueCoverage"];
     if (observed?.version !== 1 || observed.hash !== s.get("media", render.mediaId)?.hash || observed.fingerprint !== sequenceFingerprint(s, render.sequenceId)
-      || ["narrative", "performance", "continuity", "editing", "sound", "dialogueCoverage", "lipSync"].some(key => observed.storyChecks?.[key]?.verdict !== "pass")
-      || !Array.isArray(observed.eventReviews) || observed.eventReviews.some((event: any) => event.verdict !== "pass" || event.evidence !== "direct")
-      || plan.cuts.some(cut => !observed.cutReviews?.some((item: any) => item.id === cut.id && item.seconds === cut.seconds && item.verdict === "pass"))) {
-      throw conflict("当前成片缺少有效的实际事件与接点观察，不能手工填 pass 完成验收", "narrative_observation_required");
+      || checks.some(key => observed.storyChecks?.[key]?.verdict !== "pass")
+      || fromScript && (!Array.isArray(observed.eventReviews) || observed.eventReviews.some((event: any) => event.verdict !== "pass" || event.evidence !== "direct")
+        || plan.cuts.some(cut => !observed.cutReviews?.some((item: any) => item.id === cut.id && item.seconds === cut.seconds && item.verdict === "pass")))) {
+      throw conflict("请先看听当前成片，核对本片规划的事件、对白反应与接点并处理实际缺陷", "narrative_observation_required");
     }
   }
   if (passing && techniques.some(item => !review.techniqueReview.some(check => check.shotId === item.shotId && check.id === item.id && check.verdict === "pass"))) throw bad("成片的剪辑、声音和叙事技法须按 techniques 计划完整看听并逐项记录，不能跳过检查或用提示词替代");

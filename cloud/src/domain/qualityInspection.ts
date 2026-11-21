@@ -27,6 +27,10 @@ export function mediaAspectIssue(s: Scope, item: Record<string, any>) {
   return null;
 }
 
+function basicQualityKey(mediaId: string, hash: string) {
+  return sha256(JSON.stringify(["basicQuality3", mediaId, hash]));
+}
+
 /** ACT: 两路独立本地检测，不占供应商队列、不调用模型。结果落盘；进程退出后按同一素材恢复，不自动重试失败检测。 */
 export function inspectProductionQuality(s: Scope, projectId: string, type: "keyframe" | "take", id: string) {
   const table = type === "take" ? "takes" : "keyframes";
@@ -34,7 +38,7 @@ export function inspectProductionQuality(s: Scope, projectId: string, type: "key
   const shot = item && s.get("shots", item.shotId);
   const media = item && s.get("media", item.mediaId);
   if (!item || !shot || !media || [item, shot, media].some(row => row.projectId !== projectId)) throw notFound("project output");
-  const key = sha256(JSON.stringify(["basicQuality3", media.id, media.hash]));
+  const key = basicQualityKey(media.id, media.hash);
   const cached = item.meta?.basicQuality;
   if (cached?.key === key) return Promise.resolve({ ...cached, reused: true, aspectIssue: mediaAspectIssue(s, item), plan: qualityReviewPlan(shot, type) });
   const pendingKey = `${s.workspaceId}:${type}:${id}:${key}`;
@@ -83,7 +87,7 @@ export function productionQualityView(s: Scope, projectId: string) {
     const shot = s.get("shots", item.shotId)!;
     const basic = item.meta?.basicQuality;
     const media = s.get("media", item.mediaId);
-    const current = basic?.key === sha256(JSON.stringify(["basicQuality2", media?.id, media?.hash]));
+    const current = media && basic?.key === basicQualityKey(media.id, media.hash);
     const warnings: string[] = [];
     const aspectIssue = mediaAspectIssue(s, item);
     if (aspectIssue) warnings.push(aspectIssue);

@@ -311,6 +311,7 @@ export function withPhotographicBaseline(prompt: string, skinFinish?: SkinFinish
  * 入队前也调用一次——排在队列里执行时才失败，用户看到的是「提交成功然后红了一片」，说不清哪一步错了。
  */
 export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "image" | "video" | "audio", compiledInputs: { sent: boolean; mediaId: string | null; role: string }[] = []) {
+  if (mediaType === "video" && request.providerId === "atlasCloud" && request.modelId === "minimax/h3-developer/reference-to-video" && request.seed !== undefined) invalid("Atlas H3 图片参考模式不支持指定随机种子，请清空后提交");
   if (mediaType === "video" && request.providerId === "tencentWand" && request.modelId === "kling-video-v3") {
     const directorPrompt = isDirectorPrompt(request.prompt);
     const spec = directorPrompt || request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);

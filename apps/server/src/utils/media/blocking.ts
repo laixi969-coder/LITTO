@@ -73,35 +73,51 @@ export function checkAxis(scene: BlockingScene): AxisCheck {
   return { pair, sides, crossing: distinct.length > 1 };
 }
 
-/**
- * 把一镜的机位翻译成可以直接写进提示词的空间描述。
- * 只给「主体在中央 + 前景在哪一侧 + 其余人在哪一侧」——把所有人平铺成左右会连主体一起算进去，读起来是错的。
- */
-export function blockingText(scene: BlockingScene, camera: BlockingCamera) {
+/** 从同一张走位板推导每个机位的人物与场内参照。 */
+function describeCamera(scene: BlockingScene, camera: BlockingCamera) {
   const target = pointOf(scene, camera.target);
   const targetName = typeof camera.target === "string" ? camera.target : "";
   const angle = Math.atan2(target[1] - camera.y, target[0] - camera.x);
-  // 相机自身的右向量：投影为正的人在画面右侧。
-  const rightX = -Math.sin(angle);
-  const rightY = Math.cos(angle);
+  const forwardX = Math.cos(angle);
+  const forwardY = Math.sin(angle);
+  const tolerance = 1e-6;
+  function project(point: { x: number; y: number }) {
+    const dx = point.x - camera.x;
+    const dy = point.y - camera.y;
+    return { lateral: dy * forwardX - dx * forwardY, depth: dx * forwardX + dy * forwardY };
+  }
+  const screenSide = (lateral: number) => Math.abs(lateral) < tolerance ? "中线" : lateral < 0 ? "左侧" : "右侧";
   const others = scene.people
     .filter(person => person.name !== targetName)
-    .map(person => ({ name: person.name, v: (person.x - camera.x) * rightX + (person.y - camera.y) * rightY }))
-    .sort((left, right) => left.v - right.v);
-  const side = (value: number) => value >= 0 ? "右" : "左";
+    .map(person => ({ name: person.name, ...project(person) }))
+    .filter(person => person.depth > tolerance)
+    .sort((left, right) => left.lateral - right.lateral);
   const parts = [`机位 ${camera.id}`];
   if (camera.shotSize) parts.push(`景别${camera.shotSize}`);
   if (targetName) parts.push(`${targetName}在画面中央`);
-  if (camera.foreground) {
-    const foreground = others.find(item => item.name === camera.foreground);
-    parts.push(foreground
-      ? `前景是${camera.foreground}的肩，虚焦压在画面${side(foreground.v)}侧`
-      : `前景是${camera.foreground}的肩，虚焦压一条边`);
-  }
+  const foreground = others.find(item => item.name === camera.foreground);
+  if (foreground) parts.push(`前景是${foreground.name}的肩，虚焦压在画面${screenSide(foreground.lateral)}`);
   const rest = others.filter(item => item.name !== camera.foreground);
-  if (rest.length) parts.push(rest.map(item => `${item.name}在画面${side(item.v)}侧`).join("、"));
+  if (rest.length) parts.push(rest.map(item => `${item.name}在画面${screenSide(item.lateral)}`).join("、"));
+  const anchors = (scene.props ?? []).filter(prop => prop.label.trim())
+    .map(prop => ({ label: prop.label.trim(), ...project(prop) }))
+    .filter(prop => prop.depth > tolerance)
+    .sort((a, b) => a.depth - b.depth);
+  let landmarks = "";
+  if (anchors.length) {
+    // ACT: 平面坐标只能说明物件中心相对机位的位置。取近、远及偏轴参照，画幅和遮挡由实际取景决定。
+    const sideAnchor = anchors.reduce((best, item) => Math.abs(item.lateral) > Math.abs(best.lateral) ? item : best);
+    const selected = [...new Set([anchors[0]!, sideAnchor, anchors[anchors.length - 1]!])].sort((a, b) => a.depth - b.depth);
+    const positions = selected.map(item => `${item.label}（${screenSide(item.lateral)}，纵深${Number(item.depth.toFixed(2))}米）`);
+    landmarks = `场内参照由近及远为${positions.join("、")}，实际入画取决于取景与遮挡`;
+    parts.push(landmarks);
+  }
   if (camera.note) parts.push(camera.note);
-  return parts.join("；") + "。";
+  return { blocking: parts.join("；") + "。", landmarks };
+}
+
+export function blockingText(scene: BlockingScene, camera: BlockingCamera) {
+  return describeCamera(scene, camera).blocking;
 }
 
 function escapeXml(value: string) {
@@ -188,7 +204,7 @@ export async function buildBlocking(cwd: string, request: { scene: BlockingScene
   const axis = checkAxis(scene);
   const cameras = request.scene.cameras.map(camera => ({
     id: camera.id,
-    blocking: blockingText(request.scene, camera),
+    ...describeCamera(request.scene, camera),
     side: axis.sides.find(item => item.id === camera.id)?.side ?? 0,
   }));
   const outputDirectory = request.outputDirectory ?? "assets/blocking";
@@ -222,7 +238,7 @@ export async function buildBlocking(cwd: string, request: { scene: BlockingScene
 export interface BlockingRecord {
   scene?: BlockingScene;
   axis?: AxisCheck;
-  cameras?: { id: string; blocking: string; side: number }[];
+  cameras?: { id: string; blocking: string; landmarks?: string; side: number }[];
   generated?: string;
 }
 
@@ -245,15 +261,24 @@ export async function readBlocking(cwd: string): Promise<BlockingRecord | null> 
 
 /**
  * 按镜头号取走位描述，注入提示词。
- * 只做「没写就补」：作者自己写了 BLOCKING 就以作者为准，工具不覆盖。
+ * 已有镜头调度时只提取固定地标，补充本机位所见的方向和距离。
  */
-export async function blockingLine(cwd: string, shotId?: string): Promise<string> {
-  if (!shotId) return "";
+export async function blockingLine(cwd: string, shotId?: string | string[], landmarksOnly = false, excludedNames: string[] = []): Promise<string> {
+  const ids = Array.isArray(shotId) ? shotId.filter(Boolean) : shotId ? [shotId] : [];
+  if (!ids.length) return "";
   const record = await readBlocking(cwd);
   const cameras = Array.isArray(record?.cameras) ? record.cameras.filter(item => item && typeof item.id === "string" && item.id && typeof item.blocking === "string") : [];
-  const camera = cameras.find(item => item.id === shotId)
-    ?? cameras.filter(item => shotId.startsWith(item.id) && /^[_.-]/.test(shotId.slice(item.id.length)))
+  const camera = ids.map(id => cameras.find(item => item.id === id)).find(Boolean)
+    ?? cameras.filter(item => ids.some(id => id.startsWith(item.id) && /^[_.-]/.test(id.slice(item.id.length))))
       .sort((left, right) => right.id.length - left.id.length)[0];
   if (!camera?.blocking) return "";
+  if (landmarksOnly) {
+    const scene = record?.scene;
+    const source = scene?.cameras?.find(item => item.id === camera.id);
+    const saved = excludedNames.length ? undefined : camera.landmarks;
+    const props = scene?.props?.filter(prop => !excludedNames.some(name => prop.label.includes(name)));
+    const landmarks = saved ?? (scene && source && props?.length ? describeCamera({ ...scene, props }, source).landmarks : "");
+    return landmarks ? `BLOCKING: ${landmarks}` : "";
+  }
   return `BLOCKING: ${camera.blocking}`;
 }

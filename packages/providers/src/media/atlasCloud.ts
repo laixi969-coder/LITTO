@@ -158,9 +158,13 @@ async function generateSynced(context: ProviderContext, request: ImageRequest | 
 
 export default {
   resumeMedia,
-  id: "atlasCloud", label: "Atlas Cloud", version: "1.4.1", rules,
+  id: "atlasCloud", label: "Atlas Cloud", version: "1.4.3", rules,
   readme: "支持同步图片、视频和独立音频模型。音频模型选择后读取官方参数定义，包括音色、语速、格式和采样率；音乐可通过 audioParameters 填写模型定义中的 lyrics、instrumental 等标量参数。音频任务通过 generateAudio 提交并自动轮询，转录及歌词文本模型不列为音频文件生成。Midjourney 8.1/8.2 支持文生图、图生图和图生视频，每次返回 4 个结果；节点默认显示第一个。复杂参考、分层和多镜头模型需单独适配。本地参考图自动上传。\n\n[音频文档](https://www.atlascloud.ai/docs/models/audio)",
   models: [
+    { id: "minimax/h3-developer/reference-to-video", label: "MiniMax H3 Developer 图片参考生视频", type: "video",
+      mode: [["imageReference:9"]], audio: true, nativeDialogue: true,
+      videoRatios: ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+      durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480P", "768P"] }] },
     { id: "midjourney/v8.1/text-to-image", label: "Midjourney 8.1 文生图", type: "image", price: "参考价 $0.086 / 4 张起；2K HD 另计（2026-11-12）", mode: ["text"], imageSizes: ["标准", "2K"], imageRatios: ["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"] },
     { id: "midjourney/v8.1/image-to-image", label: "Midjourney 8.1 图生图", type: "image", price: "参考价 $0.086 / 4 张起；2K HD 另计（2026-11-12）", mode: ["singleImage"], imageSizes: ["标准", "2K"], imageRatios: ["1:1", "9:16", "16:9", "4:3", "3:4", "2:3", "3:2", "9:21", "21:9"] },
     { id: "midjourney/v8.1/image-to-video", label: "Midjourney 8.1 图生视频", type: "video", price: "参考价 $0.086 / 秒起；720p 另计（2026-11-12）", mode: ["singleImage"], audio: false, durationResolutionMap: [{ duration: [5], resolution: ["480p", "720p"] }] },
@@ -184,10 +188,10 @@ export default {
     if (!response.ok) throw new Error(`获取 Atlas Cloud 目录失败（HTTP ${response.status}）`);
     const result = await response.json() as { data?: Record<string, any>[] };
     if (!Array.isArray(result.data)) throw new Error("Atlas Cloud 目录格式错误");
-    // ACT: 只导入已映射请求参数的家族，复杂任务和未知新协议需单独适配；reference-to-video、video-edit、sequential 等多参考与分层任务模式暂不导入。
+    // ACT: 只导入已映射请求参数的型号，多参考、视频编辑与分层任务须按各自协议接入。
     const catalogue: AtlasModel[] = result.data.filter(item => item.display_console === true && typeof item.model === "string" && (
       item.type === "Image" && (/^midjourney\/v8\.[12]\/(?:text-to-image|image-to-image)$/.test(item.model) || /^bytedance\/seedream-v[\d.]+(?:-(?:lite|flash|pro))?(?:\/(?:edit|text-to-image))?$/.test(item.model) || /^openai\/gpt-image-2(?:\.\d)?(?:-[a-z]+)?\/(text-to-image|edit|image-to-image)$/.test(item.model) || /^google\/nano-banana-[\d.]+(?:-lite|-pro)?(?:-developer)?\/(text-to-image|edit)$/.test(item.model) || /^microsoft\/mai-image-[\d.]+(?:-[a-z]+)?\/(text-to-image|edit)$/.test(item.model))
-      || item.type === "Video" && (/^midjourney\/v8\.[12]\/image-to-video$/.test(item.model) || /^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || /^bytedance\/seedance-[\w.-]+\/(text|image)-to-video$/.test(item.model) || /^minimax\/h3-[a-z-]+\/(text|image)-to-video$/.test(item.model) || /^alibaba\/wan-[\d.]+(?:-prime)?\/(text|image)-to-video$/.test(item.model) || item.model === "sync/lipsync-v3")
+      || item.type === "Video" && (/^midjourney\/v8\.[12]\/image-to-video$/.test(item.model) || /^kwaivgi\/kling-v(?:2\.6|3\.0)-(pro|std)\/(text|image)-to-video$/.test(item.model) || /^bytedance\/seedance-[\w.-]+\/(text|image)-to-video$/.test(item.model) || /^minimax\/h3-[a-z-]+\/(text|image)-to-video$/.test(item.model) || /^alibaba\/wan-[\d.]+(?:-prime)?\/(text|image)-to-video$/.test(item.model) || item.model === "minimax/h3-developer/reference-to-video" || item.model === "sync/lipsync-v3")
       || item.type === "Audio" && !/asr|stt|transcri|lyrics-generation|voice-clon|voice-design/i.test(item.model)
     )).map(item => ({ id: item.model, label: item.displayName || item.model, type: item.type.toLowerCase(),
       ...(item.price && (item.price.actual?.base_price != null || item.price.origin?.base_price != null) ? { price: JSON.stringify({ actual: item.price.actual?.base_price, origin: item.price.origin?.base_price }) } : {}),
@@ -219,6 +223,8 @@ export default {
       const input = result?.components?.schemas?.Input;
       if (!input?.properties || !Array.isArray(input.required)) throw new Error(`模型 ${model.id} 参数格式错误`);
       const allowed = model.type === "audio" ? Object.entries(input.properties as Record<string, InputField>).filter(([, field]) => ["string", "number", "integer", "boolean"].includes(field.type ?? "")).map(([name]) => name) : ["model", "prompt", "size", "quality", "output_format", "images", "image", "reference_images", "end_image", "duration", "resolution", "aspect_ratio", "ratio", "sound", "multi_shot"];
+      const h3Reference = model.id === "minimax/h3-developer/reference-to-video";
+      if (h3Reference) allowed.push("refers");
       if (input.required.some((field: string) => !allowed.includes(field))) throw new Error(`模型 ${model.id} 包含未适配的必填参数`);
       const properties = Object.fromEntries(Object.entries(input.properties as Record<string, InputField>).filter(([field]) => allowed.includes(field)).map(([field, value]) => [field,
         Object.fromEntries(Object.entries(value).filter(([key]) => ["type", "enum", "default", "minimum", "maximum", "maxLength", "minItems", "maxItems"].includes(key))),
@@ -255,6 +261,13 @@ export default {
             : [5, 10]);
         if (!duration.length) throw new Error(`模型 ${model.id} 缺少已适配的时长参数`);
         model.durationResolutionMap = [{ duration, resolution: properties.resolution?.enum?.filter((value): value is string => typeof value === "string") ?? [] }];
+        if (h3Reference) {
+          model.mode = [["imageReference:9"]];
+          model.audio = true;
+          model.nativeDialogue = true;
+          model.videoRatios = properties.ratio?.enum?.filter((value): value is string => typeof value === "string" && /^\d+:\d+$/.test(value));
+          model.durationResolutionMap[0]!.resolution = model.durationResolutionMap[0]!.resolution.filter(value => value === "480P" || value === "768P");
+        }
       }
       models.push(model);
     }
@@ -330,6 +343,21 @@ export default {
     return generate(this, "image", { model: request.model, prompt: request.prompt, size: dimension, ...(editing ? { images: urls } : {}) }, signal);
   },
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
+    if (request.model === "minimax/h3-developer/reference-to-video") {
+      const images = request.images ?? [];
+      if (!images.length || images.length > 9 || request.videos?.length || request.audios?.length || request.firstFrame || request.lastFrame) throw new Error("H3 Developer 图片参考模式需要 1 至 9 张参考图");
+      if (!request.prompt.trim() || request.mode !== undefined && JSON.stringify(request.mode) !== JSON.stringify(["imageReference:9"])) throw new Error("请填写镜头提示并选择图片参考模式");
+      if (request.generateAudio === false || request.seed !== undefined || request.watermark || request.cameraTrajectory) throw new Error("此模型原生生成声音，当前协议不支持指定随机种子、水印或轨迹");
+      const duration = request.duration ?? 8;
+      const resolution = request.resolution ?? "768P";
+      const ratio = request.ratio ?? "adaptive";
+      if (!Number.isInteger(duration) || duration < 4 || duration > 15 || !["480P", "768P"].includes(resolution) || !["adaptive", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].includes(ratio)) throw new Error("H3 Developer 的原生档位为 4 至 15 秒、480P 或 768P，请核对画幅");
+      const signal = AbortSignal.any([AbortSignal.timeout(30 * 60_000), ...(this.signal ? [this.signal] : [])]);
+      const refers = [];
+      for (const image of images) refers.push({ type: "image", url: await uploadImage(this, image, signal) });
+      const prompt = [request.prompt, request.negativePrompt && `画面中不得出现：${request.negativePrompt}`].filter(Boolean).join("\n");
+      return generate(this, "video", { model: request.model, prompt, refers, duration, resolution, ratio, prompt_expansion: false }, signal);
+    }
     if (request.mode === "singleImage" && request.images?.length === 1 && !request.firstFrame) request = { ...request, firstFrame: request.images[0], images: [] };
     if (request.model === "sync/lipsync-v3") {
       if (request.videos?.length !== 1 || request.audios?.length !== 1 || request.images?.length || request.firstFrame || request.lastFrame || request.cameraTrajectory) throw new Error("专用对口型需要一段原视频和一段声音，不接受重新生成画面的参考参数");

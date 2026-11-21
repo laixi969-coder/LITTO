@@ -53,6 +53,7 @@ export function creativeDirectionIssues(shot: ShotInput, assets: { id: string; n
   for (const line of brief.dialogue.lines) {
     if (!characterIds.has(line.speakerId)) issues.push("对白说话人须为本镜的真实角色资产");
     if (line.lipSync === "visible" && !visibleIds.has(line.speakerId)) issues.push("画内说话人须在出镜资产中；画外声音使用 offscreen");
+    if (line.reactions?.some(reaction => !assets.some(asset => asset.id === reaction.listenerId && ["Character", "Creature"].includes(asset.type)))) issues.push("对白反应的听者须为本镜的角色或生物资产");
     if (line.end <= line.start || line.end > duration) issues.push("对白起止时间须在本段生成时长内，并为发声及口型留出时间");
   }
   if (resolveDialogueMode(shot) === "native" && shot.musicVideo && shot.musicVideo.audioMode !== "generated") issues.push("原生对白与静音/原曲方案冲突；保留台词，修改声音方案或明确后期配音对口型路径");

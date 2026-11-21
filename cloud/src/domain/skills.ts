@@ -20,6 +20,7 @@ export type ShotDraft = {
     techniques?: ShotInput["techniques"];
     source?: ShotInput["source"];
     visibleAssetIds?: string[];
+    initiallyHiddenAssetIds?: string[];
     continuity?: ShotInput["continuity"];
     continuityFromIndex?: number;
 };
@@ -42,33 +43,53 @@ const split = (t: string) => t.split(/(?<=[.!?。！？])\s*/).map((x) => x.trim
 export function storyboardDirector(script: string, assets: AssetLite[], opts: { minShots?: number } = {}): ShotDraft[] {
     // ACT: 规则草稿只覆盖原文节拍；镜数是审阅约束，不用重复插镜填配额。
     void opts;
-    type Beat = { text: string; speaker?: string; scene: number; sceneName: string; isDialogue: boolean };
+    type Beat = { text: string; speaker?: string; words?: string; attribution?: string; scene: number; sceneName: string };
     const beats: Beat[] = [];
     let scene = -1, sceneName = "Scene 1";
+    const actors = assets.filter(asset => asset.type === "Character").sort((a, b) => b.name.length - a.name.length);
+    function addAction(text: string) {
+        let cur: string[] = [];
+        for (const sent of split(text)) {
+            const pivot = cur.length && (REVEAL.test(sent) || CONTRAST.test(sent) || PICKUP.test(sent) || DROP.test(sent));
+            if (pivot) { beats.push({ text: cur.join(" "), scene, sceneName }); cur = []; }
+            cur.push(sent);
+        }
+        if (cur.length) beats.push({ text: cur.join(" "), scene, sceneName });
+    }
     for (const raw of script.split(/\r?\n/)) {
         const line = raw.trim();
         if (!line) continue;
         if (HEADING.test(line)) { scene++; sceneName = line.replace(/^场景[:：]?/, "").trim(); continue; }
-        if (scene < 0) { scene = 0; }
-        const dlg = line.match(/^([A-Z][A-Z .'\-]{1,24}|[一-龥]{1,6})\s*[:：]\s*(.+)$/);
-        if (dlg) { beats.push({ text: dlg[2], speaker: dlg[1].trim(), scene, sceneName, isDialogue: true }); continue; }
-        // Group action sentences into beats: a new beat starts at reveal / contrast / pickup / drop pivots.
-        let cur: string[] = [];
-        for (const sent of split(line)) {
-            const pivot = cur.length && (REVEAL.test(sent) || CONTRAST.test(sent) || PICKUP.test(sent) || DROP.test(sent));
-            if (pivot) { beats.push({ text: cur.join(" "), scene, sceneName, isDialogue: false }); cur = []; }
-            cur.push(sent);
+        if (scene < 0) scene = 0;
+        let cursor = 0;
+        for (const quote of line.matchAll(/[:：]?\s*(?:“([^”]+)”|「([^」]+)」|"([^"]+)")/gu)) {
+            const lead = line.slice(cursor, quote.index).trimEnd();
+            const clause = /[^。！？!?；;，,]*$/u.exec(lead)![0].trim();
+            const actor = actors.find(item => clause.startsWith(item.name));
+            // ACT: 只认有明确说话人和引语标记的句子。听到的词、牌面文字及归属不明的引号留在动作原文中。
+            if (!actor || !(clause === actor.name && /^\s*[:：]/u.test(quote[0]) || /(?:说|说着|说道|问|问道|答|答道|回答|喊|喊道|开口道|道)$/u.test(clause))) continue;
+            const gesture = clause.slice(actor.name.length);
+            if (actors.some(other => other.id !== actor.id && gesture.includes(other.name) && !/(?:对|向|朝|跟|冲)(?:着)?\s*$/u.test(gesture.slice(0, gesture.indexOf(other.name))))) continue;
+            addAction(lead.slice(0, lead.lastIndexOf(clause)));
+            beats.push({ text: clause + quote[0], attribution: clause, speaker: actor.name, words: quote[1] ?? quote[2] ?? quote[3], scene, sceneName });
+            cursor = quote.index + quote[0].length;
         }
-        if (cur.length) beats.push({ text: cur.join(" "), scene, sceneName, isDialogue: false });
+        if (cursor) { addAction(line.slice(cursor).replace(/^[。！？.!?，,；;]+/u, "")); continue; }
+        const dlg = line.match(/^([A-Z][A-Z .'\-]{1,24}|[一-龥]{1,6})\s*[:：]\s*(.+)$/);
+        if (dlg) beats.push({ text: dlg[2], speaker: dlg[1].trim(), words: dlg[2], scene, sceneName });
+        else addAction(line);
     }
-    const named = (t: string) => assets.filter((a) => t.toLowerCase().includes(a.name.toLowerCase()));
+    const named = (text: string) => assets.filter(asset => {
+        const mentions = text.toLowerCase().split(asset.name.toLowerCase()).slice(1);
+        return mentions.some(rest => asset.type !== "Character" || !/^\s*(?:全程|始终|一直)?(?:没有|并未|并不|未|不)(?:出镜|出场|入镜|露面|在场)/u.test(rest));
+    });
     const shots: ShotDraft[] = [];
     let lastScene = -1, prevSpeaker: string | undefined;
     const speakers = new Map<string, "left" | "right" | "none">();
     const envOf = (sc: number) => shots.find((s) => s.sceneIndex === sc)?.assetIds.filter((id) => assets.find((a) => a.id === id)?.type === "Environment") ?? [];
 
     for (const b of beats) {
-        const found = named(b.text);
+        const found = named(b.words === undefined ? b.text : b.attribution ?? "");
         const chars = found.filter((a) => a.type === "Character");
         const isNewScene = b.scene !== lastScene;
         const envs = isNewScene ? assets.filter((a) => a.type === "Environment" && (b.sceneName.toLowerCase().includes(a.name.toLowerCase()) || b.text.toLowerCase().includes(a.name.toLowerCase()))) : [];
@@ -84,9 +105,10 @@ export function storyboardDirector(script: string, assets: AssetLite[], opts: { 
             lighting: light, intendedStateDelta: {}, duration: 4, sceneIndex: b.scene, ...extra,
         });
         const delta: Record<string, any> = {};
-        for (const p of found.filter((a) => ["Prop", "Product", "Vehicle"].includes(a.type))) {
-            if (PICKUP.test(b.text)) delta.props = { ...delta.props, [p.id]: { heldBy: chars[0]?.id ?? "unknown", present: true } };
-            else if (DROP.test(b.text)) delta.props = { ...delta.props, [p.id]: { heldBy: null, present: true } };
+        const props = found.filter(asset => ["Prop", "Product", "Vehicle"].includes(asset.type));
+        if (props.length === 1 && b.words === undefined) {
+            if (PICKUP.test(b.text) && chars.length === 1) delta.props = { [props[0].id]: { heldBy: chars[0].id, present: true } };
+            else if (DROP.test(b.text)) delta.props = { [props[0].id]: { heldBy: null, present: true } };
         }
         if (emo && chars[0]) delta.emotional = { [chars[0].id]: { emotion: emo[1], intensity: emo[2] } };
 
@@ -96,16 +118,16 @@ export function storyboardDirector(script: string, assets: AssetLite[], opts: { 
             prevSpeaker = undefined;
         }
 
-        if (b.isDialogue) {
+        if (b.words !== undefined) {
             const speaker = assets.find((a) => a.type === "Character" && a.name.toLowerCase() === b.speaker!.toLowerCase());
             const spk = speaker ? [speaker.id] : [];
             const turn = prevSpeaker && prevSpeaker !== b.speaker;
             if (!speakers.has(b.speaker!)) speakers.set(b.speaker!, speakers.size === 0 ? "right" : speakers.size === 1 ? "left" : "none");
             const dir = speakers.get(b.speaker!)!;
             // Shot–reverse-shot: same side of the axis, opposite eyelines.
-            shots.push(base(turn ? "Reaction" : "Rhythm", "MCU", 50, `${b.speaker}: "${b.text.slice(0, 40)}"`, { assetIds: [...new Set([...sceneEnv, ...spk, ...found.map((a) => a.id)])], subtitle: b.text, duration: Math.max(4, Math.ceil(b.text.replace(/\s/g, "").length / 4 + 1)), performance: { emotion: emo?.[1] ?? "neutral", intensity: emo?.[2] ?? 0.45, eyeline: dir === "none" ? "待确认多人空间关系" : `screen ${dir} (proposed, verify blocking)`, gesture: "", timing: "on the line" }, camera: { shotSize: "MCU", position: "over-shoulder", height: "eye level", angle: "neutral", lensMm: 50, focus: speaker?.name ?? "", depth: "shallow", motion: "static", motivation: "", side: "A", screenDirection: dir } }));
+            shots.push(base(turn ? "Reaction" : "Rhythm", "MCU", 50, `${b.speaker}: "${b.words.slice(0, 40)}"`, { assetIds: [...new Set([...sceneEnv, ...spk, ...found.map((a) => a.id)])], subtitle: b.words, duration: Math.max(4, Math.ceil(b.words.replace(/\s/g, "").length / 4 + 1)), performance: { emotion: emo?.[1] ?? "neutral", intensity: emo?.[2] ?? 0.45, eyeline: dir === "none" ? "待确认多人空间关系" : `screen ${dir} (proposed, verify blocking)`, gesture: "", timing: "on the line" }, camera: { shotSize: "MCU", position: "over-shoulder", height: "eye level", angle: "neutral", lensMm: 50, focus: speaker?.name ?? "", depth: "shallow", motion: "static", motivation: "", side: "A", screenDirection: dir } }));
             prevSpeaker = b.speaker;
-            if (speaker) shots[shots.length - 1].sourceDialogue = { speakerId: speaker.id, text: b.text };
+            if (speaker) shots[shots.length - 1].sourceDialogue = { speakerId: speaker.id, text: b.words };
             continue;
         }
 

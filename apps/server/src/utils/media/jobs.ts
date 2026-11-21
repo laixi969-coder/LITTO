@@ -52,6 +52,7 @@ export async function optimizeCompiledPrompt(directory: string, sections: Record
   if ((withPhotographicBaseline(prompt) + suffix).length <= limit) return prompt;
   const protectedKeys = new Set(["duration", "creativeIntent", "dialogue", "action", "timeline", "motionTiming", "frameContinuity", "shotConnection", "continuityContext", "shotExecution", "startingFrame", "staging", "shotDesign", "performance", "camera", "lighting", "speechCoverage", "constraints", "lock", "forbiddenChanges", "repair", "selectedTechniques", "combatDesign", "audio", "objectInteraction", "blocking", "adDirection", "reference plan", "Reference binding", "Objective", "Immutable locks", "Target duration", "Timeline", "Audio direction", "Shot execution", "Avoid"]);
   protectedKeys.add("humanPerformance");
+  protectedKeys.add("spatialLandmarks");
   protectedKeys.add("visualModifiers");
   // ACT: 优先原文保留已写明的质感与参考职责；空间不足时仍交给视觉背景压缩，避免仅因保护项过长阻塞制作。
   for (const key of ["look", "realism", "opticalTexture", "appearance", "referenceIntent", "references"]) {
@@ -251,7 +252,9 @@ export async function executeMediaJob(input: GenRequest): Promise<GenResult> {
         ...request,
         // 不支持种子的供应商保留原始请求，不能传入任务自动生成的内部种子。
         ...(input.negativePrompt ? { negativePrompt: input.negativePrompt } : {}),
-        ...(providerId !== "tencentWand" && providerId !== "token01" && input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
+        ...(providerId !== "tencentWand" && providerId !== "token01"
+          && !(providerId === "atlasCloud" && modelId === "minimax/h3-developer/reference-to-video")
+          && input.params.seed !== undefined ? { seed: Number(input.params.seed) } : {}),
       }, input.signal, async task => {
         // 先持久化回执与交付检查点；恢复只收取原结果，不创建子任务或重新生成。
         const previous = api.scoped(context.workspaceId).get("generation_jobs", context.jobId)?.parameters?.remoteTask;
@@ -286,6 +289,7 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api || tenant.role === "VIEWER") throw Object.assign(new Error("无权制作镜头"), { status: 403 });
+  const scope = api.scoped(tenant.workspaceId);
   const model = (await listMediaModels(true)).find(item => item.providerId === request.providerId && item.modelId === request.modelId && item.type === kind);
   if (!model) throw Object.assign(new Error("模型不存在"), { status: 400 });
   if (kind === "image") {
@@ -297,7 +301,6 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     }
   }
   if (request.localRepair) {
-    const scope = api.scoped(tenant.workspaceId);
     const frame = scope.get("keyframes", request.localRepair.keyframeId);
     const media = frame?.mediaId && scope.get("media", frame.mediaId);
     if (kind !== "image" || frame?.shotId !== shotId || !media?.width || !media?.height) throw new Error("精修需要当前镜头原图及实际宽高");
@@ -337,8 +340,10 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   if (kind === "image" && request.providerId === "token01" && (result.compiled.negativePrompt || request.negativePrompt)) {
     result.compiled.warnings.push("Token01 图片接口没有独立负向提示词字段；排除项会作为自然语言附加到提示词，效果须在实际结果中核验。");
   }
+  if (kind === "video" && request.providerId === "atlasCloud" && request.modelId === "minimax/h3-developer/reference-to-video" && (result.compiled.negativePrompt || request.negativePrompt)) {
+    result.compiled.warnings.push("Atlas H3 图片参考模式会把排除项作为自然语言附加在镜头提示末尾。");
+  }
   if (kind === "video" && !request.ratio && result.keyframeId) {
-    const scope = api.scoped(tenant.workspaceId);
     const frame = scope.get("keyframes", result.keyframeId);
     const media = frame && scope.get("media", frame.mediaId);
     if (!frame || !media?.width || !media.height) throw new Error("主帧实际宽高尚未核验，不能猜测视频画幅");
@@ -361,12 +366,15 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
   }
   if (model.promptControl === "imageAndCameraOnly") result.compiled.warnings.push("此模型仅执行首帧与数值相机轨迹：编译文本用于审阅与记录，不会送入逐请求文本控制。表演、声音与文字约束须通过生成后的实际观看验收。");
   if (kind === "video" && request.duration !== result.duration) throw Object.assign(new Error("生成时长须与镜头的生成时长规格一致，请先保存"), { status: 400 });
-  if (!result.compiled.prompt.includes("BLOCKING:")) {
-    const blocking = await blockingLine(directory, request.outputName);
-    if (blocking) {
-      result.compiled.prompt = `${blocking}\n\n${result.compiled.prompt}`;
-      result.compiled.sections.blocking = [blocking.replace(/^BLOCKING:\s*/, ""), result.compiled.sections.blocking].filter(Boolean).join("; ");
-    }
+  const sections = result.compiled.sections;
+  const hiddenIds: string[] = kind === "image" ? scope.get("shots", shotId)?.initiallyHiddenAssetIds ?? [] : [];
+  const hiddenNames = hiddenIds.map(id => scope.get("assets", id)?.name).filter(Boolean);
+  const hasStaging = !!(sections.blocking || sections.staging || kind === "image" && sections.shotDesign || hiddenNames.length);
+  const layout = (await blockingLine(directory, [shotId, request.outputName ?? ""], hasStaging, hiddenNames)).replace(/^BLOCKING:\s*/, "");
+  if (layout && !result.compiled.prompt.includes(layout)) {
+    const key = hasStaging ? "spatialLandmarks" : "blocking";
+    sections[key] = layout;
+    result.compiled.prompt += `\n${key.toUpperCase()}: ${layout}`;
   }
   if (kind === "video") {
     result.compiled.prompt = withHumanPerformance(result.compiled.prompt);
