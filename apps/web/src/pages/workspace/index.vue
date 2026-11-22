@@ -94,7 +94,7 @@ function prepareStoryProduction(revisionId: string, model: string) {
 function prepareCharacterGeneration(assetId: string) {
   const project = workspaceStore.project;
   if (!project) return;
-  workspaceStore.pendingAgentMessage = { directory: project.directory, model: "", reasoningEffort: "", prompt: `请为当前项目角色资产 ${assetId} 一次生成一张角色设定图：左侧正脸妆造特写，右侧完整全身正面0°、右侧90°、背面180°，同一身份与造型。先 readAsset 与 listMediaModels，复用已有可用图片和已选精度；模型不支持当前输入时才 selectModel。用 purpose=asset、outputName=角色名＋角色设定图，不创建剧情镜头或 compile，不拆成三次生成。沿用已有授权；生成后一次预览实际图，轻微差异记录后继续，不自动重生或补图。通过 selectReference 保存主定妆，publishAsset 收藏供跨项目复用；已有多张参考仍保留，不为改成单张版式重新生成。` };
+  workspaceStore.pendingAgentMessage = { directory: project.directory, model: "", reasoningEffort: "", prompt: `为当前项目创作角色定妆，资产 ID 为 ${assetId}。先用 productionSpec(readAsset) 读取角色及现有定妆，已有采用身份就复用。人设待定时先在对话展示不同人选；人设已定则在当前项目画布创建全身母版与派生图片节点，先生成两张 9:16 母版供我选片。等我选定，再让人脸近景、九宫格表情和转面板实际引用同一张母版并生成。将采用的定妆关联回上述项目角色，沿用现有选角与收藏流程。` };
   agentVisible.value = true;
 }
 const voiceVisible = ref(false);

@@ -13,6 +13,8 @@ metadata:
 
 本技能落实产品 PRD 中 World / Look、ShotSpec、Realism Stack 和深度 Skills 的创作规则。账号模式优先使用 `productionSpec` 保存真实领域对象。提供 `requestKeyframeApproval` 时，主关键帧在聊天中展示并确认采用，多镜头合并一次确认，不要求用户再到「镜头制作」面板重复选择；面板仍可用于编辑与复核。若运行环境未提供规格工具，说明仅能交付方案，不把文本节点称为已持久化的制片规格。
 
+导演编排高燃打戏时用[双人分镜与声音节拍](references/screenCombat.md)建立时空关系，将表演、机位与声音写入本场已有镜头。真人镜头保持已采用的肤色、光源和材质。
+
 ## 分工与执行边界
 
 - [workflow](../workflow/SKILL.md)：剧本改编、资产制作、画布制作阶段和模型执行；先读现场模型能力；只有明确选用 Seedance 后，其专用规则才约束分段上限和提示词格式，不覆盖电影创作意图。

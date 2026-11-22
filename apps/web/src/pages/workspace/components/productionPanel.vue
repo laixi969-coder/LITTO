@@ -88,7 +88,7 @@
               </details>
               <p class="reviewHint">气质标签仅用于资产库检索与去重，不参与生成；不凭性别、年龄或职业预设脸型。</p>
             </details>
-            <button type="button" :disabled="!asset.name.trim() || asset.type !== 'Character'" @click="run(generateCharacter)">生成角色设定图</button>
+            <button type="button" :disabled="!asset.name.trim() || asset.type !== 'Character'" @click="run(generateCharacter)">创作角色定妆</button>
             <button type="button" :disabled="!asset.name.trim()" @click="run(createAsset)">{{ editingAsset ? '保存为新版本' : '建立资产' }}</button><button v-if="editingAsset" type="button" @click="clearAsset">取消编辑</button>
             <ul v-if="editingAsset"><li v-for="version in assetVersions" :key="version.version">v{{ version.version }} · {{ version.approvalStatus }} <button v-if="version.approvalStatus === 'approved'" type="button" @click="run(() => rollbackAsset(version.version))">恢复此版本</button></li></ul>
           </details>

@@ -356,6 +356,15 @@ async function resizeImage(event: Event) {
 
 function getConfig() {
   return {
+    prompt: data.value.prompt,
+    generationPrompt: generationPrompt.value,
+    references: refList.value.map((item, index) => ({
+      marker: `{{ref ${index + 1}}}`,
+      source: item.source,
+      sourceHandle: item.sourceHandle,
+      dataType: item.dataType,
+      ready: item.value !== undefined,
+    })),
     config: {
       visualModifiers: data.value.visualModifiers,
       production: data.value.production,
@@ -371,7 +380,7 @@ function getConfig() {
 
 nodeTools.register({
   name: "getConfig",
-  description: "读取此图片生成节点的当前模型、分辨率、比例及可选图片模型能力，不含密钥；未声明分辨率或比例时分别使用 2K、16:9",
+  description: "读取图片节点的提示词、编译文本、实际参考顺序与来源节点，以及当前模型、分辨率、比例和可选能力",
   parameters: z.strictObject({}),
   async execute(_args, { signal }) {
     signal?.throwIfAborted();
