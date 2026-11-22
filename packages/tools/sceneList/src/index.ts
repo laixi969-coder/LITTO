@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ToolDefinition, ToolFiles, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 import { breakdownSchema, sceneListSchema, validateBreakdown, validateSceneList, type SceneList } from "./schema";
-import { storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject, isShortDrama, applyStoryTextEdits, storyTextEditsSchema } from "./storyProject";
+import { storyDraftSchema, storySceneSchema, storyActionSchema, storyDecisionSchema, storyProjectSchema, storyStale, newStoryProject, isShortDrama, applyStoryTextEdits, storyTextEditsSchema } from "./storyProject";
 import { visualDirectors, visualFrames, resolveVisualBoard } from "./visualReference";
 import { inspectStoryLogic, storyLogicSchema } from "./storyLogic";
 
@@ -9,6 +9,15 @@ const sceneListPath = "场次表.json";
 const historyDirectory = "场次表历史";
 const breakdownPath = "拆解清单.json";
 const storyApprovalSchema = z.strictObject({ revisionId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/) });
+const draftParameters = storyDraftSchema.extend({
+  expectedVersion: z.number().int().nonnegative(),
+  parentId: storyApprovalSchema.shape.revisionId.optional().describe("从已有版本发展新稿时传其 id，首稿省略"),
+  scenes: z.array(storySceneSchema.extend({
+    episodeNumber: storySceneSchema.shape.episodeNumber.nullish().transform(value => value ?? undefined),
+  })).min(1).max(100).describe("每项为一个完整场次对象，同场的逐镜正文放在 text"),
+  canon: storyDraftSchema.shape.canon.default([]),
+  threads: storyDraftSchema.shape.threads.default([]),
+});
 const storyDecisionParameters = z.strictObject({ decision: storyDecisionSchema });
 const castContext = z.object({ characters: z.array(z.object({
   id: z.string(), name: z.string(), libraryId: z.string().optional(), actorName: z.string().optional(), referenceMediaId: z.string().optional(),
@@ -43,6 +52,8 @@ const json = (value: unknown) => ({ content: [{ type: "text" as const, text: JSO
 const plugin: ToolPlugin = {
   validateConfig: config => z.strictObject({}).parse(config),
   createTools({ files, story }) {
+    // 省略版本号时只绑定本轮工具已读过的采用稿，避免并发换稿后把旧场次挂到新稿。
+    let readRevisionId: string | undefined;
     async function checkStory(value: SceneList) {
       if (!story) return;
       const project = storyProjectSchema.extend({ productionContext: castContext }).parse(await story.read());
@@ -53,7 +64,8 @@ const plugin: ToolPlugin = {
       }
       await story.validateSources?.();
       const approved = project.revisions.find(item => item.id === project.approvedId);
-      if (!approved || value.storyRevisionId !== approved.id || storyStale(project, approved)) rejected(["请先调用 requestStoryApproval 在聊天中确认采用当前版本，并把 storyRevisionId 设为该版本 ID"]);
+      if (!approved || storyStale(project, approved)) rejected(["请先确认采用当前有效剧本"]);
+      if (value.storyRevisionId !== approved.id) rejected(["场次表所据版本与当前采用稿不一致，请读取 readStoryProject，按当前采用稿整理场次"]);
       if (JSON.stringify(value.scenes.map(item => item.sceneId)) !== JSON.stringify(approved.scenes.map(item => item.sceneId))) rejected(["场次表须按已采用剧本的顺序保留全部 sceneId"]);
       if (isShortDrama(project.brief) && value.kind !== "story") rejected(["短剧沿用剧情片场次表，kind 须为 story"]);
       if (project.brief.kind === "shortDramaCommerce" && value.kind !== "shortDramaCommerce") rejected(["短剧带货的场次表 kind 必须为 shortDramaCommerce"]);
@@ -107,6 +119,7 @@ const plugin: ToolPlugin = {
           signal?.throwIfAborted();
           const { value, issues } = validateSceneList(params);
           if (!value) rejected(issues);
+          value.storyRevisionId ??= readRevisionId;
           await checkStory(value);
           const previous = await readSaved(files);
           if (previous) {
@@ -170,10 +183,22 @@ const plugin: ToolPlugin = {
     ];
     if (story) tools.push({
       name: "readStoryProject", label: "读取故事工作台", description: "恢复创作简报、资料理解、方向、故事版本、已采用版本的事实/线索、审稿与预演、真实发布反馈。继续创作前先读。", parameters: z.toJSONSchema(z.object({})),
-      async execute() { const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read()); return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) }); },
+      async execute() {
+        const project = storyProjectSchema.extend({ productionContext: z.unknown().optional() }).parse(await story.read());
+        readRevisionId = project.approvedId;
+        return json({ ...project, visualReferences: resolveVisualBoard(project.visualBoard) });
+      },
+    }, {
+      name: "saveStoryDraft", label: "保存剧本候选", executionMode: "sequential",
+      description: "保存完整剧本候选。直接传 expectedVersion、title、outline、scenes；没有锁定事实或线索时省略 canon、threads。每次只存一版，返回的新版本可用 requestStoryApproval 采用。",
+      parameters: z.toJSONSchema(draftParameters, { target: "draft-07", io: "input" }),
+      async execute(_id, params) {
+        const { expectedVersion, parentId, ...value } = draftParameters.parse(params);
+        return json(await story.apply(expectedVersion, { type: "draft", parentId, value }));
+      },
     }, {
       name: "updateStoryProject", label: "更新故事候选", executionMode: "sequential",
-      description: "按 readStoryProject 的 version 保存资料、方向、候选与审稿。审稿按需保存，问题须引用正文；先关注会影响主线理解或结局的问题，次要细节作为建议，不反复要求审稿通过。整场改写用rewrite；指定词句用patch并按需同步speechEdits，保留其余内容与旧版。draft.parentId 只能是 revisions 中已有版本 id，第一版省略，不能填写方向 id。每次保存或改写后使用返回的最新 version 和 revisions 最后一个 id，后续操作不得沿用旧版本。采用用requestStoryApproval，不代用户确认资料、问题保留或观众反馈。",
+      description: "按 readStoryProject 的 version 保存资料、方向与审稿；写完整剧本使用 saveStoryDraft。审稿按需保存，问题须引用正文；先关注会影响主线理解或结局的问题，次要细节作为建议，不反复要求审稿通过。整场改写用rewrite；指定词句用patch并按需同步speechEdits，保留其余内容与旧版。draft.parentId 只能是 revisions 中已有版本 id，第一版省略，不能填写方向 id。每次保存或改写后使用返回的最新 version 和 revisions 最后一个 id，后续操作不得沿用旧版本。采用用requestStoryApproval，不代用户确认资料、问题保留或观众反馈。",
       parameters: z.toJSONSchema(z.object({ expectedVersion: z.number().int().nonnegative(), action: storyActionSchema }), { target: "draft-07", io: "input" }),
       async execute(_id, params) { const input = params as { expectedVersion: number; action: unknown }; return json(await story.apply(input.expectedVersion, input.action)); },
     });
@@ -183,7 +208,9 @@ const plugin: ToolPlugin = {
       parameters: z.toJSONSchema(storyApprovalSchema, { target: "draft-07", io: "input" }),
       async execute(id, params, signal) {
         const { revisionId } = storyApprovalSchema.parse(params);
-        return json(await story.requestApproval!(id, revisionId, signal));
+        const result = await story.requestApproval!(id, revisionId, signal);
+        if (result && typeof result === "object" && "approved" in result && result.approved === true) readRevisionId = revisionId;
+        return json(result);
       },
     });
     if (story?.requestDecision) tools.push({

@@ -57,7 +57,7 @@ const live = new Map<string, { controller: AbortController; finished: Promise<vo
 const confirmationTools = new Set(["askUser", "requestStoryApproval", "requestStoryDecision", "requestProductionDecision"]);
 const allowedTools = new Set([
   "read", "write", "edit", "ls", "grep", "find", "ffprobe", "ffmpeg", "skillOperator",
-  "readVisualReferences", "saveSceneList", "readSceneList", "saveBreakdown", "readStoryProject", "updateStoryProject",
+  "readVisualReferences", "saveSceneList", "readSceneList", "saveBreakdown", "readStoryProject", "updateStoryProject", "saveStoryDraft",
   ...confirmationTools, "listMediaModels", "productionSpec", "inspectProduction", "reviewProduction", "reviewProductions",
   "generateShots", "generateImage", "generateVideo", "generateAudio",
 ]);
@@ -209,7 +209,7 @@ function launch(task: AutoFilmTask, folder: string) {
           if (tool.name === "requestProductionDecision" && (["reviewFinal", "reviewOutput", "approveTake", "publishAsset", "libraryReference"].includes(input.operation) || input.operation === "selectCandidate" && input.data?.asHero))
             throw new Error("自动模式不代填用户满意度或修改跨项目角色库；关键帧和视频请用 reviewProduction，成片用 productionSpec(agentReviewFinal)");
           if (tool.name === "requestStoryDecision" && input.decision?.type === "release") throw new Error("自动成片不执行发布或填写发布反馈");
-          if (task.handoffSessionFile && (["updateStoryProject", "requestStoryApproval", "requestStoryDecision"].includes(tool.name) || tool.name === "productionSpec" && input.operation === "sequence")) throw new Error("交接任务沿用原有剧本和指定序列，不能重写剧本、重新采用或创建新序列");
+          if (task.handoffSessionFile && (["updateStoryProject", "saveStoryDraft", "requestStoryApproval", "requestStoryDecision"].includes(tool.name) || tool.name === "productionSpec" && input.operation === "sequence")) throw new Error("交接任务沿用原有剧本和指定序列，不能重写剧本、重新采用或创建新序列");
           if (tool.name === "productionSpec" && ["publishAsset", "favoriteAsset"].includes(input.operation)) throw new Error("本任务只制作当前项目，不修改跨项目角色库");
           const { api, tenant } = identity(task.directory), scope = api.scoped(tenant.workspaceId);
           const operationData = input.data ?? {};

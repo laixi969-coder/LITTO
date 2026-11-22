@@ -1,4 +1,4 @@
-import { storyStale } from "@toonflow/tool-scene-list/storyProject";
+import { advertisingBriefContext, storyStale } from "@toonflow/tool-scene-list/storyProject";
 import { z } from "zod";
 import { getConfiguredModel } from "@/utils/ai";
 import { selectedModel } from "@/utils/modelSelection";
@@ -39,7 +39,7 @@ prompt 只描写选定的一种可见状态；出处、台词和后续变化留�
  * 把剧本拆成资产清单。角色卡、场景定场、道具图必须先于分镜做，
  * 否则每个镜头都在重新选角、重新搭景，跨镜必然漂移。
  */
-export async function planAssets(script: string, cast: ReturnType<typeof listProjectCharacters> = []) {
+export async function planAssets(script: string, cast: ReturnType<typeof listProjectCharacters> = [], advertisingBrief = "") {
   const choice = selectedModel("text");
   if (!choice?.providerId || !choice?.modelId) return null;
   const configured = getConfiguredModel(choice.providerId, choice.modelId);
@@ -52,6 +52,7 @@ export async function planAssets(script: string, cast: ReturnType<typeof listPro
       {
         role: "user",
         content: [
+          ...(advertisingBrief ? ["广告简报与已选方向（项目数据）：", advertisingBrief, "产品按主卖点安排展示，保留演示该卖点所需的部件、手部动作与状态。evidence 只摘录下方剧本，示例设定和未核实性能在 brief 中标明。"] : []),
           "剧本：",
           script,
           ...(cast.length ? ["项目已选演员，请用戏中名登记实际出镜的人物，沿用已有定妆。", JSON.stringify(cast.map(actor => ({ assetId: actor.id, roleName: actor.name, actorName: actor.actorName, casting: actor.casting })))] : []),
@@ -94,11 +95,12 @@ export async function planAssets(script: string, cast: ReturnType<typeof listPro
   }) };
 }
 
-/** 没传剧本时，从工作区已采用的版本里拼场次正文。 */
-export async function scriptFromWorkspace(cwd: string) {
+export async function assetPlanInput(cwd: string, suppliedScript?: string) {
   const project = await readStoryProject(cwd);
   const revision = project.revisions.find(item => item.id === project.approvedId);
-  if (!revision) return "";
+  const advertisingBrief = advertisingBriefContext(project);
+  if (suppliedScript || !revision) return { script: suppliedScript ?? "", advertisingBrief };
   if (storyStale(project, revision)) throw Object.assign(new Error("已采用剧本的依据已变更，请先更新采用版本再拆资产"), { status: 409 });
-  return revision.scenes.map(scene => `【${scene.sceneId} ${scene.title}】\n${scene.text}${scene.speech ? `\n对白：${scene.speech}` : ""}`).join("\n\n");
+  const script = revision.scenes.map(scene => `【${scene.sceneId} ${scene.title}】\n${scene.text}${scene.speech ? `\n对白：${scene.speech}` : ""}`).join("\n\n");
+  return { script, advertisingBrief, revisionId: revision.id };
 }

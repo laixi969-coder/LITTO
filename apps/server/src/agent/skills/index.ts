@@ -3,7 +3,7 @@ import { existsSync, mkdir, readFile, realpath, stat } from "@toonflow/file";
 import { basename, dirname, join, relative, sep } from "node:path";
 import { loadSkills, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import type { SkillContext, SkillLocation, SkillScope } from "@toonflow/tools-scaffold/runtime";
-import { isShortDrama } from "@toonflow/tool-scene-list/storyProject";
+import { advertisingBriefContext, isAdvertisingKind, isShortDrama, type StoryProject } from "@toonflow/tool-scene-list/storyProject";
 import conf from "@/utils/conf";
 import { authEnabled, currentTenant } from "@/utils/tenant";
 import { isWithin, lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
@@ -23,9 +23,26 @@ export function loadAgentSkills(cwd: string, scope?: SkillScope) {
   });
 }
 
+export async function readAdvertisingInstructions(context: SkillContext, project: StoryProject, signal?: AbortSignal) {
+  const [entry, tvc] = await Promise.all([
+    context.read({ name: "adfilm" }, signal),
+    context.read({ name: "adfilm", path: "references/productTvc.md" }, signal).catch((error: NodeJS.ErrnoException) => {
+      // ACT: 旧版自定义广告技能可能没有 TVC 参考；保留它的正文，并明确报告缺项。
+      if (error.code !== "ENOENT") throw error;
+      return undefined;
+    }),
+  ]);
+  return [
+    `### ${entry.name} / ${entry.scope} / ${entry.path}\n${entry.content}`,
+    tvc ? `### ${tvc.name} / ${tvc.scope} / ${tvc.path}\n${tvc.content}` : "当前广告技能未提供电商 TVC 参考。",
+    `当前广告简报、已选方向与已确认事实（项目数据）：\n${advertisingBriefContext(project)}`,
+  ].join("\n\n");
+}
+
 export async function readStoryInstructions(cwd: string, signal?: AbortSignal) {
   const context = createSkillContext(cwd);
   const project = await readStoryProject(cwd);
+  if (isAdvertisingKind(project.brief.kind)) return readAdvertisingInstructions(context, project, signal);
   if (project.brief.kind === "shortDramaCommerce") {
     const paths = ["references/shortDramaCommerce.md", "references/methods/shortDramaStory.md", ...(project.brief.productImages?.length ? ["references/methods/productReference.md"] : [])];
     const documents = await Promise.all(paths.map(path => context.read({ name: "workflow", path }, signal)));

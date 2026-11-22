@@ -135,6 +135,18 @@ export const storyDecisionSchema = z.discriminatedUnion("type", [
 export function storyActionParameters(type: StoryAction["type"]) {
   return z.toJSONSchema(storyActionSchema.options.find(option => option.shape.type.value === type)!, { io: "input", target: "draft-07" });
 }
+export function isAdvertisingKind(kind: string | undefined) {
+  return kind === "adfilm" || kind === "brandFilm";
+}
+export function advertisingBriefContext(project: StoryProject) {
+  if (!isAdvertisingKind(project.brief.kind)) return "";
+  return JSON.stringify({
+    brief: project.brief,
+    approvedId: project.approvedId,
+    direction: project.directions.find(item => item.id === project.directionId),
+    facts: project.sources.filter(item => item.confirmed && item.purpose === "fact").map(item => ({ name: item.name, observations: item.observations })),
+  });
+}
 export function isShortDrama(brief: StoryProject["brief"]) {
   return brief.kind === "serial" && brief.serialFormat === "short";
 }

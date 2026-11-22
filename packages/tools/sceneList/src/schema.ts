@@ -13,7 +13,7 @@ export const musicSceneFields = {
 };
 
 export const sceneListSchema = z.object({
-  storyRevisionId: text(80).optional().describe("故事工作台已采用的版本 ID；有故事项目时必填"),
+  storyRevisionId: text(80).optional().describe("采用稿版本 ID；本轮 readStoryProject 或采用成功后可省略，保存时会复核版本"),
   title: text(80).min(1),
   kind: z.enum(["story", "shortDramaCommerce", "musicFilm"]).default("story"),
   volume: z.enum(["micro", "short", "medium", "long"]).describe("micro≈1 分钟；short≈3–5 分钟；medium=单集；long=长篇"),

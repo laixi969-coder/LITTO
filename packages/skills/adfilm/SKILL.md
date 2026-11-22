@@ -11,6 +11,10 @@ metadata:
 
 首页「商品图片」的已上传素材保存在当前项目 `brief.productImages`，path 是工作区相对路径。开始构思与制作前实际查看，用于商品外观、包装和结构参考；不把包装图当成人物身份或摄影风格，不从图片猜未经证实的功效。按[商品图片准备](../workflow/references/methods/productReference.md)执行 `brief.productPreparation` 的原图、抠图或三视图选项，保留真实原图；AI 补全角度是待核对候选。正式制作沿现有导入、产品资产与权威参考绑定复用图片。
 
+商业广告项目从故事、剧本到剧本拆解持续沿用同一份项目简报。沿用 brief.idea 中的商品与主卖点、audience、channel、intent、duration，以及 constraints 中的证据、创意假设、画幅与声音。用户补充或修正时用现有 updateStoryProject 的 brief 更新对应内容，保留其他字段。按已选方向写故事，剧本把主卖点落实为可见动作，保存场次表时以当前 approvedId 填入 storyRevisionId，沿用采用稿的 sceneId。拆解从 readSceneList 的采用稿与场次提取产品资产、出场与状态变化，待证实的主张写入 gaps。创意假设须一路标明依据。保存完整剧本用 saveStoryDraft，同一场的四镜或多镜写入该场 text，scenes 只放场次对象。无锁定事实或线索时可省略对应数组。
+
+电商产品片使用[产品 TVC 方法](references/productTvc.md)选取与本阶段有关的规则。单图重点锁定外观，时长、画幅和声音服从简报；品牌叙事、原生内容与纯文字拆解各自保留当前交付形式。
+
 真人商业广告与品牌片默认采用[清爽人物方法](../videoPromptDirector/references/cleanPortrait.md)：肤色自然均匀、细微纹理、轻薄妆面、克制高光和清晰毛流。从人物资产到正式镜头沿用同一参考与肤面标准，写入 look、lighting、realism.surface 后 compile 回读；五板块提示词写入第二块。此默认不改变产品本色、包装、功效证据、既定光色或明确的特殊妆效；纯产品、动画与无人画面不套人物要求。
 
 ## 先选择创作入口
@@ -37,7 +41,7 @@ metadata:
 
 ## 故事工作台与真实反馈
 
-有 readStoryProject 时先恢复项目，用 updateStoryProject 保存资料理解、少量差异方向、脚本候选与证据审稿。事实资料必须由用户确认；样片只用于表达和制作参考，不作为产品功效证据。正式采用后再生成同版本场次表（storyRevisionId），保留 sceneId。局部修改保留旧版，并核对受影响的口播、口型、字幕与镜头。
+有 readStoryProject 时先恢复项目，用 updateStoryProject 保存资料理解、少量差异方向与证据审稿，完整脚本候选用 saveStoryDraft。事实资料必须由用户确认；样片只用于表达和制作参考，不作为产品功效证据。正式采用后再生成同版本场次表（storyRevisionId），保留 sceneId。局部修改保留旧版，并核对受影响的口播、口型、字幕与镜头。
 
 正式制作前可先用工作台合成低成本动态分镜。发布反馈关联实际版本、受众、渠道、观察窗口与投放条件；效果广告看卖点理解和行动，品牌片看品牌记忆。复盘引用真实记录，未知数据留空，不给爆款概率或伪造转化成绩。
 

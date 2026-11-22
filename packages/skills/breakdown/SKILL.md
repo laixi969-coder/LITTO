@@ -14,6 +14,7 @@ metadata:
 ## 输入与边界
 
 - 输入：已确认的剧本与场次表。先用 `readSceneList` 读取当前场次表，记下其中的实体 id 和 `version`。只有剧本没有场次表时，先按 [story](../story/SKILL.md) 的规则用 `saveSceneList` 整理并保存，再拆解；用户提供的定稿剧本不改写。
+- 商业广告与品牌片从 `storyContext.brief` 取回主卖点、证据与投放规格，对照采用剧本写清产品出场场次、可见演示动作与状态变化。同一商品登记为一个 Product，样品假设及缺少的性能资料记在 notes 或 gaps。
 - 未确认的故事、大纲不拆解；先回到 story 阶段。
 - 不规划镜头，不生成图片或视频。镜头规格由 [cinema](../cinema/SKILL.md) 的导演流程在资产确认后产生。
 

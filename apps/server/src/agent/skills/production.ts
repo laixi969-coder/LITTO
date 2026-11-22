@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { isShortDrama, musicFilmWritingGuide } from "@toonflow/tool-scene-list/storyProject";
-import { createSkillContext, loadAgentSkills, readStoryInstructions } from "@/agent/skills";
+import { isAdvertisingKind, isShortDrama, musicFilmWritingGuide } from "@toonflow/tool-scene-list/storyProject";
+import { createSkillContext, loadAgentSkills, readAdvertisingInstructions, readStoryInstructions } from "@/agent/skills";
 import { readStoryProject } from "@/utils/story";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
@@ -23,7 +23,7 @@ function explicitlyNamesSkill(task: string, name: string) {
 export async function loadStoryWritingContext(cwd: string, tools: SkillTools, task: string, signal?: AbortSignal, musicFilm = false) {
   if (!canReadSkills(tools)) return "";
   const project = await readStoryProject(cwd);
-  const skillName = project.brief.kind === "shortDramaCommerce" ? "workflow" : "story";
+  const skillName = project.brief.kind === "shortDramaCommerce" ? "workflow" : isAdvertisingKind(project.brief.kind) ? "adfilm" : "story";
   const skill = loadAgentSkills(cwd).skills.find(item => item.name === skillName);
   if (!skill || skill.disableModelInvocation && !explicitlyNamesSkill(task, skill.name)) return "";
   const method = await readStoryInstructions(cwd, signal);
@@ -64,10 +64,11 @@ export async function loadModelSkillContext(cwd: string, tools: SkillTools, task
 export async function loadProductionSkillContext(cwd: string, tools: SkillTools, task: string) {
   const available = loadAgentSkills(cwd).skills;
   const explicitNames = available.filter(skill => explicitlyNamesSkill(task, skill.name)).map(skill => skill.name);
-  if (!explicitNames.length && !tools.some(tool => ["readStoryProject", "productionSpec", "generateImage", "generateVideo", "generateShots", "nodeTools", "getCanvas"].includes(tool.name))) return "";
+  if (!explicitNames.length && !tools.some(tool => ["readStoryProject", "updateStoryProject", "readSceneList", "saveSceneList", "saveBreakdown", "productionSpec", "generateImage", "generateVideo", "generateShots", "nodeTools", "getCanvas"].includes(tool.name))) return "";
   const project = await readStoryProject(cwd);
   const shortDrama = isShortDrama(project.brief);
-  const advertising = /adfilm|brandFilm|商业广告|广告|品牌片|产品片|带货|\bugc\b|探店|餐厅推广/i.test(task);
+  const commercialProject = isAdvertisingKind(project.brief.kind);
+  const advertising = commercialProject || /adfilm|brandFilm|商业广告|广告|品牌片|产品片|带货|\bugc\b|探店|餐厅推广/i.test(task);
   const story = /剧情|剧本|故事|短剧|中剧|电影|story/i.test(task) || shortDrama && /集|大纲|框架|续写|改写|继续|接着/.test(task);
   const music = /\bmv\b|musicFilm|音乐视频|音乐短片|音乐电影/i.test(task) || !advertising && !story && /歌曲|演唱|唱跳/.test(task);
   const topics = [
@@ -106,7 +107,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const savedKind = project.version > 0 ? project.brief.kind : sequenceKinds.size === 1 ? [...sequenceKinds][0] : project.brief.kind;
   const shortDramaCommerce = savedKind === "shortDramaCommerce";
   // ACT: MV 内讨论剧情或说“不要故事”仍是 MV；明确指定 story 技能才切回故事入口。
-  const kind = shortDramaCommerce || shortDrama ? savedKind : music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
+  const kind = shortDramaCommerce || shortDrama || isAdvertisingKind(savedKind) ? savedKind : music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
     : savedKind;
   const primary = shortDramaCommerce ? "workflow" : kind === "musicFilm" ? "musicfilm" : ["adfilm", "brandFilm"].includes(kind) ? "adfilm" : "story";
   const intentText = explicitNames.length || /图片|图像|生图|视频|短片|分镜|剧本|五板块/.test(task) ? task : topicText;
@@ -115,7 +116,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const standalonePrompt = explicitNames.includes("videoPromptDirector") || /五板块|视频提示词|视频节点|生成段/.test(intentText);
   // ACT: 仅对明确的文字创作收窄上下文；按分句排除否定要求，复杂或不明意图仍沿用制作流程。
   const taskIntent = task.split(/[，,。；;\n]/).filter(part => !/^(?:请)?(?:不要|不用|无需|不必|不|勿)/.test(part.trim())).join("\n");
-  const storyOnly = (story || shortDramaCommerce) && ["story", "workflow"].includes(primary) && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
+  const storyOnly = (story || shortDramaCommerce) && (commercialProject || ["story", "workflow"].includes(primary)) && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
     && !/视频|分镜|镜头|关键帧|运镜|拍摄|预演|成片|制片|拆解|场次表|资产|定妆|三视图|出图|生图|剪辑/.test(taskIntent);
   // ACT: 采用稿已存在且本轮只拆分镜时，不重复加载编剧、资产生产与生成协议；不明确的续作仍走原流程。
   const storyboardOnly = !!project.approvedId && !explicitNames.length && /分镜/.test(taskIntent)
@@ -125,6 +126,10 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const focusedNames = explicitNames.filter(name => ["gavenDirectImagePrompts", "gavenScriptToVideo", "gavenQingluAllegory", "insight", "directorPalettes", "breakdown", "canvas"].includes(name));
   const names = focusedNames.length ? [...focusedNames] : imagePrompt ? ["gavenDirectImagePrompts"] : scriptPrompt ? ["gavenScriptToVideo"]
     : storyOnly ? [primary] : storyboardOnly ? ["cinema", "continuity"] : ["workflow", primary, "cinema", "continuity", ...(standalonePrompt ? ["videoPromptDirector"] : [])];
+  if (commercialProject) {
+    if (!names.includes("adfilm")) names.push("adfilm");
+    if (/拆解|拆剧本|拆(?:分成|成|分)?资产|资产清单/.test(taskIntent) && !names.includes("breakdown")) names.push("breakdown");
+  }
   if (primary === "musicfilm" && names.includes("musicfilm")) names.push("story");
   if (!storyOnly && !storyboardOnly && !imagePrompt && !scriptPrompt && !focusedNames.length) {
     if (/旅拍|婚礼|旅行|vlog/i.test(topicText)) names.push("travelWeddingDirector");
@@ -182,11 +187,14 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
       continue;
     }
     if (name === "story") {
-      documents.push(await readStoryInstructions(cwd));
+      if (!commercialProject) documents.push(await readStoryInstructions(cwd));
       continue;
     }
     const paths: (string | undefined)[] = [];
-    if (names.includes(name) && name === "workflow" && shortDramaCommerce && storyOnly) {
+    if (commercialProject && name === "adfilm") {
+      documents.push(await readAdvertisingInstructions(context, project));
+      paths.push(...referencePaths.adfilm);
+    } else if (names.includes(name) && name === "workflow" && shortDramaCommerce && storyOnly) {
       documents.push(await readStoryInstructions(cwd));
     } else if (names.includes(name)) paths.push(undefined, ...(referencePaths[name] ?? []));
     paths.push(...specialties.filter(method => method.name === name).map(method => method.path));

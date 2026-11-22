@@ -726,6 +726,7 @@ async function startBrief() {
     storyBrief.kind = kind === "creative" ? "adfilm" : kind === "existing" ? "story" : kind;
     storyBrief.idea = subject;
     if (kind === "serial") storyBrief.serialFormat = "short";
+    if (kind === "creative") storyBrief.duration = 15;
     if (kind === "shortDramaCommerce") storyBrief.duration = 30;
     await createProject(true, message, attachments, storyBrief);
   } catch (cause) {
