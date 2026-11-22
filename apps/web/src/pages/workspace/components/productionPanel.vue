@@ -203,7 +203,7 @@
                 <label><input v-model="imageAndCameraOnly" type="checkbox" />使用图像与相机轨迹生成；已校准尺度，逐请求文字表演指令和音频不受支持</label>
               </template>
             </div>
-            <button v-if="section === 'generate'" type="button" :disabled="!modelKey" @click="run(compile)">检查并预览生成内容</button>
+            <button v-if="section === 'generate'" type="button" :disabled="!modelKey && !canSetUpModel" @click="run(canSetUpModel ? setupMediaModel : compile)">检查并预览生成内容</button>
             <div v-if="preview && section === 'generate'" class="generationPreview">
               <p>{{ preview.request.providerId }} / {{ preview.request.modelId }} · 实际画幅 {{ preview.request.ratio }} · {{ preview.request.size || preview.request.resolution }}</p>
               <p v-for="warning in preview.compiled.warnings" :key="warning" class="attention">{{ warning }}</p>
@@ -419,6 +419,8 @@ const speechChecked = ref(false), lipSyncChecked = ref(false), speechNote = ref(
 const speechReviewRequired = computed(() => needsLipSync(detail.value ?? {}) || !!detail.value?.creativeBrief?.dialogue?.lines?.length);
 const keyOf = (model: MediaModel) => JSON.stringify([model.providerId, model.modelId]);
 const availableModels = computed(() => models.value.filter(model => model.type === kind.value));
+const openModelSetup = inject<((focus: "media") => Promise<void>) | undefined>("openShareModelSetup", undefined);
+const canSetUpModel = computed(() => !!openModelSetup && !availableModels.value.length);
 const selectedModel = computed(() => availableModels.value.find(model => keyOf(model) === modelKey.value));
 watch(availableModels, items => { if (!canManageModels()) modelKey.value = items[0] ? keyOf(items[0]) : ""; }, { immediate: true });
 watch(visualModels, items => { if (!canManageModels()) visionModelKey.value = items[0] ? keyOf(items[0]) : ""; });
@@ -491,6 +493,16 @@ async function load() {
   [world.value, , assets.value, shots.value, sequences.value, references.value] = values;
   if (!sequences.value.some(item => item.id === sequenceId.value)) sequenceId.value = sequences.value[0]?.id ?? "";
   look.value = values[1].find((item: any) => item.scope === "project") ?? {};
+  await loadProductionModels();
+  await refreshAssetLibrary();
+  await refreshJobs();
+}
+async function setupMediaModel() {
+  await openModelSetup?.("media");
+  await loadProductionModels();
+  if (!modelKey.value && availableModels.value.length === 1) modelKey.value = keyOf(availableModels.value[0]!);
+}
+async function loadProductionModels() {
   const response = await fetch("/api/ai/media/models", { signal: controller.signal });
   const result = await response.json();
   if (!response.ok) throw new Error(result.message || "模型加载失败");
@@ -498,8 +510,6 @@ async function load() {
   const languageResponse = await fetch("/api/ai/models", { signal: controller.signal });
   if (!languageResponse.ok) throw new Error("检查模型列表读取失败");
   visualModels.value = (await languageResponse.json()).data;
-  await refreshAssetLibrary();
-  await refreshJobs();
 }
 let loaded = false;
 // 面板开着时每 10 秒检查一次别处发起的任务；打开时立即检查一次。

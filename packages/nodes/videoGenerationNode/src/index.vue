@@ -73,10 +73,10 @@
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
-            :disabled="deleting || uploading || toolsBusy || storyboardBusy || (!generating && ((!data.production && !generationPrompt) || !selectedModel))"
+            :disabled="deleting || uploading || toolsBusy || storyboardBusy || (!generating && ((!data.production && !generationPrompt) || (!selectedModel && !canSetUpModel)))"
             :title="generating ? '停止生成' : '生成视频'"
             :aria-label="generating ? '停止生成' : '生成视频'"
-            @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration(true).catch((error) => showNodeError(error, '视频生成失败'))" />
+            @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : (canSetUpModel ? ai.openModelSetup!('media').then(loadModels) : startGeneration(true)).catch((error) => showNodeError(error, '视频生成失败'))" />
         </div>
         <p v-if="!editing && data.storyboard" class="referenceHint">已保存 {{ data.storyboard.shots.length }} 镜 · {{ data.storyboard.shots.at(-1)?.end }} 秒，生成时采用当前编排。</p>
         <p v-if="storyboardError" class="storyboardError" role="alert">{{ storyboardError }}</p>
@@ -128,6 +128,7 @@ data.value.generateAudio ??= false;
 data.value.ratio ??= "";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
+const canSetUpModel = computed(() => !!ai.openModelSetup && !models.value.length && !modelsLoading.value);
 const modelsLoading = ref(false);
 const uploading = ref(false);
 const fileInput = ref<HTMLInputElement>();

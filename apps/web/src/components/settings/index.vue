@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, shallowRef } from "vue";
 import { hasDesktopUpdate } from "@/stores/desktopUpdate";
-import { getMe, isAuthDisabled } from "@/lib/session";
+import { getMe, isAuthDisabled, isDesktopShare } from "@/lib/session";
 import {
   IconPalette,
   IconSettings,
@@ -68,11 +68,11 @@ const settingsPanels = [
     component: defineAsyncComponent(() => import("./panels/pluginMarket/index.vue")),
   },
   { id: "personalization", label: "个性化", icon: IconUserCog, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/personalization.vue")) },
-  { id: "privacy", label: "隐私", icon: IconShieldLock, component: defineAsyncComponent(() => import("./panels/privacy.vue")) },
+  { id: "privacy", label: isDesktopShare() ? "隐私与安全" : "隐私", icon: IconShieldLock, component: defineAsyncComponent(() => import("./panels/privacy.vue")) },
   { id: "mcp", label: "MCP", icon: IconPlugConnected, component: defineAsyncComponent(() => import("./panels/mcp/index.vue")) },
   { id: "developer", label: "开发者选项", icon: IconCode, component: defineAsyncComponent(() => import("./panels/developer/index.vue")) },
   { id: "about", label: "关于", icon: IconInfoCircle, component: defineAsyncComponent(() => import("./panels/about.vue")) },
-].filter((panel) => !hiddenPanels.includes(panel.id) && (!accounts || !["modelSelection", "languageModel", "mediaModel", "videoReviewModel"].includes(panel.id)));
+].filter((panel) => !hiddenPanels.includes(panel.id) && (!accounts || isDesktopShare() || !["modelSelection", "languageModel", "mediaModel", "videoReviewModel"].includes(panel.id)));
 const activePanel = shallowRef(settingsPanels[0]!);
 const visible = defineModel<boolean>({ default: false });
 </script>

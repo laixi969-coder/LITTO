@@ -21,7 +21,7 @@
     </aside>
     <section class="card" aria-label="登录">
       <h2>开始你的下一部作品</h2>
-      <p class="slogan">用邮箱登录，灵感和作品都留在这里。</p>
+      <p class="slogan">{{ macDesktop ? "输入本机管理员邮箱，以及你为这个工作台设置的密码。" : "用邮箱登录，灵感和作品都留在这里。" }}</p>
       <el-form class="form" @submit.prevent="submit">
         <label for="loginEmail">邮箱</label>
         <el-input
@@ -44,31 +44,35 @@
           maxlength="256"
           :disabled="busy"
           aria-label="密码" />
+        <el-alert v-if="loginError" :title="loginError" type="error" :closable="false" role="alert" />
         <el-button type="primary" size="large" nativeType="submit" :loading="busy" :disabled="!email.includes('@') || !password">登录</el-button>
       </el-form>
-      <p class="hint">使用已设置的密码登录。验证码登录暂不可用，未设置密码请联系管理员。</p>
+      <p v-if="macDesktop" class="hint"><a href="/desktop/recover-password" target="_blank" rel="noopener">忘记本机密码？</a> 用 Touch ID 或 Mac 登录密码验证身份。也可以在屏幕顶部选择「MILI MILI → 重设本机密码…」。</p>
+      <p v-else class="hint">使用已设置的密码登录。验证码登录暂不可用，未设置密码请联系管理员。</p>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { ElMessage } from "element-plus";
 import { verifyPassword } from "@/lib/session";
 import brandLogo from "@/components/brandLogo.vue";
 
 const email = ref("");
 const password = ref("");
 const busy = ref(false);
+const loginError = ref("");
+const macDesktop = new URLSearchParams(location.search).get("desktop") === "1" && /Macintosh/.test(navigator.userAgent);
 async function submit() {
   if (busy.value || !email.value.includes("@") || !password.value) return;
   busy.value = true;
+  loginError.value = "";
   try {
     await verifyPassword(email.value.trim(), password.value);
     location.hash = "#/home";
     location.reload(); // reload so settings and workspaces load under the new session
   } catch (error) {
-    ElMessage.error((error as Error).message);
+    loginError.value = (error as Error).message;
     busy.value = false;
   }
 }

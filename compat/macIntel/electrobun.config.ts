@@ -6,7 +6,10 @@ export default {
   build: {
     bun: { entrypoint: "generated/src/index.ts", minify: true },
     copy: {
+      "../../LICENSE": "licenses/miliMili.txt",
+      "../../build/desktop/desktopTools": "desktopTools",
       "../../build/mcp": "mcp",
+      ...(process.env.bundleMacMediaTools === "1" ? { "../../build/desktop/mediaTools": "mediaTools" } : {}),
       "../../build/web": "views/mainview",
       "../../build/tools": "tools",
       "../../build/agents": "agents",

@@ -2,6 +2,10 @@ import { mkdirSync, readFileSync, writeAtomicSync, lstatSync, chmodSync } from "
 import { randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 
+declare const miliMiliShareBuild: boolean;
+export const superAdminEmail = typeof miliMiliShareBuild !== "undefined" && miliMiliShareBuild ? "" : "66445039@qq.com";
+export const isDesktopMac = () => process.platform === "darwin" && process.env.toonflowDesktop === "1";
+export const isShareDesktop = () => isDesktopMac() && process.env.miliMiliShare === "1";
 const dataDir = resolve(process.env.MILIMILI_DATA_DIR ?? join(process.cwd(), "data"));
 mkdirSync(dataDir, { recursive: true });
 
@@ -28,7 +32,7 @@ export const config = {
     dbFile: process.env.MILIMILI_DB ?? join(dataDir, "milimili.db"),
     mediaDir: join(dataDir, "media"),
     masterKey: masterKey(),
-    adminEmails: (process.env.MILIMILI_ADMIN_EMAILS ?? "admin@milimili.local").split(",").map((s) => s.trim().toLowerCase()),
+    adminEmails: isShareDesktop() ? [] : (process.env.MILIMILI_ADMIN_EMAILS ?? (isDesktopMac() ? superAdminEmail : "admin@milimili.local")).split(",").map((s) => s.trim().toLowerCase()),
     publicUrl: process.env.MILIMILI_PUBLIC_URL ?? "http://localhost:8787",
     workerPollMs: Number(process.env.MILIMILI_WORKER_POLL_MS ?? 300),
     mockLatencyMs: Number(process.env.MILIMILI_MOCK_LATENCY_MS ?? 400),

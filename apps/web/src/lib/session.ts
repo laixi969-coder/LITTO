@@ -1,5 +1,5 @@
 /** MILI MILI account session (cloud API under /cloud, HttpOnly cookie). `authDisabled` = server runs with MILIMILI_AUTH=off (single-user mode). */
-export type Me = { modelAccess: { canManage: boolean; canUse: boolean }; user: { id: string; email: string; isAdmin: boolean }; workspaceId: string; role: string; workspaces: { id: string; name: string; kind: string; role: string }[] };
+export type Me = { desktopShare?: { passwordRequired: boolean }; modelAccess: { canManage: boolean; canUse: boolean }; user: { id: string; email: string; isAdmin: boolean }; workspaceId: string; role: string; workspaces: { id: string; name: string; kind: string; role: string }[] };
 
 let me: Me | null = null;
 let authDisabled = false;
@@ -16,6 +16,7 @@ export async function loadMe(force = false): Promise<Me | null> {
   return me;
 }
 export const getMe = () => me;
+export const isDesktopShare = () => !!me?.desktopShare;
 export const isAuthDisabled = () => authDisabled;
 export const canManageModels = () => authDisabled || me?.modelAccess.canManage === true;
 
@@ -30,7 +31,10 @@ export async function cloudRequest<T = unknown>(path: string, method = "GET", bo
   return data;
 }
 const post = (path: string, body: unknown) => cloudRequest(path, "POST", body);
-export async function verifyPassword(email: string, password: string) { await post("/auth/password/login", { email, password, client: "web" }); await loadMe(true); }
+export async function verifyPassword(email: string, password: string) {
+  await post("/auth/password/login", { email, password, client: "web" });
+  if (!await loadMe(true)) throw new Error("密码已通过验证，但工作台未能建立会话。请重新打开应用。");
+}
 export async function logout() { await post("/auth/logout", {}); me = null; location.hash = "#/login"; location.reload(); }
 
 /** 请求绑定页面加载时的账号，其他标签页更换 Cookie 后拒绝跨账号操作并保留草稿。 */

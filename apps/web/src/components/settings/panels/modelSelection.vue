@@ -1,11 +1,13 @@
 <template>
   <div class="modelSelection">
-    <p>{{ isAuthDisabled() ? "分别选择当前工作区使用的平台和模型。用户、节点和 Agent 共用这些选择。" : "由超级管理员统一设置平台默认模型，白名单账号、节点和 Agent 直接使用，无需各自选择或配置。" }}未设置或调用失败时停止，不会自动切换到其他平台。</p>
-    <p>带参考图的图像任务（溶图、局部编辑、多图参考）自动使用「图片编辑 / 溶图」模型，纯文字生图使用「图片」模型；编辑模型留空则跟随图片模型，无需在节点上手动切换。</p>
-    <p>视频审阅可单独选择支持视频与声音理解的模型，留空则跟随对话模型。可在需要时检查实际声画读取能力。</p>
+    <p v-if="providerId">选择接下来要用的模型，选定后即可返回创作。</p>
+    <p v-else-if="isDesktopShare()">选择这台 Mac 创作时使用的默认模型。</p>
+    <p v-else>{{ isAuthDisabled() ? "分别选择当前工作区使用的平台和模型。用户、节点和 Agent 共用这些选择。" : "由超级管理员统一设置平台默认模型，白名单账号、节点和 Agent 直接使用，无需各自选择或配置。" }}未设置或调用失败时停止，不会自动切换到其他平台。</p>
+    <p v-if="!providerId">带参考图的图像任务（溶图、局部编辑、多图参考）自动使用「图片编辑 / 溶图」模型，纯文字生图使用「图片」模型；编辑模型留空则跟随图片模型，无需在节点上手动切换。</p>
+    <p v-if="!providerId">视频审阅可单独选择支持视频与声音理解的模型，留空则跟随对话模型。可在需要时检查实际声画读取能力。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-form labelPosition="top" @submit.prevent="save()">
-      <el-form-item v-for="kind in kinds" :key="kind.id" :label="kind.label">
+      <el-form-item v-for="kind in visibleKinds" :key="kind.id" :label="kind.label">
         <el-select v-model="draft[kind.id]" :aria-label="`${kind.label}默认模型`" filterable clearable :disabled="loading || saving || !modelsReady" :placeholder="kind.id === 'imageEdit' ? '留空：跟随图片模型' : kind.id === 'videoReview' ? '留空：跟随对话模型' : '未设置，请选择平台和模型'" noDataText="没有可用模型，请先配置 API Key 并检查连接和余额" @change="save(kind.id)">
           <el-option v-if="draft[kind.id] && !choices(kind.id).some(item => keyOf(item) === draft[kind.id])" :value="draft[kind.id]" :label="`${modelsReady ? '已不可用' : '待确认'}：${unavailableLabel(draft[kind.id])}`" disabled />
           <el-option v-for="model in choices(kind.id)" :key="keyOf(model)" :value="keyOf(model)" :label="`${model.providerLabel} · ${model.label}`" />
@@ -21,15 +23,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage } from "element-plus";
 import { settings, saveSettings } from "@/stores/settings";
-import { isAuthDisabled } from "@/lib/session";
+import { isAuthDisabled, isDesktopShare } from "@/lib/session";
 
 type Kind = "text" | "videoReview" | "image" | "imageEdit" | "video" | "audio" | "music" | "soundEffect";
 type Choice = { providerId: string; modelId: string; providerLabel: string; label: string; type: "text" | "image" | "video" | "audio"; purpose?: "text" | "videoReview"; mode?: unknown; audioTask?: "speech" | "music" | "soundEffect" };
 const kinds: { id: Kind; label: string }[] = [{ id: "text", label: "对话与文本" }, { id: "videoReview", label: "视频审阅（视频与声音理解）" }, { id: "image", label: "图片" }, { id: "imageEdit", label: "图片编辑 / 溶图（带参考图）" }, { id: "video", label: "视频" }, { id: "audio", label: "角色配音" }, { id: "music", label: "配乐" }, { id: "soundEffect", label: "音效" }];
+const props = defineProps<{ focus?: "text" | "media"; providerId?: string }>();
+const visibleKinds = computed(() => kinds.filter(kind => !props.focus || (props.focus === "text") === ["text", "videoReview"].includes(kind.id)));
 const models = ref<Choice[]>([]);
 const draft = ref<Record<Kind, string>>({ text: "", videoReview: "", image: "", imageEdit: "", video: "", audio: "", music: "", soundEffect: "" });
 const loading = ref(false);
@@ -44,7 +48,7 @@ function supportsImageEdit(model: Choice) {
   const modes = Array.isArray(model.mode) ? model.mode : [];
   return modes.some(mode => mode !== "text") || /\/edit$|image-to-image/i.test(model.modelId);
 }
-const choices = (kind: Kind) => models.value.filter(model => kind === "imageEdit" ? model.type === "image" && supportsImageEdit(model) : kind === "audio" || kind === "music" || kind === "soundEffect" ? model.type === "audio" && (kind === "audio" ? !model.audioTask || model.audioTask === "speech" : model.audioTask === kind) : model.type === (kind === "videoReview" ? "text" : kind) && (kind !== "text" || model.purpose !== "videoReview"));
+const choices = (kind: Kind) => models.value.filter(model => !props.providerId || model.providerId === props.providerId).filter(model => kind === "imageEdit" ? model.type === "image" && supportsImageEdit(model) : kind === "audio" || kind === "music" || kind === "soundEffect" ? model.type === "audio" && (kind === "audio" ? !model.audioTask || model.audioTask === "speech" : model.audioTask === kind) : model.type === (kind === "videoReview" ? "text" : kind) && (kind !== "text" || model.purpose !== "videoReview"));
 function unavailableLabel(value: string) { try { return JSON.parse(value).join(" / "); } catch { return "请重新选择"; } }
 function currentSelection() { return settings.value.modelSelection as Partial<Record<Kind, { providerId: string; modelId: string }>> | undefined; }
 

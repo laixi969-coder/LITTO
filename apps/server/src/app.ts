@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction } from "express";
 import buildRoute from "@/core";
 import { error } from "@/lib/responseFormat";
 import desktopRequest from "@/lib/desktop";
-import { mountCloud, requireAdminForPlugins, requireSession, requireWriteRole } from "@/lib/cloud";
+import { cloud, mountCloud, requireAdminForPlugins, requireSession, requireWriteRole } from "@/lib/cloud";
 import { noStoreApi, rateLimit, securityHeaders, staticCacheHeaders } from "@/lib/security";
 import { authEnabled } from "@/utils/tenant";
 import initializePlugins from "@/utils/plugins/initialize";
@@ -19,6 +19,22 @@ import { z } from "zod";
 import { readRelayImage } from "@/utils/media/relay";
 
 const autoInstallProviders = ["runningHub.ts", "apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "xingsuan.ts", "elevenLabs.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
+
+export function firstDesktopAccount() {
+  return cloud()?.firstDesktopAccount();
+}
+
+export function prepareShareWindow() {
+  const embedded = cloud();
+  if (!embedded) throw new Error("本机工作区服务未启动");
+  return embedded.prepareShareWindow();
+}
+
+export function resetDesktopOwnerPassword(password: string) {
+  const embedded = cloud();
+  if (!embedded) throw new Error("本机工作区服务未启动");
+  return embedded.resetDesktopOwnerPassword(password);
+}
 
 export async function createApp({
   webRoot,

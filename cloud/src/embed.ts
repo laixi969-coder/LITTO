@@ -17,7 +17,7 @@ export { configureNarrativeGate } from "./domain/narrativeGate.ts";
 export { configureWorkspaceStorage, reserveWorkspaceStorage } from "./storage.ts";
 export { storage, mediaView, saveMedia, sniff } from "./storage.ts";
 
-export { resolveSession, modelPermissions, requireModelAccess } from "./auth.ts";
+export { resolveSession, modelPermissions, requireModelAccess, firstDesktopAccount, prepareShareWindow, resetDesktopOwnerPassword } from "./auth.ts";
 export { validMutationSource } from "./requestSecurity.ts";
 export type { Auth, Role } from "./auth.ts";
 export { scoped, get as dbGet, all as dbAll, run as dbRun, audit, setting } from "./db.ts";

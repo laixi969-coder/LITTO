@@ -1,0 +1,332 @@
+[
+  {
+    "name": "韦晴",
+    "file": "weiQing.png",
+    "hash": "6ccefc360b6e575759c74c4bef1d2b7ba934d0ae38e404554c63954d62b480f2",
+    "description": "25 岁，极简时装模特，冷感剪裁。齐下颌黑色短发，利落灰黑西装，冷感秀场气质。",
+    "attributes": {
+      "casting": {
+        "gender": "女",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "fitted charcoal single-breasted blazer with a defined waist over a simple black square-neck top, long straight charcoal trousers and pointed black ankle boots",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "短句，话不多，目光稳定。",
+        "behavior": "习惯先看清位置再迈步，动作利落。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "许遥",
+    "file": "xuYao.jpg",
+    "hash": "37813e4ae90596e2ce8e067b53f35a5f346c85119e233c75a369e2f0a2f04050",
+    "description": "27 岁，运动时尚模特，都市运动。高马尾和浅雀斑，钴蓝运动夹克，明快有活力。",
+    "attributes": {
+      "casting": {
+        "gender": "女",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "cropped cobalt structured track jacket over an opaque fitted white crew-neck top, dark navy tapered technical trousers and clean low-top white sneakers",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "节奏轻快，善于迅速接话。",
+        "behavior": "站姿松弛但重心稳定，转身干脆。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "林岫",
+    "file": "linXiu.jpg",
+    "hash": "8e0bbddbbf6080f7fc86ce57609e4e4177e1cf94e51f91d182a09197d61376c8",
+    "description": "31 岁，精品时装模特，安静轻奢。低发髻、高颧骨，米白丝质上衣配宽腿裤，成熟优雅。",
+    "attributes": {
+      "casting": {
+        "gender": "女",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "tailored cream silk-blend mock-neck blouse tucked into high-waisted wide-legged ivory trousers, slim muted gold earrings and cognac pointed-toe shoes",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "语速从容，关键句言简意赅。",
+        "behavior": "动作幅度小，停顿精准，不频繁变换姿势。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "廖川",
+    "file": "liaoChuan.jpg",
+    "hash": "f4d122b32178f604d1921e510b11c2666f5cd163913ad21a3b47896544c6e129",
+    "description": "26 岁，男装模特，冷感剪裁。利落侧分、清晰下颌，黑色双排扣西装，冷峻有型。",
+    "attributes": {
+      "casting": {
+        "gender": "男",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "perfectly tailored black double-breasted suit with a plain charcoal crew-neck knit underneath, full-length straight trousers and polished black leather boots",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "清晰简练，常用结论收尾。",
+        "behavior": "站姿挺拔，转头和行走都很克制。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "周至",
+    "file": "zhouZhi.jpg",
+    "hash": "05484b1177cb46595a3e1f84b2d62e0fed6717c1cf99787bff73c3386e280cf8",
+    "description": "28 岁，运动男装模特，都市运动。短卷发、暖肤色，砂色机能夹克，运动感鲜明。",
+    "attributes": {
+      "casting": {
+        "gender": "男",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "structured sand-coloured technical bomber over a fitted off-white crewneck t-shirt, deep navy streamlined cargo trousers and minimal grey-and-white performance sneakers",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "说话自然，反应快，偶尔带一点幽默。",
+        "behavior": "表情开放，重心稳定，步态有弹性。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "冯望",
+    "file": "fengWang.jpg",
+    "hash": "364afaa8d36068503064d4c00f146b71db846db17c4b42953bb3ada900065c15",
+    "description": "34 岁，男装模特，成熟轻奢。后梳短发、整齐胡茬，咖啡色西装配象牙白针织，温润成熟。",
+    "attributes": {
+      "casting": {
+        "gender": "男",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "deep espresso relaxed tailored blazer over a fitted fine-gauge ivory mock-neck knit, chocolate pleated trousers and dark brown leather loafers",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "语调平稳，措辞讲究。",
+        "behavior": "略停一拍再开口，站姿松弛而挺拔。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "宋知意",
+    "file": "songZhiyi.jpg",
+    "hash": "16312534d51ad3cf2b5cc34a5d8e5eac9571088e1ed395d480948ffcf4836fbc",
+    "description": "23 岁，都市爱情剧女主，清冷精致。清冷都市女主。雕塑肩银蓝西装、银色扣饰和象牙白高腰长裤。",
+    "attributes": {
+      "casting": {
+        "gender": "女",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "A dramatic fitted cropped ice-blue satin-wool couture jacket with a sculpted raised shoulder and asymmetric overlapping lapels, fitted at the high waist with two brushed silver geometric clasps; ivory extra-long high-waist column trousers with knife-sharp vertical pleats; icy metallic pointed ankle boots. Sculptural brushed-silver single ear cuff as accent. Designer runway fabric quality, clear two-tone cool palette.",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "声音清亮，短句里留有停顿。",
+        "behavior": "视线稳定，姿态轻松挺拔。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "苏晚宁",
+    "file": "suWanning.jpg",
+    "hash": "3ba18622dde7192f95a59093c8b949a9626865aaa9d19bf127180055a85e31ec",
+    "description": "25 岁，唐风古装剧女主，明艳灵动。明艳唐风女主。石榴红绣花短襦、高腰长裙、金色花簪。",
+    "attributes": {
+      "casting": {
+        "gender": "女",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "High-end Tang-inspired drama costume: richly layered vermilion and coral silk, short pomegranate-red ru jacket with wave-and-peony gold thread embroidery along its edge, a very high-waisted copper-red finely pleated long skirt tied by a clearly defined embroidered band, thin cream silk long scarf draped at the arms without concealing the waist, embroidered red court slippers just visible. Structured flowing folds, not plain or costume-party fabric. Elegant high swept Tang bun with small gilded floral hairpins and pearl drop earrings. Keep the existing face, youthful bright beauty and signature mole.",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "语速轻盈，情绪上来时眼神先动。",
+        "behavior": "动作舒展，微笑自然，停步时保持中线。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "顾屿",
+    "file": "guYu.jpg",
+    "hash": "174ce8233b5374c01bcf26c0e92dfa30ca06a5433b4deb79636af3da228ae39c",
+    "description": "24 岁，都市偶像剧男主，清冷帅气。冷峻都市男主。黑银不对称短皮衣、立体肩线和锋利高腰长裤。",
+    "attributes": {
+      "casting": {
+        "gender": "男",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "High-fashion sharply cropped black lambskin jacket, deep brushed silver asymmetrical hardware and sculptural shoulder line; high-waisted black runway trousers with elongated pressed shape and a thin brushed silver waist fastening clearly visible; sleek polished black boots; underneath a thin high-neck graphite silk top. Tonal black-on-black texture contrast with strong controlled silver accents, like an urban luxury house runway look. No plain T-shirt or generic office suit.",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "说话干净克制，保持眼神接触。",
+        "behavior": "肩背舒展，走路步幅大，定姿不僵硬。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  },
+  {
+    "name": "陆星野",
+    "file": "luXingye.jpg",
+    "hash": "75554dcb031693ccac9dcb6ef7e17eed76ad4a2cf1d95c61b106bccafdc2cb79",
+    "description": "26 岁，明风古装剧男主，清朗贵气。俊朗明风男主。云纹孔雀青圆领袍、青玉束带与束发。",
+    "attributes": {
+      "casting": {
+        "gender": "男",
+        "ageGroup": "青年"
+      },
+      "fourView": true,
+      "styling": {
+        "makeup": "自然肤质，延续定妆图。",
+        "hair": "沿用定妆图的发型和发色。",
+        "costume": "High-end Ming-inspired young noble leading man drama costume: dark peacock-teal silk round-collar outer robe with woven cloud lattice and subtle gold thread, elegant structured shoulders, fitted long sleeves, deep navy contrasting inner collar, ornate very high fitted dark belt with fine jade plaques, split flowing layered lower panels distinctly revealing long dark inner trousers and two black period boots. Groom period hair as a high neat bound topknot with a small dark jade hairpiece, matching front, side and back. No weapon or armor. Preserve this exact young male face and youthful charisma.",
+        "accessories": "按定妆图保留可见配饰。"
+      },
+      "characterDirection": {
+        "speech": "语速自然明亮，回应直接。",
+        "behavior": "肩线挺拔，表情开朗；静止时重心稳定。",
+        "relationships": ""
+      }
+    },
+    "invariants": [
+      "延续采用的正脸定妆图中的面部比例、年龄感和辨识特征。"
+    ],
+    "allowedVariations": [
+      "按项目和场次调整服装、环境、表情和姿态。"
+    ],
+    "forbiddenChanges": [
+      "更换演员面孔，改变既定年龄段或抹去辨识特征。"
+    ]
+  }
+]

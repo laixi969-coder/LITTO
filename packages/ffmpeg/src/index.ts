@@ -48,7 +48,7 @@ export async function getToolStatus(directory: string, mode: FfmpegMode, formatE
   const entries = await Promise.all(toolNames.map(async (name) => {
     const downloaded = join(directory, executableName(name));
     const hasDownload = mode !== "system" && await file(downloaded).exists();
-    const path = hasDownload ? downloaded : mode === "download" ? null : Bun.which(executableName(name));
+    const path = hasDownload ? downloaded : mode === "download" ? null : Bun.which(executableName(name), { PATH: process.env.PATH });
     const origin = path ? hasDownload ? "download" as const : "system" as const : null;
     try {
       return [name, { path, origin, version: path ? await readVersion(path, name) : null, error: path ? null : "未找到可用程序" }] as const;

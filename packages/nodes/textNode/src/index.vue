@@ -33,7 +33,7 @@
             </el-option-group>
           </el-select>
           <div class="promptActions">
-            <el-button class="sendButton" :icon="IconArrowUp" :loading="generating" :disabled="!prompt.trim() || !selectedModel || generating || !textReady" title="生成" aria-label="生成" @click="generateText" />
+            <el-button class="sendButton" :icon="IconArrowUp" :loading="generating" :disabled="!prompt.trim() || (!selectedModel && !canSetUpModel) || generating || !textReady" title="生成" aria-label="生成" @click="generateText" />
           </div>
         </div>
       </el-card>
@@ -99,6 +99,7 @@ const prompt = computed({ get: () => data.value.prompt ?? "", set: (value: strin
 const model = computed({ get: () => data.value.model ?? "", set: (value: string) => { data.value.model = value; } });
 const models = ref<NodeAiModel[]>([]);
 const modelsLoading = ref(false);
+const canSetUpModel = computed(() => !!ai.openModelSetup && !models.value.length && !modelsLoading.value);
 const generating = ref(false);
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === model.value));
 const modelGroups = computed(() => groupNodeModels(models.value));
@@ -209,6 +210,10 @@ async function loadModels() {
 }
 
 async function generateText() {
+  if (canSetUpModel.value) {
+    await ai.openModelSetup!("text");
+    return loadModels();
+  }
   const choice = selectedModel.value;
   if (!textReady.value || generating.value || !choice || !prompt.value.trim()) return;
   generating.value = true;

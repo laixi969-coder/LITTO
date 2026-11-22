@@ -40,7 +40,7 @@ router.beforeEach(async (to) => {
   const me = getMe() ?? await loadMe();
   if (isAuthDisabled()) return ["/login", "/admin"].includes(to.path) ? "/home" : true;
   if (to.path === "/login") return me ? "/home" : true;
-  if (me && to.path === "/admin" && !me.user.isAdmin) return "/home";
+  if (me && to.path === "/admin" && (!me.user.isAdmin || me.desktopShare)) return "/home";
   return me ? true : "/login";
 });
 export default router;

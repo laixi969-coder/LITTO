@@ -1,8 +1,9 @@
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { lstatSync } from "@toonflow/file";
 import type { Context, Next } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { all, audit, get, run, setSetting, setting, tx } from "./db.ts";
-import { config } from "./config.ts";
+import { config, isDesktopMac, isShareDesktop, superAdminEmail } from "./config.ts";
 import { bad, conflict, forbidden, HttpError, now, sha256, ulid } from "./util.ts";
 import { grant } from "./credits.ts";
 import { queueWorkspacePurge, sweepWorkspacePurges } from "./storage.ts";
@@ -16,7 +17,9 @@ export type Auth = { user: { id: string; email: string; isAdmin: boolean }; work
 
 export function modelPermissions(userId: string) {
   const user = get("SELECT email,is_admin FROM users WHERE id=? AND status='active' AND deleted_at IS NULL", userId);
-  const canManage = !!user?.is_admin && user.email === "66445039@qq.com";
+  const canManage = !!user?.is_admin && (isShareDesktop()
+    ? setting("shareOwnerId", "") === userId
+    : user.email === superAdminEmail || isDesktopMac() && setting("desktopOwnerId", "") === userId);
   const emails = setting<string[]>("modelWhitelist", []);
   const accounts = setting("accountWhitelist", { enabled: false, emails: [] as string[] });
   return { canManage, canUse: !!user && accountAllowed(user.email, !!user.is_admin) && (canManage || emails.includes(user.email) || accounts.emails.includes(user.email)) };
@@ -71,16 +74,45 @@ export async function setUserPassword(userId: string, password: string) {
   });
 }
 
-function createUser(email: string, isAdmin: boolean) {
+function createUser(email: string, isAdmin: boolean, workspaceName = `${email.split("@")[0]}'s Workspace`) {
   const id = ulid();
   run("INSERT INTO users VALUES(?,?,?,?,?,?,NULL)", id, email, "active", isAdmin ? 1 : 0, now(), now());
   const workspaceId = ulid();
-  run("INSERT INTO workspaces(id,name,owner_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", workspaceId, `${email.split("@")[0]}'s Workspace`, id, "personal", now(), now());
+  run("INSERT INTO workspaces(id,name,owner_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", workspaceId, workspaceName, id, "personal", now(), now());
   run("INSERT INTO workspace_members VALUES(?,?,?,?)", workspaceId, id, "OWNER", now());
   run("INSERT INTO credit_accounts VALUES(?,0,0,?)", workspaceId, now());
   run("INSERT INTO subscriptions(id,workspace_id,plan,period,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", ulid(), workspaceId, "free", "free", "active", now(), now());
   grant(workspaceId, setting("defaultCredits", 0), "CREDIT_GRANT", "signup grant");
   return get("SELECT * FROM users WHERE id=?", id)!;
+}
+
+/** 原生 Mac 启动时迁移旧版初始账号；空库才要求设置密码。 */
+export function firstDesktopAccount() {
+  if (!isDesktopMac() || isShareDesktop()) return;
+  const ownerId = setting("desktopOwnerId", "");
+  if (ownerId) {
+    const legacyEmail = "admin@milimili.local";
+    tx(() => {
+      const renamed = run(`UPDATE users SET email=?, updated_at=?
+        WHERE id=? AND email=? AND is_admin=1 AND status='active' AND deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM users WHERE email=? COLLATE NOCASE)`,
+        superAdminEmail, now(), ownerId, legacyEmail, superAdminEmail);
+      if (!renamed.changes) return;
+      run("DELETE FROM login_codes WHERE email IN (?,?)", legacyEmail, superAdminEmail);
+      audit(ownerId, "auth.desktop.changeEmail", ownerId, { from: legacyEmail, to: superAdminEmail });
+    });
+  }
+  if (get("SELECT 1 FROM users LIMIT 1")) return;
+  return { email: superAdminEmail, async create(password: string) {
+    const hash = await hashPassword(password);
+    tx(() => {
+      if (get("SELECT 1 FROM users LIMIT 1")) throw conflict("本机账号已经初始化，请使用已设置的密码登录");
+      const user = createUser(superAdminEmail, true);
+      saveUserPassword(user.id, superAdminEmail, hash);
+      setSetting("desktopOwnerId", user.id);
+      audit(user.id, "auth.desktop.initialize", user.id);
+    });
+  } };
 }
 
 /** 超级管理员开户或为已有普通账号补设初始密码，整个操作原子提交。 */
@@ -89,7 +121,7 @@ export async function provisionUser(email: string, password: string, actorId: st
   const hash = await hashPassword(password);
   return tx(() => {
     if (!modelPermissions(actorId).canManage) throw forbidden("仅超级管理员可以创建普通账号和设置初始密码");
-    if (config.adminEmails.includes(email) || email === "66445039@qq.com") throw forbidden("此入口仅用于普通账号");
+    if (config.adminEmails.includes(email) || email === superAdminEmail) throw forbidden("此入口仅用于普通账号");
     assertNotSsoEnforced(email);
     let user = get("SELECT * FROM users WHERE email=?", email);
     if (user && (user.is_admin || user.status !== "active" || user.deleted_at)) throw bad("仅可为正常的普通账号设置初始密码");
@@ -109,15 +141,28 @@ export async function provisionUser(email: string, password: string, actorId: st
 }
 
 // ACT: 单进程按来源与邮箱限制尝试，避免单一来源锁死账号；多实例须共享限流存储。
-const passwordAttempts = new Map<string, { count: number; expiresAt: number }>();
-export async function verifyPassword(email: string, password: string, source = "local") {
+const passwordAttempts = new Map<string, { count: number; expiresAt: number; email: string }>();
+
+export async function resetDesktopOwnerPassword(password: string) {
+  if (!isDesktopMac() || lstatSync(config.dbFile).uid !== process.getuid?.()) throw forbidden("请在创建工作台的 Mac 用户下重设密码");
+  const id = setting(isShareDesktop() ? "shareOwnerId" : "desktopOwnerId", "");
+  const user = get("SELECT email FROM users WHERE id=? AND is_admin=1 AND status='active' AND deleted_at IS NULL", id);
+  if (!user) throw forbidden("当前数据目录没有可重设的本机管理员");
+  await setUserPassword(id, password);
+  for (const [key, attempt] of passwordAttempts) if (attempt.email === user.email) passwordAttempts.delete(key);
+  if (isShareDesktop()) {
+    shareWindowHash = "";
+    pendingShareWindow = undefined;
+  }
+}
+async function checkPassword<T>(email: string, password: string, source: string, verified: (hash: string) => T): Promise<T> {
   email = email.trim().toLowerCase();
   assertNotSsoEnforced(email);
   requireAccountAccess(email);
   const at = Date.now();
   for (const [key, attempt] of passwordAttempts) if (attempt.expiresAt <= at) passwordAttempts.delete(key);
   const attemptKey = sha256(`${source}\n${email}`);
-  const attempt = passwordAttempts.get(attemptKey) ?? { count: 0, expiresAt: at + 15 * 60_000 };
+  const attempt = passwordAttempts.get(attemptKey) ?? { count: 0, expiresAt: at + 15 * 60_000, email };
   if (attempt.count >= 10 || passwordAttempts.size >= 10_000 && !passwordAttempts.has(attemptKey)) {
     throw new HttpError(429, "登录尝试过多，请 15 分钟后重试", "rate_limited");
   }
@@ -136,9 +181,87 @@ export async function verifyPassword(email: string, password: string, source = "
   if (get("SELECT p.password_hash FROM user_passwords p JOIN users u ON u.id=p.user_id WHERE p.user_id=? AND u.email=? AND u.status='active' AND u.deleted_at IS NULL", user.id, email)?.password_hash !== hash) {
     throw new HttpError(401, "邮箱或密码不正确", "bad_credentials");
   }
-  const result = loginUser(email);
+  const result = verified(hash);
   passwordAttempts.delete(attemptKey);
   return result;
+}
+
+export function verifyPassword(email: string, password: string, source = "local") {
+  return checkPassword(email, password, source, () => loginUser(email));
+}
+
+// 分享版只有本次原生窗口领到的会话可访问工作区。旧窗口的 Cookie 在重开后也必须重新解锁。
+let shareWindowHash = "";
+let pendingShareWindow: { proofHash: string; token: string; expiresAt: number } | undefined;
+
+export function takeShareWindow(proof: string) {
+  if (!isShareDesktop() || !pendingShareWindow || Date.now() >= pendingShareWindow.expiresAt) {
+    pendingShareWindow = undefined;
+    throw forbidden("请重新打开本机工作台");
+  }
+  if (sha256(proof) !== pendingShareWindow.proofHash) throw forbidden("请重新打开本机工作台");
+  const { token } = pendingShareWindow;
+  pendingShareWindow = undefined;
+  return token;
+}
+
+export function prepareShareWindow() {
+  if (!isShareDesktop()) throw forbidden("此操作只用于本机分享版");
+  const owner = tx(() => {
+    const id = setting("shareOwnerId", "");
+    if (id) {
+      const user = get("SELECT id,email FROM users WHERE id=? AND is_admin=1 AND status='active' AND deleted_at IS NULL", id);
+      if (!user) throw conflict("本机工作区所有者不可用");
+      return user;
+    }
+    if (get("SELECT 1 FROM users LIMIT 1")) throw conflict("该数据目录已有其他账号，请使用分享版的独立数据目录");
+    const user = createUser(`${ulid().toLowerCase()}@local.invalid`, true, "本机工作区");
+    setSetting("shareOwnerId", user.id);
+    audit(user.id, "desktop.share.create", user.id);
+    return user;
+  });
+  function issueSession() {
+    const session = loginUser(owner.email);
+    const hash = sha256(session.token);
+    run("DELETE FROM sessions WHERE user_id=? AND token_hash<>?", owner.id, hash);
+    shareWindowHash = hash;
+    const proof = randomBytes(32).toString("base64url");
+    pendingShareWindow = { proofHash: sha256(proof), token: session.token, expiresAt: Date.now() + 120_000 };
+    return proof;
+  }
+  const requiresPassword = () => !!get("SELECT 1 FROM user_passwords WHERE user_id=?", owner.id);
+  return {
+    passwordRequired: requiresPassword(),
+    open(password = "") {
+      return requiresPassword() ? checkPassword(owner.email, password, "desktop-open", issueSession) : issueSession();
+    },
+  };
+}
+
+export function shareLockStatus(userId: string) {
+  if (!isShareDesktop() || setting("shareOwnerId", "") !== userId) return;
+  return { passwordRequired: !!get("SELECT 1 FROM user_passwords WHERE user_id=?", userId) };
+}
+
+export async function changeShareLock(userId: string, enabled: boolean, password: string) {
+  const state = shareLockStatus(userId);
+  if (!state) throw forbidden("只有本机工作区所有者可以设置打开密码");
+  if (enabled === state.passwordRequired) throw conflict("密码保护状态已改变，请重新打开设置");
+  if (enabled) {
+    const hash = await hashPassword(password);
+    tx(() => {
+      if (!run("INSERT INTO user_passwords(user_id,password_hash,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO NOTHING", userId, hash, now()).changes)
+        throw conflict("已设置打开密码");
+      audit(userId, "desktop.lock.enable", userId);
+    });
+  } else {
+    const email = get("SELECT email FROM users WHERE id=?", userId)!.email;
+    await checkPassword(email, password, "desktop-lock", () => tx(() => {
+      run("DELETE FROM user_passwords WHERE user_id=?", userId);
+      audit(userId, "desktop.lock.disable", userId);
+    }));
+  }
+  return { passwordRequired: enabled };
 }
 
 /** Shared by password login and OAuth: find-or-create the user (+ Personal Workspace), apply pending invites, open a session. */
@@ -169,7 +292,8 @@ export function loginUser(email: string, identity?: { provider: string; subject:
 }
 
 export function setSessionCookie(c: Context, token: string) {
-    setCookie(c, "milimili_session", token, { httpOnly: true, sameSite: "Lax", secure: config.production, path: "/", maxAge: SESSION_TTL_MS / 1000 });
+    const localWindow = isDesktopMac() && new URL(c.req.url).hostname === "127.0.0.1";
+    setCookie(c, "milimili_session", token, { httpOnly: true, sameSite: "Lax", secure: config.production && !localWindow, path: "/", maxAge: SESSION_TTL_MS / 1000 });
 }
 
 export function logout(c: Context) {
@@ -191,7 +315,9 @@ export function tokenOf(c: Context): string | null {
  */
 export function resolveSession(token: string | null | undefined, wantedWorkspace?: string | null): Auth | null {
     if (!token) return null;
-    const s = get("SELECT s.user_id, s.expires_at, u.email, u.is_admin, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?", sha256(token));
+    const hash = sha256(token);
+    if (isShareDesktop() && shareWindowHash !== hash) return null;
+    const s = get("SELECT s.user_id, s.expires_at, u.email, u.is_admin, u.status, u.deleted_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?", hash);
     if (!s || s.expires_at < now() || s.deleted_at || s.status !== "active") return null;
     if (!accountAllowed(s.email, !!s.is_admin)) return null;
     const m = wantedWorkspace

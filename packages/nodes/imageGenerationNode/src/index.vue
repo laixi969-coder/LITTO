@@ -69,10 +69,10 @@
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
-            :disabled="deleting || uploading || toolsBusy || (!generating && ((!data.production && !generationPrompt) || !selectedModel))"
+            :disabled="deleting || uploading || toolsBusy || (!generating && ((!data.production && !generationPrompt) || (!selectedModel && !canSetUpModel)))"
             :title="generating ? '停止生成' : '生成图片'"
             :aria-label="generating ? '停止生成' : '生成图片'"
-            @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : startGeneration().catch((error) => showNodeError(error, '图片生成失败'))" />
+            @click="generating ? cancelGeneration().catch((error) => showNodeError(error, '停止生成失败')) : (canSetUpModel ? ai.openModelSetup!('media').then(loadModels) : startGeneration()).catch((error) => showNodeError(error, '图片生成失败'))" />
         </div>
       </el-card>
     </template>
@@ -120,6 +120,7 @@ data.value.size ??= "";
 data.value.ratio ??= "";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
+const canSetUpModel = computed(() => !!ai.openModelSetup && !models.value.length && !modelsLoading.value);
 const modelsLoading = ref(false);
 const uploading = ref(false);
 const fileInput = ref<HTMLInputElement>();

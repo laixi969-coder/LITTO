@@ -70,7 +70,7 @@
                 <component :is="pluginTypes[plugin.type].icon" :size="18" aria-hidden="true" />
                 <span class="pluginTitle">{{ plugin.displayName }}</span>
                 <a
-                  v-if="plugin.github"
+                  v-if="plugin.github && plugin.author !== 'Toonflow'"
                   class="repoLink"
                   :href="plugin.github"
                   target="_blank"
@@ -88,7 +88,7 @@
           <p v-if="plugin.description" class="pluginDescription">{{ plugin.description }}</p>
           <el-text v-if="plugin.loadError" type="danger" size="small">{{ plugin.loadError }}</el-text>
           <div v-if="plugin.author || plugin.version" class="pluginMeta">
-            <span v-if="plugin.author" class="pluginAuthor">{{ plugin.author }}</span>
+            <span v-if="plugin.author" class="pluginAuthor">{{ plugin.author === "Toonflow" ? "内置" : plugin.author }}</span>
             <span v-if="plugin.version" class="pluginVersion" type="info" size="small" effect="plain">v{{ plugin.version }}</span>
           </div>
           <div v-if="plugin.type === 'skill'" class="pluginFooter" @click.stop>

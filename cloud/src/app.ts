@@ -5,7 +5,9 @@ import { Readable } from "node:stream";
 import { clientIp } from "./requestSecurity.ts";
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
-import { authenticate } from "./auth.ts";
+import { authenticate, setSessionCookie, takeShareWindow } from "./auth.ts";
+import { z } from "zod";
+import { body } from "./http.ts";
 import { authPublic, platform } from "./routes/platform.ts";
 import { production } from "./routes/production.ts";
 import { admin } from "./routes/admin.ts";
@@ -16,11 +18,11 @@ import { collab } from "./routes/collab.ts";
 import { ssoPublic, sso } from "./routes/sso.ts";
 import { nle } from "./routes/nle.ts";
 import { market, marketAdmin } from "./routes/market.ts";
-import { HttpError, log } from "./util.ts";
+import { forbidden, HttpError, log } from "./util.ts";
 import { get, setting } from "./db.ts";
 import { checkSignedUrl } from "./storage.ts";
 import { inc, observe } from "./metrics.ts";
-import { config } from "./config.ts";
+import { config, isShareDesktop } from "./config.ts";
 
 export const app = new Hono();
 
@@ -101,9 +103,20 @@ app.get("/media/:id/file", async (c) => {
     return new Response(Readable.toWeb(createReadStream(path)) as unknown as ReadableStream<Uint8Array>, { headers });
 });
 
-app.route("/auth", authPublic);
-app.route("/auth/oauth", oauth);
-app.route("/auth/sso", ssoPublic);
+if (isShareDesktop()) {
+    app.post("/auth/window", async (c) => {
+        const url = new URL(c.req.url);
+        if (url.hostname !== "127.0.0.1" || c.req.header("origin") !== url.origin || c.req.header("x-milimili-csrf") !== "1") throw forbidden("仅支持本机工作台窗口");
+        const { proof } = await body(c, z.object({ proof: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict());
+        setSessionCookie(c, takeShareWindow(proof));
+        c.header("Cache-Control", "no-store");
+        return c.body(null, 204);
+    });
+} else {
+    app.route("/auth", authPublic);
+    app.route("/auth/oauth", oauth);
+    app.route("/auth/sso", ssoPublic);
+}
 // Provider/Stripe callbacks authenticate by signature, not by session.
 app.post("/webhooks/*", (c) => extra.fetch(c.req.raw));
 const secured = new Hono();

@@ -122,7 +122,7 @@ const tenantConf = new Proxy(config, {
           const current = getSettings();
           for (const field of modelFields) {
             if (JSON.stringify(incoming[field] ?? current[field]) !== JSON.stringify(current[field]) && !permissions().canManage)
-              throw Object.assign(new Error("仅 66445039@qq.com 超级管理员可以配置模型"), { status: 403 });
+              throw Object.assign(new Error("仅超级管理员可以配置模型"), { status: 403 });
           }
           // ACT: 平台连接与默认模型只保存一份；租户仅保存个人偏好，授权账号实时沿用平台配置。
           if (permissions().canManage) {

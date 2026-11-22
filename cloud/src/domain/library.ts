@@ -4,6 +4,7 @@ import { bad, conflict, notFound } from "../util.ts";
 import { assetInput, castingSchema, personaTagSchema, type PersonaTags } from "./schema.ts";
 import { createAsset, approveAsset, event } from "./assets.ts";
 import { mediaView, saveMedia, sniff, storage } from "../storage.ts";
+import { ensureCharacterPresets } from "./characterPresets.ts";
 
 export const librarySearchSchema = z.object({
   type: assetInput.shape.type.optional(), tags: personaTagSchema.optional(),
@@ -92,10 +93,11 @@ export async function publishToLibrary(s: Scope, assetId: string, actor: string,
   });
 }
 
-export function searchLibrary(s: Scope, input: unknown = {}) {
+export async function searchLibrary(s: Scope, input: unknown = {}) {
   const parsed = librarySearchSchema.safeParse(input);
   if (!parsed.success) throw bad("角色库筛选参数无效", parsed.error.issues);
   const query = parsed.data;
+  if (!query.type || query.type === "Character") await ensureCharacterPresets(s);
   const wanted = Object.entries(query.tags ?? {}).filter(([, value]) => value);
   return s.list("library_assets", {}, "reuse_count DESC, created_at DESC").filter(entry => {
     return (!query.type || entry.type === query.type) && (!query.excludeName || entry.name !== query.excludeName)

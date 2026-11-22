@@ -1,4 +1,5 @@
 import { get, run, setting, tx } from "./db.ts";
+import { isShareDesktop } from "./config.ts";
 import { bad, conflict, now, ulid } from "./util.ts";
 
 export type LedgerType = "CREDIT_GRANT" | "PURCHASE" | "GENERATION_HOLD" | "GENERATION_CHARGE" | "REFUND" | "ADMIN_ADJUSTMENT";
@@ -48,7 +49,7 @@ export const available = (ws: string) => {
 export const creditsFor = (providerCostUsd: number | null) => {
     if (providerCostUsd === null) return 0;
     if (!Number.isFinite(providerCostUsd) || providerCostUsd < 0) throw bad("供应商费用无效");
-    if (!setting("billingEnabled", false)) return 0;
+    if (isShareDesktop() || !setting("billingEnabled", false)) return 0;
     const rate = setting("creditsPerUsd", 100), markup = setting("markup", 1.0);
     if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(markup) || markup < 0) throw bad("积分费率无效");
     return creditUnits(providerCostUsd * rate * markup) / 100;

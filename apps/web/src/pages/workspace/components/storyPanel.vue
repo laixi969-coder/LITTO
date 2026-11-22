@@ -6,7 +6,7 @@
         <el-button :disabled="busy || childBusy" @click="run(() => refresh(false))">重新载入（放弃未保存编辑）</el-button>
         <label v-if="canManageModels()">创作模型<select v-model="modelKey" :disabled="busy || childBusy"><option value="">选择已配置模型</option><option v-for="model in models" :key="JSON.stringify([model.providerId, model.modelId])" :value="JSON.stringify([model.providerId, model.modelId])">{{ model.providerLabel }} · {{ model.label }}</option></select></label>
         <span v-else>平台默认模型：{{ selectedModel?.label ?? "等待管理员设置" }}</span>
-        <el-button v-if="canManageModels()" :disabled="busy" @click="isAuthDisabled() ? emit('settings') : router.push('/admin?tab=defaults')">模型设置</el-button><el-button v-if="busy" @click="controller?.abort()">停止创作</el-button>
+        <el-button v-if="canManageModels()" :disabled="busy" @click="ai.openModelSetup ? runWithModelSettings() : isAuthDisabled() ? emit('settings') : router.push('/admin?tab=defaults')">模型设置</el-button><el-button v-if="busy" @click="controller?.abort()">停止创作</el-button>
       </div>
       <p class="hint">{{ progress }} 模型创作与审读按所选服务计费；正式采用由你决定。</p>
       <nav aria-label="故事创作步骤"><button v-for="tab in tabs" :key="tab.id" :aria-pressed="section === tab.id" :disabled="busy || childBusy" @click="run(() => switchSection(tab.id))">{{ tab.label }}</button></nav>
@@ -32,7 +32,7 @@
             <p>已读范围：{{ source.coverage || '尚未分析' }}</p>
             <blockquote v-for="(observation, index) in source.observations" :key="index"><strong>{{ observation.statement }}</strong><p>{{ observation.quote }}</p><small>{{ observation.locator }}</small></blockquote>
             <p v-for="(unknown, index) in source.unknowns" :key="index">待核对：{{ unknown }}</p>
-            <div class="toolbar"><el-button :disabled="!modelKey" @click="run(() => analyzeSource(source))">{{ source.mimeType.startsWith('video/') ? '采样画面分析（不含声音）' : '分析这份资料' }}</el-button><el-button @click="sourceEdit = sourceValue(source)">校正理解</el-button><el-button :disabled="!source.coverage || source.confirmed" @click="run(() => apply({ type: 'confirmSource', id: source.id }))">确认上述理解</el-button></div>
+            <div class="toolbar"><el-button :disabled="modelUnavailable" @click="runWithModel(() => analyzeSource(source))">{{ source.mimeType.startsWith('video/') ? '采样画面分析（不含声音）' : '分析这份资料' }}</el-button><el-button @click="sourceEdit = sourceValue(source)">校正理解</el-button><el-button :disabled="!source.coverage || source.confirmed" @click="run(() => apply({ type: 'confirmSource', id: source.id }))">确认上述理解</el-button></div>
           </article>
           <article v-if="sourceEdit">
             <h4>校正：{{ sourceEdit.name }}</h4><label>读取覆盖范围<textarea v-model="sourceEdit.coverage" /></label>
@@ -45,7 +45,7 @@
         <template v-if="section === 'directions'">
           <template v-if="['story', 'serial'].includes(brief.kind)">
             <p>先看故事框架，确认后再展开你选定的部分。</p>
-            <el-button :disabled="!modelKey || !brief.idea.trim() && !project.sources.length" @click="run(() => generate('framework'))">{{ framework ? '重新构思框架' : '生成故事框架' }}</el-button>
+            <el-button :disabled="modelUnavailable || !brief.idea.trim() && !project.sources.length" @click="runWithModel(() => generate('framework'))">{{ framework ? '重新构思框架' : '生成故事框架' }}</el-button>
             <article v-if="framework">
               <label>标题<input v-model="frameworkEdit.title" /></label>
               <label>作品形式<input v-model="frameworkEdit.format" /></label>
@@ -53,7 +53,7 @@
               <el-button :disabled="!frameworkDirty && framework.basis === storyFrameworkBasis(project)" @click="run(saveFramework)">保存修改，重新确认</el-button>
               <p>{{ frameworkReady ? '框架已确认' : '框架待确认；确认前不会展开正文' }}</p>
               <label>下一步<select v-model="expansionStep"><option value="sample">先写代表场次</option><option v-if="brief.kind === 'serial'" value="episodes">展开分集大纲</option><option value="draft">展开完整正文</option></select></label>
-              <el-button :disabled="frameworkDirty || !modelKey" @click="run(expandFramework)">{{ frameworkReady && project.frameworkApproval?.step === expansionStep ? '继续：' : '确认框架并' }}{{ storyExpansionLabels[expansionStep] }}</el-button>
+              <el-button :disabled="frameworkDirty || modelUnavailable" @click="runWithModel(expandFramework)">{{ frameworkReady && project.frameworkApproval?.step === expansionStep ? '继续：' : '确认框架并' }}{{ storyExpansionLabels[expansionStep] }}</el-button>
               <p v-if="framework.basis !== storyFrameworkBasis(project)" class="errorMessage">作品目标、方向或资料已变化，请重新构思或保存修订后的框架。</p>
             </article>
             <article v-for="(item, index) in project.expansions.filter(item => item.frameworkId === framework?.id)" :key="index"><h3>{{ storyExpansionLabels[item.step] }}</h3><div class="frameworkText">{{ item.text }}</div></article>
@@ -62,9 +62,9 @@
           <details>
           <summary>探索其他创意方向</summary>
           <p>比较少量真正不同的创意方向，选定后再发展为完整故事。已有定稿可在剧本页直接导入。</p>
-          <el-button :disabled="!modelKey || !brief.idea.trim() && !project.sources.length" @click="run(() => generate('directions'))">生成 2–3 个创意方向</el-button>
+          <el-button :disabled="modelUnavailable || !brief.idea.trim() && !project.sources.length" @click="runWithModel(() => generate('directions'))">生成 2–3 个创意方向</el-button>
           <article v-for="direction in project.directions" :key="direction.id"><h3>{{ direction.title }}</h3><p>{{ direction.premise }}</p><p>观众为什么在意：{{ direction.audienceReason }}</p><p>代表性场面：{{ direction.signatureScene }}</p><p>制作难点：{{ direction.risk }}</p><el-button :disabled="project.directionId === direction.id" @click="run(() => apply({ type: 'chooseDirection', id: direction.id }))">{{ project.directionId === direction.id ? '已采用此方向' : '采用此方向' }}</el-button></article>
-          <el-button v-if="!['story', 'serial'].includes(brief.kind)" :disabled="!project.directionId || !modelKey" @click="run(() => generate('draft'))">按选定方向写剧本</el-button>
+          <el-button v-if="!['story', 'serial'].includes(brief.kind)" :disabled="!project.directionId || modelUnavailable" @click="runWithModel(() => generate('draft'))">按选定方向写剧本</el-button>
           </details>
         </template>
         <template v-if="section === 'script' || section === 'preview'">
@@ -73,7 +73,7 @@
           <p v-if="impact" class="hint">相对上一版直接改变：{{ impact.changed.join('、') || '无' }}；依赖场次需复核：{{ impact.dependent.join('、') || '无' }}。相关配音、口型、字幕、预演与镜头须核对，旧素材保留。</p>
         </template>
         <template v-if="section === 'script'">
-          <div class="toolbar"><el-button @click="run(newDraft)">手动新建剧本</el-button><el-button :disabled="!modelKey" @click="run(importSceneList)">从已有场次表与正文整理</el-button></div>
+          <div class="toolbar"><el-button @click="run(newDraft)">手动新建剧本</el-button><el-button :disabled="modelUnavailable" @click="runWithModel(importSceneList)">从已有场次表与正文整理</el-button></div>
           <template v-if="draft">
             <label>作品名<input v-model="draft.title" maxlength="150" /></label><label>大纲 / 创作意图<textarea v-model="draft.outline" rows="4" /></label>
             <article v-for="(scene, index) in draft.scenes" :key="scene.sceneId">
@@ -81,16 +81,16 @@
               <label>场次标题<input v-model="scene.title" /></label><label>正文<textarea v-model="scene.text" rows="6" /></label>
               <label v-if="brief.kind === 'serial'">所属集号<input v-model.number="scene.episodeNumber" type="number" min="1" :max="brief.episodeCount || 100" /></label>
               <details><summary>因果、信息与声音</summary><div class="fields"><label v-for="field in sceneFields" :key="field.key">{{ field.label }}<textarea v-model="scene[field.key]" rows="2" /></label><label>依据场次 ID（逗号分隔）<input :value="scene.causes.join(',')" @input="scene.causes = ($event.target as HTMLInputElement).value.split(/[,，\s]+/).filter(Boolean)" /></label><label>估计时长（秒）<input v-model.number="scene.duration" type="number" min="1" max="180" /></label></div></details>
-              <el-button :disabled="!revision || !modelKey || draftDirty" @click="rewriteSceneId = scene.sceneId">只改这一场</el-button>
+              <el-button :disabled="!revision || modelUnavailable || draftDirty" @click="rewriteSceneId = scene.sceneId">只改这一场</el-button>
             </article>
             <el-button :disabled="draft.scenes.length >= 100" @click="addScene">添加场次</el-button>
             <details><summary>人物事实与未兑现线索（候选；采用版本后才作为正式记忆）</summary>
               <div v-for="(fact, index) in draft.canon" :key="fact.id" class="fields"><label>人物 / 实体<input v-model="fact.entity" /></label><label>事实<textarea v-model="fact.statement" /></label><label>来源场次<input v-model="fact.sceneId" /></label><el-button @click="draft.canon.splice(index, 1)">移除事实</el-button></div><el-button @click="draft.canon.push({ id: newId(), entity: '', statement: '', sceneId: draft.scenes[0]?.sceneId ?? 's01' })">添加事实</el-button>
               <div v-for="(thread, index) in draft.threads" :key="thread.id" class="fields"><label>线索 / 期待<textarea v-model="thread.question" /></label><label>埋设场次<input v-model="thread.setupSceneId" /></label><label>兑现场次<input :value="thread.payoffSceneId" @input="thread.payoffSceneId = ($event.target as HTMLInputElement).value || undefined" /></label><label>状态<select v-model="thread.status"><option value="open">未兑现</option><option value="paid">已兑现</option><option value="abandoned">放弃</option></select></label><label>取舍理由<textarea v-model="thread.reason" /></label><el-button @click="draft.threads.splice(index, 1)">移除线索</el-button></div><el-button @click="draft.threads.push({ id: newId(), question: '', setupSceneId: draft.scenes[0]?.sceneId ?? 's01', status: 'open', reason: '' })">添加线索</el-button>
             </details>
-            <div class="toolbar"><el-button :disabled="!draftDirty && (!revision || !storyStale(project, revision))" @click="run(saveDraft)">{{ revision && storyStale(project, revision) && !draftDirty ? '按当前依据保存新候选' : '保存为新候选版本' }}</el-button><el-button :disabled="!revision || draftDirty || !modelKey" @click="run(() => generate('review'))">审阅当前版本</el-button><el-button :disabled="!revision || draftDirty || revision.id === project.approvedId" @click="run(approve)">采用当前版本</el-button></div>
+            <div class="toolbar"><el-button :disabled="!draftDirty && (!revision || !storyStale(project, revision))" @click="run(saveDraft)">{{ revision && storyStale(project, revision) && !draftDirty ? '按当前依据保存新候选' : '保存为新候选版本' }}</el-button><el-button :disabled="!revision || draftDirty || modelUnavailable" @click="runWithModel(() => generate('review'))">审阅当前版本</el-button><el-button :disabled="!revision || draftDirty || revision.id === project.approvedId" @click="run(approve)">采用当前版本</el-button></div>
           </template>
-          <article v-if="rewriteSceneId"><label>这一场怎么改<textarea v-model="rewriteIntent" rows="3" /></label><div class="toolbar"><el-button :disabled="!rewriteIntent.trim()" @click="run(() => generate('rewrite'))">生成局部改写候选</el-button><el-button @click="rewriteSceneId = ''">取消</el-button></div></article>
+          <article v-if="rewriteSceneId"><label>这一场怎么改<textarea v-model="rewriteIntent" rows="3" /></label><div class="toolbar"><el-button :disabled="!rewriteIntent.trim()" @click="runWithModel(() => generate('rewrite'))">生成局部改写候选</el-button><el-button @click="rewriteSceneId = ''">取消</el-button></div></article>
           <details v-if="revision && !draftDirty"><summary>记录人工审阅</summary>
             <label>逐场核对后的结论、取舍与仍需注意的问题<textarea v-model="manualReview" /></label>
             <details><summary>因果与结尾依据（可选）</summary>
@@ -146,7 +146,7 @@
       <storyPreview v-if="section === 'preview' && revision" :key="revision.id" ref="previewRef" :directory="directory" :project="project" :revision="revision" :apply="apply" @busy="childBusy = $event" />
       <storyFeedback v-if="section === 'feedback'" ref="feedbackRef" :project="project" :apply="apply" />
       <template v-if="section === 'feedback'">
-        <el-button :disabled="busy || !modelKey || !project.releases.length" @click="run(learnFromFeedback)">基于真实反馈复盘</el-button>
+        <el-button :disabled="busy || modelUnavailable || !project.releases.length" @click="runWithModel(learnFromFeedback)">基于真实反馈复盘</el-button>
         <article v-for="learning in project.learnings" :key="learning.id"><h3>反馈复盘 · 待验证解释</h3><p>依据：{{ learning.releaseIds.map(id => project.releases.find(item => item.id === id)?.variant).join('、') }}</p><p>观察：{{ learning.observation }}</p><p>限制：{{ learning.limitations }}</p><p>假设：{{ learning.hypothesis }}</p><p>下一次实验：{{ learning.nextExperiment }}</p></article>
       </template>
     </div>
@@ -204,6 +204,7 @@ async function expandFramework() {
 const newId = () => crypto.randomUUID();
 const loaded = ref(false), busy = ref(false), childBusy = ref(false), error = ref(""), message = ref("");
 const section = ref("sources"), models = ref<NodeAiModel[]>([]), modelKey = ref("");
+const modelUnavailable = computed(() => !modelKey.value && !(ai.openModelSetup && !models.value.length));
 const revisionId = ref(""), draft = ref<StoryDraft>(), savedDraft = ref("");
 const sourceEdit = ref<StorySource>();
 const rewriteSceneId = ref(""), rewriteIntent = ref(""), issueReasons = ref<Record<string, string>>({});
@@ -239,14 +240,24 @@ async function run(action: () => Promise<void>) {
   try { await action(); } catch (cause) { error.value = controller.signal.aborted ? "已停止，已保存的候选保留" : axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : cause instanceof Error ? cause.message : "处理失败"; }
   finally { busy.value = false; controller = undefined; }
 }
-async function refresh(keepEdits = true) {
-  if (loaded.value && keepEdits) await flushEdits();
-  const [saved, available] = await Promise.all([readStory(directory), ai.getModels(controller?.signal)]);
-  project.value = saved; brief.value = JSON.parse(JSON.stringify(saved.brief)); models.value = available; loaded.value = true;
-  // 模型接口只返回当前已选模型；恢复这项选择，不让工作台再次要求选择同一个模型。
+async function loadStoryModels() {
+  const available = await ai.getModels(controller?.signal);
+  models.value = available;
   if (!available.some(item => JSON.stringify([item.providerId, item.modelId]) === modelKey.value)) {
     modelKey.value = available.length === 1 ? JSON.stringify([available[0]!.providerId, available[0]!.modelId]) : "";
   }
+}
+async function runWithModelSettings() {
+  await ai.openModelSetup?.("text");
+  await run(loadStoryModels);
+}
+function runWithModel(action: () => Promise<void>) {
+  return ai.openModelSetup && !models.value.length ? runWithModelSettings() : run(action);
+}
+async function refresh(keepEdits = true) {
+  if (loaded.value && keepEdits) await flushEdits();
+  const [saved] = await Promise.all([readStory(directory), loadStoryModels()]);
+  project.value = saved; brief.value = JSON.parse(JSON.stringify(saved.brief)); loaded.value = true;
   if (!keepEdits) { section.value = "sources"; sourceEdit.value = undefined; }
   revisionId.value = saved.revisions.some(item => item.id === revisionId.value) ? revisionId.value : saved.approvedId ?? saved.revisions.at(-1)?.id ?? "";
   loadDraft();

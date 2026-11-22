@@ -15,7 +15,7 @@
         </a>
       </nav>
       <div class="railFooter">
-        <el-button v-if="canManageModels()" text :icon="IconPlugConnected" @click="openConnectModel()">{{ accounts ? "API 配置" : "接入模型" }}</el-button>
+        <el-button v-if="canManageModels()" text :icon="IconPlugConnected" @click="openConnectModel()">{{ accounts && !shared ? "API 配置" : "接入模型" }}</el-button>
         <el-badge isDot :hidden="!hasDesktopUpdate"><el-button text :icon="IconSettings" @click="settingsVisible = true">设置</el-button></el-badge>
         <span>好戏，都在里头。</span>
       </div>
@@ -23,7 +23,7 @@
     <div class="homeBody">
       <header class="pageHeader">
         <span>创作工作台</span>
-        <div class="accountBar">
+        <div v-if="!shared" class="accountBar">
           <usageSummary v-if="accounts" />
           <el-text v-if="accounts" class="accountEmail" :title="me?.user.email">{{ me?.user.email }}</el-text>
           <el-button v-if="accounts && me?.user.isAdmin" text @click="router.push('/admin')">管理后台</el-button>
@@ -39,7 +39,7 @@
             <el-button size="small" @click="openConnectModel('text')">接入自己的模型</el-button>
           </div>
         </el-alert>
-        <el-alert v-else-if="canManageModels() && needsModels && !bannerDismissed" class="connectBanner" type="warning" showIcon @close="dismissBanner">
+        <el-alert v-else-if="!shared && canManageModels() && needsModels && !bannerDismissed" class="connectBanner" type="warning" showIcon @close="dismissBanner">
           <template #title>{{ trialExhausted ? "试用额度已用完，接入模型继续创作" : "接入模型，准备开拍" }}</template>
           <div class="connectBannerBody">
             <span>
@@ -324,7 +324,7 @@ import usageSummary from "@/components/usageSummary.vue";
 import workspacePreview from "@/components/workspacePreview.vue";
 import { getCanvasShots, type CanvasShot } from "@/lib/canvasShots";
 import { isCanvasFile } from "@/pages/workspace/canvasFile";
-import { canManageModels, getMe, isAuthDisabled, logout } from "@/lib/session";
+import { canManageModels, getMe, isAuthDisabled, isDesktopShare, logout } from "@/lib/session";
 import { openConnectModel } from "@/components/connectModel/state";
 import { customProviders, loadPlatformTrial, modelChoices, platformTrial, settings as settingsStore } from "@/stores/settings";
 import workspacePicker from "./workspacePicker.vue";
@@ -336,15 +336,16 @@ import { importCharacters, type CharacterSelection } from "@/lib/characterAssets
 const settingsVisible = ref(false);
 const me = getMe();
 const accounts = !isAuthDisabled();
+const shared = isDesktopShare();
 const canSend = computed(() => accounts || !!workspaceDirectory.value);
 // 创作入口与对话使用同一份可用模型列表，供应商目录也可能包含当前无法调用的模型。
 const hasOwnTextModel = computed(() => customProviders.value.some((item) => item.models.length > 0));
-const trialReady = computed(() => platformTrial.value.models.length > 0 && platformTrial.value.credits > 0);
+const trialReady = computed(() => !shared && platformTrial.value.models.length > 0 && platformTrial.value.credits > 0);
 const usingTrial = computed(() => !hasOwnTextModel.value && trialReady.value);
 const trialExhausted = computed(() => !hasOwnTextModel.value && platformTrial.value.models.length > 0 && platformTrial.value.credits <= 0);
 const hasTextModel = computed(() => modelChoices.value.length > 0);
 // 每次回到首页刷新一次剩余积分。
-void loadPlatformTrial();
+if (!shared) void loadPlatformTrial();
 const hasMediaModel = computed(() => {
   const configs = settingsStore.value.mediaProviderConfigs;
   return (
@@ -513,7 +514,7 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
   // Sending an idea without a text model would just fail: take the person to the one-minute wizard instead.
   if (fromPrompt && (message.trim() || attachments.length) && !hasTextModel.value) {
     if (!canManageModels()) return ElMessage.warning(me?.modelAccess.canUse ? "平台默认对话模型暂不可用，请联系超级管理员检查配置" : "尚未获得模型使用权限，请联系超级管理员加入模型使用白名单");
-    if (accounts && storyBrief && brief.subject.trim()) prompt.value = brief.subject.trim();
+    if (accounts && !shared && storyBrief && brief.subject.trim()) prompt.value = brief.subject.trim();
     return openConnectModel("text");
   }
   creating.value = true;

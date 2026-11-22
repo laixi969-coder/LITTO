@@ -19,6 +19,9 @@ if (!(isMac && ["x64", "arm64"].includes(process.arch)) && !(process.platform ==
 }
 if (mode === "dev") process.env.TOONFLOW_DATA_DIR = resolve(projectDir, "data");
 if (isMac) {
+  const desktopTools = resolve(projectDir, "build/desktop/desktopTools");
+  mkdirSync(desktopTools, { recursive: true });
+  await $`/usr/bin/xcrun clang -fobjc-arc -O2 -mmacosx-version-min=11.0 -framework Foundation -framework LocalAuthentication ${resolve(projectDir, "apps/desktop/native/verifyMacOwner.m")} -o ${resolve(desktopTools, "verifyMacOwner")}`;
   const startupTarget = isIntelMac ? "macX64" : "macArm64";
   for (const name of ["libthorvg.dylib", "nativeSplash.dylib"]) {
     if (!existsSync(resolve(projectDir, "packages/startup/assets", startupTarget, name))) {

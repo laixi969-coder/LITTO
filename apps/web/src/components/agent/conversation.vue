@@ -180,7 +180,8 @@ import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { writeClipboardText } from "@/lib/clipboard";
 import anonymousData from "@/lib/anonymousData";
 import { modelChoices, loadAvailableModels, refreshModelSelection } from "@/stores/settings";
-import { canManageModels } from "@/lib/session";
+import { canManageModels, isDesktopShare } from "@/lib/session";
+import { openConnectModel } from "@/components/connectModel/state";
 import { useWorkspaceStore } from "@/stores/workspace";
 import type { AgentAttachment, AgentConversation, AgentMessage } from "./types";
 import { registerStorySources } from "@/lib/storySources";
@@ -689,6 +690,7 @@ async function sendMessage(source?: AgentMessage) {
   }
   const model = selectedModelChoice.value;
   if (!directory) return ElMessage.warning("请先打开项目");
+  if (!model && isDesktopShare() && !modelChoices.value.length) return openConnectModel("text");
   if (!model) return ElMessage.warning(canManageModels() ? "请先选择模型" : "平台默认模型尚未就绪，请联系超级管理员配置");
 
   const requestController = new AbortController();

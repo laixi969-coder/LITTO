@@ -16,7 +16,7 @@ export const admin = new Hono();
 admin.use("*", requireAdmin);
 admin.use("*", async (c, next) => {
     if (/^\/admin\/(providers|models)(?:\/|$)/.test(c.req.path) && !modelPermissions(authOf(c).user.id).canManage)
-      throw forbidden("仅 66445039@qq.com 超级管理员可以管理平台模型");
+      throw forbidden("仅超级管理员可以管理平台模型");
     await next();
 });
 const actor = (c: any) => authOf(c).user.id;
@@ -183,7 +183,7 @@ const systemSchema = z.object({
 admin.get("/system", (c) => c.json({ ...Object.fromEntries(Object.entries(systemDefaults).map(([k, v]) => [k, setting(k, v)])), modelWhitelist: setting("modelWhitelist", []) }));
 admin.put("/system", async (c) => {
     const b = await body(c, systemSchema);
-    if ((b.modelWhitelist || b.accountWhitelist) && !modelPermissions(actor(c)).canManage) throw forbidden("仅 66445039@qq.com 超级管理员可以设置账户与模型使用白名单");
+    if ((b.modelWhitelist || b.accountWhitelist) && !modelPermissions(actor(c)).canManage) throw forbidden("仅超级管理员可以设置账户与模型使用白名单");
     tx(() => {
       for (const [key, value] of Object.entries(b)) setSetting(key, value);
       audit(actor(c), "system.update", undefined, b);

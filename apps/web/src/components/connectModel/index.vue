@@ -1,6 +1,7 @@
 <template>
-  <el-dialog v-model="connectModelVisible" :title="isAuthDisabled() ? '接入你的模型' : '配置平台模型'" width="min(880px, 94vw)" alignCenter appendToBody destroyOnClose :closeOnClickModal="!busy" :closeOnPressEscape="!busy">
-    <p v-if="!isAuthDisabled()" class="intro">由超级管理员统一添加平台模型，模型使用白名单内的账号可以使用。密钥仅保存在服务端，页面只显示末四位，当前不扣积分。</p>
+  <el-dialog v-model="connectModelVisible" :title="isAuthDisabled() || isDesktopShare() ? '接入你的模型' : '配置平台模型'" width="min(880px, 94vw)" alignCenter appendToBody destroyOnClose :closeOnClickModal="!busy" :closeOnPressEscape="!busy">
+    <p v-if="isDesktopShare()" class="intro">选择服务商，填入你自己的 API 密钥。密钥保存在这台 Mac，生成费用由服务商按你的账号结算。</p>
+    <p v-else-if="!isAuthDisabled()" class="intro">由超级管理员统一添加平台模型，模型使用白名单内的账号可以使用。密钥仅保存在服务端，页面只显示末四位，当前不扣积分。</p>
     <p v-else class="intro">模型用的是你自己的账号：把服务商给你的 Key 粘贴进来就行，费用直接结算给服务商。Key 只保存在你的账号里，页面上只会显示末四位。</p>
     <div class="cards" :class="{ single: connectModelFocus }">
       <!-- ① text -->
@@ -44,6 +45,7 @@
           <el-button type="primary" :loading="textBusy" :disabled="!canSaveText" @click="saveText">测试并保存</el-button>
         </el-form>
         <el-alert v-if="textResult" class="result" :title="textResult.message" :type="textResult.ok ? (textResult.verified === false ? 'warning' : 'success') : 'error'" :closable="false" showIcon />
+        <modelSelection v-if="isDesktopShare() && textConnected && !textReplacing" :key="textConnected.id" focus="text" :providerId="textConnected.id" />
       </section>
 
       <!-- ② media -->
@@ -89,6 +91,7 @@
           <el-button type="primary" :loading="mediaBusy" :disabled="!canSaveMedia" @click="saveMedia">检查并保存</el-button>
         </el-form>
         <el-alert v-if="mediaResult" class="result" :title="mediaResult.message" :type="mediaResult.ok ? (mediaResult.verified ? 'success' : 'warning') : 'error'" :closable="false" showIcon />
+        <modelSelection v-if="isDesktopShare() && mediaConnectedKey && !mediaReplacing" :key="mediaPresetId" focus="media" :providerId="mediaPresetId" />
       </section>
     </div>
     <template #footer>
@@ -107,7 +110,8 @@ import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 import { customProviders, saveSettings, settings, type CustomProvider } from "@/stores/settings";
 import { mediaPresets, nonChatModel, textPresets } from "./presets";
 import { connectModelFocus, connectModelVisible } from "./state";
-import { isAuthDisabled } from "@/lib/session";
+import { isAuthDisabled, isDesktopShare } from "@/lib/session";
+import modelSelection from "@/components/settings/panels/modelSelection.vue";
 
 type TestResult = { ok: boolean; verified?: boolean; message: string; models?: { id: string; label: string; contextWindow?: number; maxOutputTokens?: number }[] };
 
@@ -123,7 +127,7 @@ function openCustom(kind: "text" | "media") {
   customVisible.value = true;
 }
 
-const textPresetId = ref(textPresets[0]!.id);
+const textPresetId = ref(isDesktopShare() ? "atlasCloud" : textPresets[0]!.id);
 const textKey = ref("");
 const textUrl = ref("");
 const textAdvanced = ref<string[]>([]);
@@ -131,7 +135,7 @@ const textBusy = ref(false);
 const textReplacing = ref(false);
 const textResult = ref<TestResult>();
 
-const mediaPresetId = ref(mediaPresets[0]!.id);
+const mediaPresetId = ref(isDesktopShare() ? "atlasCloud" : mediaPresets[0]!.id);
 const mediaKey = ref("");
 const mediaSecret = ref("");
 const mediaUrl = ref("");

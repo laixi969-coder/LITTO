@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
+import { computed, onBeforeUnmount, provide, ref, shallowRef, watch, watchEffect } from "vue";
 import { ElMessage, useZIndex } from "element-plus";
 import { elementLocales } from "@toonflow/i18n/elementPlus";
 import { ConfigProvider, type GlobalConfigProvider } from "tdesign-vue-next";
@@ -54,15 +54,23 @@ import tdesignAr from "tdesign-vue-next/es/locale/ar_KW";
 import { locale } from "@toonflow/i18n/vue";
 import type { updateSnapshot } from "@toonflow/server/desktop";
 import { chatLocale } from "@/lib/i18n";
+import { isDesktopShare } from "@/lib/session";
 import { saveSettings, settings, uiSettings } from "@/stores/settings";
 import { desktopUpdateSnapshot, stopDesktopUpdateObservation } from "@/stores/desktopUpdate";
 import { useMcpControl } from "@/lib/mcpControl";
 import ffmpegRequired from "@/components/settings/ffmpegRequired.vue";
 import connectModel from "@/components/connectModel/index.vue";
+import { connectModelVisible, openConnectModel } from "@/components/connectModel/state";
 import updateBox from "@/components/updateBox.vue";
 import "element-plus/theme-chalk/dark/css-vars.css";
 
 useMcpControl();
+if (isDesktopShare()) {
+  provide("openShareModelSetup", async (focus: "text" | "media") => {
+    await openConnectModel(focus);
+    if (connectModelVisible.value) await new Promise<void>(resolve => watch(connectModelVisible, () => resolve(), { once: true }));
+  });
+}
 
 // ACT: TDesign 缺少的语言使用英语基底，聊天控件由应用字典补齐。
 const tdesignLocales = {
@@ -104,6 +112,7 @@ watch(desktopUpdateSnapshot, snapshot => {
     installFailure.value = undefined;
     installFailureVisible.value = false;
   }
+  if (isDesktopShare() || /Macintosh/.test(navigator.userAgent)) return;
   const buildKey = `${snapshot.version}:${snapshot.hash}`;
   const seenBuilds = settings.value.updateBoxSeenBuilds;
   if (shownUpdateBuilds.has(buildKey) || Array.isArray(seenBuilds) && seenBuilds.includes(buildKey)) return;

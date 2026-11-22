@@ -14,7 +14,7 @@
       <div class="updateHeader">
         <div class="versionInfo">
           <h2 :id="titleId" class="updateTitle">MILI MILI <span class="versionNumber">v{{ version }}</span></h2>
-          <div class="buildInfo"><span class="buildLabel">构建代码</span><code>{{ buildCode }}</code></div>
+
         </div>
         <button class="closeButton" type="button" aria-label="关闭更新说明" @click="close">
           <icon-x :size="20" aria-hidden="true" />
@@ -23,20 +23,6 @@
     </template>
 
     <div class="updateBody">
-      <div class="artworkSection">
-        <svg class="buildArtwork" viewBox="0 0 600 200" role="img" :aria-label="`构建 ${buildCode} 的色块图`">
-          <g v-for="(tile, index) in buildTiles" :key="index" :transform="`translate(${index % 6 * 100} ${Math.floor(index / 6) * 100})`">
-            <rect width="100" height="100" :fill="tile.background" />
-            <g :transform="`rotate(${tile.rotation} 50 50)`" :fill="tile.foreground">
-              <path v-if="tile.shape === 0" d="M0 0H100A100 100 0 0 1 0 100Z" />
-              <circle v-else-if="tile.shape === 1" cx="50" cy="50" r="38" />
-              <path v-else-if="tile.shape === 2" d="M0 0H50V50H100V100H50V50H0Z" />
-              <path v-else d="M0 0H100V50H0Z" />
-            </g>
-          </g>
-        </svg>
-      </div>
-
       <section class="releaseSection" aria-label="更新内容">
         <h3 class="releaseTitle">更新内容</h3>
         <div class="releaseContent" tabindex="0" role="region" aria-label="Markdown 更新说明">
@@ -52,36 +38,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from "vue";
+import { defineAsyncComponent } from "vue";
 import updateNotes from "./updateBox.md?raw";
 
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ opened: []; close: [] }>();
-const { version, buildCode, markdown = updateNotes } = defineProps<{ version: string; buildCode: string; markdown?: string }>();
+const { version, markdown = updateNotes } = defineProps<{ version: string; buildCode: string; markdown?: string }>();
 const messageMarkdown = defineAsyncComponent(() => import("./messageMarkdown.vue"));
 
-const buildTiles = computed(() => {
-  // ACT: 构建码仅用于生成稳定的装饰图案，不作为完整性校验。
-  let seed = 2166136261;
-  for (const character of buildCode) seed = Math.imul(seed ^ character.codePointAt(0)!, 16777619) >>> 0;
-  const palettes = [
-    ["#f1eadb", "#d1d8bc", "#7d9486", "#c77e69", "#e1b97a", "#475957"],
-    ["#ece9e1", "#b9cddd", "#698798", "#d7977a", "#dbc5a1", "#43566e"],
-    ["#eee7df", "#cfbfce", "#9a869f", "#c98478", "#d7b579", "#5e6472"],
-    ["#eeeade", "#c7d3b6", "#8fa58e", "#dcad73", "#b87f62", "#536b68"],
-  ];
-  const palette = palettes[seed % palettes.length]!;
-  return Array.from({ length: 12 }, () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const colorIndex = (seed >>> 16) % palette.length;
-    return {
-      background: palette[colorIndex],
-      foreground: palette[(colorIndex + 1 + (seed >>> 24) % (palette.length - 1)) % palette.length],
-      shape: (seed >>> 8) % 4,
-      rotation: (seed >>> 12) % 4 * 90,
-    };
-  });
-});
 </script>
 
 <style lang="scss">
@@ -122,18 +86,7 @@ const buildTiles = computed(() => {
           .versionNumber { color: var(--el-text-color-regular); font-weight: 400; overflow-wrap: anywhere; }
         }
 
-        .buildInfo {
-          display: flex;
-          align-items: baseline;
-          flex-wrap: wrap;
-          gap: 6px 10px;
-          margin-top: 7px;
-          font-size: 11px;
-          line-height: 1.6;
 
-          .buildLabel { color: var(--el-text-color-secondary); }
-          code { color: var(--el-text-color-secondary); font-family: ui-monospace, "Cascadia Code", Consolas, monospace; overflow-wrap: anywhere; }
-        }
       }
 
       .closeButton {
@@ -159,17 +112,7 @@ const buildTiles = computed(() => {
     padding: 0;
 
     .updateBody {
-      .artworkSection {
-        padding: 0 26px;
 
-        .buildArtwork {
-          display: block;
-          width: 100%;
-          height: auto;
-          overflow: hidden;
-          border-radius: var(--ui-radius);
-        }
-      }
 
       .releaseSection {
         .releaseTitle {
@@ -225,7 +168,7 @@ const buildTiles = computed(() => {
   @media (max-width: 480px) {
     .el-dialog__header { padding: 20px 20px 18px; }
     .el-dialog__body .updateBody {
-      .artworkSection { padding: 0 20px; }
+
       .releaseSection {
         .releaseTitle { padding: 20px 20px 10px; }
         .releaseContent { padding: 0 20px 12px; }

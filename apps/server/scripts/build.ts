@@ -6,6 +6,7 @@ const projectDir = resolve(import.meta.dirname, "../../..");
 await $`${process.execPath} run build:teams`.cwd(projectDir);
 await $`${process.execPath} run build`.cwd(resolve(projectDir, "packages/mcp"));
 await $`${process.execPath} build src/index.ts --target=bun --minify --outdir ../../build/server`.cwd(resolve(projectDir, "apps/server"));
+await cp(resolve(projectDir, "cloud/assets/characterPresets"), resolve(projectDir, "build/server/characterPresets"), { recursive: true });
 const skillsOutput = resolve(projectDir, "build/skills");
 await rm(skillsOutput, { recursive: true, force: true });
 await cp(resolve(projectDir, "packages/skills"), skillsOutput, { recursive: true });

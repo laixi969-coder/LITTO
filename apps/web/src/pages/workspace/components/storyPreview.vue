@@ -15,8 +15,8 @@
       <div class="toolbar">
         <label>分镜图片<input type="file" accept="image/png,image/jpeg,image/webp" @change="upload(index, 'image', $event)" /></label>
         <label>配音音轨<input type="file" accept="audio/wav,audio/mpeg,audio/mp4,audio/flac" @change="upload(index, 'audio', $event)" /></label>
-        <el-button :disabled="busy || !scene.speech || !speechModel || !voice" @click="run(() => generateSpeech(index))">生成此场临时配音</el-button>
-        <el-button :disabled="busy || !imageModel" @click="run(() => generateImage(index))">生成此场草图</el-button>
+        <el-button :disabled="busy || !scene.speech || ((!speechModel || !voice) && !(ai.openModelSetup && !speechModels.length))" @click="run(() => generateSpeech(index))">生成此场临时配音</el-button>
+        <el-button :disabled="busy || (!imageModel && !(ai.openModelSetup && !imageModels.length))" @click="run(() => generateImage(index))">生成此场草图</el-button>
         <attachmentPreview v-for="kind in (['image', 'audio'] as const)" v-show="boards[index]?.[kind]" :key="kind" :directory="directory" :attachment="{ ...(boards[index]?.[kind] ?? { path: '', mimeType: 'text/plain' }), name: kind === 'image' ? '分镜图' : '临时音轨' }" />
         <el-button v-if="boards[index]?.image" :disabled="busy" @click="delete boards[index]!.image">移除图</el-button>
         <el-button v-if="boards[index]?.audio" :disabled="busy" @click="delete boards[index]!.audio">移除音轨</el-button>
@@ -55,7 +55,8 @@ const imageModel = computed(() => imageModels.value.find(item => key(item) === i
 const previews = computed(() => props.project.previews.filter(item => item.revisionId === props.revision.id));
 let controller: AbortController | undefined;
 watch(speechKey, () => { voice.value = ""; });
-void ai.getMediaModels().then(value => { models.value = value; }).catch(cause => { error.value = cause.message; });
+async function loadMediaModels() { models.value = await ai.getMediaModels(); }
+void loadMediaModels().catch(cause => { error.value = cause.message; });
 async function run(action: () => Promise<void>) {
   if (busy.value) return;
   busy.value = true; emit("busy", true); controller = new AbortController(); error.value = "";
@@ -84,6 +85,7 @@ async function upload(index: number, kind: "image" | "audio", event: Event) {
   });
 }
 async function generateSpeech(index: number) {
+  if (!speechModels.value.length && ai.openModelSetup) { await ai.openModelSetup("media"); return loadMediaModels(); }
   const model = speechModel.value;
   if (!model || !voice.value) throw new Error("请选择配音模型和音色");
   const [audio] = await ai.generateAudio({ directory, providerId: model.providerId, modelId: model.modelId, voice: voice.value, prompt: props.revision.scenes[index]!.speech, format: "wav", outputDirectory: "assets/story" }, controller?.signal);
@@ -91,6 +93,7 @@ async function generateSpeech(index: number) {
   boards.value[index]!.audio = { path: audio.path, mimeType: audio.mimeType }; await save();
 }
 async function generateImage(index: number) {
+  if (!imageModels.value.length && ai.openModelSetup) { await ai.openModelSetup("media"); return loadMediaModels(); }
   const model = imageModel.value, scene = props.revision.scenes[index]!;
   if (!model) throw new Error("请选择草图模型");
   const [image] = await ai.generateImage({ directory, providerId: model.providerId, modelId: model.modelId, outputDirectory: "assets/story", prompt: `绘制单张电影分镜草图，表现这一场最有代表性的可见行动。用于节奏预演，保持构图清晰，不添加标题、字幕、水印。作品风格：${props.revision.brief.tone}。场景：${scene.title}\n${scene.text}` }, controller?.signal);

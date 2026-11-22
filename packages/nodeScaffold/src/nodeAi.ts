@@ -1,5 +1,5 @@
 export { cameraTrajectorySchema, videoDurations } from "@toonflow/tools-scaffold/runtime";
-import { onScopeDispose } from "vue";
+import { inject, onScopeDispose } from "vue";
 import { runAgentLoop, type AgentTool, type AgentToolResult } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, type AssistantMessage, type Context, type Message, type Model } from "@earendil-works/pi-ai";
 import { EventSourceParserStream } from "eventsource-parser/stream";
@@ -170,6 +170,7 @@ async function delayMediaPoll(signal: AbortSignal) {
 }
 
 export function useNodeAi() {
+  const openModelSetup = inject<((focus: "text" | "media") => Promise<void>) | undefined>("openShareModelSetup", undefined);
   const controller = new AbortController();
   onScopeDispose(() => controller.abort());
   const requestSignal = (signal?: AbortSignal) => signal ? AbortSignal.any([controller.signal, signal]) : controller.signal;
@@ -292,5 +293,5 @@ export function useNodeAi() {
     return { text, ...(reasoning ? { reasoning } : {}) };
   }
 
-  return { getModels, getMediaModels, generateImage, generateVideo, generateAudio, waitMediaJob, cancelMediaJob, cancelMediaRequest, generate };
+  return { getModels, getMediaModels, openModelSetup, generateImage, generateVideo, generateAudio, waitMediaJob, cancelMediaJob, cancelMediaRequest, generate };
 }

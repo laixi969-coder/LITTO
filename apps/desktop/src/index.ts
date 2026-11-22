@@ -2,20 +2,47 @@ import { setLocaleFallback, t, translateMessage } from "@toonflow/server/i18n";
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { once } from "node:events";
 import { execFile } from "node:child_process";
-import { existsSync, writeAtomicSync } from "@toonflow/file";
+import { access, constants, existsSync, mkdir, mkdtemp, rename, rm, writeAtomicSync } from "@toonflow/file";
 import { file } from "@toonflow/file/bun";
 import type { AddressInfo } from "node:net";
-import { resolve } from "node:path";
+import { delimiter, resolve } from "node:path";
+import { homedir } from "node:os";
 import { promisify } from "node:util";
 import { dlopen, ptr } from "bun:ffi";
 import type { DesktopRuntime, PluginInstallRequest } from "@toonflow/server/desktop";
 import { showNativeSplash } from "@toonflow/startup";
 import Electrobun, { ApplicationMenu, BrowserWindow, PATHS, Screen, Utils, Updater } from "electrobun/main";
+import { chooseMacPassword, openShareSession, recoverFromMacMenu } from "./macPassword";
 import { parseInstallUrl } from "./protocol";
 import saveFile, { selectSaveFile } from "./saveFile";
 import createWindowsUpdater, { confirmWindowsUpdateStartup } from "./update/windowsUpdater";
 
 const execFileAsync = promisify(execFile);
+
+async function installShareForUser(source: string) {
+  const directory = resolve(homedir(), "Applications");
+  const target = resolve(directory, "MILI MILI Share.app");
+  const { response } = await Utils.showMessageBox({
+    type: "question", title: "安装 MILI MILI 分享版", message: "当前位置无法保存作品。要在个人应用程序文件夹中打开工作台吗？",
+    detail: target, buttons: ["继续", "退出"], defaultId: 0, cancelId: 1,
+  });
+  if (response !== 0) return;
+  await mkdir(directory, { recursive: true });
+  if (source === target) throw new Error("请允许当前用户写入个人应用程序文件夹旁的工作台数据目录。");
+  if (!existsSync(target)) {
+    const staging = await mkdtemp(resolve(directory, "miliMiliInstall"));
+    try {
+      const staged = resolve(staging, "MILI MILI Share.app");
+      await execFileAsync("/usr/bin/ditto", [source, staged]);
+      await rename(staged, target);
+    } finally {
+      await rm(staging, { recursive: true, force: true });
+    }
+  }
+  const version = await file(resolve(target, "Contents/Resources/version.json")).json();
+  if (version.identifier !== "local.milimili.share") throw new Error("个人应用程序文件夹中已存在同名的其他应用。请选择另一个可写文件夹安装。");
+  await execFileAsync("/usr/bin/open", ["-n", target]);
+}
 const pendingInstalls: PluginInstallRequest[] = [];
 let deliverInstall: ((request: PluginInstallRequest) => void) | undefined;
 function openUrl(url: string) {
@@ -77,7 +104,30 @@ async function start() {
   try {
     // Windows 的 data 与 app 同级；macOS 的 data 与 .app 同级，避免随程序更新被替换。
     const installDirectory = resolve(PATHS.RESOURCES_FOLDER, process.platform === "darwin" ? "../../.." : "../..");
-    const dataDirectory = process.env.TOONFLOW_DATA_DIR ?? resolve(installDirectory, "data");
+    const { hash, identifier } = await file(resolve(PATHS.RESOURCES_FOLDER, "version.json")).json();
+    const shared = process.platform === "darwin" && identifier === "local.milimili.share";
+    process.env.miliMiliShare = shared ? "1" : "0";
+    const dataDirectory = process.env.TOONFLOW_DATA_DIR ?? resolve(installDirectory, shared ? "data/miliMiliShare" : "data");
+    if (shared) {
+      process.env.MILIMILI_AUTH = "on";
+      process.env.MILIMILI_DATA_DIR = resolve(dataDirectory, "cloud");
+      process.env.MILIMILI_DB = resolve(dataDirectory, "cloud/milimili.db");
+    }
+    if (process.platform === "darwin") {
+      try {
+        await mkdir(dataDirectory, { recursive: true, mode: 0o700 });
+        if (shared) await access(dataDirectory, constants.R_OK | constants.W_OK | constants.X_OK);
+      } catch (error) {
+        if (!shared || process.env.TOONFLOW_DATA_DIR || !["EROFS", "EACCES", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+        await installShareForUser(resolve(PATHS.RESOURCES_FOLDER, "../.."));
+        Utils.quit();
+        return;
+      }
+      // 拖放安装没有解包器预建的目录，SDK 在下次启动时会在此登记安装位置。
+      if (process.arch === "arm64") await mkdir(Utils.paths.userData, { recursive: true, mode: 0o700 });
+      const mediaTools = resolve(PATHS.RESOURCES_FOLDER, "app/mediaTools");
+      process.env.PATH = [existsSync(mediaTools) ? mediaTools : "", resolve(PATHS.RESOURCES_FOLDER, "../MacOS"), process.env.PATH].filter(Boolean).join(delimiter);
+    }
     // ACT: 先显示原生动画，再加载服务，避免初始化期间没有反馈。
     const startupSettings = await file(resolve(dataDirectory, "settings.json")).json().catch((error) => {
       if (error.code !== "ENOENT") console.error("读取启动设置失败，使用默认启动动画：", error);
@@ -88,8 +138,9 @@ async function start() {
     if (process.platform === "darwin") {
       // ACT: WKWebView 的 Command 编辑快捷键由原生菜单角色交给当前响应者处理。
       ApplicationMenu.setApplicationMenu([
-        { label: "Toonflow", submenu: [
+        { label: "MILI MILI", submenu: [
           { role: "about" },
+          ...(!shared ? [{ label: "重设本机密码…", action: "recoverMacPassword" }] : []),
           { type: "separator" },
           { role: "hide" },
           { role: "hideOthers" },
@@ -124,8 +175,7 @@ async function start() {
       return;
     }
     process.env.toonflowDesktop = "1";
-    const { createApp } = await import("@toonflow/server/app");
-    const { hash } = await file(resolve(PATHS.RESOURCES_FOLDER, "version.json")).json();
+    const { createApp, firstDesktopAccount, prepareShareWindow, resetDesktopOwnerPassword } = await import("@toonflow/server/app");
     if (typeof hash !== "string" || !hash) throw new Error(t`应用构建标识缺失，无法同步内置插件`);
     const app = await createApp({
       webRoot: resolve(PATHS.VIEWS_FOLDER, "mainview"),
@@ -137,6 +187,32 @@ async function start() {
       agentsRoot: resolve(PATHS.VIEWS_FOLDER, "../agents"),
       pluginRevision: hash,
     });
+    if (process.platform === "darwin" && !shared) {
+      ApplicationMenu.on("application-menu-clicked", (event: unknown) => {
+        if ((event as { data?: { action?: string } }).data?.action === "recoverMacPassword") void recoverFromMacMenu(resetDesktopOwnerPassword);
+      });
+    }
+    let windowProof: string | undefined;
+    if (shared) {
+      const access = prepareShareWindow();
+      if (access.passwordRequired) {
+        splash?.close();
+        splash = undefined;
+      }
+      windowProof = await openShareSession(access, resetDesktopOwnerPassword);
+      if (!windowProof) {
+        Utils.quit();
+        return;
+      }
+    }
+    const setup = process.platform === "darwin" && !shared && firstDesktopAccount();
+    if (setup) {
+      splash?.close();
+      splash = undefined;
+      const password = await chooseMacPassword(`为本机管理员 ${setup.email} 设置工作台登录密码（12 至 256 个字符）。`);
+      if (password === undefined) { Utils.quit(); return; }
+      await setup.create(password);
+    }
     const server = app.listen(0, "127.0.0.1");
 
     await once(server, "listening");
@@ -151,8 +227,8 @@ async function start() {
     const width = Math.min(1280, workArea.width - 64);
     const height = Math.min(960, workArea.height - 64);
     const mainWindow = new BrowserWindow({
-      title: "Toonflow",
-      url: `http://127.0.0.1:${address.port}/?desktop=1`,
+      title: "MILI MILI",
+      url: `http://127.0.0.1:${address.port}/?desktop=1${windowProof ? "#/desktopWindow=" + windowProof : ""}`,
       hidden: Boolean(splash),
       frame: {
         width,
@@ -167,6 +243,10 @@ async function start() {
       const url = typeof detail === "string" ? detail : detail && typeof detail === "object" && "url" in detail ? detail.url : undefined;
       if (typeof url !== "string" || !URL.canParse(url)) return;
       const target = new URL(url);
+      if (process.platform === "darwin" && !shared && target.origin === `http://127.0.0.1:${address.port}` && target.pathname === "/desktop/recover-password") {
+        void recoverFromMacMenu(resetDesktopOwnerPassword);
+        return;
+      }
       if (target.protocol !== "http:" && target.protocol !== "https:") return;
       if (!Utils.openExternal(target.href)) {
         void Utils.showMessageBox({ type: "error", title: t`打开链接失败`, message: t`请检查默认浏览器设置后重试。` });
@@ -175,6 +255,20 @@ async function start() {
     // 页面重载时监听器随旧页面销毁，安装请求等新页面 ready 后再投递。
     Electrobun.events.on(`will-navigate-${mainWindow.webview.id}`, () => { deliverInstall = undefined; });
     let isShowing = false;
+    async function showWindow() {
+      if (isShowing || isClosing) return;
+      isShowing = true;
+      if (splash) {
+        await splash.finish();
+        if (isClosing || !splash) return;
+        mainWindow.show();
+        splash.close();
+        splash = undefined;
+      }
+      void restoreInstallRegistration(installDirectory);
+    }
+    // 登录页也须可见。仅显示窗口，协议安装和更新确认仍等待登录后的 ready 请求。
+    mainWindow.webview.on("dom-ready", () => { void showWindow(); });
     app.locals.desktop = {
       openUrl,
       readClipboardText: Utils.clipboardReadText,
@@ -191,18 +285,8 @@ async function start() {
       },
       async ready(failed = false) {
         if (isClosing) return;
-        if (!isShowing) {
-          if (splash) {
-            await splash.finish();
-            if (isClosing || !splash) return;
-            mainWindow.show();
-            splash.close();
-            splash = undefined;
-          }
-          isShowing = true;
-          // ACT: 安装器已完成注册；更新后的修复仅首次展示时执行，不阻塞主窗口。
-          void restoreInstallRegistration(installDirectory);
-        }
+        await showWindow();
+        if (isClosing) return;
         if (failed) {
           if (process.platform === "win32") confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER, true);
           else await (Updater as DesktopRuntime["updater"]).confirmStartup?.(true);
@@ -268,6 +352,7 @@ async function start() {
   } catch (error) {
     splash?.close();
     console.error("桌面启动失败：", error);
+    if (process.env.miliMiliShare === "1") await Utils.showMessageBox({ type: "error", title: "无法打开 MILI MILI 工作台", message: error instanceof Error ? error.message : "请检查应用所在文件夹的读写权限。" });
     if (process.platform === "win32") {
       try { confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER, true); }
       catch (resultError) { console.error("更新启动结果写入失败：", resultError); }

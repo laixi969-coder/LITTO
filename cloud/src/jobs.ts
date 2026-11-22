@@ -7,7 +7,7 @@ import { route, resolvePolicy } from "./providers/router.ts";
 import type { GenRequest, GenResult } from "./providers/adapter.ts";
 import { saveMedia, storage } from "./storage.ts";
 import { bad, conflict, j, log, now, sha256, sleep, ulid } from "./util.ts";
-import { config } from "./config.ts";
+import { config, isShareDesktop } from "./config.ts";
 import { onJobSucceeded } from "./domain/lifecycle.ts";
 import { inc, observe } from "./metrics.ts";
 import { assertSpeechPlan } from "./domain/speechPlanning.ts";
@@ -72,7 +72,7 @@ export function enqueue(spec: JobSpec) {
     const prov = get("SELECT * FROM providers WHERE id=?", model.provider_id)!;
     const pricingParams = prov.id === "workspaceMedia" ? spec.parameters.request ?? spec.parameters : spec.parameters;
     const est = estimate(spec.modelId, spec.kind, pricingParams);
-    if (prov.id === "workspaceMedia" && (!setting("billingEnabled", false) || est.usd === null || !Number.isFinite(est.usd) || est.usd <= 0 || !Number.isFinite(est.credits) || est.credits <= 0)) throw bad("共享媒体模型须先由管理员开启积分计费并配置有效单价，未提交生成");
+    if (prov.id === "workspaceMedia" && !isShareDesktop() && (!setting("billingEnabled", false) || est.usd === null || !Number.isFinite(est.usd) || est.usd <= 0 || !Number.isFinite(est.credits) || est.credits <= 0)) throw bad("共享媒体模型须先由管理员开启积分计费并配置有效单价，未提交生成");
     const id = ulid();
     const retry = JSON.parse(prov.retry_policy);
     const seed = spec.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -220,7 +220,7 @@ async function execute(jobId: string) {
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
-        if (job.providerId === "workspaceMedia" && !p.remoteTask && !(job.held > 0)) throw Object.assign(bad("此任务没有预占生成额度，请配置计费后重新创建"), { retryable: false, fallbackAllowed: false });
+        if (job.providerId === "workspaceMedia" && !isShareDesktop() && !p.remoteTask && !(job.held > 0)) throw Object.assign(bad("此任务没有预占生成额度，请配置计费后重新创建"), { retryable: false, fallbackAllowed: false });
         let narrativeUnchanged: (() => Promise<void>) | undefined;
         if (job.projectId && (job.kind === "video" || job.targetType === "shot") && !raw.provider_task_id && (!p.remoteTask || ["failed", "rejected"].includes(p.remoteTask.status))) {
             try {

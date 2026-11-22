@@ -10,17 +10,17 @@
       popperClass="agentModelPopover"
       :popperStyle="{ padding: '20px', maxWidth: 'calc(100vw - 24px)' }">
       <template #reference>
-        <el-button class="modelButton" text :disabled="disabled" :aria-label="`选择推理等级，当前模型：${selectedModelChoice?.label ?? '未选择'}`" :title="isAuthDisabled() ? '选择对话模型与推理等级' : '选择推理等级'">
+        <el-button class="modelButton" text :disabled="disabled" :aria-label="`选择推理等级，当前模型：${selectedModelChoice?.label ?? '未选择'}`" :title="canChooseModel ? '选择对话模型与推理等级' : '选择推理等级'">
           <span class="modelLabel">模型</span>
           <modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="14" />
-          <span class="modelName">{{ selectedModelChoice?.label ?? (isAuthDisabled() ? "选择模型" : "等待管理员设置默认模型") }}</span>
+          <span class="modelName">{{ selectedModelChoice?.label ?? (canChooseModel ? "选择模型" : "等待管理员设置默认模型") }}</span>
           ·
           <span class="reasoningLabel">{{ reasoningLabel }}</span>
           <icon-chevron-down :size="12" />
         </el-button>
       </template>
       <el-form class="modelOptions" labelPosition="top">
-        <el-form-item v-if="isAuthDisabled()" label="模型">
+        <el-form-item v-if="canChooseModel" label="模型">
           <el-select :modelValue="selectedModel" filterable :loading="loading || saving" :disabled="disabled || loading || saving" :teleported="false" placeholder="选择模型" aria-label="选择模型" noDataText="暂无可用模型，请先添加供应商并配置 API Key" @change="selectModel">
             <template #prefix><modelIcon v-if="selectedModelChoice" :model="selectedModelChoice.modelId" :size="18" /></template>
             <el-option-group v-for="provider in modelGroups" :key="provider.id" :label="provider.label">
@@ -50,7 +50,7 @@ import { ElMessage } from "element-plus";
 import { IconChevronDown } from "@tabler/icons-vue";
 import { modelIcon } from "@toonflow/model-icons";
 import { modelChoices, loadAvailableModels, saveSettings } from "@/stores/settings";
-import { isAuthDisabled } from "@/lib/session";
+import { isAuthDisabled, isDesktopShare } from "@/lib/session";
 
 const selectedModel = defineModel<string>({ default: "" });
 const reasoningEffort = defineModel<string>("reasoningEffort", { default: "" });
@@ -103,9 +103,10 @@ async function selectModel(value: string) {
     error.value = axios.isAxiosError(cause) ? cause.response?.data?.message || cause.message : cause instanceof Error ? cause.message : "保存失败，原模型保持不变";
   } finally { saving.value = false; }
 }
+const canChooseModel = isAuthDisabled() || isDesktopShare();
 const selectedModelChoice = computed(() => modelChoices.value.find(item => item.value === selectedModel.value));
 const reasoningLabel = computed(() => reasoningOptions.find(item => item.value === reasoningEffort.value)?.label ?? "默认");
-watch(visible, open => { if (open && isAuthDisabled()) { void loadAvailableModels(); void loadModels(); } });
+watch(visible, open => { if (open && canChooseModel) { void loadAvailableModels(); void loadModels(); } });
 watch([modelChoices, selectedModel], ([items]) => {
   if (!items.some(item => item.value === selectedModel.value)) selectedModel.value = items[0]?.value ?? "";
 }, { immediate: true });

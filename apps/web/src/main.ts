@@ -13,7 +13,7 @@ import { registerDesktopProtocol } from "@/lib/desktopProtocol";
 import { registerDesktopDownloads } from "@/lib/saveFile";
 import { registerAnonymousData } from "@/lib/anonymousData";
 import { loadSettings, settingsStorage } from "@/stores/settings";
-import { isAuthDisabled, loadMe, registerSessionGuard } from "@/lib/session";
+import { cloudRequest, getMe, isAuthDisabled, loadMe, registerSessionGuard } from "@/lib/session";
 import { checkDesktopUpdate } from "@/stores/desktopUpdate";
 import { registerLanguage } from "@/lib/i18n";
 import { migrateBrandKeys } from "@/lib/migrateBrandKeys";
@@ -28,6 +28,18 @@ const requiresWebView2Update = isDesktop && /Windows/i.test(navigator.userAgent)
   && [Map.groupBy, URL.canParse, Promise.withResolvers].some(method => typeof method !== "function");
 let isMounted = false;
 
+async function loadInitialSession() {
+  registerSessionGuard();
+  const proof = isDesktop && location.hash.match(/^#\/desktopWindow=([A-Za-z0-9_-]{43})$/)?.[1];
+  if (proof) {
+    router.options.history.replace("/home");
+    await cloudRequest("/auth/window", "POST", { proof });
+  }
+  const me = await loadMe();
+  if (proof && !me?.desktopShare) throw new Error("请重新打开 MILI MILI 本机工作台。");
+  if (me || isAuthDisabled()) await loadSettings();
+}
+
 async function notifyDesktopReady(failed = false) {
   if (!isDesktop) return;
   const response = await fetch("/api/desktop/ready", {
@@ -41,7 +53,7 @@ async function notifyDesktopReady(failed = false) {
 // ACT: 已安装客户端的自动更新不经过 NSIS；启动时阻止缺少所需 API 的旧 WebView2 进入业务页面。
 (requiresWebView2Update
   ? Promise.reject(new Error("当前 Microsoft Edge WebView2 Runtime 版本过旧。请以管理员身份运行微软最新版安装器；若仍提示已安装，请修复 WebView2 或联系管理员检查更新服务。更新完成后，请完全退出 MILI MILI 再重新打开。"))
-  : (registerSessionGuard(), loadMe().then(me => me || isAuthDisabled() ? loadSettings() : undefined))).then(async () => {
+  : loadInitialSession()).then(async () => {
   app.use(createPinia().use(createPersistedState({ storage: settingsStorage })));
   app.use(router);
   await router.isReady();
@@ -56,6 +68,7 @@ async function notifyDesktopReady(failed = false) {
   if (document.readyState !== "complete") {
     await new Promise<void>((resolve) => window.addEventListener("load", () => resolve(), { once: true }));
   }
+  if (!getMe() && !isAuthDisabled()) return;
   await notifyDesktopReady();
   // ACT: 桌面启动后只静默检查一次；失败留待用户手动重试，不阻塞启动或自动下载。
   void checkDesktopUpdate(true).catch(() => {});

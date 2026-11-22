@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { authOf, deleteAccount, logout, modelPermissions, requireRole, setSessionCookie, verifyPassword, revalidateAuth } from "../auth.ts";
+import { authOf, changeShareLock, deleteAccount, logout, modelPermissions, requireRole, setSessionCookie, shareLockStatus, verifyPassword, revalidateAuth } from "../auth.ts";
 import { all, audit, get, run, scoped, tx, hydrate } from "../db.ts";
 import { body, ctx, project } from "../http.ts";
 import { accountOf, grant } from "../credits.ts";
@@ -32,7 +32,11 @@ authPublic.post("/password/login", async (c) => {
 platform.get("/auth/me", (c) => {
     const a = authOf(c);
     const ws = all("SELECT w.id, w.name, w.kind, m.role FROM workspaces w JOIN workspace_members m ON m.workspace_id=w.id WHERE m.user_id=? AND w.deleted_at IS NULL", a.user.id);
-    return c.json({ user: a.user, workspaceId: a.workspaceId, role: a.role, workspaces: ws, modelAccess: modelPermissions(a.user.id) });
+    return c.json({ user: a.user, workspaceId: a.workspaceId, role: a.role, workspaces: ws, modelAccess: modelPermissions(a.user.id), desktopShare: shareLockStatus(a.user.id) });
+});
+platform.put("/auth/desktop-lock", async (c) => {
+    const b = await body(c, z.object({ enabled: z.boolean(), password: z.string().min(1).max(256) }).strict());
+    return c.json(await changeShareLock(authOf(c).user.id, b.enabled, b.password));
 });
 platform.post("/auth/logout", (c) => (logout(c), c.json({ ok: true })));
 platform.post("/auth/logoutAll", (c) => {

@@ -163,11 +163,15 @@ bun run package:desktop
 
 启动库脚本会下载固定版本的 ThorVG 源码并校验摘要。产物分别位于 `build/desktop/artifacts/macArm64/` 和 `build/desktop/artifacts/macX64/`。
 
-本机默认生成未做 Developer ID 签名与公证的测试包；GitHub Actions 的 ARM 包会按下方配置自动签名并公证，Intel 仍不重签。对于自己构建且确认来源的测试应用，若被隔离属性拦截，可仅移除该应用的隔离属性，路径按实际位置调整：
+本机完整版可以一并提供 FFmpeg 和 ffprobe。把与目标架构一致的可执行文件和上游许可放入 `build/desktop/mediaTools/`，执行 `bundleMacMediaTools=1 bun run package:desktop`。Apple 芯片版本使用 [Jellyfin FFmpeg 的 macarm64 GPL 发行包](https://github.com/jellyfin/jellyfin-ffmpeg/releases/tag/v8.1.3-2)。如需制作拖放安装盘，将产物中的 `*.app.tar.zst` 解开，在同一目录加入指向 `/Applications` 的软链接，再用 `hdiutil create -srcfolder` 制作磁盘映像。
 
-```sh
-xattr -dr com.apple.quarantine "/Applications/toonflow.app"
-```
+将 `MILI MILI.app` 安装在当前用户可写的目录，如 `~/Applications/`。首次打开时，系统对话框会让用户为本机超级管理员 `66445039@qq.com` 设置密码。旧版创建的本机管理员在该邮箱可用时会沿用原密码和工作区。工作台把账号、模型配置和作品保存在应用同级的 `data/`。备份或搬迁时先退出应用，再整体复制这个目录。
+
+制作给其他用户的 Apple 芯片分享版时，运行 `shareMac=1 bundleMacMediaTools=1 bun run package:desktop`，使用 `build/desktop/artifacts/macArm64Share/` 中的应用归档制作拖放安装盘。分享版名为 `MILI MILI Share.app`。首次打开直接创建本机工作区，模型首次使用时由用户填写自己的服务商密钥并选定模型。在「设置 → 隐私与安全」中可以设置打开密码。作品和配置位于应用旁的 `data/miliMiliShare/`，备份前应退出应用。
+
+自用版从登录页点「忘记本机密码？」或打开 Mac 应用菜单里的「重设本机密码…」。分享版从解锁窗口点「忘记密码」。系统验证当前 Mac 用户身份后，需要连续两次输入相同的新密码。工作台保留原账号、权限和作品，并使旧会话失效。
+
+本地构建默认不做 Developer ID 签名和 Apple 公证。GitHub Actions 的 ARM 包使用下方的签名及公证配置。
 
 **类型检查与 SDK**
 
