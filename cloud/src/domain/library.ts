@@ -93,11 +93,11 @@ export async function publishToLibrary(s: Scope, assetId: string, actor: string,
   });
 }
 
-export async function searchLibrary(s: Scope, input: unknown = {}) {
+export function searchLibrary(s: Scope, input: unknown = {}) {
   const parsed = librarySearchSchema.safeParse(input);
   if (!parsed.success) throw bad("角色库筛选参数无效", parsed.error.issues);
   const query = parsed.data;
-  if (!query.type || query.type === "Character") await ensureCharacterPresets(s);
+  if (!query.type || query.type === "Character") ensureCharacterPresets(s);
   const wanted = Object.entries(query.tags ?? {}).filter(([, value]) => value);
   return s.list("library_assets", {}, "reuse_count DESC, created_at DESC").filter(entry => {
     return (!query.type || entry.type === query.type) && (!query.excludeName || entry.name !== query.excludeName)

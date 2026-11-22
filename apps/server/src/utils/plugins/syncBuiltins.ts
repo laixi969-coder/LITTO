@@ -45,7 +45,12 @@ export default async function syncBuiltins(target: string, source: string, categ
       const info = await pathInfo(path);
       if (info?.isDirectory()) {
         for (const name of await readdir(path)) await collect(`${relative}/${name}`);
-      } else if (info?.isFile()) files.set(relative, await readFile(path));
+      } else if (info?.isFile()) {
+        // SDK 按大小写识别技能入口，将仓库的小驼峰源文件映射到安装格式。
+        const installed = category === "skills" && relative === `${entry.name}/skill.md` ? `${entry.name}/SKILL.md` : relative;
+        if (files.has(installed)) throw new Error(`重复的内置资源：${installed}`);
+        files.set(installed, await readFile(path));
+      }
       else throw new Error(`内置资源不是普通文件：${path}`);
     }
     await collect(entry.name);

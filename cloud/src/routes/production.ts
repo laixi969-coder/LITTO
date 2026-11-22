@@ -458,7 +458,7 @@ production.post("/candidates/:id/promote", async (c) => {
 });
 
 // ---- Tenant library (跨项目复用角色与资产) ----
-production.get("/library/assets", async (c) => {
+production.get("/library/assets", (c) => {
     const { s } = ctx(c);
     const t = c.req.query("type"), n = c.req.query("name");
     const tags = PERSONA_AXES.reduce((acc, axis) => {
@@ -468,7 +468,7 @@ production.get("/library/assets", async (c) => {
     }, {} as Record<string, string>);
     const favorite = c.req.query("favorite");
     if (favorite !== undefined && !["true", "false"].includes(favorite)) throw bad("favorite 须为 true 或 false");
-    return c.json(await searchLibrary(s, { type: t, tags, gender: c.req.query("gender"), ageGroup: c.req.query("ageGroup"), excludeName: n, q: c.req.query("q"), favorite: favorite === undefined ? undefined : favorite === "true", limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined }));
+    return c.json(searchLibrary(s, { type: t, tags, gender: c.req.query("gender"), ageGroup: c.req.query("ageGroup"), excludeName: n, q: c.req.query("q"), favorite: favorite === undefined ? undefined : favorite === "true", limit: c.req.query("limit") ? Number(c.req.query("limit")) : undefined }));
 });
 production.post("/library/characters", uploadSlot, async c => {
     const { s, a } = ctx(c, "EDITOR");

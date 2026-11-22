@@ -30,7 +30,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/png",
+    "size": 5828152,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "许遥",
@@ -63,7 +67,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2402997,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "林岫",
@@ -96,7 +104,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2316964,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "廖川",
@@ -129,7 +141,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2370107,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "周至",
@@ -162,7 +178,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2409079,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "冯望",
@@ -195,7 +215,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2474180,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "宋知意",
@@ -228,7 +252,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 1988742,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "苏晚宁",
@@ -261,7 +289,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2433867,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "顾屿",
@@ -294,7 +326,11 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2069668,
+    "width": 2752,
+    "height": 1536
   },
   {
     "name": "陆星野",
@@ -327,6 +363,10 @@
     ],
     "forbiddenChanges": [
       "更换演员面孔，改变既定年龄段或抹去辨识特征。"
-    ]
+    ],
+    "mime": "image/jpeg",
+    "size": 2672005,
+    "width": 2752,
+    "height": 1536
   }
 ]

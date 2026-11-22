@@ -7,6 +7,11 @@ import { sign, verifySig } from "./crypto.ts";
 import { subscriptionOf } from "./billing.ts";
 import { bad, conflict, now, sha256, ulid } from "./util.ts";
 import { makeDerivatives, probeBuffer } from "./media-tools.ts";
+import { characterPresetPath } from "./domain/characterPresets.ts";
+
+export function mediaReadPath(key: string) {
+    return characterPresetPath(key) ?? join(config.mediaDir, key);
+}
 
 /** Storage adapter contract. Local FS is implemented; S3/MinIO plug in by implementing the same 4 methods. */
 export interface StorageAdapter {
@@ -27,7 +32,7 @@ class LocalStorage implements StorageAdapter {
         writeFileSync(this.path(key), data);
     }
     getSync(key: string) {
-        return readFileSync(this.path(key));
+        return readFileSync(mediaReadPath(key));
     }
     putSync(key: string, data: Buffer) {
         if (get("SELECT deleted_at FROM workspaces WHERE id=?", key.split("/")[0])?.deleted_at) throw conflict("工作区已注销，停止写入");
@@ -35,7 +40,7 @@ class LocalStorage implements StorageAdapter {
         writeFileSync(this.path(key), data);
     }
     async get(key: string) {
-        return readFileSync(this.path(key));
+        return readFileSync(mediaReadPath(key));
     }
     async delete(key: string) {
         rmSync(this.path(key), { force: true });
@@ -89,7 +94,7 @@ export function reserveWorkspaceStorage(workspaceId: string, bytes: number) {
     return () => { if (!released) { released = true; const remaining = (workspaceReservations.get(workspaceId) ?? 0) - bytes; if (remaining) workspaceReservations.set(workspaceId, remaining); else workspaceReservations.delete(workspaceId); } };
 }
 export function usage(workspaceId: string) {
-    const media = get("SELECT COALESCE(SUM(size),0) AS bytes, COUNT(*) AS files FROM media WHERE workspace_id=?", workspaceId)!;
+    const media = get("SELECT COALESCE(SUM(size),0) AS bytes, COUNT(*) AS files FROM media WHERE workspace_id=? AND source<>'characterPreset'", workspaceId)!;
     let derivatives = 0;
     for (const row of all("SELECT thumbnail_key,proxy_key FROM media WHERE workspace_id=?", workspaceId)) {
         for (const key of [row.thumbnail_key, row.proxy_key]) if (key) {

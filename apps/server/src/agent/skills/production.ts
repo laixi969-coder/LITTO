@@ -93,8 +93,13 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   // ACT: 专项路由也读取待制作镜头，续作不能只靠本轮措辞；这里只匹配主题，不把全项目规格重复塞入上下文。
   const topicText = `${task}\n${JSON.stringify(project.revisions.find(item => item.id === project.approvedId)?.brief ?? project.brief)}\n${JSON.stringify(pendingShots.map(shot => ({ action: shot.action, creativeBrief: shot.creativeBrief, camera: shot.camera, lighting: shot.lighting, realism: shot.realism })))}`;
   const selectedTopics = topics.filter(topic => topic.match.test(topicText));
+  const specialties = [
+    { name: "screenCombat", match: /打斗|打戏|武戏|武打|对打|斗法|对决|交锋|格斗|动作戏|武侠动作|fight scene|screen combat/i },
+    { name: "cinematicCg", match: /(?:电影级?|顶级|写实|银黑|过场|超逼真)\s*CG|\bCG\s*(?:电影|质感|过场|写实|动画)|游戏过场|液态金属|cinematic CG|CG cinematic/i },
+    { name: "characterForge", match: /选角|试镜|定妆|角色母版|角色锻造|人物母版|表情板|角色板|(?:生成|设计|创建|预设|新建).{0,12}(?:角色|演员)|(?:人物|角色).{0,8}(?:三视图|四视图|设计|资产)|character forge|casting sheet/i },
+  ].filter(skill => skill.match.test(topicText)).map(skill => skill.name);
   // ACT: 先读取已保存的制作上下文再判断入口，避免“再快一点”等续作指令在专项路由前被漏掉。
-  if (!explicitNames.length && !music && !advertising && !story && !shortDrama && !selectedTopics.length && !/视频|短片|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
+  if (!explicitNames.length && !music && !advertising && !story && !shortDrama && !selectedTopics.length && !specialties.length && !/视频|短片|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
   if (!canReadSkills(tools)) {
     return "## 制作技能状态\n本轮技能正文读取未开启，未自动加载制作技能；不能声称已使用。";
   }
@@ -132,7 +137,7 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   if (!focused) {
     for (const topic of selectedTopics) if (!names.includes(topic.name)) names.push(topic.name);
   }
-  for (const name of explicitNames) if (!names.includes(name)) names.push(name);
+  for (const name of [...specialties, ...explicitNames]) if (!names.includes(name)) names.push(name);
   // ACT: 短剧带货只复用公共制作工艺，不并入其他板块的创意主方法。
   if (shortDramaCommerce) {
     for (let index = names.length - 1; index >= 0; index--) if (["story", "adfilm", "musicfilm"].includes(names[index]!)) names.splice(index, 1);

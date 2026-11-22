@@ -1,6 +1,5 @@
 import { bodyLimit } from "hono/body-limit";
 import { createReadStream, stat } from "@toonflow/file";
-import { join } from "node:path";
 import { Readable } from "node:stream";
 import { clientIp } from "./requestSecurity.ts";
 import { Hono } from "hono";
@@ -20,7 +19,7 @@ import { nle } from "./routes/nle.ts";
 import { market, marketAdmin } from "./routes/market.ts";
 import { forbidden, HttpError, log } from "./util.ts";
 import { get, setting } from "./db.ts";
-import { checkSignedUrl } from "./storage.ts";
+import { checkSignedUrl, mediaReadPath } from "./storage.ts";
 import { inc, observe } from "./metrics.ts";
 import { config, isShareDesktop } from "./config.ts";
 
@@ -83,7 +82,7 @@ app.get("/media/:id/file", async (c) => {
     const variant = c.req.query("variant");
     const key = variant === "thumb" && m.thumbnail_key ? m.thumbnail_key : variant === "proxy" && m.proxy_key ? m.proxy_key : m.storage_key;
     const mime = key === m.thumbnail_key ? "image/jpeg" : key === m.proxy_key ? "video/mp4" : m.mime;
-    const path = join(config.mediaDir, key);
+    const path = mediaReadPath(key);
     const size = (await stat(path)).size;
     // SVG could carry script: serve it inert.
     const headers: Record<string, string> = { "content-type": mime, "cache-control": "private, max-age=300", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff", "accept-ranges": "bytes" };
