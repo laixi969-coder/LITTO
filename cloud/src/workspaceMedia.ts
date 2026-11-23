@@ -35,11 +35,11 @@ export function configureWorkspaceMedia(execute: (request: GenRequest) => Promis
   });
 }
 
-export function linkWorkspaceProject(workspaceId: string, directory: string, name: string) {
+export function linkWorkspaceProject(workspaceId: string, directory: string, name: string, medium?: string) {
   return tx(() => {
     const link = get("SELECT project_id FROM workspace_project_links WHERE workspace_id=? AND directory=?", workspaceId, directory);
     if (link && scoped(workspaceId).get("projects", link.project_id)) return link.project_id as string;
-    const project = createProject(scoped(workspaceId), name);
+    const project = createProject(scoped(workspaceId), name, medium);
     run(
       "INSERT INTO workspace_project_links VALUES(?,?,?) ON CONFLICT(workspace_id,directory) DO UPDATE SET project_id=excluded.project_id",
       workspaceId,
@@ -63,6 +63,7 @@ export function enqueueWorkspaceMedia(input: {
     candidateBatchId?: string;
     negativePrompt?: string;
     requestId: string;
+    canvasTest?: boolean;
     assetReferenceFingerprint?: string;
     production?: ReturnType<typeof prepareWorkspaceShot>;
 }) {
@@ -117,6 +118,7 @@ export function enqueueWorkspaceMedia(input: {
   return enqueue({
     workspaceId: input.workspaceId,
     createdBy: input.userId,
+    canvasTest: input.canvasTest,
     projectId: input.projectId,
     kind: input.kind,
     targetType: input.production ? "shot" : undefined,

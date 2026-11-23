@@ -7,7 +7,7 @@ const text = (max = 2000) => z.string().trim().max(max);
 const id = z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/);
 export const storyPath = z.string().min(1).max(1024).refine(value => !/^[\\/]/.test(value) && !/[\\:\x00-\x1f]/.test(value) && value.split("/").every(part => part && part !== "." && part !== ".."), "须为工作区内的相对文件路径");
 export const storyBriefSchema = z.strictObject({
-  kind: z.enum(["story", "serial", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"]),
+  kind: z.enum(["story", "serial", "cgAnimation", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"]),
   serialFormat: z.enum(["short", "medium"]).optional().describe("连载形态：短剧或中剧；duration 为单集目标秒数"),
   episodeCount: z.number().int().min(1).max(100).optional(),
   cast: z.array(z.strictObject({ assetId: id, libraryId: id, actorName: text(120).min(1), roleName: text(120).min(1) })).max(20).optional().describe("用户从角色库选用并已导入本项目的演员与饰演人物；沿用 assetId 的身份和定妆，不重复建角或重生成"),
@@ -134,6 +134,9 @@ export const storyDecisionSchema = z.discriminatedUnion("type", [
 ]);
 export function storyActionParameters(type: StoryAction["type"]) {
   return z.toJSONSchema(storyActionSchema.options.find(option => option.shape.type.value === type)!, { io: "input", target: "draft-07" });
+}
+export function usesStoryFramework(kind: string) {
+  return ["story", "serial", "cgAnimation"].includes(kind);
 }
 export function isAdvertisingKind(kind: string | undefined) {
   return kind === "adfilm" || kind === "brandFilm";

@@ -9,7 +9,7 @@ import { ensureReferenceCrop } from "./referenceCrop.ts";
 import { validateActionTimeline, validateMusicVideoTiming } from "./schema.ts";
 import type { ShotInput } from "./schema.ts";
 import { cameraDirectionIssues, creativeDirectionIssues } from "./creativeDirection.ts";
-import { adContext, adShotIssues } from "./adDirection.ts";
+import { adContext, adShotIssues, sequenceKindSchema } from "./adDirection.ts";
 import { checkPair, continuityPlanningIssues } from "./continuity.ts";
 import { characterPerformanceDirection, isStylizedPrompt, photographicVisualBrief, physicalInteractionPlan, stylizedMedium, stylizedVisualBrief } from "@toonflow/tool-media-generation/runtime";
 import { musicSource } from "./music.ts";
@@ -276,7 +276,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }
     if (kind === "video" && extra.startFrameMediaId && !inputs.some((i) => i.role === "START_FRAME")) inputs.unshift({ referenceId: "hero", mediaId: extra.startFrameMediaId, role: "START_FRAME", weight: 1, lockLevel: "LOCK", sent: true });
 
-    if (["story", "serial", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"].includes(s.get("sequences", shot.sequenceId)?.kind ?? "story")) {
+    if (sequenceKindSchema.options.includes(s.get("sequences", shot.sequenceId)?.kind ?? "story")) {
       for (const asset of assets) {
         if (asset.approvalStatus !== "approved") warnings.push(`创作准备未完成：资产「${asset.name}」尚未采用，请先固定设定再生成正式镜头`);
         if (coveredByHero(asset.id) || !["Character", "Creature", "Wardrobe", "Environment", "Product", "Vehicle", "Prop"].includes(asset.type)) continue;

@@ -12,13 +12,13 @@ import { onJobSucceeded } from "./domain/lifecycle.ts";
 import { inc, observe } from "./metrics.ts";
 import { assertSpeechPlan } from "./domain/speechPlanning.ts";
 import { shotFingerprint } from "./domain/realism.ts";
-import { requireModelAccess, assertWorkspaceEditor } from "./auth.ts";
+import { requireModelAccess, assertWorkspaceEditor, modelPermissions } from "./auth.ts";
 import { requireNarrative } from "./domain/narrativeGate.ts";
 
 export type JobSpec = {
     workspaceId: string; projectId: string | null; kind: "image" | "video"; targetType?: string; targetId?: string; modelId: string;
     compiledPrompt: string; negativePrompt?: string; parameters: Record<string, any>; inputRefs: { referenceId: string; mediaId: string | null; role: string; weight: number; sent: boolean }[];
-    seed?: number; createdBy: string; parentJobId?: string; fallbackAllowed?: boolean; idempotencyKey?: string; label?: string;
+    canvasTest?: boolean; seed?: number; createdBy: string; parentJobId?: string; fallbackAllowed?: boolean; idempotencyKey?: string; label?: string;
 };
 
 export function estimate(modelId: string, kind: string, params: Record<string, any>) {
@@ -72,7 +72,10 @@ export function enqueue(spec: JobSpec) {
     const prov = get("SELECT * FROM providers WHERE id=?", model.provider_id)!;
     const pricingParams = prov.id === "workspaceMedia" ? spec.parameters.request ?? spec.parameters : spec.parameters;
     const est = estimate(spec.modelId, spec.kind, pricingParams);
-    if (prov.id === "workspaceMedia" && !isShareDesktop() && (!setting("billingEnabled", false) || est.usd === null || !Number.isFinite(est.usd) || est.usd <= 0 || !Number.isFinite(est.credits) || est.credits <= 0)) throw bad("共享媒体模型须先由管理员开启积分计费并配置有效单价，未提交生成");
+    const canvasTest = spec.canvasTest === true;
+    if (canvasTest && !(prov.id === "workspaceMedia" && spec.kind === "video" && spec.projectId && !spec.targetType && est.usd === null
+        && modelPermissions(spec.createdBy).canManage && pricingParams.purpose === "standalone" && pricingParams.images?.length)) throw bad("仅模型管理员可对未定价的独立参考图视频进行画布试生成");
+    if (prov.id === "workspaceMedia" && !canvasTest && !isShareDesktop() && (!setting("billingEnabled", false) || est.usd === null || !Number.isFinite(est.usd) || est.usd <= 0 || !Number.isFinite(est.credits) || est.credits <= 0)) throw bad("共享媒体模型须先由管理员开启积分计费并配置有效单价，未提交生成");
     const id = ulid();
     const retry = JSON.parse(prov.retry_policy);
     const seed = spec.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -80,7 +83,7 @@ export function enqueue(spec: JobSpec) {
         hold(spec.workspaceId, id, est.credits);
         scoped(spec.workspaceId).insert("generation_jobs", {
             id, project_id: spec.projectId, kind: spec.kind, target_type: spec.targetType ?? null, target_id: spec.targetId ?? null, provider_id: prov.id, model_id: spec.modelId,
-            model_version: model.external_model_id, compiled_prompt: spec.compiledPrompt, parameters: { ...spec.parameters, negativePrompt: spec.negativePrompt, label: spec.label, fallbackAllowed: spec.fallbackAllowed ?? true, excluded: [] },
+            model_version: model.external_model_id, compiled_prompt: spec.compiledPrompt, parameters: { ...spec.parameters, canvasTest: canvasTest || undefined, negativePrompt: spec.negativePrompt, label: spec.label, fallbackAllowed: spec.fallbackAllowed ?? true, excluded: [] },
             input_refs: spec.inputRefs, seed, status: "QUEUED", attempts: 0, max_attempts: retry.maxAttempts ?? 2, run_after: now(), estimated_cost: est.usd, held: est.credits, parent_job_id: spec.parentJobId ?? null, fallback_chain: [spec.modelId], created_by: spec.createdBy,
         });
         const out = jobView(scoped(spec.workspaceId).get("generation_jobs", id)!);
@@ -217,10 +220,11 @@ async function execute(jobId: string) {
             if (active?.provider_id !== job.providerId || active?.model_status !== "active" || active?.provider_status !== "active" || job.projectId && !s.get("projects", job.projectId)) throw Object.assign(bad("项目或模型已停用或改变"), { retryable: false, fallbackAllowed: false });
         };
         if (submitting) authorizeSubmission();
+        if (submitting && job.parameters?.canvasTest && !modelPermissions(job.createdBy).canManage) throw Object.assign(bad("画布试生成权限已失效"), { retryable: false, fallbackAllowed: false });
         if (adapter.requiresKey && !cred) throw Object.assign(new Error("no credential for provider"), { retryable: false });
         const apiKey = cred ? secretOf(cred) : undefined;
         const p = job.parameters ?? {};
-        if (job.providerId === "workspaceMedia" && !isShareDesktop() && !p.remoteTask && !(job.held > 0)) throw Object.assign(bad("此任务没有预占生成额度，请配置计费后重新创建"), { retryable: false, fallbackAllowed: false });
+        if (job.providerId === "workspaceMedia" && !isShareDesktop() && !p.canvasTest && !p.remoteTask && !(job.held > 0)) throw Object.assign(bad("此任务没有预占生成额度，请配置计费后重新创建"), { retryable: false, fallbackAllowed: false });
         let narrativeUnchanged: (() => Promise<void>) | undefined;
         if (job.projectId && (job.kind === "video" || job.targetType === "shot") && !raw.provider_task_id && (!p.remoteTask || ["failed", "rejected"].includes(p.remoteTask.status))) {
             try {
@@ -432,6 +436,6 @@ export function retryJob(workspaceId: string, id: string, actor: string) {
     }
     if (o.parameters?.remoteTask && !["failed", "rejected"].includes(o.parameters.remoteTask.status)) throw conflict("供应商结果尚未核清或已完成，请先查询并恢复原任务，不得重复提交", "remote_result_unresolved");
     const { negativePrompt, label, remoteTask, ...rest } = o.parameters ?? {};
-    return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label, idempotencyKey: `retry:${o.id}` });
+    return enqueue({ workspaceId, projectId: o.projectId, kind: o.kind, targetType: o.targetType, targetId: o.targetId, modelId: o.fallbackChain?.[0] ?? o.modelId, compiledPrompt: o.compiledPrompt, negativePrompt, parameters: rest, canvasTest: o.parameters?.canvasTest === true, inputRefs: o.inputRefs ?? [], seed: o.seed, createdBy: actor, parentJobId: o.id, fallbackAllowed: o.parameters?.fallbackAllowed !== false, label, idempotencyKey: `retry:${o.id}` });
 }
 void setting; void conflict;

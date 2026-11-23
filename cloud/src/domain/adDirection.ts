@@ -6,7 +6,7 @@ import { advertisingSchema } from "./schema.ts";
 import { mediaAspectIssue } from "./qualityInspection.ts";
 
 const text = z.string().trim().min(1).max(2000);
-export const sequenceKindSchema = z.enum(["story", "serial", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"]);
+export const sequenceKindSchema = z.enum(["story", "serial", "cgAnimation", "adfilm", "brandFilm", "shortDramaCommerce", "musicFilm"]);
 export const adDirectionSchema = z.object({
   concept: text, audienceFeeling: text, productRole: text, brandRecall: text,
   referenceIds: z.array(z.string().min(1)).max(12).default([]),

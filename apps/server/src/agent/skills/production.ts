@@ -98,16 +98,17 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     { name: "cinema", path: "references/screenCombat.md", match: /打斗|打戏|武戏|武打|对打|斗法|对决|交锋|格斗|动作戏|武侠动作|fight scene|screen combat/i },
     { name: "workflow", path: "references/methods/characterForgeLibtv.md", match: /选角|试镜|定妆|(?:角色|演员|人物)人选|(?:给我|推荐|比较).{0,8}人选|角色母版|角色锻造|人物母版|表情板|角色板|(?:生成|设计|创建|预设|新建|创作|塑造).{0,12}(?:角色|演员|人物)|(?:人物|角色).{0,8}(?:创作|三视图|四视图|设计|资产)|全身母版|换母版|character[- ]forge|casting sheet/i },
   ].filter(method => method.match.test(topicText)).map(({ name, path }) => ({ name, path }));
+  const sequenceKinds = new Set(projectId ? api!.scoped(tenant!.workspaceId).list("sequences", { projectId }).map(item => item.kind).filter(Boolean) : []);
+  const savedKind = project.version > 0 ? project.brief.kind : sequenceKinds.size === 1 ? [...sequenceKinds][0] : project.brief.kind;
+  const cgAnimation = savedKind === "cgAnimation";
   // ACT: 先读取已保存的制作上下文再判断入口，避免“再快一点”等续作指令在专项路由前被漏掉。
-  if (!explicitNames.length && !music && !advertising && !story && !shortDrama && !selectedTopics.length && !specialties.length && !/视频|短片|漫剧|影调|改光|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
+  if (!explicitNames.length && !music && !advertising && !story && !shortDrama && !cgAnimation && !selectedTopics.length && !specialties.length && !/视频|短片|漫剧|影调|改光|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
   if (!canReadSkills(tools)) {
     return "## 制作技能状态\n本轮技能正文读取未开启，未自动加载制作技能；不能声称已使用。";
   }
-  const sequenceKinds = new Set(projectId ? api!.scoped(tenant!.workspaceId).list("sequences", { projectId }).map(item => item.kind).filter(Boolean) : []);
-  const savedKind = project.version > 0 ? project.brief.kind : sequenceKinds.size === 1 ? [...sequenceKinds][0] : project.brief.kind;
   const shortDramaCommerce = savedKind === "shortDramaCommerce";
   // ACT: MV 内讨论剧情或说“不要故事”仍是 MV；明确指定 story 技能才切回故事入口。
-  const kind = shortDramaCommerce || shortDrama || isAdvertisingKind(savedKind) ? savedKind : music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
+  const kind = cgAnimation || shortDramaCommerce || shortDrama || isAdvertisingKind(savedKind) ? savedKind : music ? "musicFilm" : advertising ? "adfilm" : story && (savedKind !== "musicFilm" || explicitNames.includes("story")) ? "story"
     : savedKind;
   const primary = shortDramaCommerce ? "workflow" : kind === "musicFilm" ? "musicfilm" : ["adfilm", "brandFilm"].includes(kind) ? "adfilm" : "story";
   const intentText = explicitNames.length || /图片|图像|生图|视频|短片|分镜|剧本|五板块/.test(task) ? task : topicText;
@@ -116,7 +117,8 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const standalonePrompt = explicitNames.includes("videoPromptDirector") || /五板块|视频提示词|视频节点|生成段/.test(intentText);
   // ACT: 仅对明确的文字创作收窄上下文；按分句排除否定要求，复杂或不明意图仍沿用制作流程。
   const taskIntent = task.split(/[，,。；;\n]/).filter(part => !/^(?:请)?(?:不要|不用|无需|不必|不|勿)/.test(part.trim())).join("\n");
-  const storyOnly = (story || shortDramaCommerce) && (commercialProject || ["story", "workflow"].includes(primary)) && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
+  const cgVisualTask = cgAnimation && /出图|系列图|角色系列|景别|定稿图|分段版|生图提示词|电影质感|角色锚点|银黑|midjourney|seedance/i.test(taskIntent);
+  const storyOnly = !cgVisualTask && (story || shortDramaCommerce) && (commercialProject || ["story", "workflow"].includes(primary)) && !pendingShots.length && !imagePrompt && !scriptPrompt && !standalonePrompt
     && !/视频|分镜|镜头|关键帧|运镜|拍摄|预演|成片|制片|拆解|场次表|资产|定妆|三视图|出图|生图|剪辑/.test(taskIntent);
   // ACT: 采用稿已存在且本轮只拆分镜时，不重复加载编剧、资产生产与生成协议；不明确的续作仍走原流程。
   const storyboardOnly = !!project.approvedId && !explicitNames.length && /分镜/.test(taskIntent)
@@ -151,6 +153,10 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     for (let index = names.length - 1; index >= 0; index--) if (["story", "adfilm", "musicfilm"].includes(names[index]!)) names.splice(index, 1);
     if (!names.includes("workflow")) names.push("workflow");
   }
+  if (cgAnimation && !storyOnly) specialties.push(
+    { name: "cinema", path: "references/cinematicCg.md" },
+    { name: "cinema", path: "references/cinematicCgPrompts.md" },
+  );
   const videoModel = names.includes("workflow") || names.includes("gavenScriptToVideo") ? await selectedVideoSkillModel() : undefined;
   if (names.includes("gavenScriptToVideo") && videoModel?.seedance && !names.includes("workflow")) names.push("workflow");
   const context = createSkillContext(cwd);

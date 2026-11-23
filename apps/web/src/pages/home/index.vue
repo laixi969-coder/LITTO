@@ -293,6 +293,7 @@ import {
   IconLayoutGrid,
   IconUsers,
   IconMovie,
+  IconCube,
   IconDeviceTv,
   IconSpeakerphone,
   IconShoppingBag,
@@ -530,7 +531,7 @@ async function createProject(fromPrompt = true, message = prompt.value, attachme
             .split(/\n/)[0]
             ?.slice(0, 24)
         : "";
-      path = (await axios.post<{ data: { directory: string } }>("/api/workspaces/createProject", { name: title })).data.data.directory;
+      path = (await axios.post<{ data: { directory: string } }>("/api/workspaces/createProject", { name: title, kind: storyBrief?.kind })).data.data.directory;
     } else if (!fromPrompt) {
       const confirmed = await ElMessageBox.confirm("请选择一个空文件夹作为项目目录，画布和素材将保存在其中。", "添加项目", {
         confirmButtonText: "选择空文件夹",
@@ -612,6 +613,7 @@ const briefVisible = ref(false);
 const creationLanes = [
   { kind: "story", promptPrefix: "/skill:story", icon: IconMovie, title: "剧情片", desc: "从一句想法出发，打磨故事、剧本与镜头。", label: "故事想法", placeholder: "主角是谁？发生了什么？" },
   { kind: "serial", promptPrefix: "请创作一部连载短剧。", icon: IconDeviceTv, title: "短剧", desc: "构思贯穿全剧的冲突，写出每集的转折与悬念。", label: "短剧想法", placeholder: "主角想争取什么？也可以写下计划集数和每集时长。" },
+  { kind: "cgAnimation", promptPrefix: "请创作一部 CG 动画。", icon: IconCube, title: "CG 动画", desc: "从故事或参考图出发，设计角色、场景和动画镜头。", label: "动画想法", placeholder: "想让谁动起来？可以描述一个动作、一段故事，或上传参考图。" },
   { kind: "creative", promptPrefix: "/skill:adfilm", icon: IconSpeakerphone, title: "商业广告", desc: "围绕产品与受众，把卖点拍清楚。", label: "产品与卖点", placeholder: "要介绍什么产品？最想让人记住什么？" },
   { kind: "shortDramaCommerce", promptPrefix: "/skill:workflow", icon: IconShoppingBag, title: "短剧广告（带货）", desc: "用钩子与反转留住观众，让商品顺着剧情出现。", label: "商品与剧情想法", placeholder: "想带什么商品？有哪些卖点，想拍怎样的冲突或反转？" },
   { kind: "musicFilm", promptPrefix: "/skill:musicfilm", icon: IconMusic, title: "MV", desc: "从歌曲与歌词出发，理解情绪，再设计影像。", label: "歌曲与想法（选填）", placeholder: "上传歌曲或歌词，补充你想要的情绪与画面感觉。也可以直接粘贴歌词。" },
@@ -707,6 +709,7 @@ async function startBrief() {
   const defaultSubjects: Record<LaneKind, string> = {
     story: "根据上传的故事资料与参考素材创作故事",
     serial: "根据上传的故事资料与参考素材构思分集短剧",
+    cgAnimation: "根据上传的故事与视觉参考创作 CG 动画",
     creative: "根据上传的产品、品牌与参考资料创作广告",
     shortDramaCommerce: "根据上传的商品与参考素材创作短剧带货视频",
     musicFilm: "根据上传的歌曲与歌词创作 MV",

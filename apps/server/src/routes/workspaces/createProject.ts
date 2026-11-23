@@ -2,6 +2,7 @@ import { Router } from "express";
 import { mkdir, realpath } from "@toonflow/file";
 import { join } from "node:path";
 import { z } from "zod";
+import { storyBriefSchema } from "@toonflow/tool-scene-list/storyProject";
 import { validateFields } from "@/lib/middleware";
 import { error, success } from "@/lib/responseFormat";
 import u from "@/utils";
@@ -10,7 +11,7 @@ import { workspacesRoot } from "@/utils/tenant";
 const router = Router();
 
 /** Accounts mode: users never pick folders. A project is a sub-directory of the caller's own workspace root, created here. */
-export default router.post("/", validateFields({ name: z.string().max(80).optional() }), async (req, res) => {
+export default router.post("/", validateFields({ name: z.string().max(80).optional(), kind: storyBriefSchema.shape.kind.optional() }), async (req, res) => {
   const root = workspacesRoot();
   await mkdir(root, { recursive: true });
   const base = (req.body.name ?? "").replace(/[\\/:*?"<>|\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40) || "未命名项目";
@@ -19,7 +20,7 @@ export default router.post("/", validateFields({ name: z.string().max(80).option
     try {
       await mkdir(directory, { recursive: false });
       const normalized = await realpath(directory);
-      return res.json(success({ directory: normalized, projectId: u.mediaJobs.workspaceProject(normalized), name: n ? `${base} ${n + 1}` : base }));
+      return res.json(success({ directory: normalized, projectId: u.mediaJobs.workspaceProject(normalized, true, req.body.kind === "cgAnimation" ? "CG 动画" : undefined), name: n ? `${base} ${n + 1}` : base }));
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     }

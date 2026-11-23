@@ -222,9 +222,11 @@ async function resolveSkinFinish(cwd: string, isAsset: boolean, override?: strin
 
 export default Router().post("/", validateFields({
   requestId: z.string().uuid().optional(), directory: z.string().min(1).max(4096), mediaType: z.enum(["image", "video", "audio"]),
+  canvasTest: z.boolean().optional(),
   cast: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
 }), async (req, res) => {
-  const { directory, mediaType, requestId, continueFrom, styleReference, cast, skinFinish, ...raw } = req.body;
+  const { directory, mediaType, requestId, canvasTest, continueFrom, styleReference, cast, skinFinish, ...raw } = req.body;
+  if (canvasTest && (!authEnabled() || mediaType !== "video" || raw.purpose !== "standalone" || raw.shotId)) return res.status(400).json(error("画布试生成仅用于独立视频节点", null, 400));
   const cwd = await u.workspace.resolveWorkspace(req, directory);
   let request: Record<string, unknown> = { ...raw };
   const plan = raw.storyboard === undefined ? undefined : videoStoryboardSchema.safeParse(raw.storyboard);
@@ -309,7 +311,7 @@ export default Router().post("/", validateFields({
     return;
   }
   if (authEnabled() && mediaType !== "audio") {
-    const job = await u.mediaJobs.enqueueMedia(cwd, mediaType, parsed.data, requestId ?? crypto.randomUUID());
+    const job = await u.mediaJobs.enqueueMedia(cwd, mediaType, parsed.data, requestId ?? crypto.randomUUID(), canvasTest);
     return res.status(202).json(success({ jobId: job.id }));
   }
   const controller = new AbortController();

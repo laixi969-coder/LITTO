@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createAgentModel } from "@/agent/runtime/model";
 import { recordTextUsage } from "@/utils/usage";
-import { storyFrameworkReady, storyExpansionLabels, type StoryProject } from "@toonflow/tool-scene-list/storyProject";
+import { storyFrameworkReady, usesStoryFramework, storyExpansionLabels, type StoryProject } from "@toonflow/tool-scene-list/storyProject";
 import { assertModelSelection } from "@/utils/modelSelection";
 import { musicDraftSchema, repairMusicScenes, musicCapacityIssues, renderMusicDraft, reviewMusicExecution } from "@/utils/story/musicExecution";
 
@@ -245,7 +245,7 @@ export function createStoryWriter(providerId: string, modelId: string, loadInstr
     async execute(_id, params, signal) {
       const input = inputSchema.parse(params);
       const project = await readProject?.();
-      const staged = project && ["story", "serial"].includes(project.brief.kind) && (!project.revisions.length || project.frameworks.length > 0);
+      const staged = project && usesStoryFramework(project.brief.kind) && (!project.revisions.length || project.frameworks.length > 0);
       if (staged) {
         if (!storyFrameworkReady(project)) throw new Error("先用 updateStoryProject 保存 framework，再调用 requestStoryDecision(confirmFramework) 等待用户确认；尚未确认，不能展开正文");
         if (project.frameworkApproval!.step !== "draft") throw new Error(`本次只授权${storyExpansionLabels[project.frameworkApproval!.step]}，请按范围创作并用 expansion 保存，不调用完整正文写作器`);

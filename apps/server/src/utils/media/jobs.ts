@@ -90,7 +90,7 @@ export async function optimizeCompiledPrompt(directory: string, sections: Record
   catch (cause) { throw new Error(`自动精简失败：${cause instanceof Error ? cause.message : String(cause)}。请精简镜头规格或拆分镜头；未提交生成。`); }
 }
 
-export function workspaceProject(directory: string, create = true) {
+export function workspaceProject(directory: string, create = true, medium?: string) {
   const tenant = currentTenant();
   const api = cloud();
   if (!tenant || !api) return undefined;
@@ -104,10 +104,10 @@ export function workspaceProject(directory: string, create = true) {
   const link = links[0];
   if (link) return link.project_id as string;
   if (tenant.role === "VIEWER" || !create) return undefined;
-  return api.linkWorkspaceProject(tenant.workspaceId, directory, basename(directory));
+  return api.linkWorkspaceProject(tenant.workspaceId, directory, basename(directory), medium);
 }
 
-export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string) {
+export async function enqueueMedia(directory: string, kind: "image" | "video", request: MediaGenerationRequest, requestId: string, canvasTest = false) {
   if (request.purpose === "storyboard" && (kind !== "image" || request.shotId)) throw Object.assign(new Error("多格总览仅用于分镜规划，不绑定正式 shotId；正式镜头请独立生成高清关键帧"), { status: 400 });
   if (request.localRepair && (!request.shotId || kind !== "image")) throw Object.assign(new Error("精修须提供图像镜头 shotId"), { status: 400 });
   if (request.candidateDirection && (!request.shotId || kind !== "image" || request.localRepair)) throw Object.assign(new Error("系列变体仅支持普通镜头关键帧，不能与局部修改同时使用"), { status: 400 });
@@ -186,6 +186,7 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
   return api.enqueueWorkspaceMedia({
     workspaceId: tenant.workspaceId,
     userId: tenant.userId,
+    canvasTest,
     projectId,
     directory,
     kind,

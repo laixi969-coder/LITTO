@@ -17,6 +17,7 @@ export type NodeAiModel = {
 };
 export type NodeMediaModel = Omit<MediaModel, "mode"> & {
   mode?: (string | string[])[];
+  canTestUnpriced?: boolean;
 };
 export type NodeImageRequest = {
   visualModifiers?: MediaGenerationRequest["visualModifiers"];
@@ -35,7 +36,7 @@ export type NodeImageRequest = {
   quality?: string;
 };
 export type NodeImageResult = { path: string; mimeType: string; mediaType: "image" };
-export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { directory: string; outputDirectory: string };
+export type NodeVideoRequest = Omit<MediaGenerationRequest, "size"> & { canvasTest?: boolean; directory: string; outputDirectory: string };
 export type NodeAudioRequest = MediaGenerationRequest & { directory: string };
 export type NodeVideoResult = { path: string; mimeType: string; mediaType: "video" };
 export type NodeAiRequest = {

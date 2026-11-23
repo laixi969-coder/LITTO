@@ -70,6 +70,7 @@
             :disabled="generating || deleting || !selectedModel" />
           <promptTools :text="data.prompt" mediaType="video" :request="generationInput" :preview="workshopBasePrompt" :disabled="generating || deleting || uploading" @append="promptEditor?.appendText($event)" @replace="promptEditor?.replaceText($event)" @expand="promptEditor?.expand()" @busy="toolsBusy = $event" />
           <storyboardEditor :count="data.storyboard?.shots.length" :duration="data.duration" :production="!!data.production" :disabled="editing || generating || deleting || uploading || toolsBusy" :references="storyboard.mentions.value" :load="storyboard.load" :save="saveStoryboard" :clear="!data.production && data.storyboard ? clearStoryboard : undefined" :validate="storyboard.validate" :preview="storyboard.textPreview" @busy="storyboardBusy = $event" />
+          <el-button v-if="selectedModel?.canTestUnpriced && !data.production && !editing && !frameMode && mediaCounts.image" :disabled="generating || deleting || uploading || toolsBusy || storyboardBusy || !generationPrompt" title="仅管理员测试，供应商照常计费" @click="startGeneration(true, true).catch(error => showNodeError(error, '试生成失败'))">试生成</el-button>
           <el-button
             class="sendButton"
             :icon="generating ? IconPlayerStop : IconArrowUp"
@@ -290,7 +291,7 @@ function loadModels() {
   return modelsRequest;
 }
 
-async function startGeneration(manual = false) {
+async function startGeneration(manual = false, canvasTest = false) {
   if (toolsBusy.value || storyboardBusy.value) throw new Error("请先结束提示词编辑或分镜保存");
   const choice = selectedModel.value;
   if (generating.value) throw new Error("视频正在生成，请等待完成");
@@ -311,6 +312,10 @@ async function startGeneration(manual = false) {
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   const input = generationInput(manual);
+  if (canvasTest) {
+    input.canvasTest = true;
+    input.purpose = "standalone";
+  }
   generationController = controller;
   data.value.generationPending = true;
   data.value.generationJobId = undefined;

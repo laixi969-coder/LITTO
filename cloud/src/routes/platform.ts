@@ -196,10 +196,10 @@ platform.post("/projects", async (c) => {
     au("project.create", p.id);
     return c.json(p, 201);
 });
-export function createProject(s: ReturnType<typeof scoped>, name: string) {
+export function createProject(s: ReturnType<typeof scoped>, name: string, medium = PROJECT_DEFAULTS.world.realism) {
     return tx(() => {
       const p = s.insert("projects", { name, status: "active", updated_at: now() });
-      s.insert("worlds", { project_id: p.id, data: { era: "", locationLogic: "", architecture: "", culture: "", weather: "", time: "", material: "", physics: "real-world", realism: "photographic", environmentalConstraints: [] }, updated_at: now() });
+      s.insert("worlds", { project_id: p.id, data: { era: "", locationLogic: "", architecture: "", culture: "", weather: "", time: "", material: "", physics: "real-world", realism: medium, environmentalConstraints: [] }, updated_at: now() });
       s.insert("looks", { project_id: p.id, scope: "project", data: { contrast: "", saturation: "", palette: [], skinTone: "", blackLevel: "", highlightRolloff: "", shadowBehavior: "", grain: "", halation: "", bloom: "", lensCharacter: "", texture: "", sharpnessPhilosophy: "", colorReferenceIds: [] }, updated_at: now() });
       return p;
     });

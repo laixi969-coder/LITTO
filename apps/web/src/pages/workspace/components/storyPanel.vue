@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" :title="isShortDrama(project.brief) ? '短剧工作台' : project.brief.kind === 'shortDramaCommerce' ? '短剧广告工作台' : '故事工作台'" size="min(1120px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
+  <el-drawer v-model="visible" :title="isShortDrama(project.brief) ? '短剧工作台' : project.brief.kind === 'shortDramaCommerce' ? '短剧广告工作台' : project.brief.kind === 'cgAnimation' ? 'CG 动画工作台' : '故事工作台'" size="min(1120px, 100vw)" :beforeClose="closePanel" :destroyOnClose="false">
     <div class="storyPanel" :aria-busy="busy || childBusy">
       <p v-if="error" class="errorMessage" role="alert">{{ error }}</p><p v-if="message" role="status">{{ message }}</p>
       <div class="toolbar">
@@ -43,7 +43,7 @@
           </article>
         </template>
         <template v-if="section === 'directions'">
-          <template v-if="['story', 'serial'].includes(brief.kind)">
+          <template v-if="usesStoryFramework(brief.kind)">
             <p>先看故事框架，确认后再展开你选定的部分。</p>
             <el-button :disabled="modelUnavailable || !brief.idea.trim() && !project.sources.length" @click="runWithModel(() => generate('framework'))">{{ framework ? '重新构思框架' : '生成故事框架' }}</el-button>
             <article v-if="framework">
@@ -64,7 +64,7 @@
           <p>比较少量真正不同的创意方向，选定后再发展为完整故事。已有定稿可在剧本页直接导入。</p>
           <el-button :disabled="modelUnavailable || !brief.idea.trim() && !project.sources.length" @click="runWithModel(() => generate('directions'))">生成 2–3 个创意方向</el-button>
           <article v-for="direction in project.directions" :key="direction.id"><h3>{{ direction.title }}</h3><p>{{ direction.premise }}</p><p>观众为什么在意：{{ direction.audienceReason }}</p><p>代表性场面：{{ direction.signatureScene }}</p><p>制作难点：{{ direction.risk }}</p><el-button :disabled="project.directionId === direction.id" @click="run(() => apply({ type: 'chooseDirection', id: direction.id }))">{{ project.directionId === direction.id ? '已采用此方向' : '采用此方向' }}</el-button></article>
-          <el-button v-if="!['story', 'serial'].includes(brief.kind)" :disabled="!project.directionId || modelUnavailable" @click="runWithModel(() => generate('draft'))">按选定方向写剧本</el-button>
+          <el-button v-if="!usesStoryFramework(brief.kind)" :disabled="!project.directionId || modelUnavailable" @click="runWithModel(() => generate('draft'))">按选定方向写剧本</el-button>
           </details>
         </template>
         <template v-if="section === 'script' || section === 'preview'">
@@ -169,7 +169,7 @@ import { createSourceAttachments } from "@/components/agent/sourceAttachments";
 import attachmentPreview from "@/components/agent/attachmentPreview.vue";
 import storyPreview from "./storyPreview.vue";
 import storyFeedback from "./storyFeedback.vue";
-import { isShortDrama, storyFrameworkBasis, storyFrameworkReady, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
+import { isShortDrama, storyFrameworkBasis, storyFrameworkReady, usesStoryFramework, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
 import visualReferenceBoard from "./visualReferenceBoard.vue";
 
 const props = defineProps<{ directory: string }>();
@@ -218,7 +218,7 @@ const previewRef = ref<InstanceType<typeof storyPreview>>(), feedbackRef = ref<I
 let controller: AbortController | undefined;
 const tabs = [{ id: "sources", label: "目标与资料" }, { id: "directions", label: "框架与展开" }, { id: "script", label: "剧本与审稿" }, { id: "visual", label: "视觉参考" }, { id: "preview", label: "动态分镜" }, { id: "feedback", label: "发布反馈" }];
 const selectedModel = computed(() => models.value.find(item => JSON.stringify([item.providerId, item.modelId]) === modelKey.value));
-const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "shortDramaCommerce", label: "短剧广告（带货）" }, { value: "musicFilm", label: "音乐影像" }];
+const kinds = [{ value: "story", label: "故事短片" }, { value: "serial", label: "连载短剧 / 中剧" }, { value: "cgAnimation", label: "CG 动画" }, { value: "adfilm", label: "效果广告" }, { value: "brandFilm", label: "品牌片" }, { value: "shortDramaCommerce", label: "短剧广告（带货）" }, { value: "musicFilm", label: "音乐影像" }];
 const briefFields = [{ key: "idea", label: "想法 / 创作需求" }, { key: "audience", label: "谁会看 / 在什么情境下看" }, { key: "channel", label: "观看渠道" }, { key: "intent", label: "希望观众感受什么或做什么" }, { key: "genre", label: "类型" }, { key: "tone", label: "语气与风格" }, { key: "ending", label: "结尾选择" }, { key: "constraints", label: "不可改变的内容与制作预算 / 限制" }] as const;
 const sceneFields = [{ key: "goal", label: "人物目标" }, { key: "obstacle", label: "阻碍" }, { key: "change", label: "此场改变了什么" }, { key: "knowledge", label: "人物与观众分别知道什么" }, { key: "speech", label: "实际对白 / 旁白（不含角色名与表演说明）" }] as const;
 const issueLabels = { contradiction: "明确矛盾", comprehension: "理解风险", taste: "审美建议" };
@@ -356,7 +356,7 @@ async function generate(type: "framework" | "directions" | "draft" | "review" | 
   await saveBrief();
   if (draftDirty.value) await saveDraft();
   const id = revisionId.value;
-  if (type === "draft" && ["story", "serial"].includes(project.value.brief.kind) && (!frameworkReady.value || project.value.frameworkApproval?.step !== "draft")) throw new Error("请先确认框架并选择展开完整正文");
+  if (type === "draft" && usesStoryFramework(project.value.brief.kind) && (!frameworkReady.value || project.value.frameworkApproval?.step !== "draft")) throw new Error("请先确认框架并选择展开完整正文");
   const instructions = {
     framework: `只构思一份可审阅故事框架，不写完整正文。value 包含 title、format、content；content 依次交代一句话故事、人物与锁定事实、${isShortDrama(project.value.brief) ? "全剧主线与分集走向" : "主要段落或三幕"}、伏笔与揭示、结尾。沿用用户指定形式与已选方向，未指定篇幅不自定长剧。`,
     directions: "生成 2–3 个真正不同的方向。资料未读部分明确标未知，信息不足时给假设，不要求用户填写专业参数。",

@@ -7,7 +7,7 @@ import { cloud } from "@/lib/cloud";
 import { listProjectCharacters } from "@/utils/media/projectCast";
 import type { QuestionContext } from "@toonflow/tools-scaffold/runtime";
 import { inspectStoryLogic } from "@toonflow/tool-scene-list/storyLogic";
-import { storyFrameworkBasis, storyFrameworkReady, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
+import { storyFrameworkBasis, storyFrameworkReady, usesStoryFramework, storyExpansionLabels } from "@toonflow/tool-scene-list/storyProject";
 
 const fileName = "storyProject.json";
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }
@@ -162,7 +162,7 @@ export async function applyStoryAction(directory: string, expectedVersion: numbe
     const now = new Date().toISOString();
     const getRevision = (id: string) => project.revisions.find(item => item.id === id) ?? fail("故事版本不存在");
     const addDraft = async (value: Parameters<typeof validateStoryDraft>[0], parentId?: string) => {
-      if (!human && ["story", "serial"].includes(project.brief.kind) && !project.revisions.length && !storyFrameworkReady(project)) fail("请先保存并确认故事框架，再展开正文", 409);
+      if (!human && usesStoryFramework(project.brief.kind) && !project.revisions.length && !storyFrameworkReady(project)) fail("请先保存并确认故事框架，再展开正文", 409);
       if (project.frameworks.length && !storyFrameworkReady(project)) fail("请先确认当前故事框架，再保存展开稿", 409);
       if (!human && project.frameworks.length && project.frameworkApproval?.step !== "draft") fail("用户尚未选择展开完整正文，请只保存已授权范围的 expansion", 409);
       try { validateStoryDraft(value, project.brief); }

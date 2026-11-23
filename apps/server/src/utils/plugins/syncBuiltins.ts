@@ -72,11 +72,11 @@ export default async function syncBuiltins(target: string, source: string, categ
       hashes[relative] = digest(content);
     }
   }
-  // 原装入口并入父技能后退役；CG 留待动画版块。自定义内容继续保留。
+  // 原装入口并入父技能后退役。自定义内容继续保留。
   if (category === "skills") for (const [name, method, original] of [
     ["characterForge", "workflow/references/methods/characterForgeLibtv.md", "fecaccd85e43d0f252f698305c3746daa7f4af400cb0ab27c6970c461b341596"],
     ["screenCombat", "cinema/references/screenCombat.md", "ea6fd12a368d7b9730321ce99d864db4386dddccbc0d2672b392755e43e97222"],
-    ["cinematicCg", null, "cf34090151419c8c538bb1d44becdaea408d83b5275a905bf12a72b01180b507"],
+    ["cinematicCg", "cinema/references/cinematicCg.md", "cf34090151419c8c538bb1d44becdaea408d83b5275a905bf12a72b01180b507"],
   ] as const) {
     const entry = `${name}/SKILL.md`;
     if (hashes[entry] !== original || method && (!hashes[method] || conflicts.includes(method.split("/")[0]!))) continue;

@@ -67,7 +67,7 @@ const plugin: ToolPlugin = {
       if (!approved || storyStale(project, approved)) rejected(["请先确认采用当前有效剧本"]);
       if (value.storyRevisionId !== approved.id) rejected(["场次表所据版本与当前采用稿不一致，请读取 readStoryProject，按当前采用稿整理场次"]);
       if (JSON.stringify(value.scenes.map(item => item.sceneId)) !== JSON.stringify(approved.scenes.map(item => item.sceneId))) rejected(["场次表须按已采用剧本的顺序保留全部 sceneId"]);
-      if (isShortDrama(project.brief) && value.kind !== "story") rejected(["短剧沿用剧情片场次表，kind 须为 story"]);
+      if ((isShortDrama(project.brief) || project.brief.kind === "cgAnimation") && value.kind !== "story") rejected(["短剧和 CG 动画沿用剧情片场次表，kind 须为 story"]);
       if (project.brief.kind === "shortDramaCommerce" && value.kind !== "shortDramaCommerce") rejected(["短剧带货的场次表 kind 必须为 shortDramaCommerce"]);
       if (project.brief.kind === "musicFilm") {
         if (value.kind !== "musicFilm") rejected(["MV 的场次表 kind 必须为 musicFilm"]);
@@ -113,7 +113,7 @@ const plugin: ToolPlugin = {
         name: "saveSceneList",
         label: "保存场次表",
         executionMode: "sequential",
-        description: "保存剧本的结构化场次表。有故事项目时只依据 approvedId 对应的已采用正文、canon 和 threads，不从旧候选或旧审稿补回已删除的剧情、道具状态和光源。按正文可见动作区分道具递出、被接住和最终带走，人物与持物状态以该场实际结果为准。人物、场景、道具、服装的固定 id 用小写字母开头，只含小写字母和数字，例如 c1、loc1、prop1。分集短剧沿用 kind=story，逐场传已采用的 sceneId，集号由 readSceneList 在 scenes[].story.episodeNumber 返回。服务端校验引用、顺序和体量，保存为新版本，旧版本移入历史。",
+        description: "保存剧本的结构化场次表。有故事项目时只依据 approvedId 对应的已采用正文、canon 和 threads，不从旧候选或旧审稿补回已删除的剧情、道具状态和光源。按正文可见动作区分道具递出、被接住和最终带走，人物与持物状态以该场实际结果为准。人物、场景、道具、服装的固定 id 用小写字母开头，只含小写字母和数字，例如 c1、loc1、prop1。CG 动画与分集短剧沿用 kind=story，逐场传已采用的 sceneId；短剧集号由 readSceneList 在 scenes[].story.episodeNumber 返回。服务端校验引用、顺序和体量，保存为新版本，旧版本移入历史。",
         parameters: z.toJSONSchema(sceneListSchema, { io: "input", target: "draft-07" }),
         async execute(_id, params, signal) {
           signal?.throwIfAborted();
