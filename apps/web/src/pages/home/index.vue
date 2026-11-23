@@ -15,6 +15,7 @@
         </a>
       </nav>
       <div class="railFooter">
+        <el-button tag="a" href="#/pricing" text>套餐与积分</el-button>
         <el-button v-if="canManageModels()" text :icon="IconPlugConnected" @click="openConnectModel()">{{ accounts && !shared ? "API 配置" : "接入模型" }}</el-button>
         <el-badge isDot :hidden="!hasDesktopUpdate"><el-button text :icon="IconSettings" @click="settingsVisible = true">设置</el-button></el-badge>
         <span>好戏，都在里头。</span>

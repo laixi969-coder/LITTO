@@ -49,6 +49,7 @@
       </el-form>
       <p v-if="macDesktop" class="hint"><a href="/desktop/recover-password" target="_blank" rel="noopener">忘记本机密码？</a> 用 Touch ID 或 Mac 登录密码验证身份。也可以在屏幕顶部选择「MILI MILI → 重设本机密码…」。</p>
       <p v-else class="hint">使用已设置的密码登录。验证码登录暂不可用，未设置密码请联系管理员。</p>
+      <p class="hint"><a href="#/pricing">查看套餐与积分</a></p>
     </section>
   </main>
 </template>

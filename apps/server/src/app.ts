@@ -18,7 +18,7 @@ import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 import { readRelayImage } from "@/utils/media/relay";
 
-const autoInstallProviders = ["runningHub.ts", "apiMart.ts", "meta.ts", "agnes.ts", "volcengine.ts", "xingsuan.ts", "elevenLabs.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
+const autoInstallProviders = ["runningHub.ts", "apiMart.ts", "meta.ts", "agnes.ts", "cloudflare.ts", "volcengine.ts", "xingsuan.ts", "elevenLabs.ts", "volcSpeech.ts", "bailian.ts", "kling.ts", "vidu.ts", "atlasCloud.ts", "easyRouter.ts", "gen3c.ts", "tencentWand.ts", "token01.ts"];
 
 export function firstDesktopAccount() {
   return cloud()?.firstDesktopAccount();

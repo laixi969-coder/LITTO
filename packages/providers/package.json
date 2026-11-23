@@ -20,6 +20,7 @@
     "./media/runningHub": "./src/media/runningHub.ts",
     "./media/apiMart": "./src/media/apiMart.ts",
     "./media/meta": "./src/media/meta.ts",
+    "./media/cloudflare": "./src/media/cloudflare.ts",
     "./media/agnes": "./src/media/agnes.ts",
     "./media/volcengine": "./src/media/volcengine.ts",
     "./media/xingsuan": "./src/media/xingsuan.ts",

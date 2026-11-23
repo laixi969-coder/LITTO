@@ -22,6 +22,10 @@ const router = createRouter({
       component: () => import("@/pages/home/index.vue"),
     },
     {
+      path: "/pricing",
+      component: () => import("@/pages/pricing/index.vue"),
+    },
+    {
       path: "/admin",
       component: () => import("@/pages/admin/index.vue"),
     },
@@ -35,8 +39,9 @@ const router = createRouter({
     },
   ],
 });
-// Accounts: everything except /login needs a session (unless the server runs in single-user mode).
+// The pricing preview is public. Workspace and administration still require a session.
 router.beforeEach(async (to) => {
+  if (to.path === "/pricing") return true;
   const me = getMe() ?? await loadMe();
   if (isAuthDisabled()) return ["/login", "/admin"].includes(to.path) ? "/home" : true;
   if (to.path === "/login") return me ? "/home" : true;
