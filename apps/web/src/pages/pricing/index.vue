@@ -2,12 +2,18 @@
   <main class="pricingPage">
     <div class="priceSheet">
       <header>
-        <a class="backLink" href="#/home">← 返回工作台</a>
-        <p class="brandName">MILI MILI</p>
-        <h1>选择你的创作套餐</h1>
-        <p>会员方案预览 · 积分按月发放，可在图片与视频模型间通用。订阅待开放。</p>
-        <div class="cycleSwitch" role="group" aria-label="付费周期">
-          <button v-for="(cycle, index) in cycles" :key="cycle.name" type="button" :aria-pressed="cycleIndex === index" @click="cycleIndex = index">{{ cycle.name }}</button>
+        <div class="pageNav">
+          <brandLogo class="pageLogo" />
+          <el-button tag="a" href="#/home" text :icon="IconArrowLeft">返回工作台</el-button>
+        </div>
+        <div class="planIntro">
+          <div>
+            <h1>选择你的创作套餐</h1>
+            <p>会员方案预览 · 积分按月发放，可在图片与视频模型间通用。订阅待开放。</p>
+          </div>
+          <el-radio-group v-model="cycleIndex" aria-label="付费周期">
+            <el-radio-button v-for="(cycle, index) in cycles" :key="cycle.name" :value="index">{{ cycle.name }}</el-radio-button>
+          </el-radio-group>
         </div>
       </header>
       <section class="planGrid" aria-label="会员套餐对比">
@@ -35,18 +41,16 @@
       </section>
       <div class="cardNotes">
         <p>单项上限按同一笔月额度全部用于 {{ lowestImageRate.model }} {{ lowestImageRate.tier }} 或 H3 480p 活动档估算，视频每条 5 秒。</p>
-        <button type="button" :aria-expanded="showBenefits" @click="showBenefits = !showBenefits">{{ showBenefits ? "收起权益 −" : "更多权益 +" }}</button>
+        <el-button text :aria-expanded="showBenefits" @click="showBenefits = !showBenefits">{{ showBenefits ? "收起权益 −" : "更多权益 +" }}</el-button>
       </div>
       <section class="comparison" aria-labelledby="outputTitle">
         <h2 id="outputTitle">各模型每月生成量对比</h2>
         <p>选择你常用的模型，按活动扣分估算各档月额度可生成的张数或条数。</p>
         <div class="filters">
-          <div class="mediaTabs" role="group" aria-label="生成类型">
-            <button v-for="kind in mediaTypes" :key="kind" type="button" :aria-pressed="media === kind" @click="media = kind">{{ kind }}生成</button>
-          </div>
-          <label>查找型号
-            <input v-model.trim="modelSearch[media]" type="search" :placeholder="media === '图像' ? '例如 Seedream 5.5' : '例如 Kling 3.0'" />
-          </label>
+          <el-radio-group v-model="media" aria-label="生成类型">
+            <el-radio-button v-for="kind in mediaTypes" :key="kind" :value="kind">{{ kind }}生成</el-radio-button>
+          </el-radio-group>
+          <el-input v-model="modelSearch[media]" class="modelSearch" type="search" aria-label="查找型号" :prefixIcon="IconSearch" clearable :placeholder="media === '图像' ? '查找型号，如 Seedream 5.5' : '查找型号，如 Kling 3.0'" />
         </div>
         <div class="tableWrap" tabindex="0" aria-label="模型生成量对比表">
           <table>
@@ -76,6 +80,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { IconArrowLeft, IconSearch } from "@tabler/icons-vue";
+import brandLogo from "@/components/brandLogo.vue";
 
 import membershipPlans from "./membershipPlans.json";
 import imageRates from "./imageRates.json";
@@ -139,35 +145,27 @@ function maxSeconds(points: number) {
 
 <style lang="scss" scoped>
 .pricingPage {
-  --paper: #17191b;
-  --line: rgb(198 213 207 / 16%);
-  --muted: #b3b8bc;
-  --accent: #94d5c6;
   height: 100dvh;
   overflow: auto;
-  background: #101214;
-  color: #fafaf8;
-  color-scheme: dark;
+  background: var(--studioPage);
+  color: var(--studioInk);
+  :deep(.el-radio-button) { --el-radio-button-checked-text-color: var(--studioOnAccent); }
   .priceSheet {
     max-width: 1280px;
     margin: auto;
-    padding: 24px clamp(16px, 4vw, 50px) 60px;
-    button, select { font: inherit; cursor: pointer; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-    @media (pointer: coarse) {
-      button, select, input, .backLink { min-height: 44px; }
-    }
-    h2, h3, p { margin: 0; }
+    padding: 0 clamp(16px, 4vw, 50px) 60px;
+    h1, h2, h3, p { margin: 0; }
     header {
-      position: relative; padding: 38px 0 28px; text-align: center;
-      .backLink { position: absolute; top: 0; left: 0; color: var(--muted); }
-      .brandName { font-size: 12px; font-weight: 750; color: var(--accent); letter-spacing: 2px; }
-      h1 { margin: 8px 0; font-size: clamp(32px, 4vw, 48px); line-height: 1.22; }
-      p { color: var(--muted); line-height: 1.6; }
-      .cycleSwitch {
-        display: inline-flex; gap: 4px; margin-top: 20px; padding: 4px; border-radius: 24px; background: #25282b;
-        button { padding: 7px 22px; color: var(--muted); border: 0; border-radius: 20px; background: transparent; }
-        button[aria-pressed="true"] { background: #f1f2ef; color: #151718; font-weight: 700; }
+      .pageNav {
+        min-height: 64px; display: flex; align-items: center; justify-content: space-between;
+        border-bottom: 1px solid var(--studioBorder);
+        .pageLogo { width: 104px; }
+      }
+      .planIntro {
+        padding: clamp(24px, 3vw, 40px) 0 24px;
+        display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px;
+        h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); line-height: 1.2; }
+        p { margin-top: 8px; color: var(--studioMuted); line-height: 1.6; }
       }
     }
     .planGrid {
@@ -176,70 +174,67 @@ function maxSeconds(points: number) {
       @media (max-width: 550px) { grid-template-columns: 1fr; }
       .planCard {
         display: grid; grid-template-rows: subgrid; grid-row: span 6; row-gap: 0;
-        padding: clamp(16px, 1.6vw, 24px); border: 1px solid var(--line); border-radius: 16px; background: var(--paper);
+        padding: clamp(16px, 1.6vw, 24px); border: 1px solid var(--studioBorder); border-radius: var(--ui-radius-large); background: var(--studioSurface);
         font-variant-numeric: tabular-nums;
         @media (max-width: 550px) { display: block; grid-row: auto; }
-        &.featured { border-color: var(--accent); }
+        &.featured { border-color: var(--el-color-primary); box-shadow: var(--studioShadow); }
         > h2 { font-size: 24px; }
         .price {
           display: flex; align-items: baseline; gap: 4px; margin: 20px 0 2px;
           strong { font-size: clamp(28px, 3vw, 43px); line-height: 1.1; font-variant-numeric: tabular-nums; }
-          small { color: var(--muted); }
+          small { color: var(--studioMuted); }
         }
-        .payment { font-size: 13px; color: var(--muted); }
+        .payment { font-size: 13px; color: var(--studioMuted); }
         .allowance {
-          padding: 14px; margin-top: 20px; border-radius: 10px; background: #232629;
-          > span { display: block; color: var(--muted); font-size: 13px; }
-          > strong { font-size: 24px; small { font-size: 13px; } }
+          padding: 14px; margin-top: 20px; border-radius: var(--ui-radius); background: var(--studioInset);
+          > span { display: block; color: var(--studioMuted); font-size: 13px; }
+          > strong { font-size: 24px; small { font-size: .8125rem; } }
           .quotaOptions {
             display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
-            button { background: transparent; color: var(--muted); border: 1px solid #61686d; border-radius: 5px; padding: 2px 7px; font-size: 12px; }
-            button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+            button { background: transparent; color: var(--studioMuted); border: 1px solid var(--el-border-color); border-radius: var(--ui-radius-small); padding: 3px 8px; font: inherit; font-size: .8125rem; cursor: pointer; }
+            button[aria-pressed="true"] { border-color: var(--el-color-primary); color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
           }
         }
         .outputs {
           margin-top: 16px;
           h3 { font-size: 16px; margin-bottom: 8px; }
-          p { display: flex; align-items: baseline; justify-content: space-between; padding: 3px 0; color: var(--muted); strong { color: #edf3ef; font-size: 18px; } }
+          p { display: flex; align-items: baseline; justify-content: space-between; padding: 3px 0; color: var(--studioMuted); strong { color: var(--studioInk); font-size: 18px; } }
         }
         .benefits {
-          padding: 12px 0 0; margin: 14px 0 0; border-top: 1px solid var(--line); list-style: none;
+          padding: 12px 0 0; margin: 14px 0 0; border-top: 1px solid var(--studioBorder); list-style: none;
           li { margin-top: 6px; font-size: 14px; }
-          li::before { content: "✓"; color: var(--accent); margin-right: 8px; }
+          li::before { content: "✓"; color: var(--el-color-primary); margin-right: 8px; }
         }
       }
     }
     .cardNotes {
       margin: 12px 0 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
-      p { font-size: 13px; color: var(--muted); }
-      button { color: var(--accent); padding: 4px 0; background: transparent; border: 0; }
+      p { font-size: 13px; color: var(--studioMuted); }
+
     }
     .comparison {
-      padding: clamp(14px, 3vw, 28px); background: var(--paper); border: 1px solid var(--line); border-radius: 16px;
-      > p { margin: 8px 0; color: var(--muted); line-height: 1.6; }
+      padding: clamp(14px, 3vw, 28px); background: var(--studioSurface); border: 1px solid var(--studioBorder); border-radius: var(--ui-radius-large);
+      > p { margin: 8px 0; color: var(--studioMuted); line-height: 1.6; }
       .filters {
         display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0;
-        label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-        select, input { font: inherit; color: inherit; border-radius: 7px; border: 1px solid var(--line); padding: 7px; background: #232629; }
-        .mediaTabs {
-          display: flex; gap: 2px; padding: 3px; background: #25282b; border-radius: 8px;
-          button { color: inherit; border: 0; padding: 7px 12px; border-radius: 6px; background: transparent; }
-          button[aria-pressed="true"] { background: var(--accent); color: #101c19; }
-        }
+        .modelSearch { width: min(100%, 260px); }
       }
       .tableWrap {
-        overflow-x: auto;
+        overflow-x: auto; border-radius: var(--ui-radius);
         table {
           width: 100%; min-width: 680px; border-collapse: collapse; font-variant-numeric: tabular-nums;
-          th, td { text-align: right; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+          th, td { text-align: right; padding: 10px 8px; border-bottom: 1px solid var(--studioBorder); }
           th:first-child { text-align: left; }
-          thead th { background: #25282b; }
+          thead th { background: var(--studioInset); }
           tbody th { font-weight: 500; }
-          small { display: block; color: var(--muted); font-weight: 400; }
+          small { display: block; color: var(--studioMuted); font-weight: 400; }
         }
       }
     }
-    .topUps { margin-top: 24px; p { color: var(--muted); margin-top: 8px; } }
+    @media (pointer: coarse) {
+      :deep(.el-radio-button__inner), :deep(.el-input__wrapper), :deep(.el-button), .planGrid .planCard .quotaOptions button { min-height: 44px; align-content: center; }
+    }
+    .topUps { margin-top: 24px; p { color: var(--studioMuted); margin-top: 8px; } }
   }
 }
 </style>
