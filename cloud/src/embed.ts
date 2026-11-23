@@ -32,6 +32,7 @@ export { prepareProductionDecision, applyProductionDecision } from "./domain/pro
 export { inspectFinalQuality, finalQualityView, finalReviewPlan, sequenceFingerprint, assertSpeechExport } from "./domain/finalQuality.ts";
 export { shotFingerprint } from "./domain/realism.ts";
 export { continuityPlanningIssues } from "./domain/continuity.ts";
+export { shotLighting, statesOf } from "./domain/state.ts";
 export { assertSpeechPlan, speechPlanningIssues, shotDialogueMode } from "./domain/speechPlanning.ts";
 export { editView, getEdit, nativeDialogueWindows } from "./domain/nle.ts";
 export { cutPairSchema, soundBridgeSchema, suggestCuts, previewCut, soundBridge } from "./domain/cutEditing.ts";

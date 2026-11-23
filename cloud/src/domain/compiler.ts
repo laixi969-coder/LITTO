@@ -1,7 +1,7 @@
 import { bad, notFound, HttpError } from "../util.ts";
 import { all, get, type Row, type Scope } from "../db.ts";
 import { validateVisibleAssets } from "./shots.ts";
-import { statesOf, validateStateDelta, continuityPredecessor } from "./state.ts";
+import { statesOf, validateStateDelta, continuityPredecessor, shotLighting } from "./state.ts";
 import { route, type Policy } from "../providers/router.ts";
 import { modelView } from "../providers/registry.ts";
 import { ensureCropMedia, viewOf } from "./panorama.ts";
@@ -11,7 +11,7 @@ import type { ShotInput } from "./schema.ts";
 import { cameraDirectionIssues, creativeDirectionIssues } from "./creativeDirection.ts";
 import { adContext, adShotIssues } from "./adDirection.ts";
 import { checkPair, continuityPlanningIssues } from "./continuity.ts";
-import { photographicVisualBrief, physicalInteractionPlan } from "@toonflow/tool-media-generation/runtime";
+import { characterPerformanceDirection, isStylizedPrompt, photographicVisualBrief, physicalInteractionPlan, stylizedMedium, stylizedVisualBrief } from "@toonflow/tool-media-generation/runtime";
 import { musicSource } from "./music.ts";
 import { cleanVisualDefaults, characterReferenceUse, effectiveLook, lookReferenceBindings } from "./visualDefaults.ts";
 import { compileTechniqueDirection, techniqueIssues, techniquePlan } from "@toonflow/tool-media-generation/filmTechniques";
@@ -72,14 +72,15 @@ export function compileWorkspacePrompt(s: Scope, projectId: string, prompt: stri
   if (!s.get("projects", projectId)) throw bad("生成项目不存在");
   const world = s.list("worlds", { projectId })[0];
   const look = effectiveLook(s, projectId);
+  const stylized = isStylizedPrompt(prompt, world?.realism);
   return renderCompiledPrompt({
     request: prompt,
     projectVisualContext: purpose === "asset"
       ? `Reusable identity reference. Use a simple background and neutral readable light unless explicitly requested otherwise. Preserve only the chosen medium: ${world?.realism ?? "photographic"}. Do not inherit scene lighting, time of day, dramatic grading or story action.`
       : `Inherit these project defaults unless the request explicitly changes the medium or scene. Do not relocate the requested scene or change its time of day to match a style reference. ${JSON.stringify({ medium: world?.realism, materials: world?.material, look })}`,
-    renderingStandard: kind === "video" ? "保持既定媒介、光源与材质，人物肤面继承参考与本镜明确设计。" : photographicRendering,
-    visualDefaults: kind === "video" ? "保持既定身份、造型和场景维护状态；表情与身体反应服从当前动作和触发，不冻结参考表情。" : cleanVisualDefaults,
-    referenceUse: kind === "video" ? "实际输入只用于指定的身份、首尾帧或动作参考；不复制设定板背景，镜内表演按本镜时序执行。" : characterReferenceUse,
+    renderingStandard: stylized ? stylizedVisualBrief : kind === "video" ? "保持既定媒介、光源与材质，人物肤面继承参考与本镜明确设计。" : photographicRendering,
+    visualDefaults: kind === "video" || stylized ? "保持既定身份、造型和场景维护状态；表情与身体反应服从当前动作和触发，不冻结参考表情。" : cleanVisualDefaults,
+    referenceUse: kind === "video" ? "按实际绑定用途使用身份、首尾帧、动作或定光参考。同场沿用已定光源的空间位置，换机位按当前朝向表现亮面与投影；镜内换光和表演按本镜时序执行。" : characterReferenceUse,
   });
 }
 
@@ -110,6 +111,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     if (techniqueProblems.length) throw bad(techniqueProblems.join("；"));
     const proj = shot.projectId;
     const world = s.list("worlds", { projectId: proj })[0] as any;
+    const stylized = stylizedMedium.test(world?.realism ?? "");
     const look = effectiveLook(s, proj, shot.sequenceId, shotId);
     const projectAssets = new Map(s.list("assets", { projectId: proj }).map(asset => [asset.id, asset]));
     const missingAssets = (shot.assetIds as string[]).filter(id => !projectAssets.has(id));
@@ -285,7 +287,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
       }
     }
 
-    const cam = shot.camera ?? {}, lt = shot.lighting ?? {};
+    const cam = shot.camera ?? {}, lt = shotLighting(shot, state.start.lighting);
     const musicVideo = shot.musicVideo as ShotInput["musicVideo"];
     const executionTimeline = (cam.design?.timeline ?? musicVideo?.timeline ?? []) as NonNullable<NonNullable<ShotInput["camera"]["design"]>["timeline"]>;
     const timed = (key: "lensMm" | "aperture" | "cameraMove" | "foreground" | "background") => kind === "video" && executionTimeline.some(item => item[key] !== undefined && String(item[key]).trim() !== "");
@@ -338,6 +340,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             shot.performance?.eyeline && `eyeline ${shot.performance.eyeline}`,
             shot.performance?.lookTarget && `gaze target: ${shot.performance.lookTarget}; keep the subject's gaze on the specified in-scene target or follow its planned changes, including while showing an object. Look into the lens only if directed.`,
             !shot.performance?.gesture && shot.performance?.emotion && `emotion ${shot.performance.emotion} @ ${shot.performance.intensity}`,
+            assets.some(asset => asset.type === "Character" || asset.type === "Creature") && characterPerformanceDirection,
         ]) : "",
         continuityContext: Object.values(start).some(group => Object.keys(group).length)
             ? `Continuity ledger for present subjects, not additional action instructions. Retain compatible injuries, identity and prop ownership; previous poses or contacts may predate this shot. Follow the explicit starting state and current causal action order; never reinstate completed contact, restore lost power or replay an earlier event to fill speech: ${JSON.stringify(start)}` : "",
@@ -355,11 +358,12 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
         look: J([look.contrast && `contrast ${look.contrast}`, look.saturation && `saturation ${look.saturation}`, look.palette.length > 0 && `palette ${look.palette.join("/")}`, look.skinTone && `skin ${look.skinTone}`, look.blackLevel && `blacks ${look.blackLevel}`, look.highlightRolloff && `highlight roll-off ${look.highlightRolloff}`, look.grain && `grain ${look.grain}`, look.halation && `halation ${look.halation}`, look.lensCharacter && `lens character ${look.lensCharacter}`, look.shadowBehavior && `shadow behavior ${look.shadowBehavior}`, look.bloom && `bloom ${look.bloom}`, look.texture && `material texture ${look.texture}`, look.sharpnessPhilosophy && `sharpness philosophy ${look.sharpnessPhilosophy}`]),
         // Realism stack: concrete behaviours instead of adjectives.
         realism: J(Object.entries(shot.realism ?? {}).filter(([key, value]) => value && (kind === "video" || key !== "motion")).map(([key, value]) => `${key}: ${clean(String(value), `realism.${key}`)}`)),
-        renderingStandard: photographicRendering,
+        renderingStandard: stylized ? stylizedVisualBrief : photographicRendering,
         constraints: J(shot.constraints ?? []),
         physicalContinuity: kind === "video" ? "Keep anatomy and object geometry stable; show contact, weight transfer and the resulting motion at the planned speed." : "",
         opticalTexture: look ? J([look.shadowBehavior && `shadows: ${look.shadowBehavior}`, look.texture && `texture: ${look.texture}`, look.sharpnessPhilosophy && `sharpness: ${look.sharpnessPhilosophy}`, look.bloom && `bloom: ${look.bloom}`]) : "",
-        referenceIntent: J(bindings.filter(b => b.notes).map(b => `${b.referenceId} (${b.role}): ${b.notes}`)),
+        referenceIntent: J([...bindings.filter(b => b.notes).map(b => `${b.referenceId} (${b.role}): ${b.notes}`),
+            ...inputs.filter(input => input.sent && input.role === "LIGHTING").map(input => `${input.referenceId}: use this scene's lighting reference for the world light source and shadow character. Project it from the current viewpoint; follow planned light changes and preserve subject colors.`)]),
         references: textFallback.join("; "),
         lock: freedom.LOCK.join("; "),
         control: freedom.CONTROL.join("; "),
@@ -394,7 +398,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             compactVideoMotion,
         ]);
         sections.allow = J([...(shot.freedomMap?.ALLOW ?? []), ...assets.flatMap(a => (a.allowedVariations ?? []).map((value: string) => `${a.name}: ${value}`))]);
-        sections.renderingStandard = model.limits.workspaceExecution ? "" : photographicRendering;
+        if (model.limits.workspaceExecution && !stylized) sections.renderingStandard = "";
         if (sections.continuityContext) sections.continuityContext = sections.continuityContext.replace(/^.*?: (?=\{)/, "接续状态，遵循本镜起点和动作顺序：");
     }
     let negativePrompt = J(shotAvoid(freedom));
@@ -458,7 +462,8 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             shotConnection: sections.shotConnection,
             performance: sections.performance,
             camera: sections.camera,
-            appearance: J([sections.world, sections.lighting, sections.look, sections.realism, sections.opticalTexture]),
+            lighting: sections.lighting,
+            appearance: J([sections.world, sections.look, sections.realism, sections.opticalTexture]),
             references: J([sections.referenceIntent, sections.references]),
             audio: sections.audio,
             constraints: J([sections.constraints, sections.lock, sections.repair,
@@ -488,7 +493,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
             productRead: shot.advertising?.productRead,
         });
     }
-    sections["Objective" in sections ? "Visual defaults" : "visualDefaults"] = kind === "video" ? "遵循既定状态、光照和妆容，不擅自添加污损、疲态或磨皮。" : cleanVisualDefaults;
+    sections["Objective" in sections ? "Visual defaults" : "visualDefaults"] = kind === "video" || stylized ? "遵循既定状态、光照和妆容，不擅自添加污损、疲态或磨皮。" : cleanVisualDefaults;
     if (inputs.length || assets.some(asset => asset.type === "Character" || asset.type === "Creature")) {
         sections["Objective" in sections ? "Reference roles" : "referenceUse"] = kind === "video" ? "参考仅用于各自指定用途；保持人物身份、服装和体态，表情服从当前动作。" : characterReferenceUse;
     }
@@ -501,7 +506,7 @@ export function compileShot(s: Scope, shotId: string, kind: "image" | "video", m
     }).join("\n");
     if (techniqueDirection) sections["Objective" in sections ? "Selected techniques" : "selectedTechniques"] = techniqueDirection;
     // ACT: 视频规格保留原文，只缩短通用规则；空间不足时由调用方明确报错，不截断内容。
-    if (kind === "video" && model.limits.workspaceExecution) sections["Objective" in sections ? "PHOTOGRAPHICBASELINE" : "photographicBaseline"] = photographicVisualBrief;
+    if (kind === "video" && model.limits.workspaceExecution && !stylized) sections["Objective" in sections ? "PHOTOGRAPHICBASELINE" : "photographicBaseline"] = photographicVisualBrief;
     // 剪辑、声音和叙事仍交各自真实流程，不当作单镜视觉动作；返回待执行项目供导演继续。
     for (const stage of ["edit", "audio", "story"] as const) {
         const planned = techniquePlan(shot, stage);

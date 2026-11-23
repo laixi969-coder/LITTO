@@ -1,3 +1,5 @@
+export { positivePromptText, isStylizedPrompt } from "@toonflow/tool-media-generation/runtime";
+
 const videoPromptTitles = ["故事前提与资产绑定", "画面质感与光影", "镜头与动作时间线", "对白、环境声与BGM", "负面提示词"];
 
 export function isDirectorPrompt(prompt: string) {
@@ -39,14 +41,4 @@ export function inspectVideoPrompt(prompt: string, duration?: number) {
   if (/(不出现|不要|禁止|避免|不得|不能)/.test(timeline)) warnings.push("时间线含否定表达，建议改成可见的正向动作，限制集中到末段");
   if (/@[^\s＝=，。；]+/.test(blocks.get("故事前提与资产绑定") ?? "")) warnings.push("普通 @名称 不能证明已绑定；请核对实际图片、视频或首尾帧输入");
   return { applicable: true, errors, warnings };
-}
-
-/** 只用于风格/做旧启发式判断；原始正文与负面约束仍原样发送。 */
-export function positivePromptText(prompt: string) {
-  const authored = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(prompt)?.[1] ?? prompt;
-  return authored
-    .replace(/^[ \t]*(?:FORBIDDENCHANGES|AVOID)[ \t]*[:：][^\n]*/gim, "")
-    .split(/【(?:负面提示词|负面约束)】|^\s*(?:NEGATIVE(?:PROMPT)?|负面提示词)\s*[:：]/im)[0]!
-    .replace(/(?:没有|无|不带|不留|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得|不能|不靠|不以|不用|非(?=动画|插画|漫画|卡通|二次元|像素|3D|CG|写实|拼图))[^。；;\n]*/g, "")
-    .replace(/\b(?:no|not|without|avoid|remove)\b[^.;\n]*/gi, "");
 }

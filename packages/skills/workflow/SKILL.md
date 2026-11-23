@@ -57,7 +57,7 @@ metadata:
 
 广告与品牌片在生成前读取 [adfilm](../adfilm/SKILL.md) 的真实导演方案流程：保存序列类型和 `adDirection`，参考片用 `analyzeReference` 实际分析，每镜关联 `advertising`，先检查并采用指定视觉样镜再量产。`readAdDirection` 返回是否已定标；产品独立镜头也须有 `creativeBrief`。成片先做 `inspectFinal`，再用 `inspectAdFilm` 比较整片表达、产品和邻镜光色。用户已授权的范围直接继续，不为这些内部步骤要求重复确认。
 
-电影、短片、广告、MV 与独立视频共用同一套视觉设计入口：初次制定或修改视觉方案时，有场景就读取[视觉设计](references/methods/visualDesign.md)，确定配色或布光就读取[色彩与用光](references/methods/colorAndLight.md)，有人物妆发服饰就读取[妆造设计](references/methods/characterStyling.md)；已有适用方案直接继承。广告另外使用 [adfilm](../adfilm/SKILL.md) 的产品展示方法。按本次对象读取，不因不是 MV 就跳过，也不为无人产品图增加人物造型。
+制作各类作品时，按[分场光线与角色表演](../cinema/references/sceneDirection.md)将全片 Look、分场定光与角色动作接到关键帧、视频和审看。电影、短片、广告、MV 与独立视频共用同一套视觉设计入口：初次制定或修改视觉方案时，有场景就读取[视觉设计](references/methods/visualDesign.md)，确定配色或布光就读取[色彩与用光](references/methods/colorAndLight.md)，有人物妆发服饰就读取[妆造设计](references/methods/characterStyling.md)；已有适用方案直接继承。广告另外使用 [adfilm](../adfilm/SKILL.md) 的产品展示方法。按本次对象读取，不因不是 MV 就跳过，也不为无人产品图增加人物造型。
 
 生成前核对最终请求，而不只核对聊天里的方案：场景的空间/陈设/材质/维护状态、资产本色、实际光源、后期色彩、当前妆发服装及参考用途是否相容；不适用项跳过。有 productionSpec 时检查 compile 返回的提示词、参考与降级；普通节点则检查实际节点配置、提示词与输入图片。未经说明的做旧、疲态、湿地、雾尘及与当前时段冲突的影调先移除；用户明确需要的状态保留。只能检查计划与请求是否一致，不能代替生成后的视觉验收。
 

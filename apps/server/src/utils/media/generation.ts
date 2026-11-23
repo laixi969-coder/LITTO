@@ -17,9 +17,9 @@ import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@
 import { blockingLine } from "@/utils/media/blocking";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 import { applyMediaQuality, readMediaAspect } from "@/utils/media/quality";
-import { photographicVisualBrief, skinFinishes, videoMotionTiming, type SkinFinish } from "@toonflow/tool-media-generation/runtime";
+import { characterPerformanceDirection, photographicVisualBrief, skinFinishes, videoMotionTiming, type SkinFinish } from "@toonflow/tool-media-generation/runtime";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
-import { inspectVideoPrompt, isDirectorPrompt, positivePromptText } from "@/utils/media/videoPrompt";
+import { inspectVideoPrompt, isDirectorPrompt, isStylizedPrompt, positivePromptText } from "@/utils/media/videoPrompt";
 import { autoFilmScope } from "@/utils/autoFilm/scope";
 import { readMultiShotCapabilities, assertMultiShotCapability } from "@/utils/media/shotCapabilities";
 
@@ -251,13 +251,13 @@ export function looksLikePersonShot(prompt: string) {
   return /人脸|面容|面部|正脸|肖像|长相|五官|表情|眼神|口型|对白|台词|人物|角色|男主|女主|演员|男人|女人|男子|女子|男性|女性|男孩|女孩|她|他|她们|他们|\bface\b|\bportrait\b|\beyes\b|\bdialogue\b|\bman\b|\bwoman\b|\bhe\b|\bshe\b/i.test(authored);
 }
 
-/** ACT: 仅为已识别的真人视频补执行原则，不凭关键词自动编造动作；具体节拍由导演写入本镜。 */
-export function withHumanPerformance(prompt: string) {
-  const authored = prompt.replace(/PHOTOGRAPHICBASELINE[\s\S]*?\n\n/g, "");
-  if (/^HUMANPERFORMANCE:/m.test(prompt) || !looksLikePersonShot(authored)) return prompt;
-  if (/动画|插画|漫画|卡通|二次元|像素|3D\s*渲染|CG\s*渲染|anime|cartoon|illustration|\brender\b|\bstylized\b/i.test(positivePromptText(authored))) return prompt;
-  const direction = "仅适用于画内真人，既定剧情、动作、时序与有意静止优先。按本镜触发让视线、细微面部变化、头颈与身体任务自然协同，避免只有嘴动而其余身体冻结；不机械摇头、眨眼或添加道具。每句台词与本镜可见行为、语气及停顿同步，听者获得信息后才有相应反应，镜尾承接余波。自然呼吸与重心服务当前姿态，不用持续晃动代替表演；不擅自加台词、切镜或改变音乐。";
-  return `HUMANPERFORMANCE: ${direction}\n${prompt}`;
+/** 独立节点缺少出镜资产表，仅按创作者的描述识别角色。正式镜头由编译器按出镜资产决定。 */
+export function withHumanPerformance(prompt: string, subject = prompt) {
+  const authored = subject.replace(/PHOTOGRAPHICBASELINE[\s\S]*?\n\n/g, "").split(/【(?:对白、环境声与BGM|负面提示词)】/)[0]!
+    .replace(/(?:无|没有|无需|不加|不要)(?:对白|台词|口型)|\bno dialogue\b/gi, "");
+  if (/^HUMANPERFORMANCE:/m.test(prompt) || prompt.includes(characterPerformanceDirection) || !looksLikePersonShot(authored)) return prompt;
+  if (isDirectorPrompt(prompt)) return prompt.replace(/(^[ \t]*【镜头与动作时间线】[ \t\r]*$)/m, `$1\n${characterPerformanceDirection}`);
+  return `HUMANPERFORMANCE: ${characterPerformanceDirection}\n${prompt}`;
 }
 
 /**
@@ -295,7 +295,7 @@ export function withPhotographicBaseline(prompt: string, skinFinish?: SkinFinish
   const finish = skinFinish ?? readSkinFinish(prompt);
   // SKIN 行只是给编译看的指令，不该出现在发给模型的正文里。
   const body = prompt.replace(/^[ \t]*SKIN\s*[:：]\s*(?:clean|natural)[ \t]*\r?\n?/gim, "").trim();
-  if (/动画|插画|漫画|卡通|二次元|像素|3D\s*渲染|CG\s*渲染|anime|cartoon|illustration|\brender\b|\bstylized\b/i.test(positivePromptText(body))) return body;
+  if (isStylizedPrompt(body)) return body;
   // ACT: 五板块只在第二块补默认肤面，不改时间线、资产、声音和既定成像设计。
   if (isDirectorPrompt(body)) {
     if (body.includes(skinFinishes[finish])) return body;
@@ -316,7 +316,8 @@ export function assertPromptPolicy(request: MediaGenerationRequest, mediaType: "
     const directorPrompt = isDirectorPrompt(request.prompt);
     const spec = directorPrompt || request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
     const motionTiming = !request.shotId && !directorPrompt && !/^MOTIONTIMING:/m.test(request.prompt) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
-    const prompt = withPhotographicBaseline(withHumanPerformance([spec, request.prompt, motionTiming].filter(Boolean).join("\n\n")));
+    const authored = [spec, request.prompt, motionTiming].filter(Boolean).join("\n\n");
+    const prompt = withPhotographicBaseline(request.shotId ? authored : withHumanPerformance(authored));
     const actualPrompt = [prompt, request.negativePrompt ? `画面中不得出现：${request.negativePrompt}` : ""].filter(Boolean).join("\n");
     const length = Array.from(actualPrompt).length;
     if (length > 3072) invalid(`腾讯 TokenHub 可灵 V3 提示词为 ${length} 字符，超过 3072 字符上限（建议不超过 2500）。请精简重复的世界、风格和角色描述，优先保留本镜动作、对白、时间线及必要约束；参考图仍按原配置发送。精简后重新编译，不会自动截断或提交生成。`);
@@ -433,7 +434,7 @@ async function generateMediaUnrecorded(
   const spec = directorPrompt || request.prompt.includes("SHOTSPEC:") ? "" : compileShotSpec(request.shotSpec);
   const motionTiming = mediaType === "video" && !request.shotId && !directorPrompt && !/^MOTIONTIMING:/m.test(request.prompt) ? `MOTIONTIMING: ${videoMotionTiming}` : "";
   const authoredPrompt = [spec, request.prompt, motionTiming].filter(Boolean).join("\n\n");
-  const prompt = withPhotographicBaseline(mediaType === "video" ? withHumanPerformance(authoredPrompt) : authoredPrompt);
+  const prompt = withPhotographicBaseline(mediaType === "video" && !request.shotId ? withHumanPerformance(authoredPrompt) : authoredPrompt);
   // ACT: 仅本次请求复用同路径、声明类型及用途的读取，跨次生成重新检查真实文件。
   const referenceReads = new Map<string, ReturnType<typeof readReference>>();
   const reference = (item: MediaReference, type: string) => {

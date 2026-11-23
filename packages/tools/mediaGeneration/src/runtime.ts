@@ -11,6 +11,26 @@ export type { MediaModel, MediaReference, MediaGenerationRequest, GeneratedMedia
  */
 export type SkinFinish = "clean" | "natural";
 
+/** 只用于风格/做旧启发式判断；原始正文与负面约束仍原样发送。 */
+export function positivePromptText(prompt: string) {
+  const authored = /REQUEST:\s*([\s\S]*?)(?=\n[A-Z][A-Z0-9]{3,}:|$)/.exec(prompt)?.[1] ?? prompt;
+  return authored
+    .replace(/^[ \t]*(?:FORBIDDENCHANGES|AVOID)[ \t]*[:：][^\n]*/gim, "")
+    .split(/【(?:负面提示词|负面约束)】|^\s*(?:NEGATIVE(?:PROMPT)?|负面提示词)\s*[:：]/im)[0]!
+    .replace(/(?:没有|无|不带|不留|不要|不出现|禁止|避免|去除|不主动|不添加|不做|不得|不能|不靠|不以|不用|非(?=动画|插画|漫画|漫剧|卡通|二次元|像素|3D|CG|写实|拼图))[^。；;\n]*/g, "")
+    .replace(/\b(?:no|not|without|avoid|remove)\b[^.;\n]*/gi, "");
+}
+
+export function isStylizedPrompt(prompt: string, projectMedium = "") {
+  const authored = positivePromptText(prompt);
+  return stylizedMedium.test(authored) || stylizedMedium.test(projectMedium) && !/实拍|真人|照片级|photographic|photoreal|live.action/i.test(authored);
+}
+
+export const stylizedMedium = /动画|插画|漫画|漫剧|卡通|二次元|赛璐璐|像素|(?:3D|CG)\s*渲染|anime|cartoon|illustration|\b(?:(?:3d|cg) render|stylized|cel.shaded|animation)\b/i;
+export const stylizedVisualBrief = "保持既定风格化画法（stylized）、色块与投影边界，依本场光源和已设计的灯光变化表现体积与遮挡。";
+
+export const characterPerformanceDirection = "依本镜节拍表演，先让角色接收到声音、视线或接触，再按既定意图回应。需要辨认时给察觉与确认各自的动作；表情、握力或重心可先后释放，承接未完成的姿势。台词、乐句、动作落点与既定停顿同步。保持选定媒介的动作幅度、节奏和有意静止，不添动作、台词或切镜。";
+
 export const photographicVisualBrief = "保持既定媒介、身份、年龄、造型、场景光色与剧情状态，用户最新明确限制优先于旧草案。写实摄影中人物和环境共享可信的光源、遮挡与接触阴影，受光随位置和朝向自然变化；空间有前后层次，主体清晰可辨，背景按景深保留合理细节。皮肤、头发、衣料、建筑与环境各有符合景别的细节和反光；保留自然肤色差异与柔和高光，不靠磨皮、粗毛孔、脏污、雾化或过度锐化制造真实感。未明确选择时不添加可见噪点、胶片颗粒、彩噪、压缩块或随机纹理闪烁；自然细微纹理不等于噪点，不能以降噪为由抹平材质。用户选择明亮手机Vlog时保留通透日光、自然肤色、柔和阴影和生活化持机视点，不强制暗调、硬光或全哑光皮肤。";
 
 export const skinFinishes: Record<SkinFinish, string> = {

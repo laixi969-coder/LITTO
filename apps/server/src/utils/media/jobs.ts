@@ -3,7 +3,7 @@ import { compileVisualModifiers } from "@toonflow/tools-scaffold/runtime";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, realpathSync } from "@toonflow/file";
 import type { MediaGenerationRequest } from "@toonflow/tools-scaffold/runtime";
-import { photographicVisualBrief } from "@toonflow/tool-media-generation/runtime";
+import { photographicVisualBrief, stylizedVisualBrief } from "@toonflow/tool-media-generation/runtime";
 import type { ProviderTask } from "@toonflow/providers";
 import type { GenRequest, GenResult } from "@/lib/cloud";
 import { cloud } from "@/lib/cloud";
@@ -20,7 +20,7 @@ import { blockingLine } from "@/utils/media/blocking";
 import { modelAccess } from "@/utils/modelAvailability";
 import { validateSpeechInputs } from "@/utils/media/lipSync";
 import { assertCurrentSpeechAudio } from "@/utils/media/voiceDecision";
-import { isDirectorPrompt } from "@/utils/media/videoPrompt";
+import { isDirectorPrompt, isStylizedPrompt } from "@/utils/media/videoPrompt";
 import { getConfiguredModel, streamAi } from "@/utils/ai";
 import { selectedModel } from "@/utils/modelSelection";
 import { recordTextUsage } from "@/utils/usage";
@@ -54,19 +54,19 @@ export async function optimizeCompiledPrompt(directory: string, sections: Record
   protectedKeys.add("humanPerformance");
   protectedKeys.add("spatialLandmarks");
   protectedKeys.add("visualModifiers");
+  const baseline = isStylizedPrompt(prompt) ? `MEDIUM: ${stylizedVisualBrief}` : `PHOTOGRAPHICBASELINE: ${photographicVisualBrief}`;
   // ACT: 优先原文保留已写明的质感与参考职责；空间不足时仍交给视觉背景压缩，避免仅因保护项过长阻塞制作。
   for (const key of ["look", "realism", "opticalTexture", "appearance", "referenceIntent", "references"]) {
     const protectedLength = Object.entries(sections).filter(([name, value]) => value && (protectedKeys.has(name) || name === key)).reduce((sum, [name, value]) => sum + name.length + value.length + 3, 0);
-    if (protectedLength + photographicVisualBrief.length + suffix.length + 350 <= limit) protectedKeys.add(key);
+    if (protectedLength + baseline.length + suffix.length + 350 <= limit) protectedKeys.add(key);
   }
   const essential = Object.entries(sections).filter(([key, value]) => value && protectedKeys.has(key)).map(([key, value]) => `${key.toUpperCase()}: ${value}`).join("\n");
-  const baseline = `PHOTOGRAPHICBASELINE: ${photographicVisualBrief}`;
   const budget = limit - [baseline, essential, suffix].join("\n").length - 32;
   if (budget < 100) throw new Error(`模型提示词上限 ${limit} 字符，保留动作、对白和关键约束后空间不足；请拆分镜头或精简规格。未提交生成。`);
   const choice = selectedModel("text");
   if (!choice) throw new Error(`提示词超过模型 ${limit} 字符上限，需要先配置对话模型才能自动精简；未提交生成。`);
   const source = Object.fromEntries(Object.entries(sections).filter(([key, value]) => value && !protectedKeys.has(key) && key.toLowerCase() !== "photographicbaseline"));
-  const key = createHash("sha256").update(JSON.stringify([directory, choice, limit, essential, source, suffix])).digest("hex");
+  const key = createHash("sha256").update(JSON.stringify([directory, choice, limit, baseline, essential, source, suffix])).digest("hex");
   let pending = promptOptimizations.get(key);
   if (!pending) {
     pending = (async () => {
@@ -147,7 +147,11 @@ export async function enqueueMedia(directory: string, kind: "image" | "video", r
     if (kind === "video" && model.lipSync) speechSyncInputs = await validateSpeechInputs(directory, request);
     // 入队前编译镜头规格并补写实基底：让任务记录里的 compiled_prompt 与实际发送内容一致。
     const spec = isDirectorPrompt(request.prompt) ? "" : compileShotSpec(request.shotSpec);
-    const prompt = spec ? `${spec}\n\n${request.prompt}` : request.prompt;
+    let prompt = spec ? `${spec}\n\n${request.prompt}` : request.prompt;
+    const medium = linkedProjectId && api.scoped(tenant.workspaceId).list("worlds", { projectId: linkedProjectId })[0]?.realism;
+    if (medium && isStylizedPrompt(prompt, medium) && !isStylizedPrompt(prompt)) {
+      prompt = isDirectorPrompt(prompt) ? prompt.replace("【画面质感与光影】", `【画面质感与光影】\n${medium}`) : `画面媒介：${medium}\n${prompt}`;
+    }
     request = { ...request, prompt: withPhotographicBaseline(kind === "video" ? withHumanPerformance(prompt) : prompt) };
   }
   const projectId = workspaceProject(directory)!;
@@ -376,13 +380,14 @@ export async function prepareShot(directory: string, kind: "image" | "video", sh
     sections[key] = layout;
     result.compiled.prompt += `\n${key.toUpperCase()}: ${layout}`;
   }
-  if (kind === "video") {
-    result.compiled.prompt = withHumanPerformance(result.compiled.prompt);
+  const shot = scope.get("shots", shotId)!;
+  if (kind === "video" && !shot.assetIds?.length && shot.visibleAssetIds == null) {
+    // 没有出镜清单的旧镜头只按原始动作识别人物，避免编译模板把产品空镜误判为人物。
+    result.compiled.prompt = withHumanPerformance(result.compiled.prompt, shot.action ?? "");
     const direction = /^HUMANPERFORMANCE: (.+)$/m.exec(result.compiled.prompt)?.[1];
     if (direction) result.compiled.sections.humanPerformance = direction;
   }
   if (request.visualModifiers) {
-    const shot = api.scoped(tenant.workspaceId).get("shots", shotId)!;
     const timeline = kind === "video" ? shot.camera?.design?.timeline ?? shot.musicVideo?.timeline ?? [] : [];
     prepareVisualModifiers({ ...request, prompt: result.compiled.prompt, storyboard: undefined }, model);
     // 正式请求保留结构化修饰供指纹重算；后台发送的是编译后的正文。

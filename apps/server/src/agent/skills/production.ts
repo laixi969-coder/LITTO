@@ -27,7 +27,7 @@ export async function loadStoryWritingContext(cwd: string, tools: SkillTools, ta
   const skill = loadAgentSkills(cwd).skills.find(item => item.name === skillName);
   if (!skill || skill.disableModelInvocation && !explicitlyNamesSkill(task, skill.name)) return "";
   const method = await readStoryInstructions(cwd, signal);
-  return musicFilm ? `${method}\n\n${musicFilmWritingGuide}` : method;
+  return [method, musicFilm ? musicFilmWritingGuide : "", "写可拍的场次时，交代已有光源让观众看清什么，以及人物何时察觉、确认并行动；无人物段落跟随产品或环境变化，歌舞沿原曲乐句。纯文字阶段保留剧本文体，具体灯位与表演节拍留给分镜。"].filter(Boolean).join("\n\n");
 }
 
 async function selectedVideoSkillModel() {
@@ -97,9 +97,9 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
   const specialties = [
     { name: "cinema", path: "references/screenCombat.md", match: /打斗|打戏|武戏|武打|对打|斗法|对决|交锋|格斗|动作戏|武侠动作|fight scene|screen combat/i },
     { name: "workflow", path: "references/methods/characterForgeLibtv.md", match: /选角|试镜|定妆|(?:角色|演员|人物)人选|(?:给我|推荐|比较).{0,8}人选|角色母版|角色锻造|人物母版|表情板|角色板|(?:生成|设计|创建|预设|新建|创作|塑造).{0,12}(?:角色|演员|人物)|(?:人物|角色).{0,8}(?:创作|三视图|四视图|设计|资产)|全身母版|换母版|character[- ]forge|casting sheet/i },
-  ].filter(method => method.match.test(topicText));
+  ].filter(method => method.match.test(topicText)).map(({ name, path }) => ({ name, path }));
   // ACT: 先读取已保存的制作上下文再判断入口，避免“再快一点”等续作指令在专项路由前被漏掉。
-  if (!explicitNames.length && !music && !advertising && !story && !shortDrama && !selectedTopics.length && !specialties.length && !/视频|短片|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
+  if (!explicitNames.length && !music && !advertising && !story && !shortDrama && !selectedTopics.length && !specialties.length && !/视频|短片|漫剧|影调|改光|分镜|场景|生成|制作|继续|接着|这部作品|旅拍|婚礼|旅行|vlog|小清新|自然光|清透色彩|中式园林|月洞门|游廊|东方奇境|巨物花木|云上天宫|东方梦境|提示词|videoPromptDirector/i.test(topicText)) return "";
   if (!canReadSkills(tools)) {
     return "## 制作技能状态\n本轮技能正文读取未开启，未自动加载制作技能；不能声称已使用。";
   }
@@ -138,6 +138,10 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     if (/东方奇境|巨物花木|云上天宫|东方梦境/.test(topicText)) names.push("orientalEpicDirector");
   }
   const focused = storyOnly || storyboardOnly || focusedNames.length || imagePrompt || scriptPrompt;
+  // 所有制作入口共用一份分场方法，专项入口只补这份短文，保留原有输出协议。
+  if (!focusedNames.length || focusedNames.some(name => ["breakdown", "gavenScriptToVideo", "gavenDirectImagePrompts"].includes(name))) {
+    specialties.push({ name: "cinema", path: "references/sceneDirection.md" });
+  }
   if (!focused) {
     for (const topic of selectedTopics) if (!names.includes(topic.name)) names.push(topic.name);
   }

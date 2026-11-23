@@ -33,6 +33,24 @@ export function validateStateDelta(s: Scope, projectId: string, delta: unknown) 
     return parsed.data;
 }
 
+/** 只从接戏起点取得世界光源。面部亮区、屏幕左右和曝光由本机位定义。 */
+export function shotLighting(shot: Record<string, any>, start: State["lighting"]): Record<string, any> {
+    const lighting = shot.lighting ?? {};
+    const prior = shot.sceneId || shot.source?.sceneId || ["coverage", "continuous"].includes(shot.continuity?.mode) ? start : {};
+    const timeChanged = lighting.timeOfDay && prior.timeOfDay && lighting.timeOfDay !== prior.timeOfDay;
+    const sourceChanged = lighting.worldSource && prior.worldSource && lighting.worldSource !== prior.worldSource;
+    const sameLight = !timeChanged && !sourceChanged;
+    const direction = lighting.keyDirection && lighting.keyDirection !== "none" ? lighting.keyDirection : "";
+    const inheritDirection = !direction && sameLight && prior.directionSpace === "world" && ["left", "right", "front", "back", "top"].includes(prior.keyDirection);
+    return { ...lighting,
+        timeOfDay: lighting.timeOfDay || (typeof prior.timeOfDay === "string" ? prior.timeOfDay : ""),
+        worldSource: lighting.worldSource || (!timeChanged && typeof prior.worldSource === "string" ? prior.worldSource : ""),
+        colorTemp: lighting.colorTemp || (sameLight && typeof prior.colorTemp === "string" ? prior.colorTemp : ""),
+        directionSpace: inheritDirection ? "world" : lighting.directionSpace ?? "screen",
+        keyDirection: direction || (inheritDirection ? prior.keyDirection : "none"),
+    };
+}
+
 /** Seed entries for assets that first appear in this shot (their baseline is the asset itself, not a guess). */
 function seed(state: State, shot: any, assets: Map<string, any>, newScene: boolean): State {
     const s = structuredClone(state);
@@ -47,7 +65,9 @@ function seed(state: State, shot: any, assets: Map<string, any>, newScene: boole
             if (!c.wardrobeId) c.wardrobeId = id;
         }
     }
-    if ((newScene || !Object.keys(s.lighting).length) && shot.lighting) s.lighting = { worldSource: shot.lighting.worldSource, directionSpace: shot.lighting.directionSpace ?? "screen", keyDirection: shot.lighting.keyDirection, timeOfDay: shot.lighting.timeOfDay, colorTemp: shot.lighting.colorTemp };
+    const prior = newScene ? {} : s.lighting;
+    const { worldSource, directionSpace, keyDirection, timeOfDay, colorTemp } = shotLighting(shot, prior);
+    s.lighting = { ...prior, worldSource, directionSpace, keyDirection, timeOfDay, colorTemp };
     return s;
 }
 
@@ -60,7 +80,7 @@ export function recomputeStates(s: Scope, sequenceId: string) {
   if (!sequence) throw bad("接戏序列不存在");
   const sequences = s.list("sequences", { projectId: sequence.projectId }, "ord, id");
   const assets = new Map(s.list("assets", { projectId: sequence.projectId }).map((a) => [a.id, a]));
-  const results = new Map<string, { state: State; sceneId: string }>();
+  const results = new Map<string, { state: State; sceneId: string | null }>();
   // ACT: 按项目顺序重算以传播跨集修改，复杂度 O(项目镜头数)；更大项目可按接戏依赖缩小重算范围。
   tx(() => {
     for (const current of sequences) {
@@ -72,7 +92,9 @@ export function recomputeStates(s: Scope, sequenceId: string) {
         if (shot.continuityFromShotId && !reference) throw bad("接戏来源须为同项目中更早序列的镜头或本序列更早镜头，不能跨项目、向后引用或引用已删除镜头；请先调整接戏依赖");
         // ACT: 新分镜只沿明确的事件线继承；旧记录保持原语义，不改写已有素材或自动猜测平行叙事。
         const inherited = reference?.state ?? (shot.continuity ? null : previousState);
-        const start = seed(inherited ?? emptyState(), shot, assets, shot.sceneId !== (reference?.sceneId ?? (shot.continuity ? null : previousScene)));
+        const sceneId = shot.sceneId ?? (shot.source?.sceneId ? JSON.stringify([current.id, shot.source.revisionId, shot.source.sceneId]) : null);
+        const priorScene = reference ? reference.sceneId : previousScene;
+        const start = seed(inherited ?? emptyState(), shot, assets, sceneId !== priorScene);
         const approved = shot.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
         const result = applyDelta(start, approved?.meta?.observedStateDelta ?? shot.intendedStateDelta ?? {});
         for (const [kind, data] of [["start", start], ["result", result]] as const) {
@@ -80,9 +102,9 @@ export function recomputeStates(s: Scope, sequenceId: string) {
           if (existing) run("UPDATE shot_states SET data=?, updated_at=? WHERE id=?", j(data), new Date().toISOString(), existing.id);
           else s.insert("shot_states", { project_id: shot.projectId, shot_id: shot.id, kind, data });
         }
-        results.set(shot.id, { state: result, sceneId: shot.sceneId });
+        results.set(shot.id, { state: result, sceneId });
         previousState = result;
-        previousScene = shot.sceneId;
+        previousScene = sceneId;
       }
     }
   });

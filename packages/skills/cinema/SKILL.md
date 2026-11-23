@@ -17,6 +17,8 @@ metadata:
 
 ## 分工与执行边界
 
+剧情、MV、广告、漫剧从关键帧到视频与审看共同使用[分场光线与角色表演](references/sceneDirection.md)。先定同场光源与角色获得信息的时点，再按本版块的节拍写进镜头。
+
 - [workflow](../workflow/SKILL.md)：剧本改编、资产制作、画布制作阶段和模型执行；先读现场模型能力；只有明确选用 Seedance 后，其专用规则才约束分段上限和提示词格式，不覆盖电影创作意图。
 - [canvas](../canvas/SKILL.md)：查询实际节点、配置、参考顺序并操作画布，不猜节点能力。
 - [continuity](../continuity/SKILL.md)：身份、服装、道具、空间、动作、光线与情绪的跨镜状态；锁定资产与版本修复。
