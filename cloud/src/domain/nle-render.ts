@@ -197,8 +197,10 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         const tk = tracks.get(a.track)!, c = a.c;
         const gain = c.gainDb + tk.gainDb, sp = c.speed, ms = Math.max(0, Math.round(c.start * 1000));
         const out = c.in + c.duration * sp;
-        // 先按原时间戳补齐声音空档，再裁切，不能把延迟发声提前到镜头开头。
-        const f = ["aresample=async=1:first_pts=0", `atrim=start=${r3(c.in)}:end=${r3(out)}`, "asetpts=PTS-STARTPTS", ...atempo(sp), "aformat=sample_rates=48000:channel_layouts=stereo", gain ? `volume=${gain}dB` : "", c.fadeIn > 0 ? `afade=t=in:st=0:d=${r3(c.fadeIn)}` : "", c.fadeOut > 0 ? `afade=t=out:st=${r3(Math.max(0, c.duration - c.fadeOut))}:d=${r3(c.fadeOut)}` : "", `adelay=${ms}|${ms}`].filter(Boolean).join(",");
+        // FFmpeg 可能不给 adelay 补入的首批静音帧分配 PTS。按已含留白的采样数定时，后续混音才能保留片段入点。
+        const delay = ms ? `adelay=${ms}|${ms},asetpts=N/SR/TB` : "";
+        // 先按原时轴补齐音频帧空档再裁切。默认 100ms 门槛会使短缺口后的声音整体提前。
+        const f = ["aresample=async=1:first_pts=0:min_hard_comp=0.001", `atrim=start=${r3(c.in)}:end=${r3(out)}`, "asetpts=PTS-STARTPTS", ...atempo(sp), "aformat=sample_rates=48000:channel_layouts=stereo", gain ? `volume=${gain}dB` : "", c.fadeIn > 0 ? `afade=t=in:st=0:d=${r3(c.fadeIn)}` : "", c.fadeOut > 0 ? `afade=t=out:st=${r3(Math.max(0, c.duration - c.fadeOut))}:d=${r3(c.fadeOut)}` : "", delay].filter(Boolean).join(",");
         g.push(`[${a.k}:a]${f}[a${i}]`);
         buses.set(a.role, [...(buses.get(a.role) ?? []), `a${i}`]);
     });
@@ -216,7 +218,9 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
             const keyBus = bus.get(e.duck.underRole)!;
             const others = [...bus.keys()].filter((r) => r !== e.duck!.underRole);
             const ratio = Math.max(2, Math.min(20, Math.round(Math.abs(e.duck.amountDb) / 1.5)));
-            g.push(`[${keyBus}]asplit=${others.length + 1}[${keyBus}_mix]${others.map((_, i) => `[${keyBus}_k${i}]`).join("")}`);
+            // 侧链结束会截短被压低的音轨；只把控制信号补静音至片尾，保留各可听轨的实际长度。
+            g.push(`[${keyBus}]asplit=2[${keyBus}_mix][duckKey]`,
+                `[duckKey]apad=whole_dur=${total},asplit=${others.length}${others.map((_, i) => `[${keyBus}_k${i}]`).join("")}`);
             bus.set(e.duck.underRole, `${keyBus}_mix`);
             others.forEach((r, i) => { const n = `${bus.get(r)}_duck`; g.push(`[${bus.get(r)}][${keyBus}_k${i}]sidechaincompress=threshold=0.04:ratio=${ratio}:attack=20:release=350:makeup=1[${n}]`); bus.set(r, n); });
         }

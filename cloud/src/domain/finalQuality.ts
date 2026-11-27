@@ -123,7 +123,7 @@ export function sequenceFingerprint(s: Scope, sequenceId: string) {
   });
   const sequence = s.get("sequences", sequenceId);
   const projectId = sequence?.projectId;
-  // 导出时轴算法更新后，旧文件与其验收记录不能命中当前导出缓存。
+  // 保留既有剪辑指纹格式，使历史成片仍能按原时间线复查。编码算法版本在导出缓存中另行比较。
   return createHash("sha256").update(JSON.stringify({ renderVersion: 2, ...(sources.some(item => item.shot?.techniques?.length) ? { techniqueVersion } : {}), edit, sources, ...(sequence && isAdSequence(sequence) ? { advertising: adContext(s, { sequenceId, projectId }) } : {}) })).digest("hex");
 }
 

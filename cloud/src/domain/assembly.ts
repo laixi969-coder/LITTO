@@ -142,6 +142,9 @@ export async function exportPackage(s: Scope, sequenceId: string) {
 // ---- optional ffmpeg render (see nle-render.ts) ----
 export const ffmpegAvailable = () => new Promise<boolean>((r) => { const p = spawn("ffmpeg", ["-version"]); p.on("error", () => r(false)); p.on("exit", (c) => r(c === 0)); });
 
+// 旧版可能在控制轨结束时裁短配乐，或丢掉素材中的短音频空档。新导出须使用当前编码版本。
+const encoderVersion = 3;
+
 export function startRender(workspaceId: string, projectId: string, sequenceId: string, actor: string, opts: RenderOpts = {}) {
     const s = scoped(workspaceId);
     getEdit(s, sequenceId, true);
@@ -150,9 +153,9 @@ export function startRender(workspaceId: string, projectId: string, sequenceId: 
     if (!opts.draft) assertSpeechExport(s, sequenceId);
     const sourceFingerprint = sequenceFingerprint(s, sequenceId);
     const existing = s.list("renders", { sequenceId }, "created_at DESC").find(render => ["RUNNING", "SUCCEEDED"].includes(render.status)
-        && render.manifest?.sourceFingerprint === sourceFingerprint && JSON.stringify(render.manifest?.options) === JSON.stringify(opts));
+        && render.manifest?.encoderVersion === encoderVersion && render.manifest.sourceFingerprint === sourceFingerprint && JSON.stringify(render.manifest.options) === JSON.stringify(opts));
     if (existing) return existing;
-    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts, sourceFingerprint }, created_by: actor, updated_at: now() });
+    const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts, sourceFingerprint, encoderVersion }, created_by: actor, updated_at: now() });
     void startNleRender(workspaceId, projectId, sequenceId, r.id, opts);
     return r;
 }
@@ -169,7 +172,7 @@ export function assembleApprovedSequence(s: Scope, sequenceId: string, actor: st
     if (!timeline.clips.length || timeline.missing.length) return null;
     const fingerprint = sequenceFingerprint(s, sequenceId);
     const existing = s.list("renders", { sequenceId }, "created_at DESC").find(render =>
-        ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.sourceFingerprint === fingerprint && render.manifest?.options?.draft === true);
+        ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.encoderVersion === encoderVersion && render.manifest.sourceFingerprint === fingerprint && render.manifest.options?.draft === true);
     // ACT: 素材齐备只触发粗剪，接缝处理后由现有 render 入口显式导出定稿。
     return existing ?? startRender(sequence.workspaceId, sequence.projectId, sequenceId, actor, { draft: true });
 }
