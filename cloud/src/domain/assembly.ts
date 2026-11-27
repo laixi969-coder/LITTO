@@ -1,43 +1,46 @@
 import { spawn } from "node:child_process";
 import { crc32 } from "node:zlib";
-import { get, scoped, type Scope } from "../db.ts";
-import { saveMedia, storage } from "../storage.ts";
-import { bad, notFound, now } from "../util.ts";
-import { end as clipEnd, getEdit, hasEdit, resolveClip } from "./nle.ts";
+import { scoped, type Scope } from "../db.ts";
+import { storage } from "../storage.ts";
+import { conflict, notFound, now, sha256 } from "../util.ts";
+import { end as clipEnd, getEdit, hasEdit, resolveClip, type EditRow } from "./nle.ts";
 import { startNleRender, renderOptionsSchema } from "./nle-render.ts";
 import type { RenderOpts } from "./nle-render.ts";
-import { sequenceFingerprint, assertSpeechExport } from "./finalQuality.ts";
+import { sequenceFingerprint, assertSpeechExport, finalRenderMedia } from "./finalQuality.ts";
+import { requireNarrative } from "./narrativeGate.ts";
 
 /** Basic assembly timeline (PRD Phase 5 / P2 "基础 Timeline"): approved Take per shot, in shot order, with subtitles and audio references. */
 export type Clip = { shotId: string; order: number; title: string; kind: "take" | "hero" | "missing"; mediaId: string | null; mime: string | null; start: number; duration: number; subtitle: string; clipId?: string; srcIn?: number; srcOut?: number; speed?: number; transition?: { type: string; duration: number } };
 export type Timeline = { edited?: boolean; fps: number; duration: number; clips: Clip[]; subtitles: { start: number; end: number; text: string; shotId: string }[]; audio: { referenceId: string; mediaId: string | null; name: string | null; shotId: string; start: number; duration: number }[]; missing: string[]; warnings: string[] };
 
 /** Once an editable timeline exists, the public timeline is derived from it (V1 = clips, audio tracks = audio, shot subtitles follow their clips). */
-function fromEdit(s: Scope, sequenceId: string): Timeline {
-    const e = getEdit(s, sequenceId, false);
+function fromEdit(s: Scope, e: EditRow, playback = false): Timeline {
     const tl: Timeline = { edited: true, fps: e.fps, duration: 0, clips: [], subtitles: [], audio: [], missing: [], warnings: [] };
     const track = new Map(e.tracks.map((t) => [t.id, t]));
-    const v1 = e.clips.filter((c) => track.get(c.trackId)?.kind === "video").sort((a, b) => a.start - b.start);
-    for (const [i, c] of v1.entries()) {
+    const clips = playback ? e.clips.filter(c => !track.get(c.trackId)?.muted) : e.clips;
+    const mainTrack = e.tracks.find(t => t.kind === "video");
+    const video = clips.filter(c => track.get(c.trackId)?.kind === "video").sort((a, b) => a.start - b.start);
+    for (const [i, c] of video.entries()) {
         const r = resolveClip(s, c);
         const sh = c.shotId ? s.get("shots", c.shotId) : null;
         const kind = r.kind === "media" ? (r.mime?.startsWith("video/") ? "take" : r.mediaId ? "hero" : "missing") : r.kind;
         if (kind !== "take") { tl.missing.push(c.shotId ?? c.id); tl.warnings.push(`${sh ? `shot #${sh.ord + 1}` : `clip ${c.label || c.id}`} has no Approved Take${kind === "hero" ? " (Hero Frame stills used as placeholder)" : ""}`); }
         if (kind === "take" && sh && (!sh.approvedTakeId || s.get("takes", sh.approvedTakeId)?.mediaId !== r.mediaId)) tl.warnings.push(`shot #${sh.ord + 1} uses an unapproved working video; preview only`);
-        tl.clips.push({ shotId: c.shotId ?? "", clipId: c.id, order: sh?.ord ?? i, title: c.label || sh?.title || "", kind, mediaId: r.mediaId, mime: r.mime, start: c.start, duration: c.duration, subtitle: sh?.subtitle ?? "", srcIn: c.in, srcOut: c.in + c.duration * c.speed, speed: c.speed, transition: c.transition });
-        if (sh?.subtitle) tl.subtitles.push({ start: c.start, end: c.start + c.duration, text: sh.subtitle, shotId: sh.id });
+        const subtitle = !playback || c.trackId === mainTrack?.id ? sh?.subtitle ?? "" : "";
+        tl.clips.push({ shotId: c.shotId ?? "", clipId: c.id, order: sh?.ord ?? i, title: c.label || sh?.title || "", kind, mediaId: r.mediaId, mime: r.mime, start: c.start, duration: c.duration, subtitle, srcIn: c.in, srcOut: c.in + c.duration * c.speed, speed: c.speed, transition: c.transition });
+        if (subtitle) tl.subtitles.push({ start: c.start, end: c.start + c.duration, text: subtitle, shotId: c.shotId! });
     }
-    for (const c of e.clips.filter((x) => track.get(x.trackId)?.kind === "audio").sort((a, b) => a.start - b.start)) {
+    for (const c of clips.filter(x => track.get(x.trackId)?.kind === "audio" && (!playback || x.gainDb + track.get(x.trackId)!.gainDb > -60)).sort((a, b) => a.start - b.start)) {
         const r = resolveClip(s, c);
         tl.audio.push({ referenceId: c.refId ?? c.id, mediaId: r.mediaId, name: c.label || null, shotId: c.shotId ?? c.refId?.split(":")[0] ?? "", start: c.start, duration: c.duration });
     }
-    tl.duration = Math.max(0, ...e.clips.map(clipEnd));
+    tl.duration = Math.max(0, ...clips.map(clipEnd));
     return tl;
 }
 
 export function buildTimeline(s: Scope, sequenceId: string): Timeline {
     if (!s.get("sequences", sequenceId)) throw notFound("sequence");
-    if (hasEdit(s, sequenceId)) return fromEdit(s, sequenceId);
+    if (hasEdit(s, sequenceId)) return fromEdit(s, getEdit(s, sequenceId, false));
     const shots = s.list("shots", { sequenceId }, "ord");
     const bindings = s.list("reference_bindings", { targetType: "shot" });
     let t = 0;
@@ -142,21 +145,52 @@ export async function exportPackage(s: Scope, sequenceId: string) {
 // ---- optional ffmpeg render (see nle-render.ts) ----
 export const ffmpegAvailable = () => new Promise<boolean>((r) => { const p = spawn("ffmpeg", ["-version"]); p.on("error", () => r(false)); p.on("exit", (c) => r(c === 0)); });
 
-// 旧版可能在控制轨结束时裁短配乐，或丢掉素材中的短音频空档。新导出须使用当前编码版本。
-const encoderVersion = 3;
+// 编码器的混音和输入快照影响成片内容，历史成片仍可按其原记录复查。
+const encoderVersion = 4;
 
-export function startRender(workspaceId: string, projectId: string, sequenceId: string, actor: string, opts: RenderOpts = {}) {
+export async function startRender(workspaceId: string, projectId: string, sequenceId: string, actor: string, opts: RenderOpts = {}) {
     const s = scoped(workspaceId);
-    getEdit(s, sequenceId, true);
-    const tl = buildTimeline(s, sequenceId);
+    if (s.get("sequences", sequenceId)?.projectId !== projectId || !s.get("projects", projectId)) throw notFound("sequence");
     opts = renderOptionsSchema.parse(opts);
+    const edit = getEdit(s, sequenceId, true);
     if (!opts.draft) assertSpeechExport(s, sequenceId);
     const sourceFingerprint = sequenceFingerprint(s, sequenceId);
-    const existing = s.list("renders", { sequenceId }, "created_at DESC").find(render => ["RUNNING", "SUCCEEDED"].includes(render.status)
-        && render.manifest?.encoderVersion === encoderVersion && render.manifest.sourceFingerprint === sourceFingerprint && JSON.stringify(render.manifest.options) === JSON.stringify(opts));
+    const optionsKey = JSON.stringify(opts);
+    const matching = () => s.list("renders", { projectId, sequenceId }, "created_at DESC").filter(({ manifest }) =>
+        manifest?.encoderVersion === encoderVersion && manifest.sourceFingerprint === sourceFingerprint && JSON.stringify(manifest.options) === optionsKey);
+    let matches = matching();
+    const running = matches.find(render => render.status === "RUNNING");
+    if (running) return running;
+    if (!opts.draft && matches.some(render => render.status === "SUCCEEDED")) {
+        // 采用剧本存于工作目录，即使剪辑指纹未变，也要重新确认当前叙事允许交付。
+        try {
+            const unchanged = await requireNarrative({ workspaceId, projectId, sequenceId }, AbortSignal.timeout(180_000));
+            await unchanged();
+        } catch (error) {
+            throw conflict(error instanceof Error ? error.message : "当前叙事检查未通过", "narrative_blocked");
+        }
+        if (!s.get("projects", projectId) || s.get("sequences", sequenceId)?.projectId !== projectId || sequenceFingerprint(s, sequenceId) !== sourceFingerprint)
+            throw conflict("核对缓存期间剪辑或采用素材已改变，请按当前版本重新导出", "stale_render");
+        assertSpeechExport(s, sequenceId);
+        matches = matching();
+    }
+    const existing = matches.find(render => {
+        if (render.status === "RUNNING") return true;
+        if (render.status !== "SUCCEEDED" || render.manifest.quality?.coverage === "fileIntegrity") return false;
+        const media = finalRenderMedia(s, render);
+        if (!media || !storage.getSync) return false;
+        try {
+            const bytes = storage.getSync(media.storageKey);
+            return bytes.length === media.size && sha256(bytes) === media.hash;
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+            throw error;
+        }
+    });
     if (existing) return existing;
+    const tl = fromEdit(s, edit, true);
     const r = s.insert("renders", { project_id: projectId, sequence_id: sequenceId, status: "RUNNING", manifest: { ...tl, options: opts, sourceFingerprint, encoderVersion }, created_by: actor, updated_at: now() });
-    void startNleRender(workspaceId, projectId, sequenceId, r.id, opts);
+    void startNleRender(workspaceId, projectId, sequenceId, r.id, opts, sourceFingerprint);
     return r;
 }
 
@@ -168,12 +202,8 @@ export function assembleApprovedSequence(s: Scope, sequenceId: string, actor: st
     const edit = getEdit(s, sequenceId, true);
     if (shots.some(shot => !shot.approvedTakeId && !(includeWorkingVersion && edit.clips.some(clip => clip.shotId === shot.id
         && edit.tracks.find(track => track.id === clip.trackId)?.kind === "video" && clip.mediaId && s.get("media", clip.mediaId)?.mime.startsWith("video/"))))) return null;
-    const timeline = buildTimeline(s, sequenceId);
+    const timeline = fromEdit(s, edit, true);
     if (!timeline.clips.length || timeline.missing.length) return null;
-    const fingerprint = sequenceFingerprint(s, sequenceId);
-    const existing = s.list("renders", { sequenceId }, "created_at DESC").find(render =>
-        ["RUNNING", "SUCCEEDED"].includes(render.status) && render.manifest?.encoderVersion === encoderVersion && render.manifest.sourceFingerprint === fingerprint && render.manifest.options?.draft === true);
     // ACT: 素材齐备只触发粗剪，接缝处理后由现有 render 入口显式导出定稿。
-    return existing ?? startRender(sequence.workspaceId, sequence.projectId, sequenceId, actor, { draft: true });
+    return startRender(sequence.workspaceId, sequence.projectId, sequenceId, actor, { draft: true });
 }
-void bad;

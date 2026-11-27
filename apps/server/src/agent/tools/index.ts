@@ -142,8 +142,9 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
         const publishRender = async (renderId: string) => {
           const render = scope.get("renders", renderId);
           if (!render || render.projectId !== projectId || render.status !== "SUCCEEDED" || !render.mediaId) throw new Error("当前项目中没有可用的渲染成片");
-          const media = scope.get("media", render.mediaId);
-          if (!media || media.projectId !== projectId || media.mime !== "video/mp4") throw new Error("成片媒体不存在或不属于当前项目");
+          if (render.manifest?.quality?.coverage === "fileIntegrity") throw new Error("成片文件完整性检查未通过，请恢复原文件并重新检测");
+          const media = api.finalRenderMedia(scope, render);
+          if (!media || media.mime !== "video/mp4") throw new Error("成片媒体与当前项目的导出记录不符");
           const path = `render${render.id}.mp4`;
           const target = await resolveWorkspacePath(cwd, path, true);
           const bytes = await api.storage.get(media.storageKey);
@@ -211,7 +212,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
             const plan = await cameraObservationPlan(cwd, projectId, mediaId, sequenceIds);
             const observerKey = videoObservationModel().key;
             const events = review?.scenes.flatMap(scene => (scene.events ?? []).map(event => ({ ...event, sceneId: scene.sceneId }))) ?? [];
-            const observation = await observeVideo(cwd, projectId, projectId, mediaId, JSON.stringify(snapshot.plan), mediaSignal(signal) ?? new AbortController().signal, plan, events);
+            const observation = await observeVideo(cwd, projectId, projectId, mediaId, JSON.stringify(snapshot.plan), mediaSignal(signal) ?? new AbortController().signal, plan, events, sequenceIds);
             if ((await narrativePlan(input)).key !== snapshot.key || videoObservationModel().key !== observerKey) throw new Error("观察期间剧本、分镜或审片模型已变化，请重新观察");
             return { issues, observation, storyKey: snapshot.key, observerKey };
           }
@@ -296,9 +297,9 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
           if (typeof data.sequenceId !== "string" || scope.get("sequences", data.sequenceId)?.projectId !== projectId) throw new Error("序列不属于当前项目");
           if (operation === "readEdit") return api.editView(scope, api.getEdit(scope, data.sequenceId, true));
           const options = api.renderOptionsSchema.parse(data.options ?? {});
-          const render = api.startRender(tenant.workspaceId, projectId, data.sequenceId, tenant.userId, options);
+          const render = await api.startRender(tenant.workspaceId, projectId, data.sequenceId, tenant.userId, options);
           const completed = await api.waitNleRender(scope, render.id, mediaSignal(signal));
-          const media = completed.mediaId ? api.mediaView(scope.get("media", completed.mediaId)) : null;
+          const media = api.mediaView(api.finalRenderMedia(scope, completed));
           const delivery = completed.status === "SUCCEEDED" && completed.mediaId
             ? await publishRender(completed.id).catch(error => ({ published: false, message: `成片已渲染，但保存或展示失败：${error instanceof Error ? error.message : error}。请使用 publishRender 重试，无需重新渲染。` })) : null;
           return { ...completed, media: media ? { ...media, url: media.url.startsWith("/") ? `/cloud${media.url}` : media.url } : null, delivery };

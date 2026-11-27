@@ -2,7 +2,7 @@ import { z } from "zod";
 import { mkdtemp, readFile, writeFile, rm } from "@toonflow/file";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { finalQualityView, finalReviewSchema, reviewFinalQuality } from "./finalQuality.ts";
+import { finalQualityView, finalRenderMedia, finalReviewSchema, reviewFinalQuality } from "./finalQuality.ts";
 import { tx, type Scope } from "../db.ts";
 import { assetInput, bindingInput, shotInput, worldSchema, lookSchema, stateDeltaSchema } from "./schema.ts";
 import { createAsset, assetVersions } from "./assets.ts";
@@ -316,7 +316,10 @@ export function workspaceProduction(s: Scope, projectId: string, operation: stri
     keyframes: s.list("keyframes", { projectId }), takes: s.list("takes", { projectId }), qc: s.list("qc_reports", { projectId }),
     media: s.list("media", { projectId }).map(mediaView),
     candidateBatches: s.list("candidate_batches", { projectId }), candidates: s.list("candidates", { projectId }),
-    renders: s.list("renders", { projectId }).map(render => ({ ...render, quality: finalQualityView(s, render), media: render.mediaId ? mediaView(s.get("media", render.mediaId)) : null })),
+    renders: s.list("renders", { projectId }).filter(render => s.get("sequences", render.sequenceId)?.projectId === projectId).map(render => {
+      const media = finalRenderMedia(s, render);
+      return { ...render, mediaId: media?.id ?? null, quality: finalQualityView(s, render, media), media: mediaView(media) };
+    }),
   });
   if (operation === "world" || operation === "look") {
     if (shots.some(shot => shot.heroKeyframeId || shot.approvedTakeId)) throw conflict("已有采用镜头，请调用 requestProductionDecision 在聊天中确认世界或影调修改", "approved_world");

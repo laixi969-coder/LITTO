@@ -112,8 +112,12 @@ export async function get(directory: string): Promise<AutoFilmTask | null> {
   const { task } = await readCurrent(directory);
   if (task?.output) {
     const { api, tenant } = identity(directory);
-    const media = api.scoped(tenant.workspaceId).get("media", task.output.mediaId);
-    if (media && !media.deletedAt) task.output.url = `/cloud${api.mediaView(media).url}`;
+    const scope = api.scoped(tenant.workspaceId), render = scope.get("renders", task.output.renderId);
+    const media = render && api.finalRenderMedia(scope, render);
+    if (!media || media.id !== task.output.mediaId || render?.projectId !== task.projectId || render.sequenceId !== task.output.sequenceId
+      || render.manifest?.options?.draft || render.manifest?.quality?.coverage === "fileIntegrity")
+      return { ...task, status: "failed", output: undefined, progress: "交付记录与成片文件不符，请核对原导出并重新检测" };
+    task.output.url = `/cloud${api.mediaView(media).url}`;
   }
   return task?.status === "running" && !live.has(directory)
     ? { ...task, status: "interrupted", progress: "服务已重启，制作进度已保留，点击继续制作可恢复" } : task;
@@ -223,7 +227,7 @@ function launch(task: AutoFilmTask, folder: string) {
             }
           }
           if (tool.name === "productionSpec" && input.operation === "agentReviewFinal") {
-            const render = scope.get("renders", operationData.renderId), media = render && scope.get("media", render.mediaId);
+            const render = scope.get("renders", operationData.renderId), media = render && api.finalRenderMedia(scope, render);
             const playback = await findCurrentPlayback(task, media?.id);
             assertStoryObservation(playback, "final");
             operationData.review.cutReview = playback!.cutReviews!.map(item => ({ ...item, verdict: item.verdict === "revise" ? "fail" : item.verdict }));
@@ -342,7 +346,7 @@ function launch(task: AutoFilmTask, folder: string) {
         task.attempts[key] = (task.attempts[key] ?? 0) + 1;
         task.progress = "正在完整观察视频画面和声音";
         await save();
-        const result = { ...await observeVideo(task.directory, task.id, task.projectId, mediaId, `原稿与全剧分镜（仅核对当前视频覆盖范围；成片核对全部）：${JSON.stringify(snapshot.plan)}\n\n检查目标：${focus}`, signal, cameraPlan, events), planKey, storyKey: snapshot.key, observerKey };
+        const result = { ...await observeVideo(task.directory, task.id, task.projectId, mediaId, `原稿与全剧分镜（仅核对当前视频覆盖范围；成片核对全部）：${JSON.stringify(snapshot.plan)}\n\n检查目标：${focus}`, signal, cameraPlan, events, task.sequenceIds), planKey, storyKey: snapshot.key, observerKey };
         if (videoObservationModel().key !== observerKey) throw new Error("观察期间审阅模型已更换，请重新观察");
         if ((await narrativePlan(task)).key !== snapshot.key) throw new Error("观察期间叙事分镜已变化，请按当前计划重新观察");
         task.playbacks.push(result);
@@ -362,21 +366,27 @@ function launch(task: AutoFilmTask, folder: string) {
         if (issues.length) throw new Error(`叙事与剪辑尚未通过：${issues.join("；")}`);
         const render = scope.get("renders", renderId);
         if (!render || render.projectId !== task.projectId || !task.sequenceIds.includes(render.sequenceId)) throw new Error("只能交付本任务序列的真实成片");
-        if (render.status !== "SUCCEEDED" || render.manifest?.options?.draft || !render.mediaId) throw new Error("成片尚未完成正式导出；不能把草稿标为完成");
-        const quality = api.finalQualityView(scope, render);
-        if (!quality.analysisId || !["pass", "unverified", "fail"].includes(quality.status) || quality.findings?.some((item: { severity: string }) => item.severity === "block")) throw new Error("成片尚未完成有效文件检查或存在阻断问题，请先处理");
+        const renderedMedia = api.finalRenderMedia(scope, render);
+        if (!renderedMedia || render.manifest?.options?.draft) throw new Error("成片尚未完成正式导出或媒体关联失效");
+        const quality = api.finalQualityView(scope, render, renderedMedia);
+        if (!quality.analysisId || quality.coverage === "fileIntegrity" || !["pass", "unverified", "fail"].includes(quality.status) || quality.findings?.some((item: { severity: string }) => item.severity === "block")) throw new Error("成片尚未完成有效文件检查或存在阻断问题，请先处理");
         const story = await readStoryProject(task.directory), revision = story.revisions.find(item => item.id === task.storyRevisionId);
         const sequence = scope.get("sequences", render.sequenceId), shots = scope.list("shots", { sequenceId: render.sequenceId });
         const edit = api.getEdit(scope, render.sequenceId, false);
+        const visibleShots = new Set(edit.clips.filter(clip => clip.shotId && edit.tracks.some(track => track.id === clip.trackId && track.kind === "video" && !track.muted)
+          && api.resolveClip(scope, clip).mime?.startsWith("video/")).map(clip => clip.shotId));
         if (!revision || story.approvedId !== revision.id || sequence?.storyRevisionId !== revision.id
           || revision.scenes.some(scene => !shots.some(shot => shot.source?.sceneId === scene.sceneId && shot.source?.revisionId === revision.id
-            && edit.clips.some(clip => clip.shotId === shot.id && edit.tracks.some(track => track.id === clip.trackId && track.kind === "video") && clip.mediaId && scope.get("media", clip.mediaId)?.mime.startsWith("video/"))))) throw new Error("本任务采用剧本的场次尚未全部进入本次成片，不能省略场次交付");
-        const renderedMedia = scope.get("media", render.mediaId);
-        if (quality.status === "pass") assertStoryObservation(await findCurrentPlayback(task, renderedMedia?.id), "final");
-        const view = api.workspaceProduction(scope, task.projectId, "read", {}, tenant.userId) as { renders: { id: string; media?: { url: string } }[] };
-        const media = view.renders.find(item => item.id === renderId)?.media;
-        if (!media) throw new Error("成片媒体不存在");
-        task.output = { renderId, sequenceId: render.sequenceId, mediaId: render.mediaId, url: media.url.startsWith("/") ? `/cloud${media.url}` : media.url, qualityStatus: quality.status === "pass" ? "pass" : quality.status === "fail" ? "fail" : "unverified" };
+            && visibleShots.has(shot.id)))) throw new Error("本任务采用剧本的场次尚未全部进入本次成片，不能省略场次交付");
+        if (quality.status === "pass") assertStoryObservation(await findCurrentPlayback(task, renderedMedia.id), "final");
+        const bytes = await api.storage.get(renderedMedia.storageKey);
+        const current = scope.get("renders", renderId), media = current && api.finalRenderMedia(scope, current);
+        if (!current || !media || media.id !== renderedMedia.id || media.storageKey !== renderedMedia.storageKey
+          || createHash("sha256").update(bytes).digest("hex") !== quality.hash || JSON.stringify(current.manifest) !== JSON.stringify(render.manifest)
+          || api.sequenceFingerprint(scope, render.sequenceId) !== render.manifest.sourceFingerprint)
+          throw new Error("交付期间成片、剪辑或检查结果已变化，请重新检测");
+        const url = api.mediaView(media).url;
+        task.output = { renderId, sequenceId: render.sequenceId, mediaId: media.id, url: url.startsWith("/") ? `/cloud${url}` : url, qualityStatus: quality.status === "pass" ? "pass" : quality.status === "fail" ? "fail" : "unverified" };
         task.progress = quality.status === "pass" ? "成片已导出并通过代理验收" : quality.status === "fail" ? "成片已导出，内容验收发现问题" : "成片已导出，文件检查完成，内容尚未通过完整验收";
         await save();
         return { content: [{ type: "text", text: JSON.stringify(task.output) }], details: task.output };

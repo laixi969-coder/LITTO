@@ -16,7 +16,7 @@ import { readUpload, reservedUploadBytes, uploadMaxBytes, uploadSlot } from "../
 import { join } from "node:path";
 import { bad, forbidden, HttpError, notFound, now, ulid } from "../util.ts";
 import { config } from "../config.ts";
-import { finalQualityView } from "../domain/finalQuality.ts";
+import { finalQualityView, finalRenderMedia } from "../domain/finalQuality.ts";
 import { exportCsv, summary } from "../usage.ts";
 
 export const extra = new Hono();
@@ -35,11 +35,16 @@ extra.post("/sequences/:id/render", async (c) => {
     const q = s.get("sequences", c.req.param("id"));
     if (!q) throw notFound("sequence");
     const o = await body(c, renderOptionsSchema);
-    return c.json(startRender(a.workspaceId, q.projectId, q.id, a.user.id, o), 202);
+    return c.json(await startRender(a.workspaceId, q.projectId, q.id, a.user.id, o), 202);
 });
 extra.get("/sequences/:id/renders", (c) => {
     const { s } = ctx(c);
-    return c.json(s.list("renders", { sequenceId: c.req.param("id") }, "created_at DESC").map((r: any) => ({ id: r.id, status: r.status, draft: r.manifest?.options?.draft === true, quality: finalQualityView(s, r), error: r.error, createdAt: r.createdAt, media: r.mediaId ? mediaView(s.get("media", r.mediaId)) : null })));
+    const sequence = s.get("sequences", c.req.param("id"));
+    if (!sequence) throw notFound("sequence");
+    return c.json(s.list("renders", { sequenceId: sequence.id, projectId: sequence.projectId }, "created_at DESC").map(render => {
+        const media = finalRenderMedia(s, render);
+        return { id: render.id, status: render.status, draft: render.manifest?.options?.draft === true, quality: finalQualityView(s, render, media), error: render.error, createdAt: render.createdAt, media: mediaView(media) };
+    }));
 });
 extra.put("/sequences/:id/subtitles", async (c) => {
     const { s } = ctx(c, "EDITOR");

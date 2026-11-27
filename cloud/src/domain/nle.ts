@@ -219,11 +219,13 @@ export function validateTimeline(s: Scope, t: Body) {
             const aspectIssue = output && mediaAspectIssue(s, output);
             if (aspectIssue) throw bad(aspectIssue);
         }
-        if (src.mime?.startsWith("audio/") && (tk.role === "dialogue" || media?.source === "speechReference" || c.dialogueLineIndex !== undefined)) {
+        if (c.dialogueLineIndex !== undefined || c.dialogueText !== undefined || media?.source === "speechReference" || (tk.role === "dialogue" && src.mime?.startsWith("audio/"))) {
+            if (!src.mime?.startsWith("audio/")) throw bad("独立逐句配音须引用真实音频素材");
             const parent = t.clips.find(item => item.id === c.linkedClipId);
             const shot = parent?.shotId ? s.get("shots", parent.shotId) : null;
             const line = c.dialogueLineIndex === undefined ? null : shot?.creativeBrief?.dialogue?.lines?.[c.dialogueLineIndex];
             if (tk.kind !== "audio" || !parent || !line || c.shotId !== parent.shotId || c.dialogueText !== line.text) throw bad("对白缺少当前镜头、原句和台词窗口关联；请通过 soundCues 排轨，改轨道名称或角色不能绕过校验");
+            if (media?.projectId !== shot?.projectId) throw bad("独立逐句配音须引用当前项目的音频素材");
             if (line.audio && (line.audio.mediaId !== c.mediaId || line.audio.text !== line.text)) throw bad("对白音轨与当前规划绑定的真实配音不符，不能换音轨绕过容量检查");
             const start = parent.start + (line.start - parent.in) / parent.speed;
             const stop = parent.start + (line.end - parent.in) / parent.speed;

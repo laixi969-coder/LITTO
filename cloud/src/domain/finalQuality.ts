@@ -127,12 +127,25 @@ export function sequenceFingerprint(s: Scope, sequenceId: string) {
   return createHash("sha256").update(JSON.stringify({ renderVersion: 2, ...(sources.some(item => item.shot?.techniques?.length) ? { techniqueVersion } : {}), edit, sources, ...(sequence && isAdSequence(sequence) ? { advertising: adContext(s, { sequenceId, projectId }) } : {}) })).digest("hex");
 }
 
+export function finalRenderMedia(s: Scope, render: Record<string, any>) {
+  if (render.status !== "SUCCEEDED" || !render.mediaId || s.get("sequences", render.sequenceId)?.projectId !== render.projectId) return null;
+  const media = s.get("media", render.mediaId);
+  if (!media || media.projectId !== render.projectId || media.source !== "render" || !media.mime?.startsWith("video/")) return null;
+  const manifest = render.manifest;
+  if (manifest?.encoderVersion >= 4 && (!manifest.outputMediaId || !manifest.outputHash)) return null;
+  if ((manifest?.outputMediaId && manifest.outputMediaId !== media.id) || (manifest?.outputHash && manifest.outputHash !== media.hash)) return null;
+  const quality = manifest?.quality;
+  const reviewedHash = quality?.coverage === "fileIntegrity" ? quality.expectedHash : quality?.hash;
+  if ((quality?.mediaId && quality.mediaId !== media.id) || (reviewedHash && media.hash && reviewedHash !== media.hash)) return null;
+  return media;
+}
+
 function renderMedia(s: Scope, id: string) {
   const render = s.get("renders", id);
   if (!render) throw notFound("render");
   if (render.manifest?.options?.draft) throw conflict("草稿导出不进入检测验收；需要验收请重新导出并省略 options.draft", "draft_render");
-  const media = render.mediaId ? s.get("media", render.mediaId) : null;
-  if (render.status !== "SUCCEEDED" || !media || media.projectId !== render.projectId) throw conflict("请先完成成片导出", "no_render");
+  const media = finalRenderMedia(s, render);
+  if (!media) throw conflict("成片尚未就绪或文件与导出记录不符，请核对原文件或重新导出", "no_render");
   return { render, media };
 }
 
@@ -162,20 +175,20 @@ export function finalReviewPlan(s: Scope, sequenceId: string) {
   return { fields: finalReviewFields(sequence.kind ?? "story", shots.some(needsLipSync), shots.some(shot => !!shot.musicVideo)), cuts };
 }
 
-export function finalQualityView(s: Scope, render: Record<string, any>) {
+export function finalQualityView(s: Scope, render: Record<string, any>, media = finalRenderMedia(s, render)) {
   const quality = render.manifest?.quality;
   const techniques = finalTechniquePlan(s, render.sequenceId);
   const plan = finalReviewPlan(s, render.sequenceId);
   if (!quality) return { status: "unverified", techniques, plan };
   const fingerprint = sequenceFingerprint(s, render.sequenceId);
-  const stale = !render.manifest?.sourceFingerprint || render.manifest.sourceFingerprint !== fingerprint || quality.mediaId !== render.mediaId;
+  const stale = !media || render.manifest?.sourceFingerprint !== fingerprint || quality.mediaId !== media.id;
   const sequence = s.get("sequences", render.sequenceId);
   const adReviewRequired = sequence && isAdSequence(sequence) && (quality.advertising?.hash !== quality.hash || quality.advertising?.fingerprint !== fingerprint || !adReadiness(s, sequence.id).ready);
   const storyReviewRequired = plan.fields.some(field => quality.review?.checks?.[field.id] !== "pass")
     || plan.cuts.some(cut => !quality.review?.cutReview?.some((item: any) => item.id === cut.id && Math.abs(item.seconds - cut.seconds) < 0.001 && item.verdict === "pass" && item.note?.trim().length >= 10));
   const techniqueReviewRequired = techniques.some(item => !quality.review?.techniqueReview?.some((check: { shotId: string; id: string; verdict: string }) => check.shotId === item.shotId && check.id === item.id && check.verdict === "pass"));
   let speechReviewRequired = false;
-  if (quality.status === "pass") {
+  if (!stale && quality.status === "pass") {
     try { assertSpeechExport(s, render.sequenceId); }
     catch (error) { if (!(error instanceof HttpError)) throw error; speechReviewRequired = true; }
   }
@@ -244,6 +257,7 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
     const hash = data && sha256(data);
     const active = render.manifest?.quality;
     const previous = active?.coverage === "fileIntegrity" ? render.manifest.qualityBeforeFileIssue : active;
+    const expectedHash = media.hash || (active?.coverage === "fileIntegrity" ? active.expectedHash : active?.hash);
     const matchesTimeline = render.manifest?.sourceFingerprint === fingerprint;
     const musicPlan = matchesTimeline ? musicInspectionPlan(s, render.sequenceId) : null;
     const speechPlan = matchesTimeline ? speechInspectionPlan(s, render.sequenceId) : null;
@@ -263,10 +277,10 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
     function reusePrevious() {
       return active === previous ? finalQualityView(s, currentRender()) : saveQuality(previous);
     }
-    if (!data || (media.hash && media.hash !== hash)) {
-      if (active?.coverage === "fileIntegrity" && active.mediaId === media.id && active.hash === hash && active.expectedHash === media.hash) return finalQualityView(s, currentRender());
+    if (!data || (expectedHash && expectedHash !== hash)) {
+      if (active?.coverage === "fileIntegrity" && active.mediaId === media.id && active.hash === hash && active.expectedHash === expectedHash) return finalQualityView(s, currentRender());
       const finding: Finding = { id: "outputHash", severity: "block", message: data ? "成片文件内容与导出记录不符，请恢复原文件后重新检测" : "找不到已导出的成片文件，请恢复后重新检测" };
-      const quality = { analysisId: randomUUID(), inspectionVersion: 3, inspectionFingerprint, mediaId: media.id, hash, expectedHash: media.hash, checkedAt: now(), status: "fail", coverage: "fileIntegrity", findings: [finding], seams: [], silences: [] };
+      const quality = { analysisId: randomUUID(), inspectionVersion: 3, inspectionFingerprint, mediaId: media.id, hash, expectedHash, checkedAt: now(), status: "fail", coverage: "fileIntegrity", findings: [finding], seams: [], silences: [] };
       return saveQuality(quality, previous?.mediaId === media.id ? previous : undefined);
     }
     // 旧版成片仍保留当时的实测与听审记录，不能用今天的时间线重建当时的逐句计划。

@@ -299,7 +299,7 @@ production.post("/takes/:id/approve", async (c) => {
     const take = approveTake(s, c.req.param("id"), a.user.id, b.overrideReason ? { reason: b.overrideReason } : undefined);
     const shot = s.get("shots", take.shotId)!;
     try {
-        const render = assembleApprovedSequence(s, shot.sequenceId, a.user.id);
+        const render = await assembleApprovedSequence(s, shot.sequenceId, a.user.id);
         return c.json({ ...takeView(take), autoRender: render ? { id: render.id, status: render.status } : null });
     } catch (cause) {
         return c.json({ ...takeView(take), autoRenderError: `镜头已采用，自动合成未启动：${cause instanceof Error ? cause.message : String(cause)}` });

@@ -355,7 +355,7 @@ export async function applyProductionDecision(s: Scope, projectId: string, prepa
     let autoRender: unknown;
     let autoRenderError: string | undefined;
     if (feedbackResult.selected) {
-      try { autoRender = assembleApprovedSequence(s, s.get("shots", s.get("takes", targetId)!.shotId)!.sequenceId, actor, true); }
+      try { autoRender = await assembleApprovedSequence(s, s.get("shots", s.get("takes", targetId)!.shotId)!.sequenceId, actor, true); }
       catch (error) { autoRenderError = "选择已保存，自动合成未启动：" + (error instanceof Error ? error.message : String(error)); }
     }
     return { ...feedbackResult, autoRender, autoRenderError };

@@ -312,18 +312,30 @@ export async function assertVideoObservation(signal: AbortSignal) {
   }
 }
 
+function observationRender(projectId: string, media: Record<string, any>, sequenceIds: string[]) {
+  if (media.source !== "render") return;
+  const api = cloud()!, scope = api.scoped(currentTenant()!.workspaceId);
+  const candidates = scope.list("renders", { projectId, mediaId: media.id }).filter(render => sequenceIds.includes(render.sequenceId));
+  if (!candidates.length && scope.list("takes", { projectId, mediaId: media.id }).some(take => sequenceIds.includes(scope.get("shots", take.shotId)?.sequenceId))) return;
+  const renders = candidates.filter(render => render.manifest?.quality?.coverage !== "fileIntegrity" && api.finalRenderMedia(scope, render)?.id === media.id
+    && render.manifest?.sourceFingerprint === api.sequenceFingerprint(scope, render.sequenceId));
+  if (renders.length !== 1) throw new Error("无法将该成片唯一对应到本任务当前剪辑，或成片文件检查未通过，请先核对导出");
+  return renders[0];
+}
+
 export async function cameraObservationPlan(directory: string, projectId: string, mediaId: string, sequenceIds: string[]) {
   const api = cloud()!, tenant = currentTenant()!, scope = api.scoped(tenant.workspaceId);
   const media = scope.get("media", mediaId);
   if (!media || media.projectId !== projectId || !media.mime.startsWith("video/") || media.deletedAt) throw new Error("只能观察当前项目的有效视频");
-  const render = scope.list("renders", { projectId }).find(item => item.mediaId === mediaId && sequenceIds.includes(item.sequenceId));
+  const render = observationRender(projectId, media, sequenceIds);
   const edit = render ? api.getEdit(scope, render.sequenceId, false) : undefined;
-  const clips = edit?.clips.filter(clip => edit.tracks.some(track => track.id === clip.trackId && track.kind === "video" && !track.muted)) ?? [];
+  const clips = edit?.clips.filter(clip => edit.tracks.some(track => track.id === clip.trackId && track.kind === "video" && !track.muted))
+    .map(clip => ({ ...clip, mediaId: api.resolveClip(scope, clip).mediaId })) ?? [];
   const takes = scope.list("takes", { projectId }).filter(take => sequenceIds.includes(scope.get("shots", take.shotId)?.sequenceId)
     && (render ? clips.some(clip => clip.shotId === take.shotId && clip.mediaId === take.mediaId) : take.mediaId === mediaId));
   if (render && clips.some(clip => clip.shotId && !takes.some(take => take.shotId === clip.shotId && take.mediaId === clip.mediaId)))
     throw new Error("成片含未登记为镜头候选的视频，须先登记并按当前摄影规格审阅");
-  if (!takes.length && !scope.list("renders", { projectId }).some(render => render.mediaId === mediaId && sequenceIds.includes(render.sequenceId))) {
+  if (!takes.length && !render) {
     if (media.source?.startsWith("speechAssembly:")) {
       const assembly = await validateSpeechAssembly(directory, media.source.slice("speechAssembly:".length));
       if (assembly.output?.mediaId !== mediaId || !sequenceIds.includes(assembly.sequenceId)) throw new Error("完整口型结果不属于本任务序列");
@@ -356,10 +368,11 @@ export async function cameraObservationPlan(directory: string, projectId: string
 }
 
 /** 发送完整视频与原声音，不以抽帧、音轨存在或静音检测代替完整声画观察。 */
-export async function observeVideo(directory: string, taskId: string, projectId: string, mediaId: string, prompt: string, signal: AbortSignal, cameraPlan: Awaited<ReturnType<typeof cameraObservationPlan>>, events: NarrativeEvent[]) {
+export async function observeVideo(directory: string, taskId: string, projectId: string, mediaId: string, prompt: string, signal: AbortSignal, cameraPlan: Awaited<ReturnType<typeof cameraObservationPlan>>, events: NarrativeEvent[], sequenceIds: string[]) {
   const api = cloud()!, tenant = currentTenant()!;
   const scope = api.scoped(tenant.workspaceId), media = scope.get("media", mediaId);
   if (!media || media.projectId !== projectId || !media.mime.startsWith("video/") || media.deletedAt) throw new Error("只能审阅当前项目的有效视频");
+  const render = observationRender(projectId, media, sequenceIds);
   if (!media.size || media.size > 100 * 1024 * 1024) throw new Error("完整视频审阅最多支持100MB，原视频保留，请在本任务内按镜头制作与导出");
   const bytes = await api.storage.get(media.storageKey);
   const hash = createHash("sha256").update(bytes).digest("hex");
@@ -372,7 +385,6 @@ export async function observeVideo(directory: string, taskId: string, projectId:
   const ffmpeg = await createWorkspaceFfmpeg(directory, signal);
   const probe = await new Promise<{ streams?: { codec_type?: string }[] }>((resolve, reject) => ffmpeg.ffprobe(path, (error, data) => error ? reject(error) : resolve(data)));
   const hasAudio = probe.streams?.some(stream => stream.codec_type === "audio") ?? false;
-  const render = scope.list("renders", { projectId }).find(item => item.mediaId === mediaId);
   const shotIds = new Set(scope.list("takes", { projectId }).filter(take => take.mediaId === mediaId).map(take => take.shotId as string));
   if (!render && !shotIds.size && media.source?.startsWith("speechAssembly:")) shotIds.add((await validateSpeechAssembly(directory, media.source.slice("speechAssembly:".length))).shotId);
   if (!render && !shotIds.size) {
@@ -490,8 +502,10 @@ export async function observeVideo(directory: string, taskId: string, projectId:
     if (!take || (!render && take.mediaId !== mediaId) || api.shotFingerprint(scope, take.shotId) !== plan.fingerprint) throw new Error("审阅期间镜头规格已变化，请按当前规格重新观察");
     return { ...observed, fingerprint: plan.fingerprint };
   });
-  if (api.scoped(tenant.workspaceId).get("media", mediaId)?.hash !== hash) throw new Error("审阅期间媒体已变化");
-  if (render && JSON.stringify(api.getEdit(api.scoped(tenant.workspaceId), render.sequenceId, false)) !== JSON.stringify(edit)) throw new Error("审阅期间剪辑已变化，请按当前时间线重新观察");
+  if (render && createHash("sha256").update(await api.storage.get(media.storageKey)).digest("hex") !== hash) throw new Error("审阅期间成片文件已改变，请重新检测");
+  const currentMedia = scope.get("media", mediaId);
+  if (currentMedia?.hash !== hash || currentMedia.storageKey !== media.storageKey) throw new Error("审阅期间媒体已变化");
+  if (render && observationRender(projectId, currentMedia, sequenceIds)?.id !== render.id) throw new Error("审阅期间成片已变化，请按当前时间线重新观察");
   const observation = { mediaId, hash, note: review.note, cameraReviews, storyChecks: review.storyChecks, cutReviews: review.cutReviews, eventReviews: review.eventReviews.map(event => ({ ...event, quote: eventPlan.find(item => item.id === event.id)!.quote })), dialogueReviews: review.dialogueReviews, lipSyncReviews: review.lipSyncReviews, visualChecks: review.visualChecks };
   // 普通与自动制作共同使用服务端观察回执；制作助手不能用自己填写的 pass 替代观察结果。
   if (!render) for (const plan of cameraPlan) {

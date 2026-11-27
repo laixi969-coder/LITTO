@@ -50,6 +50,7 @@ export async function makeDerivatives(media: { id: string; workspaceId: string; 
 
 export type Probe = {
   duration: number | null; width: number | null; height: number | null; hasVideo: boolean; hasAudio: boolean;
+  videoRange: { start: number; end: number } | null;
   video: {
     codec: string | null; pixelFormat: string | null; bitsPerRawSample: number | null;
     colorRange: string | null; colorSpace: string | null; colorTransfer: string | null; colorPrimaries: string | null;
@@ -66,16 +67,34 @@ const run2 = (cmd: string, args: string[], signal?: AbortSignal) => new Promise<
 });
 
 /** ffprobe a file on disk; null when ffprobe is unavailable or the file is unreadable. */
-export async function probeFile(path: string, signal?: AbortSignal): Promise<Probe | null> {
+export async function probeFile(path: string, signal?: AbortSignal, checkVideoRange = false): Promise<Probe | null> {
     const r = await run2("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", path], signal);
     if (r.code !== 0) return null;
     try {
         const j = JSON.parse(r.out);
         const v = (j.streams ?? []).find((s: any) => s.codec_type === "video" && s.disposition?.attached_pic !== 1);
+        let videoRange: Probe["videoRange"] = null;
+        if (checkVideoRange && v) {
+            const origin = Number(j.format?.start_time) || 0;
+            let first = Number(v.start_time), last = first + Number(v.duration);
+            if (!Number.isFinite(last) || last <= first) {
+                // WebM 等容器可能只给总时长。只在缺少画轨时长时读取视频包，长音轨不能替画面补时。
+                const packets = await run2("ffprobe", ["-v", "error", "-select_streams", String(v.index), "-show_packets", "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", path], signal);
+                if (packets.code !== 0) return null;
+                first = Infinity; last = -Infinity;
+                for (const row of packets.out.trim().split("\n")) {
+                    const [pts, duration] = row.split(",");
+                    if (!pts || !Number.isFinite(Number(pts))) continue;
+                    first = Math.min(first, Number(pts));
+                    last = Math.max(last, Number(pts) + (Number(duration) || 0));
+                }
+            }
+            if (Number.isFinite(first) && last > first) videoRange = { start: first - origin, end: last - origin };
+        }
         const d = Number(j.format?.duration ?? v?.duration);
         const bits = Number(v?.bits_per_raw_sample);
         const tag = (value: unknown) => typeof value === "string" && value !== "unknown" && value !== "unspecified" ? value : null;
-        return { duration: Number.isFinite(d) ? d : null, width: v?.width ?? null, height: v?.height ?? null, hasVideo: !!v, hasAudio: (j.streams ?? []).some((s: any) => s.codec_type === "audio"),
+        return { duration: Number.isFinite(d) ? d : null, width: v?.width ?? null, height: v?.height ?? null, hasVideo: !!v, hasAudio: (j.streams ?? []).some((s: any) => s.codec_type === "audio"), videoRange,
           // ACT: 只保留源文件声明；缺标记不猜BT.709，raw sample位数不等于有效影像精度。
           video: v ? { codec: tag(v.codec_name), pixelFormat: tag(v.pix_fmt), bitsPerRawSample: Number.isInteger(bits) && bits > 0 ? bits : null,
             colorRange: tag(v.color_range), colorSpace: tag(v.color_space), colorTransfer: tag(v.color_transfer), colorPrimaries: tag(v.color_primaries) } : null };

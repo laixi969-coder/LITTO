@@ -11,7 +11,7 @@ import { inspectVision } from "./qc-vision.ts";
 import { adDirectionFingerprint, adDirectionSchema, adPilotAssessment, adReadiness, adShotIssues, updateSequenceData } from "./adDirection.ts";
 import { creativeDirectionIssues } from "./creativeDirection.ts";
 import { shotFingerprint } from "./realism.ts";
-import { finalQualityView, sequenceFingerprint } from "./finalQuality.ts";
+import { finalQualityView, finalRenderMedia, sequenceFingerprint } from "./finalQuality.ts";
 import { sampleVideoFrames } from "./mediaInspection.ts";
 import type { ShotInput } from "./schema.ts";
 
@@ -132,6 +132,7 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
         : Object.fromEntries(creativeKeys.map(key => [key, { verdict: "pass|revise|unverified", severity: "block|review", evidence: [{ frameIndex: 0, observation: "具体可见证据" }], repair: "修正建议或通过依据；不虚构未见内容" }])) }),
   }, input.model, text => (operation === "analyzeReference" ? referenceSchema : creativeSchema).parse(parseJson(text)), input.reconsider);
   const parsed = operation === "analyzeReference" ? referenceSchema.parse(parseJson(result.text)) : creativeSchema.parse(parseJson(result.text));
+  if (render && sha256(await storage.get(media.storageKey)) !== sampled.hash) throw conflict("广告审片期间成片文件已改变，请重新检测", "stale");
   signal?.throwIfAborted();
   const latest = s.get("sequences", sequence.id);
   if (!latest || latest.projectId !== projectId || s.get("media", mediaId)?.storageKey !== media.storageKey) throw conflict("检查期间素材已改变", "stale");
@@ -156,7 +157,8 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
     return { review, readiness: adReadiness(s, sequence.id), adoptionRequired };
   }
   const current = s.get("renders", render!.id);
-  if (current?.mediaId !== mediaId || current?.manifest?.quality?.analysisId !== render!.manifest.quality.analysisId) throw conflict("成片检测已改变", "stale");
+  if (!current || finalRenderMedia(s, current)?.id !== mediaId || current.manifest?.quality?.coverage === "fileIntegrity"
+    || current.manifest?.quality?.analysisId !== render!.manifest.quality.analysisId) throw conflict("成片检测已改变", "stale");
   if (current.manifest.quality.advertising?.jobId === result.jobId && current.manifest.quality.advertising.fingerprint === fingerprint) return finalQualityView(s, current);
   if (JSON.stringify(current.manifest.quality.review) !== JSON.stringify(render!.manifest.quality.review)
     || JSON.stringify(current.manifest.quality.advertising) !== JSON.stringify(render!.manifest.quality.advertising)) throw conflict("审片期间已有新的验收或广告审片记录，请刷新后复核", "stale");

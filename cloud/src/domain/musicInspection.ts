@@ -40,7 +40,8 @@ export function musicInspectionPlan(s: Scope, sequenceId: string) {
   const sequence = s.get("sequences", sequenceId)!;
   const shots = new Map(s.list("shots", { sequenceId }).map(shot => [shot.id, shot]));
   const declared = new Set([...shots.values()].filter(shot => shot.musicVideo?.audioMode === "sourceTrack").map(shot => shot.musicVideo.sourceMediaId).filter(Boolean));
-  const manual = sequence.kind === "musicFilm" && ![...shots.values()].some(shot => shot.musicVideo?.audioMode);
+  const manual = sequence.kind === "musicFilm" && !declared.size && [...shots.values()].every(shot =>
+    !shot.musicVideo?.audioMode || shot.musicVideo.audioMode === "sourceTrack");
   if (!declared.size && !manual) return null;
   const edit = getEdit(s, sequenceId, false);
   const tracks = new Map(edit.tracks.map(track => [track.id, track]));

@@ -105,7 +105,13 @@ export function usage(workspaceId: string) {
     return { bytes: media.bytes + derivatives + workspaceFileBytes(workspaceId) + (workspaceReservations.get(workspaceId) ?? 0), files: media.files };
 }
 
-export async function saveMedia(workspaceId: string, projectId: string | null, data: Buffer, opts: { source: string; uploadId?: string; mime?: string; duration?: number; allowUnsniffed?: boolean; signal?: AbortSignal }) {
+export async function saveMedia(workspaceId: string, projectId: string | null, data: Buffer, opts: {
+    source: string; uploadId?: string; mime?: string; duration?: number; allowUnsniffed?: boolean; signal?: AbortSignal;
+    /** 文件落盘后、媒资登记前核验外部状态；失败时回收文件。 */
+    afterWrite?: () => Promise<void>;
+    /** 与媒资登记在同一事务内同步更新业务记录。 */
+    onSaved?: (id: string, hash: string) => undefined;
+}) {
     opts.signal?.throwIfAborted();
     if (data.length > uploadMaxBytes) throw bad("file too large");
     const s = sniff(data);
@@ -120,15 +126,21 @@ export async function saveMedia(workspaceId: string, projectId: string | null, d
     opts.signal?.throwIfAborted();
     const id = ulid();
     const key = `${workspaceId}/${projectId ?? "_"}/${id}`;
-    await storage.put(key, data);
     let row;
     try {
+        await storage.put(key, data);
+        if (opts.afterWrite) await opts.afterWrite();
         opts.signal?.throwIfAborted();
         // 文件写入期间其他请求也可能完成入库；同步复核配额与记录写入之间不能再 await。
         subscriptionOf(workspaceId);
         const current = get("SELECT quota_bytes FROM workspaces WHERE id=? AND deleted_at IS NULL", workspaceId);
         if (!current || usage(workspaceId).bytes + reservedUploadBytes(workspaceId, opts.uploadId) + data.length > current.quota_bytes) throw conflict("storage quota exceeded", "quota_exceeded");
-        row = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash: sha256(data), duration: probed?.duration ?? opts.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });
+        const hash = sha256(data);
+        row = tx(() => {
+            const media = scoped(workspaceId).insert("media", { id, project_id: projectId, mime, size: data.length, hash, duration: probed?.duration ?? opts.duration ?? null, width: s?.width ?? probed?.width ?? null, height: s?.height ?? probed?.height ?? null, source: opts.source, storage_key: key });
+            opts.onSaved?.(id, hash);
+            return media;
+        });
     } catch (error) {
         await storage.delete(key);
         throw error;

@@ -6,10 +6,10 @@ import { run, scoped, type Scope } from "../db.ts";
 import { setTimeout } from "node:timers/promises";
 import { probeFile, runCmd } from "../media-tools.ts";
 import { saveMedia, storage } from "../storage.ts";
-import { bad, conflict, now } from "../util.ts";
+import { bad, conflict, now, sha256 } from "../util.ts";
 import { gradeFilters, isNeutral } from "./grade.ts";
 import { end, getEdit, resolveClip, validateTimeline, type EClip } from "./nle.ts";
-import { assertSpeechExport } from "./finalQuality.ts";
+import { assertSpeechExport, sequenceFingerprint } from "./finalQuality.ts";
 import { requireNarrative } from "./narrativeGate.ts";
 
 const r3 = (n: number) => Number(n.toFixed(3));
@@ -45,20 +45,35 @@ export async function waitNleRender(s: Scope, renderId: string, signal?: AbortSi
     }
 }
 
-export async function startNleRender(workspaceId: string, projectId: string, sequenceId: string, renderId: string, opts: RenderOpts) {
+export async function startNleRender(workspaceId: string, projectId: string, sequenceId: string, renderId: string, opts: RenderOpts, sourceFingerprint: string) {
     const s = scoped(workspaceId);
     const signal = AbortSignal.timeout(30 * 60_000);
+    const assertCurrent = () => {
+        signal.throwIfAborted();
+        const render = s.get("renders", renderId);
+        if (render?.status !== "RUNNING" || render.sequenceId !== sequenceId || render.projectId !== projectId)
+            throw conflict("导出任务已结束或所属序列发生变化", "stale_render");
+        if (!s.get("projects", projectId) || s.get("sequences", sequenceId)?.projectId !== projectId
+            || render.manifest?.sourceFingerprint !== sourceFingerprint || sequenceFingerprint(s, sequenceId) !== sourceFingerprint)
+            throw conflict("导出期间剪辑或采用素材已变化，请按当前时间线重新导出", "stale_render");
+        return render;
+    };
     let dir: string | undefined;
     try {
         const unchanged = !opts.draft ? await requireNarrative({ workspaceId, projectId, sequenceId }, signal) : undefined;
+        assertCurrent();
         dir = mkdtempSync(join(tmpdir(), "milimili-nle-"));
         const media = await renderTimeline(s, sequenceId, dir, opts, undefined, signal);
-        await unchanged?.();
-        signal.throwIfAborted();
-        const saved = await saveMedia(workspaceId, projectId, readFileSync(media.file), { source: "render", duration: media.duration, signal });
-        s.update("renders", renderId, { status: "SUCCEEDED", media_id: saved.id });
+        await saveMedia(workspaceId, projectId, readFileSync(media.file), {
+            source: "render", duration: media.duration, signal, afterWrite: unchanged,
+            onSaved(outputMediaId, outputHash) {
+                const render = assertCurrent();
+                s.update("renders", renderId, { status: "SUCCEEDED", media_id: outputMediaId, manifest: { ...render.manifest, outputMediaId, outputHash } });
+            },
+        });
     } catch (e) {
-        s.update("renders", renderId, { status: "FAILED", error: signal.aborted ? "导出超过30分钟，已停止执行；已有素材保留，请检查时间线和服务器资源后重试" : (e as Error).message.slice(0, 600) });
+        if (s.get("renders", renderId)?.status === "RUNNING")
+            s.update("renders", renderId, { status: "FAILED", error: signal.aborted ? "导出超过30分钟，已停止执行；已有素材保留，请检查时间线和服务器资源后重试" : (e instanceof Error ? e.message : String(e)).slice(0, 600) });
     } finally { if (dir) rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -68,12 +83,22 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     const e = getEdit(s, sequenceId, false);
     validateTimeline(s, e);
     if (!opts.draft && !previewWindow) assertSpeechExport(s, sequenceId);
-    // 导出跨越多个 await；固定每段的素材版本，不能在中途采用新 Take 后混用两版音画。
-    for (const clip of e.clips) clip.mediaId = resolveClip(s, clip).mediaId ?? undefined;
+    // 在首次等待前固定源素材、镜头调色与字幕，所有片段按同一版时间线编码。
+    const sources = new Map(e.clips.map(clip => {
+        const source = resolveClip(s, clip);
+        return [clip, { source, shot: clip.shotId ? s.get("shots", clip.shotId) : null, media: source.mediaId ? s.get("media", source.mediaId) : null }] as const;
+    }));
     let width = opts.width ?? 0, height = opts.height ?? 0;
     const ff = await runCmd("ffmpeg", ["-version"], signal);
     if (ff.code !== 0) throw new Error("ffmpeg is not installed on the server; use the export package instead");
     const tracks = new Map(e.tracks.map((t) => [t.id, t]));
+    const isAudible = (c: EClip) => {
+        const track = tracks.get(c.trackId)!;
+        return !track.muted && c.gainDb + track.gainDb > -60;
+    };
+    const mediaByClipId = new Map([...sources].map(([clip, item]) => [clip.id, item.media]));
+    const dubbed = e.clips.filter(c => c.dialogueLineIndex !== undefined && isAudible(c))
+        .map(cue => ({ cue, original: mediaByClipId.get(cue.linkedClipId!) }));
     const video = e.clips.filter((c) => tracks.get(c.trackId)?.kind === "video" && !tracks.get(c.trackId)!.muted);
     const mainTrack = e.tracks.find((t) => t.kind === "video");
     const main = video.filter((c) => c.trackId === mainTrack?.id).sort((a, b) => a.start - b.start);
@@ -86,28 +111,33 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     const preparedMedia = new Map<string, { file: string; probe: NonNullable<Awaited<ReturnType<typeof probeFile>>> }>();
     let lut = 0;
     const addInput = async (c: EClip, needVideoOnly = false) => {
-        const r = resolveClip(s, c);
-        const sh = c.shotId ? s.get("shots", c.shotId) : null;
-        if (!r.mediaId) throw new Error(`clip for ${sh ? `shot #${sh.ord + 1}` : `"${c.label || c.id}"`} is not an approved video Take (${r.kind}); render needs real video for every shot`);
+        const { source: r, shot: sh, media: m } = sources.get(c)!;
+        if (!m) throw new Error(`clip for ${sh ? `shot #${sh.ord + 1}` : `"${c.label || c.id}"`} is not an approved video Take (${r.kind}); render needs real video for every shot`);
         const isVideo = r.mime?.startsWith("video/"), isImage = r.mime?.startsWith("image/") && c.type === "media";
         if (!isVideo && !isImage && !(needVideoOnly === false && r.mime?.startsWith("audio/")))
             throw new Error(`clip for ${sh ? `shot #${sh.ord + 1}` : `"${c.label || c.id}"`} is not an approved video Take (${r.kind}, ${r.mime ?? "no media"}); render needs real video for every shot`);
-        const m = s.get("media", r.mediaId)!;
         // ACT: 同次导出重复片段复用文件与探测，仍为每段建立独立输入以保留裁切、变速和音画滤镜。
         const key = JSON.stringify([m.id, m.storageKey, m.mime]);
         let prepared = preparedMedia.get(key);
         if (!prepared) {
             const file = join(dir, `in${inputs.length}.${ext(m.mime)}`);
-            writeFileSync(file, await storage.get(m.storageKey));
-            const probe = await probeFile(file, signal);
+            const bytes = await storage.get(m.storageKey);
+            if (bytes.length !== m.size || (m.hash && sha256(bytes) !== m.hash)) throw conflict("导出源素材的内容与存储记录不一致", "stale_media");
+            writeFileSync(file, bytes);
+            const probe = await probeFile(file, signal, needVideoOnly && !!isVideo);
             if (!probe) throw new Error(`media ${m.id} could not be read by ffprobe (${m.mime})`);
             prepared = { file, probe };
             preparedMedia.set(key, prepared);
         }
         const { file, probe: p } = prepared;
-        if ((isVideo) && !p.hasVideo) throw new Error(`media ${m.id} has no video stream`);
-        if (isVideo && p.hasAudio && (!needVideoOnly || !c.audioDetached) && e.clips.some(audio => audio.dialogueLineIndex !== undefined
-            && !tracks.get(audio.trackId)?.muted && audio.start < end(c) && end(audio) > c.start)) {
+        if (needVideoOnly && isVideo) {
+            if (!p.hasVideo) throw new Error(`media ${m.id} has no video stream`);
+            const range = p.videoRange, out = c.in + c.duration * c.speed, tolerance = c.speed / e.fps + 0.001;
+            if (!range || c.in >= range.end || out <= range.start || c.in < range.start - tolerance || out > range.end + tolerance)
+                throw bad(`片段「${c.label || c.id}」所选入点或出点超出可用视频帧；请缩短裁切区间或替换素材`);
+        }
+        if (isVideo && p.hasAudio && (!needVideoOnly || !c.audioDetached) && isAudible(c) && dubbed.some(({ cue, original }) =>
+            (needVideoOnly || original?.id === m.id || (m.hash && original?.hash === m.hash)) && cue.start < r3(end(c)) && r3(end(cue)) > c.start)) {
             throw bad("画面原音轨与后配对白同时启用，会重复发声；请先处理原音轨后再导出");
         }
         if (!width && c.id === main[0].id) {
@@ -127,9 +157,11 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     const fps = e.fps;
     const clipChain = (c: EClip, k: number, extra: string, startShift = false) => {
         const sp = c.speed, inn = c.in, out = c.in + c.duration * sp;
-        const head = info[k].image ? `[${k}:v]` : `[${k}:v]trim=start=${r3(inn)}:end=${r3(out)},`;
-        // 片段以素材公共时轴的入点归零，保留音画起始偏移；fps 补齐首帧前的显示区间。
-        return `${head}setpts=(PTS-${info[k].image ? "STARTPTS" : `${r3(inn)}/TB`})/${sp}${startShift ? `+${r3(c.start)}/TB` : ""},settb=AVTB,fps=${fps}:start_time=0,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p${extra ? "," + extra : ""}`;
+        // 保留覆盖入点的上一帧；低帧率素材的入、出点可能落在同一帧的显示区间内。
+        const head = info[k].image ? `[${k}:v]` : `[${k}:V:0]trim=end=${r3(out)},`;
+        const frames = Math.round(end(c) * fps) - Math.round(c.start * fps);
+        // 量化两端各自的绝对帧位，补齐边界不足的一帧，避免连续剪辑逐镜漂移。
+        return `${head}settb=AVTB,setpts=(PTS-${info[k].image ? "STARTPTS" : `${r3(inn)}/TB`})/${sp},fps=${fps}:start_time=0,tpad=stop_mode=clone:stop=2,trim=end_frame=${frames}${startShift ? `,setpts=PTS+${r3(c.start)}/TB` : ""},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p${extra ? "," + extra : ""}`;
     };
 
     // ---- V1 layout: black gaps, cuts (concat), dissolves (xfade), dip-to-black (fades)
@@ -139,7 +171,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     const audioItems: { k: number; c: EClip; track: string; role: string; embedded: boolean }[] = [];
     for (const [i, c] of main.entries()) {
         const k = await addInput(c, true);
-        const sh = c.shotId ? s.get("shots", c.shotId) : null;
+        const sh = sources.get(c)!.shot;
         const gr = sh?.grade && !isNeutral(sh.grade) ? gradeFilters(sh.grade, lutFor(sh.grade.lutCube)) : "";
         const next = main[i + 1], dipOut = next?.transition.type === "fade_black" ? next.transition.duration / 2 : 0;
         const dipIn = c.transition.type === "fade_black" && i > 0 ? c.transition.duration / 2 : 0;
@@ -150,7 +182,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         if (c.start > pos + 0.002) { const gl = `gap${i}`; g.push(`color=c=black:s=${width}x${height}:r=${fps}:d=${r3(c.start - pos)},format=yuv420p,setsar=1,settb=AVTB[${gl}]`); segs.push({ label: gl, dur: c.start - pos, dissolve: 0 }); pos = c.start; }
         segs.push({ label, dur: c.duration, dissolve: overlap > 0.002 && c.transition.type === "dissolve" ? Math.min(overlap, c.transition.duration) : 0 });
         pos = end(c);
-        if (info[k].hasAudio && !c.audioDetached && !tracks.get(c.trackId)!.muted) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
+        if (info[k].hasAudio && !c.audioDetached && isAudible(c)) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
     }
     let cur = segs[0].label, curLen = segs[0].dur;
     for (const [i, sg] of segs.slice(1).entries()) {
@@ -169,12 +201,12 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
         g.push(`${clipChain(c, k, "", true)}[ov${i}]`);
         g.push(`[${cur}][ov${i}]overlay=enable='between(t,${r3(c.start)},${r3(end(c))})':eof_action=pass[o${i}]`);
         cur = `o${i}`;
-        if (info[k].hasAudio && !c.audioDetached) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
+        if (info[k].hasAudio && !c.audioDetached && isAudible(c)) audioItems.push({ k, c, track: c.trackId, role: "dialogue", embedded: true });
     }
     // ---- sequence grade + optional burned subtitles
     const post: string[] = [];
     if (e.grade && !isNeutral(e.grade)) post.push(gradeFilters(e.grade, lutFor(e.grade.lutCube)), "format=yuv420p");
-    const subs = main.map((c) => ({ c, sh: c.shotId ? s.get("shots", c.shotId) : null })).filter((x) => x.sh?.subtitle);
+    const subs = main.map((c) => ({ c, sh: sources.get(c)!.shot })).filter((x) => x.sh?.subtitle);
     const srt = subs.map((x, i) => { const t = (n: number) => new Date(Math.round(n * 1000)).toISOString().slice(11, 23).replace(".", ","); return `${i + 1}\n${t(x.c.start)} --> ${t(end(x.c))}\n${x.sh!.subtitle}\n`; }).join("\n");
     if (opts.burnSubtitles && srt) {
         const filters = await runCmd("ffmpeg", ["-hide_banner", "-filters"], signal);
@@ -187,7 +219,7 @@ export async function renderTimeline(s: Scope, sequenceId: string, dir: string, 
     // ---- audio: every audio clip + embedded audio of video clips, mixed per role bus
     for (const c of e.clips) {
         const tk = tracks.get(c.trackId)!;
-        if (tk.kind !== "audio" || tk.muted) continue;
+        if (tk.kind !== "audio" || !isAudible(c)) continue;
         const k = await addInput(c, false);
         if (!info[k].hasAudio) throw new Error(`audio clip "${c.label || c.id}" has no audio stream`);
         audioItems.push({ k, c, track: c.trackId, role: tk.role ?? "sfx", embedded: false });
