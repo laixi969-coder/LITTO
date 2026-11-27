@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { isAdvertisingKind, isShortDrama, musicFilmWritingGuide } from "@toonflow/tool-scene-list/storyProject";
-import { createSkillContext, loadAgentSkills, readAdvertisingInstructions, readStoryInstructions } from "@/agent/skills";
+import { createSkillContext, loadAgentSkills, readAdvertisingInstructions, readStoryInstructions, readViralCore } from "@/agent/skills";
 import { readStoryProject } from "@/utils/story";
 import { cloud } from "@/lib/cloud";
 import { currentTenant } from "@/utils/tenant";
@@ -203,10 +203,16 @@ export async function loadProductionSkillContext(cwd: string, tools: SkillTools,
     const paths: (string | undefined)[] = [];
     if (commercialProject && name === "adfilm") {
       documents.push(await readAdvertisingInstructions(context, project));
-      paths.push(...referencePaths.adfilm);
+      paths.push(...referencePaths.adfilm.filter(path => path !== "references/creativeTranslation.md"));
     } else if (names.includes(name) && name === "workflow" && shortDramaCommerce && storyOnly) {
       documents.push(await readStoryInstructions(cwd));
-    } else if (names.includes(name)) paths.push(undefined, ...(referencePaths[name] ?? []));
+    } else if (names.includes(name)) {
+      paths.push(undefined, ...(referencePaths[name] ?? []));
+      if (name === "workflow" && shortDramaCommerce) {
+        const viralCore = await readViralCore(context);
+        if (viralCore) documents.push(`### ${viralCore.name} / ${viralCore.scope} / ${viralCore.path}\n${viralCore.content}`);
+      }
+    }
     paths.push(...specialties.filter(method => method.name === name).map(method => method.path));
     for (const path of new Set(paths)) {
       try {

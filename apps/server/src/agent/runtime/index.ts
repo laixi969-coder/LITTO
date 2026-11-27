@@ -30,7 +30,7 @@ import { t } from "@/lib/i18n";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { requiresStoryRuleValidation, type StoryLogic } from "@toonflow/tool-scene-list/storyLogic";
 import { createStoryPlanning } from "@/utils/story/planning";
-import { reviewStoryText } from "@/utils/story/review";
+import { createStoryRedTeamReviewer, reviewStoryText } from "@/utils/story/review";
 import { createStoryWriter } from "@/utils/story/writing";
 import { readStoryProject } from "@/utils/story";
 import { isAdvertisingKind, isShortDrama, storyFrameworkReady } from "@toonflow/tool-scene-list/storyProject";
@@ -190,9 +190,47 @@ export async function run(
     const cgAnimation = storyProject.brief.kind === "cgAnimation";
     const musicFilm = !cgAnimation && !commercialProject && !shortDrama && storyProject.brief.kind !== "shortDramaCommerce" && (/\bmv\b|musicfilm|音乐视频|音乐短片|音乐电影/i.test(taskIntent)
       || !/\/skill:story\b/.test(taskIntent) && (storyProject.revisions.find(item => item.id === storyProject.approvedId)?.brief.kind ?? storyProject.brief.kind) === "musicFilm");
-    // ACT: MV 入口与简短续作也保留编剧能力；是否写剧情由已选方向决定，不强制纯演唱创作故事。
-    if (musicFilm || cgAnimation || commercialProject || shortDrama || storyProject.brief.kind === "shortDramaCommerce" || /故事|剧本|剧情|短剧|爽剧|悬疑剧|剧集|story/i.test(taskIntent)) tools.push(createStoryWriter(providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm), musicFilm, () => readStoryProject(cwd)));
+    const storyPipelineActive = musicFilm || cgAnimation || commercialProject || shortDrama || storyProject.brief.kind === "shortDramaCommerce" || /故事|剧本|剧情|短剧|爽剧|悬疑剧|剧集|story/i.test(taskIntent);
+    const resolveReviewKind = (project: typeof storyProject) => (musicFilm || project.brief.kind === "musicFilm") ? "musicFilm" : isShortDrama(project.brief) ? "shortDrama" : project.brief.kind;
+    // ACT: MV 入口与简短续作也保留编剧与红队审稿能力；是否写剧情由已选方向决定，不强制纯演唱创作故事。
+    if (storyPipelineActive) tools.push(createStoryWriter(providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm), musicFilm, () => readStoryProject(cwd)));
+    const redTeamReviewer = storyPipelineActive ? createStoryRedTeamReviewer(providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm), () => readStoryProject(cwd), resolveReviewKind, storyTask) : undefined;
+    if (redTeamReviewer) tools.push(redTeamReviewer.tool);
     if (prepareTools) tools = prepareTools(tools);
+    const createdDraftIds = new Set<string>();
+    if (redTeamReviewer) tools = tools.map(tool => {
+      if (tool.name === "saveStoryDraft" || tool.name === "updateStoryProject") return {
+        ...tool,
+        async execute(id, params, ...rest) {
+          const result = await tool.execute(id, params, ...rest);
+          const isNewDraft = tool.name === "saveStoryDraft" || (params as { action?: { type?: string } } | undefined)?.action?.type === "draft";
+          const revisions = (result.details as { revisions?: { id?: string }[] } | undefined)?.revisions;
+          const latestId = isNewDraft ? revisions?.at(-1)?.id : undefined;
+          if (latestId) createdDraftIds.add(latestId);
+          return result;
+        },
+      };
+      if (tool.name === "requestStoryApproval") return {
+        ...tool,
+        async execute(id, params, ...rest) {
+          const revisionId = (params as { revisionId?: string } | undefined)?.revisionId;
+          // ACT: 仅对本轮新写的完整剧本候选启用红队门控；旧稿、用户导入稿、局部patch及模型异常/耗尽均放行，防止阻塞。
+          if (revisionId && createdDraftIds.has(revisionId) && !redTeamReviewer.exhausted()) {
+            const review = redTeamReviewer.reviewOf(revisionId);
+            if (!review) {
+              const details = { approved: false, revisionId, needsRedTeamReview: true, message: "本版新剧本尚未经过独立红队审稿；请先调用 reviewStoryDraft 核查开场拦截力、去AI味、超级记忆锤与载体红队清单，再调用 requestStoryApproval。" };
+              return { content: [{ type: "text", text: JSON.stringify(details) }], details };
+            }
+            if (review.verdict === "revise" && "revision" in review && review.revision === "structure") {
+              const details = { approved: false, revisionId, needsRedTeamReview: true, message: "本版剧本在独立红队审稿中被判 structure（开场无力、平庸无记忆锤、品牌贴标或核心因果缺陷），禁止直接申请采用；请按审稿证据重构并保存新版本，再次通过 reviewStoryDraft 后再申请采用。" };
+              return { content: [{ type: "text", text: JSON.stringify(details) }], details };
+            }
+          }
+          return tool.execute(id, params, ...rest);
+        },
+      };
+      return tool;
+    });
     const planning = enforceStoryDelivery ? createStoryPlanning(storyTask, providerId, modelId, toolSignal => loadStoryWritingContext(cwd, tools, taskIntent, toolSignal, musicFilm)) : undefined;
     const storyReviews = new Map<string, Awaited<ReturnType<typeof reviewStoryText>>>();
     const storyReviewClaims = new Map<string, string>();
@@ -230,7 +268,8 @@ export async function run(
               // ACT: 审读不继承作者的深度思考配置，避免长推理耗尽时限。
               const reviewer = await createAgentModel(providerId, modelId, "off");
               const instructions = await loadStoryWritingContext(cwd, tools, taskIntent, signal, musicFilm);
-              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? storyTask : prompt, prepared.text, ruleClaims, signal!, instructions);
+              const reviewKind = musicFilm ? "musicFilm" : shortDrama ? "shortDrama" : storyProject.brief.kind;
+              semanticReview = await reviewStoryText(reviewer.runtime, reviewer.runtime.getModel(providerId, modelId)!, planning ? storyTask : prompt, prepared.text, ruleClaims, signal!, instructions, reviewKind);
             } catch (error) {
               if (signal?.aborted) throw error;
               semanticReview = { verdict: "unverified", issues: [], message: "独立审读请求失败或超过三分钟，不能宣称通过" };

@@ -3,11 +3,11 @@ name: story
 description: >
   为短视频、商业广告、电影和剧集创作、改写有戏剧冲突的故事或剧本；支持现实题材、爱情、亲情、喜剧、悬疑、推理、动作、冒险、科幻、奇幻、寓言及实验叙事。每场戏都要有冲突与转折。也支持主持人系列、当下被改写、秩序即世界等特色写法。恐怖、生活流和安静情感戏不作为本技能目标。
 metadata:
-  version: "2.2.0"
+  version: "2.3.0"
   displayName: 故事与剧本
   shortDramaEntry: shortDrama.md
   author: MILI MILI
-  basedOn: hiccai-host-story
+  basedOn: hiccai-host-story, hiccai-baokuan
   sourceCommit: 3d425deeaacf2f092f5eea3071912fe10ffb41c0
 ---
 
@@ -21,7 +21,7 @@ metadata:
 
 新故事先用 framework 保存标题、作品形式和可读框架（一句话故事、人物与锁定事实、主要段落、伏笔和结尾），再调用 requestStoryDecision(confirmFramework) 等待用户亲自确认并选择 sample、episodes 或 draft。未确认不写完整正文，自动决定不代替框架确认；框架或依据变化后重新确认。样稿与分集大纲用 expansion 保存，完整正文仍用 draft。已有定稿局改不重新起框架。每轮给少量具体下一步选择；用户只选一场或一集就只写该范围。电影不因“继续”变剧集，核对人物年龄、时间跨度、道具内容与数字，修改已定事实须说明。用户禁止存盘时，在聊天交框架后停下等确认。
 
-先判断观众主要会期待什么：例如笑、好奇、紧张、心动、心疼、惊叹、思考或复杂感受。允许多种体验并存，按用户意图确定主次。类型不决定唯一体验。写视频故事读 [references/video.md](references/video.md) 和 [references/scenes.md](references/scenes.md)；需要具体判断题材时读 [references/genres.md](references/genres.md)。
+先判断观众主要会期待什么：例如笑、好奇、紧张、心动、心疼、惊叹、思考或复杂感受。允许多种体验并存，按用户意图确定主次。类型不决定唯一体验。写视频故事读 [references/video.md](references/video.md)、[references/scenes.md](references/scenes.md) 与 [references/viralCore.md](references/viralCore.md)；需要具体判断题材时读 [references/genres.md](references/genres.md)。在保持逻辑可信与用户定调的前提下，优先打磨时代情绪锚点、开场拦截力、超级视听锤/道具记忆点，彻底清除 AI 套话腔与直白抒情。
 
 用户要品牌叙事广告、产品广告或商业微电影时，另读 [references/advertising.md](references/advertising.md)：让传播任务、品牌或产品作用与剧情共同成立，不把纯戏剧指标当作广告效果。
 

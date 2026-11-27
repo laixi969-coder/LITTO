@@ -1,8 +1,8 @@
 ---
 name: adfilm
-description: 创作商业广告、品牌片与原生短视频，支持消费者洞察、差异创意方向、Big Idea、品牌文案、脑洞与二创、Hook 和完整分镜。已整合 hiccai-insight-new、hiccai-72、hiccai-wenan、hiccai-wild 与 hiccai-pop 的适用方法；按任务选择，不强套反转或生活小故事。按用户要求交付创意成稿或衔接 MILI MILI 制作；纯叙事影片使用 cinema。
+description: 创作商业广告、品牌片与原生短视频，支持消费者洞察、差异创意方向、Big Idea、品牌文案、脑洞与二创、Hook 和完整分镜。已整合 hiccai-insight-new、hiccai-72、hiccai-wenan、hiccai-wild、hiccai-pop 与 hiccai-baokuan 的适用方法；按任务选择，不强套反转或生活小故事。按用户要求交付创意成稿或衔接 MILI MILI 制作；纯叙事影片使用 cinema。
 metadata:
-  version: "1.8.1"
+  version: "1.9.0"
   displayName: 广告与原生短视频
   author: MILI MILI
 ---
@@ -54,7 +54,7 @@ metadata:
 3. **时长与画幅**：缺失时按渠道给默认值（见 [平台规格](references/platforms.md)），并说明是默认。
 4. **必须出现的卖点与禁忌**：1–3 个卖点；不能出现的内容（竞品、特定词、颜色、人物）。
 
-缺项超过一项时，用 `askUser` 的 `fields` 一次问完（字段名如 `product`、`channel`、`duration`、`mustSay`），不要逐条追问；用户跳过或没回答，就用保守默认值继续并标明「待确认」。不要求用户先写策划案。
+缺项超过一项时，用 `askUser` 的 `fields` 一次问完（字段名如 `product`、`channel`、`duration`、`mustSay`），不要逐条追问；若用户只给一句宽泛需求且缺乏锋利弹药，优先一并追问 3 个反向挖料切口：①产品/品牌最反常识或带点荒诞感的真实细节；②目标人群最具体、最窝火的精确生活场景（时间/地点/动作）；③最想让观众看完立刻做的动作，并给出“按默认假设起跑”快捷出口。用户跳过或没回答，就用保守默认值继续并标明「待确认」。不要求用户先写策划案。
 
 选择消费者洞察路线或用户要求洞察时，先读取 [insight](../insight/SKILL.md) 及其“交给商业广告”部分，再写策略。没有材料可探索明确标注的假设，但必须有具体情境、进展、阻力/取舍与行为后果；“年轻人需要自信”等愿望不是合格洞察。产品事实、感官体验和品牌资产也可直接作为入口，不为填洞察栏编造心理动机。卖点未知时避开相关承诺，只追问会改变主张的缺口。
 

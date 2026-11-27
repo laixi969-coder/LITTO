@@ -11,6 +11,7 @@
 | [hiccai-pop](https://github.com/laixi969-coder/hiccai-pop/tree/249e0873a9f0c91e8ad374e50a78e00b42d7283d) | v3.5.2 主技能；现有12份参考资料；重点复核前三秒、反转判定与制作条件 | 复用 [nativeShortVideo](nativeShortVideo.md) 及现有参考；限定原生制作规则的适用范围 |
 | [hiccai-wild](https://github.com/laixi969-coder/hiccai-wild/tree/82b5739f51bd8a518bcd8696a4b191319c512e9b) | 主技能、creative-mechanics、distribution | [socialPlay](socialPlay.md) 的荒诞规则、关系分享、二创母版与按需传播 |
 | [hiccai-wenan](https://github.com/laixi969-coder/hiccai-wenan/tree/5fd2df84d00eccd0ed5b37e86633468f6e1ebe95) | v4.0.0 主技能、formats、creative-review | [brandWriting](brandWriting.md) 的主张、媒介表达、高端/销售适配及反事实筛选 |
+| [hiccai-baokuan](https://github.com/laixi969-coder/hiccai-baokuan) | 主控 SKILL.md 与 8 载体 references（视频类 6 载体吸收） | [viralCore](../../story/references/viralCore.md) 与各视频载体技能（反向挖料、情绪水位、视听双锤、Few-Shot 校准、红队清单）；舍弃模型自评 10 分制与非视频图文主入口 |
 
 上游作者/来源为 laixi969-coder（各文件署名按原仓库）。本次为方法归纳与适配，不声称完整复制72张卡，也不引入上游测试文件。原有 pop 的固定版本与来源声明继续保留。insight-new 经 GitHub 仓库元数据确认 private=false、visibility=public；技能不在仓库根目录，而在 skills/hiccai-insight/SKILL.md。公开网页曾返回404不能证明仓库私有或不存在。
 

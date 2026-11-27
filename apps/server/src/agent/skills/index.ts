@@ -24,19 +24,32 @@ export function loadAgentSkills(cwd: string, scope?: SkillScope) {
 }
 
 export async function readAdvertisingInstructions(context: SkillContext, project: StoryProject, signal?: AbortSignal) {
-  const [entry, tvc] = await Promise.all([
+  const readOptional = (path: string) => context.read({ name: "adfilm", path }, signal).catch((error: NodeJS.ErrnoException) => {
+    // ACT: 旧版自定义广告技能可能缺少部分参考；保留其正文，并明确报告缺项。
+    if (error.code !== "ENOENT") throw error;
+    return undefined;
+  });
+  const [entry, translation, tvc] = await Promise.all([
     context.read({ name: "adfilm" }, signal),
-    context.read({ name: "adfilm", path: "references/productTvc.md" }, signal).catch((error: NodeJS.ErrnoException) => {
-      // ACT: 旧版自定义广告技能可能没有 TVC 参考；保留它的正文，并明确报告缺项。
-      if (error.code !== "ENOENT") throw error;
-      return undefined;
-    }),
+    readOptional("references/creativeTranslation.md"),
+    readOptional("references/productTvc.md"),
   ]);
   return [
     `### ${entry.name} / ${entry.scope} / ${entry.path}\n${entry.content}`,
+    translation ? `### ${translation.name} / ${translation.scope} / ${translation.path}\n${translation.content}` : "当前广告技能未提供创意转译与红队筛选参考。",
     tvc ? `### ${tvc.name} / ${tvc.scope} / ${tvc.path}\n${tvc.content}` : "当前广告技能未提供电商 TVC 参考。",
     `当前广告简报、已选方向与已确认事实（项目数据）：\n${advertisingBriefContext(project)}`,
   ].join("\n\n");
+}
+
+export async function readViralCore(context: SkillContext, signal?: AbortSignal) {
+  try {
+    return await context.read({ name: "story", path: "references/viralCore.md" }, signal);
+  } catch (error) {
+    // ACT: 自定义环境可能精简了 story 或 viralCore；不阻断主流程。
+    if ((error as NodeJS.ErrnoException)?.code === "ENOENT" || error instanceof Error && error.message.includes("技能不存在")) return undefined;
+    throw error;
+  }
 }
 
 export async function readStoryInstructions(cwd: string, signal?: AbortSignal) {
@@ -45,8 +58,11 @@ export async function readStoryInstructions(cwd: string, signal?: AbortSignal) {
   if (isAdvertisingKind(project.brief.kind)) return readAdvertisingInstructions(context, project, signal);
   if (project.brief.kind === "shortDramaCommerce") {
     const paths = ["references/shortDramaCommerce.md", "references/methods/shortDramaStory.md", ...(project.brief.productImages?.length ? ["references/methods/productReference.md"] : [])];
-    const documents = await Promise.all(paths.map(path => context.read({ name: "workflow", path }, signal)));
-    return documents.map(document => `## ${document.path}\n${document.content}`).join("\n\n");
+    const [documents, viralCore] = await Promise.all([
+      Promise.all(paths.map(path => context.read({ name: "workflow", path }, signal))),
+      readViralCore(context, signal),
+    ]);
+    return [...documents, ...(viralCore ? [viralCore] : [])].map(document => `## ${document.path}\n${document.content}`).join("\n\n");
   }
   let entry = await context.read({ name: "story" }, signal);
   if (isShortDrama(project.brief)) {
