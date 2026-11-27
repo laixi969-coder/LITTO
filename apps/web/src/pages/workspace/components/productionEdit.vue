@@ -129,12 +129,46 @@
             </div>
             <p v-if="publishErrors[item.id]" role="alert">{{ publishErrors[item.id] }}（文件已导出，可直接下载或重试放到画布）</p>
             <button v-if="!item.draft" type="button" @click="run(() => analyzeQuality(item.id))">检测最终文件与声音接缝</button>
+            <details v-if="!item.draft && item.quality?.musicAlignment">
+              <summary>原曲对齐检测</summary>
+              <p>区间显示成片是否有音轨，采样点显示原曲波形的比对结果。可逐点复听，再记录最终验收。</p>
+              <ul>
+                <li v-for="(range, index) in item.quality.musicAlignment.ranges" :key="index">
+                  成片 {{ range.start.toFixed(3) }}–{{ range.end.toFixed(3) }} 秒 · {{ musicCoverageLabels[range.status] }}
+                </li>
+              </ul>
+              <ul>
+                <li v-for="(sample, index) in item.quality.musicAlignment.windows" :key="index">
+                  <button type="button" @click="run(() => replayRender($event, sample.time))">复听成片 {{ sample.time.toFixed(3) }} 秒</button>
+                  {{ sample.sourceLabel || "原曲" }} {{ sample.sourceTime.toFixed(3) }} 秒 · {{ musicOffsetLabel(sample) }}<span v-if="sample.reason">（{{ sample.reason }}）</span>
+                </li>
+              </ul>
+            </details>
+            <details v-if="!item.draft && item.quality?.speechAlignment?.lines?.length">
+              <summary>对白与旁白逐句检测</summary>
+              <p>逐句比较成片与对照声音的波形。镜头原声可能包含配乐，波形对齐时仍需复听每个字。口型和混音听感须播放成片确认。</p>
+              <ul>
+                <li v-for="(line, index) in item.quality.speechAlignment.lines" :key="index">
+                  <strong>{{ line.shotTitle || line.shotId }} · 第 {{ line.lineIndex + 1 }} 句<span v-if="line.speaker"> · {{ line.speaker }}</span></strong>
+                  <p>{{ line.text }}</p>
+                  <p>对照来源 · {{ speechReferenceLabels[line.referenceKind] || (line.referenceKind === null ? '无可用对照声音' : '历史记录未标注') }}</p>
+                  <button v-if="line.time != null" type="button" @click="run(() => replayRender($event, line.time, line.offsetMs))">复听第 {{ line.lineIndex + 1 }} 句</button>
+                  <span v-if="line.time != null">预计 {{ line.time.toFixed(3) }}<template v-if="line.end != null">–{{ line.end.toFixed(3) }}</template> 秒</span>
+                  <span v-else-if="line.end != null">预计结束于 {{ line.end.toFixed(3) }} 秒</span>
+                  <span v-else>预期时间未知</span>
+                  · {{ speechOffsetLabel(line) }}
+                  <span v-if="line.missingStart"> · {{ line.referenceKind === 'recording' ? '缺句首' : '声音区间开头缺失' }}</span><span v-if="line.missingEnd"> · {{ line.referenceKind === 'recording' ? '缺句尾' : '声音区间末尾缺失' }}</span><span v-if="line.reason"> · {{ line.reason }}</span>
+                </li>
+              </ul>
+            </details>
             <details v-if="item.quality?.advertising">
               <summary>广告表达抽帧审片</summary>
               <p>覆盖 {{ item.quality.advertising.timestamps.length }} 个样本；{{ item.quality.advertising.omittedCuts }} 个切点未专项采样。声音需完整试听。</p>
               <p v-for="field in adQualityFields" :key="field[0]">{{ field[1] }}：{{ item.quality.advertising[field[0]].evidence.map((evidence: any) => `${evidence.frameIndex < item.quality.advertising.timestamps.length ? item.quality.advertising.timestamps[evidence.frameIndex] + " 秒" : "参考图 " + (evidence.frameIndex + 1)}：${evidence.observation}`).join('；') }}。{{ item.quality.advertising[field[0]].repair }}</p>
             </details>
-            <details v-if="!item.draft && qualityDrafts[item.id] && item.quality?.analysisId">
+            <p v-if="item.quality?.coverage === 'fileIntegrity'" role="alert">{{ item.quality.findings[0]?.message }}</p>
+            <p v-else-if="item.quality?.status === 'stale' && item.quality.review?.note">此版本的验收记录 · {{ item.quality.review.note }}</p>
+            <details v-else-if="!item.draft && qualityDrafts[item.id] && item.quality?.analysisId && item.quality.status !== 'stale'">
               <summary>最终声画验收</summary>
               <p>每项记录实际观察；有意静默或声音进入需解释告警，未解决则选返修。剪辑或素材改变后须重新导出。</p>
               <label v-for="field in item.quality.plan.fields" :key="field.id">{{ field.label }}<select v-model="qualityDrafts[item.id].checks[field.id]"><option value="unverified">未验证</option><option value="fail">需要返修</option><option value="pass">已检查通过</option></select></label>
@@ -186,10 +220,14 @@ const adPlan = ref<any>(null);
 const visualLabels: Record<string, string> = { palette: "色彩", light: "用光", materials: "材质", composition: "构图", motion: "运动" };
 const grade = ref({ exposureStops: 0, temperature: 0, saturation: 1, contrast: 1 });
 const qualityLabels: Record<string, string> = { unverified: "未验收", fail: "需要返修", pass: "人工验收通过", stale: "版本已改变，须重新导出验收" };
+const musicCoverageLabels: Record<string, string> = { covered: "音轨已覆盖", missing: "音轨缺失或覆盖不足", uncertain: "无法判断音轨覆盖" };
+const speechReferenceLabels: Record<string, string> = { recording: "已采用的逐句录音", takeAudio: "已采用镜头在该区间的原声（可能含配乐）" };
+const speechStatusLabels: Record<string, string> = { aligned: "波形已对齐", early: "波形提前", late: "波形延后", truncated: "声音区间被截断", uncertain: "无法判断" };
 const qualityDrafts = ref<Record<string, { analysisId: string; checks: Record<string, string>; fullPlayback: boolean; note: string; techniques: Record<string, { verdict: string; note: string }>; cuts: Record<string, { verdict: string; note: string }>; reasons: Record<string, string> }>>({});
 let disposed = false;
 let renderTimer: ReturnType<typeof setTimeout> | undefined;
 let renderLoading = false;
+let renderRefreshPending = false;
 const lifetime = new AbortController();
 const getCanvas = inject<() => CanvasContext | undefined>("canvas");
 const published = ref(new Set<string>());
@@ -284,14 +322,15 @@ async function publish(item: any, focus = true) {
 }
 async function loadRenders() {
   const id = sequenceId.value;
-  if (!id || renderLoading || disposed) return;
+  if (!id || disposed) return;
+  if (renderLoading) { renderRefreshPending = true; return; }
   renderLoading = true;
   clearTimeout(renderTimer);
   try {
     const values = await props.request(`/sequences/${id}/renders`);
     if (disposed || id !== sequenceId.value) return;
     renders.value = values;
-    for (const item of values) if (item.quality?.analysisId && qualityDrafts.value[item.id]?.analysisId !== item.quality.analysisId) {
+    for (const item of values) if (item.quality?.analysisId && item.quality.coverage !== "fileIntegrity" && item.quality.status !== "stale" && qualityDrafts.value[item.id]?.analysisId !== item.quality.analysisId) {
       qualityDrafts.value[item.id] = { analysisId: item.quality.analysisId, checks: Object.fromEntries(item.quality.plan.fields.map((field: any) => [field.id, "unverified"])), fullPlayback: false, note: "", cuts: Object.fromEntries(item.quality.plan.cuts.map((cut: any) => [cut.id, { verdict: "unverified", note: "" }])), techniques: Object.fromEntries((item.quality.techniques ?? []).map((technique: any) => { const prior = item.quality.review?.techniqueReview?.find((check: any) => check.shotId === technique.shotId && check.id === technique.id); return [technique.shotId + ":" + technique.id, { verdict: prior?.verdict ?? "unverified", note: prior?.note ?? "" }]; })), reasons: {} };
     }
     const latest = values.find((item: any) => item.status === "SUCCEEDED" && item.media);
@@ -301,12 +340,39 @@ async function loadRenders() {
     }
   } finally {
     renderLoading = false;
-    if (!disposed && (id !== sequenceId.value || renders.value.some(item => item.status === "RUNNING" || item.status === "QUEUED"))) {
+    if (renderRefreshPending) {
+      renderRefreshPending = false;
+      await loadRenders();
+    } else if (!disposed && (id !== sequenceId.value || renders.value.some(item => item.status === "RUNNING" || item.status === "QUEUED"))) {
       renderTimer = setTimeout(() => { void loadRenders().catch(cause => { if (!disposed) error.value = String(cause); }); }, 3000);
     }
   }
 }
 async function analyzeQuality(id: string) { await props.request(`/renders/${id}/quality/analyze`, "POST", {}); await loadRenders(); }
+function offsetLabel(milliseconds: number) {
+  if (milliseconds === 0) return "0 毫秒";
+  return `${milliseconds > 0 ? "延后" : "提前"} ${Math.abs(milliseconds)} 毫秒`;
+}
+function musicOffsetLabel(sample: { status: string; offsetMs: number | null }) {
+  if (sample.status === "missing") return "该时段缺少音轨";
+  if (sample.status === "uncertain" || sample.offsetMs === null) return "无法判断偏移";
+  if (sample.offsetMs === 0) return "对齐（0 毫秒）";
+  const offset = `成片音乐${offsetLabel(sample.offsetMs)}`;
+  return sample.status === "aligned" ? `${offset}（不足一帧）` : offset;
+}
+function speechOffsetLabel(line: { status: string; offsetMs: number | null }) {
+  const status = speechStatusLabels[line.status];
+  if (line.offsetMs === null) return status;
+  const offset = offsetLabel(line.offsetMs);
+  if (line.status === "uncertain") return `已匹配片段${line.offsetMs === 0 ? "偏移 " : ""}${offset}，整句待复听`;
+  return line.status === "early" || line.status === "late" ? `波形${offset}` : `${status}（${offset}）`;
+}
+async function replayRender(event: MouseEvent, time: number, offsetMs: number | null = 0) {
+  const player = (event.currentTarget as HTMLButtonElement).closest("article")?.querySelector("video");
+  if (!player) throw new Error("未找到这份成片的播放器");
+  player.currentTime = Math.max(0, time + Math.min(0, offsetMs ?? 0) / 1000);
+  await player.play();
+}
 async function saveQuality(item: any) {
   const draft = qualityDrafts.value[item.id];
   await props.request(`/renders/${item.id}/quality/review`, "POST", { analysisId: draft.analysisId, checks: draft.checks, fullPlayback: draft.fullPlayback, note: draft.note, cutReview: item.quality.plan.cuts.map((cut: any) => ({ id: cut.id, seconds: cut.seconds, ...draft.cuts[cut.id] })), techniqueReview: (item.quality.techniques ?? []).map((technique: any) => ({ shotId: technique.shotId, id: technique.id, ...draft.techniques[technique.shotId + ":" + technique.id] })), acknowledgements: Object.entries(draft.reasons).filter(([, reason]) => reason.trim()).map(([id, reason]) => ({ id, reason })) });

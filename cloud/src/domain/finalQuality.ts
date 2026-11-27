@@ -7,7 +7,7 @@ import { z } from "zod";
 import type { Scope } from "../db.ts";
 import { storage } from "../storage.ts";
 import { probeFile, runCmd } from "../media-tools.ts";
-import { bad, conflict, notFound, now, HttpError } from "../util.ts";
+import { bad, conflict, notFound, now, sha256, HttpError } from "../util.ts";
 import { getEdit, nativeDialogueWindows, resolveClip, validateTimeline } from "./nle.ts";
 import { adContext, adReadiness, isAdSequence } from "./adDirection.ts";
 import { needsLipSync, requireReviewed, shotFingerprint } from "./realism.ts";
@@ -15,16 +15,19 @@ import { techniquePlan, techniqueVersion } from "@toonflow/tool-media-generation
 import { checkSequence, openHighIssues } from "./continuity.ts";
 import { coversSpeechRanges, finalReviewFields, hasDialogueReactions } from "@toonflow/tool-media-generation/runtime";
 import { validateMusicEdit } from "./music.ts";
+import { inspectMusicAlignment, musicInspectionPlan, prepareInspectionSources, readAudioIntervals } from "./musicInspection.ts";
+import { inspectSpeechAlignment, speechInspectionPlan } from "./speechInspection.ts";
 
 export function assertSpeechExport(s: Scope, sequenceId: string) {
   const edit = getEdit(s, sequenceId, false);
+  const { projectId } = s.get("sequences", sequenceId)!;
   validateTimeline(s, edit);
   validateMusicEdit(s, edit);
   const active = edit.clips.filter(clip => !edit.tracks.find(track => track.id === clip.trackId)?.muted);
   const pictures = active.filter(clip => edit.tracks.find(track => track.id === clip.trackId)?.kind === "video");
   const pictureRanges = pictures.map(clip => ({ start: clip.start, end: clip.start + clip.duration }));
   checkSequence(s, sequenceId);
-  for (const shot of s.list("shots", { sequenceId })) {
+  for (const shot of s.list("shots", { sequenceId, projectId })) {
     const lines = shot.creativeBrief?.dialogue?.lines ?? [];
     const clips = pictures.filter(clip => clip.shotId === shot.id);
     if (lines.length && shotDialogueMode(s, shot) === "native") {
@@ -41,17 +44,19 @@ export function assertSpeechExport(s: Scope, sequenceId: string) {
   for (const clip of pictures) {
     const shot = clip.shotId ? s.get("shots", clip.shotId) : null;
     const source = resolveClip(s, clip);
+    const media = source.mediaId ? s.get("media", source.mediaId) : null;
+    if (!shot || shot.sequenceId !== sequenceId || shot.projectId !== projectId || !media || media.projectId !== projectId) throw conflict("定稿镜头或素材归属与当前序列不符", "production_export_blocked");
     // 显式静态落版沿用已检查的主帧；不能把它当运动镜头、对白或演唱的替身。
-    if (clip.type === "media" && source.mime?.startsWith("image/") && shot?.sequenceId === sequenceId) {
+    if (clip.type === "media" && source.mime?.startsWith("image/")) {
       const hero = shot.heroKeyframeId ? s.get("keyframes", shot.heroKeyframeId) : null;
-      if (hero?.mediaId === source.mediaId && !shot.creativeBrief?.dialogue?.lines?.length && !needsLipSync(shot) && !techniquePlan(shot, "video").length) {
+      if (hero?.status === "hero" && hero.shotId === shot.id && hero.projectId === shot.projectId && hero.mediaId === source.mediaId && !shot.creativeBrief?.dialogue?.lines?.length && !needsLipSync(shot) && !techniquePlan(shot, "video").length) {
         if (openHighIssues(s, shot.id).length) throw conflict("静态落版仍有未解决的连续性问题", "continuity_blocked");
         requireReviewed(s, "keyframe", hero);
         continue;
       }
     }
     const take = shot?.approvedTakeId ? s.get("takes", shot.approvedTakeId) : null;
-    if (!shot || shot.sequenceId !== sequenceId || !take || take.mediaId !== source.mediaId || !source.mime?.startsWith("video/")) throw conflict("定稿须使用本序列已采用且经过检查的镜头视频；工作版本可用 draft:true 预览", "production_export_blocked");
+    if (!take || take.status !== "approved" || take.shotId !== shot.id || take.projectId !== shot.projectId || take.mediaId !== source.mediaId || !source.mime?.startsWith("video/")) throw conflict("定稿须使用本镜头已采用且经过检查的视频；工作版本可用 draft:true 预览", "production_export_blocked");
     if (openHighIssues(s, shot.id).length) throw conflict("本序列仍有未解决的高严重度连续性问题，请先处理后导出定稿", "continuity_blocked");
     requireReviewed(s, "take", take);
     const lines = shot.creativeBrief?.dialogue?.lines ?? [];
@@ -162,9 +167,10 @@ export function finalQualityView(s: Scope, render: Record<string, any>) {
   const techniques = finalTechniquePlan(s, render.sequenceId);
   const plan = finalReviewPlan(s, render.sequenceId);
   if (!quality) return { status: "unverified", techniques, plan };
-  const stale = !render.manifest?.sourceFingerprint || render.manifest.sourceFingerprint !== sequenceFingerprint(s, render.sequenceId) || quality.mediaId !== render.mediaId;
+  const fingerprint = sequenceFingerprint(s, render.sequenceId);
+  const stale = !render.manifest?.sourceFingerprint || render.manifest.sourceFingerprint !== fingerprint || quality.mediaId !== render.mediaId;
   const sequence = s.get("sequences", render.sequenceId);
-  const pilotReviewRequired = sequence && isAdSequence(sequence) && !adReadiness(s, sequence.id).ready;
+  const adReviewRequired = sequence && isAdSequence(sequence) && (quality.advertising?.hash !== quality.hash || quality.advertising?.fingerprint !== fingerprint || !adReadiness(s, sequence.id).ready);
   const storyReviewRequired = plan.fields.some(field => quality.review?.checks?.[field.id] !== "pass")
     || plan.cuts.some(cut => !quality.review?.cutReview?.some((item: any) => item.id === cut.id && Math.abs(item.seconds - cut.seconds) < 0.001 && item.verdict === "pass" && item.note?.trim().length >= 10));
   const techniqueReviewRequired = techniques.some(item => !quality.review?.techniqueReview?.some((check: { shotId: string; id: string; verdict: string }) => check.shotId === item.shotId && check.id === item.id && check.verdict === "pass"));
@@ -173,7 +179,7 @@ export function finalQualityView(s: Scope, render: Record<string, any>) {
     try { assertSpeechExport(s, render.sequenceId); }
     catch (error) { if (!(error instanceof HttpError)) throw error; speechReviewRequired = true; }
   }
-  return { ...quality, techniques, plan, techniqueReviewRequired, speechReviewRequired, status: stale ? "stale" : (pilotReviewRequired || storyReviewRequired || techniqueReviewRequired || speechReviewRequired) && quality.status === "pass" ? "unverified" : quality.status };
+  return { ...quality, techniques, plan, techniqueReviewRequired, speechReviewRequired, status: stale ? "stale" : (adReviewRequired || storyReviewRequired || techniqueReviewRequired || speechReviewRequired) && quality.status === "pass" ? "unverified" : quality.status };
 }
 
 export const finalReviewSchema = z.object({
@@ -216,7 +222,7 @@ const finalInspections = new Map<string, ReturnType<typeof inspectFinalFile>>();
 export async function inspectFinalQuality(s: Scope, id: string) {
   const { render, media } = renderMedia(s, id);
   const fingerprint = sequenceFingerprint(s, render.sequenceId);
-  const key = JSON.stringify([s.workspaceId, id, media.id, media.storageKey, render.manifest, fingerprint]);
+  const key = JSON.stringify([s.workspaceId, id, media.id, media.storageKey, media.hash, render.manifest, fingerprint]);
   const pending = finalInspections.get(key);
   if (pending) return pending;
   const task = inspectFinalFile(s, id, fingerprint);
@@ -231,21 +237,60 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
   const directory = await mkdtemp(join(tmpdir(), "milimiliFinalQuality"));
   try {
     const file = join(directory, "output.mp4");
-    const data = await storage.get(media.storageKey);
-    const hash = createHash("sha256").update(data).digest("hex");
-    const previous = render.manifest?.quality;
-    // ACT: 只复用同一检测版本、实际文件哈希及完整制作指纹；保留既有告警、广告审片和人工验收。
-    if (previous?.inspectionVersion === 3 && previous.hash === hash && previous.mediaId === media.id
-      && previous.inspectionFingerprint === inspectionFingerprint && render.manifest.sourceFingerprint === fingerprint) {
-      const current = s.get("renders", id);
-      if (!current || current.mediaId !== media.id || s.get("media", media.id)?.storageKey !== media.storageKey
-        || JSON.stringify(current.manifest) !== JSON.stringify(render.manifest)
-        || sequenceFingerprint(s, render.sequenceId) !== fingerprint) throw conflict("检测期间方案、素材或验收已改变", "stale");
-      return finalQualityView(s, current);
+    const data = await storage.get(media.storageKey).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+    const hash = data && sha256(data);
+    const active = render.manifest?.quality;
+    const previous = active?.coverage === "fileIntegrity" ? render.manifest.qualityBeforeFileIssue : active;
+    const matchesTimeline = render.manifest?.sourceFingerprint === fingerprint;
+    const musicPlan = matchesTimeline ? musicInspectionPlan(s, render.sequenceId) : null;
+    const speechPlan = matchesTimeline ? speechInspectionPlan(s, render.sequenceId) : null;
+    function currentRender() {
+      const { render: current, media: currentMedia } = renderMedia(s, id);
+      if (current.sequenceId !== render.sequenceId || current.projectId !== render.projectId || currentMedia.id !== media.id || currentMedia.storageKey !== media.storageKey || currentMedia.hash !== media.hash
+        || JSON.stringify(current.manifest) !== JSON.stringify(render.manifest) || sequenceFingerprint(s, render.sequenceId) !== fingerprint
+        || (matchesTimeline && musicInspectionPlan(s, render.sequenceId)?.key !== musicPlan?.key)
+        || (matchesTimeline && speechInspectionPlan(s, render.sequenceId)?.key !== speechPlan?.key)) throw conflict("检测期间方案、素材或验收已改变", "stale");
+      return current;
+    }
+    function saveQuality(quality: Record<string, any>, retained?: Record<string, any>) {
+      const { qualityBeforeFileIssue, ...manifest } = currentRender().manifest;
+      s.update("renders", id, { manifest: { ...manifest, quality, ...(retained && { qualityBeforeFileIssue: retained }) } });
+      return finalQualityView(s, s.get("renders", id)!);
+    }
+    function reusePrevious() {
+      return active === previous ? finalQualityView(s, currentRender()) : saveQuality(previous);
+    }
+    if (!data || (media.hash && media.hash !== hash)) {
+      if (active?.coverage === "fileIntegrity" && active.mediaId === media.id && active.hash === hash && active.expectedHash === media.hash) return finalQualityView(s, currentRender());
+      const finding: Finding = { id: "outputHash", severity: "block", message: data ? "成片文件内容与导出记录不符，请恢复原文件后重新检测" : "找不到已导出的成片文件，请恢复后重新检测" };
+      const quality = { analysisId: randomUUID(), inspectionVersion: 3, inspectionFingerprint, mediaId: media.id, hash, expectedHash: media.hash, checkedAt: now(), status: "fail", coverage: "fileIntegrity", findings: [finding], seams: [], silences: [] };
+      return saveQuality(quality, previous?.mediaId === media.id ? previous : undefined);
+    }
+    // 旧版成片仍保留当时的实测与听审记录，不能用今天的时间线重建当时的逐句计划。
+    if (!matchesTimeline && previous?.mediaId === media.id && previous.hash === hash) return reusePrevious();
+    const reusable = matchesTimeline && previous?.inspectionVersion === 3 && previous.hash === hash
+      && previous.mediaId === media.id && previous.inspectionFingerprint === inspectionFingerprint;
+    const musicSources = musicPlan ? await prepareInspectionSources(musicPlan, directory, "music") : null;
+    const speechSources = speechPlan ? await prepareInspectionSources(speechPlan, directory, "speech") : null;
+    const reuseMusic = reusable && (musicPlan ? musicSources?.key && previous.musicAlignment?.key === musicSources.key : !previous.musicAlignment);
+    const reuseSpeech = reusable && (speechPlan ? speechSources?.key && previous.speechAlignment?.key === speechSources.key : !previous.speechAlignment);
+    if (reuseMusic && reuseSpeech) {
+      return reusePrevious();
     }
     await writeFile(file, data);
     const probe = await probeFile(file);
     if (!probe?.hasVideo || !probe.duration) throw bad("最终文件不可解码或没有视频");
+    let audioRanges = (musicPlan || speechPlan) && probe.hasAudio ? await readAudioIntervals(file) : undefined;
+    const ranges = audioRanges === undefined ? [] : audioRanges;
+    const musicAlignment = reuseMusic ? previous.musicAlignment : musicPlan && musicSources ? await inspectMusicAlignment(musicPlan, file, musicSources, ranges) : undefined;
+    const speechAlignment = reuseSpeech ? previous.speechAlignment : speechPlan && speechSources ? await inspectSpeechAlignment(speechPlan, file, probe.duration, speechSources, ranges) : undefined;
+    if (reusable) {
+      // 声音对齐诊断为补充信息，旧检测的人工验收、广告审片及其 analysisId 仍然有效。
+      return saveQuality({ ...previous, musicAlignment, speechAlignment });
+    }
     const findings: Finding[] = [];
     for (const clip of render.manifest?.clips ?? []) {
       for (const report of sourceReviews(s, clip.mediaId)) {
@@ -282,8 +327,14 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
       for (const match of audio.err.matchAll(/\[astats@level(\d+) @ [^\]]+\] RMS level dB:\s*(-?[\d.]+|-inf)/g)) {
         levels.set(Number(match[1]), match[2] === "-inf" ? null : Number(match[2]));
       }
+      for (const [index, [from, to]] of windows.entries()) {
+        if (levels.has(index)) continue;
+        if (audioRanges === undefined) audioRanges = await readAudioIntervals(file);
+        if (!audioRanges || audioRanges.some(range => range.start < to && range.end > from)) throw bad("接点电平不可读");
+        // 截尾或轨内空档确实没有音频帧，保留空电平，继续报告真实的缺音区间。
+        levels.set(index, null);
+      }
       for (const [index, t] of cuts.entries()) {
-        if (!levels.has(index * 2) || !levels.has(index * 2 + 1)) throw bad("接点电平不可读");
         const beforeDb = levels.get(index * 2)!;
         const afterDb = levels.get(index * 2 + 1)!;
         seams.push({ seconds: t, beforeDb, afterDb });
@@ -292,20 +343,17 @@ async function inspectFinalFile(s: Scope, id: string, fingerprint: string) {
         if (silences.some(gap => gap.end - gap.start >= 0.25 && gap.start < t + 0.25 && gap.end > t - 0.25)) findings.push({ id: `gap${index}`, seconds: t, severity: "review", message: "切点附近存在至少 0.25 秒低于 −50 dBFS 的区间，请确认是否有意静默" });
       }
     }
-    const latest = s.get("renders", id)!;
-    if (!latest || latest.mediaId !== media.id || s.get("media", media.id)?.storageKey !== media.storageKey
-      || sequenceFingerprint(s, render.sequenceId) !== fingerprint || JSON.stringify(latest.manifest) !== JSON.stringify(render.manifest)) throw conflict("检测期间方案、素材或验收已改变，请重新检测", "stale");
-    const quality = { analysisId: randomUUID(), inspectionVersion: 3, inspectionFingerprint, mediaId: media.id, hash, checkedAt: now(), status: findings.some(item => item.severity === "block") ? "fail" : "unverified", coverage: "decodeAndAudioSignals", duration, hasAudio: probe.hasAudio, video: probe.video, findings, seams, silences };
-    s.update("renders", id, { manifest: { ...latest.manifest, quality } });
-    return finalQualityView(s, s.get("renders", id)!);
+    const quality = { analysisId: randomUUID(), inspectionVersion: 3, inspectionFingerprint, mediaId: media.id, hash, checkedAt: now(), status: findings.some(item => item.severity === "block") ? "fail" : "unverified", coverage: "decodeAndAudioSignals", duration, hasAudio: probe.hasAudio, video: probe.video, findings, seams, silences, ...(musicAlignment && { musicAlignment }), ...(speechAlignment && { speechAlignment }) };
+    return saveQuality(quality);
   } finally { await rm(directory, { recursive: true, force: true }); }
 }
 
 export async function reviewFinalQuality(s: Scope, id: string, input: unknown, actor: string, authorization?: string) {
   const review = finalReviewSchema.parse(input);
-  const { render } = renderMedia(s, id);
+  const { render, media } = renderMedia(s, id);
   const quality = finalQualityView(s, render);
   if (!quality.analysisId || quality.analysisId !== review.analysisId || quality.status === "stale") throw conflict("检测记录已过期，请重新导出或检测", "stale");
+  if (quality.coverage === "fileIntegrity") throw conflict("请恢复导出的原文件并重新检测后再提交人工验收", "qc_blocked");
   const techniques = finalTechniquePlan(s, render.sequenceId);
   const plan = finalReviewPlan(s, render.sequenceId);
   const cutIds = review.cutReview.map(item => item.id);
@@ -329,22 +377,29 @@ export async function reviewFinalQuality(s: Scope, id: string, input: unknown, a
   }
   if (passing && techniques.some(item => !review.techniqueReview.some(check => check.shotId === item.shotId && check.id === item.id && check.verdict === "pass"))) throw bad("成片的剪辑、声音和叙事技法须按 techniques 计划完整看听并逐项记录，不能跳过检查或用提示词替代");
   if (passing && s.list("shots", { sequenceId: render.sequenceId }).some(needsLipSync) && review.checks.lipSync !== "pass") throw bad("成片包含画内对白或演唱，须完整看听并确认逐字口型同步；不能只以声音检查替代口型验收");
-  if (passing) assertSpeechExport(s, render.sequenceId);
   const sequence = s.get("sequences", render.sequenceId)!;
   if (passing && isAdSequence(sequence)) {
     if (!["emotion", "product", "composition", "color", "editing"].every(key => review.checks[key as keyof typeof review.checks] === "pass")) throw bad("广告成片须检查情绪表达、产品识别、构图、整片色调与剪辑节奏");
-    if (!quality.advertising || quality.advertising.fingerprint !== sequenceFingerprint(s, render.sequenceId)) throw bad("请先 inspectAdFilm 对实际导出文件完成广告表达审片");
-    if (!adReadiness(s, render.sequenceId).ready) throw bad("视觉样镜已过期或未定标，请先复核样镜");
+    if (!quality.advertising || quality.advertising.hash !== quality.hash || quality.advertising.fingerprint !== sequenceFingerprint(s, render.sequenceId)) throw bad("请先 inspectAdFilm 对实际导出文件完成广告表达审片");
   }
-  if (passing && quality.findings.some((item: Finding) => item.severity === "block")) throw conflict("最终文件或源素材存在阻断问题", "qc_blocked");
+  const blocked = quality.findings.some((item: Finding) => item.severity === "block");
+  if (passing && blocked) throw conflict("最终文件或源素材存在阻断问题", "qc_blocked");
   if (passing && quality.findings.some((item: Finding) => !review.acknowledgements.some(ack => ack.id === item.id))) throw bad("请逐项填写声音、时长或广告表达告警的复核依据；尚未解决则标记返修");
-  const status = passing ? "pass" : Object.values(review.checks).includes("fail") || review.cutReview.some(item => item.verdict === "fail") || review.techniqueReview.some(item => item.verdict === "revise") ? "fail" : "unverified";
+  const status = passing ? "pass" : blocked || Object.values(review.checks).includes("fail") || review.cutReview.some(item => item.verdict === "fail") || review.techniqueReview.some(item => item.verdict === "revise") ? "fail" : "unverified";
   if (passing) {
     const { requireNarrative } = await import("./narrativeGate.ts");
     const unchanged = await requireNarrative({ workspaceId: s.workspaceId, projectId: render.projectId, sequenceId: render.sequenceId });
     await unchanged();
-    const current = finalQualityView(s, s.get("renders", id)!);
-    if (current.analysisId !== review.analysisId || current.status === "stale") throw conflict("审查期间成片或源素材已改变，请重新检测", "stale");
+    const file = await storage.get(media.storageKey).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") throw conflict("找不到已检测的成片，请恢复文件后重新检测", "stale");
+      throw error;
+    });
+    const { render: current, media: currentMedia } = renderMedia(s, id);
+    if (currentMedia.id !== media.id || currentMedia.storageKey !== media.storageKey || currentMedia.hash !== media.hash || sha256(file) !== quality.hash || (media.hash && media.hash !== quality.hash)
+      || current.projectId !== render.projectId || current.sequenceId !== render.sequenceId || JSON.stringify(current.manifest) !== JSON.stringify(render.manifest)
+      || finalQualityView(s, current).status === "stale") throw conflict("审查期间成片、方案或验收记录已改变，请刷新并重新检测", "stale");
+    if (isAdSequence(sequence) && !adReadiness(s, render.sequenceId).ready) throw bad("视觉样镜已过期或未定标，请先复核样镜");
+    assertSpeechExport(s, render.sequenceId);
   }
   const { plan: reviewPlan, techniques: reviewTechniques, techniqueReviewRequired, speechReviewRequired, ...inspection } = quality;
   const next = { ...inspection, status, review: { ...review, actor, ...(authorization ? { authorization } : {}), reviewedAt: now() } };

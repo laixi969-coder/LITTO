@@ -13,7 +13,7 @@ export function shotDialogueMode(s: Scope, shot: Record<string, any>) {
   return speakers.size > 1 ? "post" : resolveDialogueMode(shot);
 }
 
-function speechMedia(s: Scope, projectId: string, line: DialogueLine) {
+export function speechMedia(s: Scope, projectId: string, line: DialogueLine) {
   if (!line.audio) return null;
   const media = s.get("media", line.audio.mediaId);
   if (!media || media.projectId !== projectId || media.source !== "speechReference" || !media.mime.startsWith("audio/")

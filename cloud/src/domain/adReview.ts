@@ -79,6 +79,7 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
       if (render.manifest?.options?.draft) throw conflict("草稿导出不进入广告审片；需要验收请重新导出并省略 options.draft", "draft_render");
       const quality = finalQualityView(s, render);
       if (!quality.analysisId || quality.status === "stale") throw conflict("请先导出当前剪辑并 inspectFinal 检测文件和声音", "stale");
+      if (quality.coverage === "fileIntegrity") throw conflict("请恢复导出的原文件并重新检测后再审片", "qc_blocked");
       mediaId = render.mediaId; fingerprint = sequenceFingerprint(s, sequence.id);
     }
   }
@@ -86,6 +87,7 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
   if (!media || media.projectId !== projectId) throw notFound("project media");
   const sampled = await sampleAdMedia(s, mediaId, render ? (render.manifest?.clips ?? []).map((clip: any) => clip.start) : [], operation === "inspectAdFilm" ? "targeted" : "even", signal);
   signal?.throwIfAborted();
+  if (render && (sampled.hash !== render.manifest.quality.hash || (media.hash && sampled.hash !== media.hash))) throw conflict("本次抽帧的成片与已检测文件不一致，请恢复原文件并重新检测", "stale");
   if (operation === "inspectAdPilot" && !input.reconsider) {
     const currentShot = s.get("shots", shot!.id);
     const currentFrame = s.get("keyframes", frame!.id);
@@ -156,6 +158,8 @@ export async function inspectAd(s: Scope, projectId: string, operation: "analyze
   const current = s.get("renders", render!.id);
   if (current?.mediaId !== mediaId || current?.manifest?.quality?.analysisId !== render!.manifest.quality.analysisId) throw conflict("成片检测已改变", "stale");
   if (current.manifest.quality.advertising?.jobId === result.jobId && current.manifest.quality.advertising.fingerprint === fingerprint) return finalQualityView(s, current);
+  if (JSON.stringify(current.manifest.quality.review) !== JSON.stringify(render!.manifest.quality.review)
+    || JSON.stringify(current.manifest.quality.advertising) !== JSON.stringify(render!.manifest.quality.advertising)) throw conflict("审片期间已有新的验收或广告审片记录，请刷新后复核", "stale");
   const checks = creativeSchema.parse(parsed);
   const findings = current.manifest.quality.findings.filter((finding: any) => !String(finding.id).startsWith("adReview:"));
   for (const key of creativeKeys) if (checks[key].verdict !== "pass") findings.push({ id: `adReview:${key}`, severity: "review", seconds: sampled.timestamps[checks[key].evidence.find(item => item.frameIndex < outputCount)!.frameIndex], message: `${key}：${checks[key].evidence.map(item => item.observation).join("；")}；${checks[key].repair}` });
